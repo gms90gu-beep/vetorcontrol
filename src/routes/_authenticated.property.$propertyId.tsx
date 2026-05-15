@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/property/$propertyId")({
 });
 
 function PropertyVisitPage() {
-  const { propertyId } = useParams({ from: "/_authenticated/property.$propertyId" });
+  const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
   const [status, setStatus] = useState<any>("visited");
   const [activity, setActivity] = useState<any>("routine");
@@ -36,21 +36,35 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [propertyId]);
 
   async function fetchData() {
+    setIsLoading(true);
+    setError(null);
     try {
+      if (!propertyId) {
+        setError("ID do imóvel inválido.");
+        return;
+      }
+      
       // Get property details
-      const { data: propData } = await supabase
+      const { data: propData, error: propError } = await supabase
         .from("properties")
         .select("*")
         .eq("id", propertyId)
-        .single();
+        .maybeSingle();
       
-      if (propData) setProperty(propData);
+      if (propError) throw propError;
+      if (!propData) {
+        setError("Imóvel não encontrado.");
+        return;
+      }
+      setProperty(propData);
 
       // Get current active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -62,12 +76,15 @@ function PropertyVisitPage() {
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
         if (session) setActiveSession(session);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data:", error);
+      setError("Falha ao carregar dados do imóvel.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -147,6 +164,44 @@ function PropertyVisitPage() {
   const updateDeposit = (id: number, field: string, value: any) => {
     setDeposits(deposits.map(d => d.id === id ? { ...d, [field]: value } : d));
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4 animate-in fade-in duration-500">
+        <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Carregando dados do imóvel...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6 animate-in fade-in duration-500">
+        <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
+          <AlertCircle className="h-10 w-10 text-red-500" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error}</h3>
+          <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações deste imóvel.</p>
+        </div>
+        <div className="flex gap-3 w-full max-w-xs">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate({ to: "/field-work-list" })}
+            className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+          >
+            Voltar
+          </Button>
+          <Button 
+            onClick={fetchData}
+            className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+          >
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
