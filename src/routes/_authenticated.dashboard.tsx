@@ -137,7 +137,7 @@ function DashboardPage() {
         <div className="flex gap-2">
           <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
             <Calendar className="mr-1 h-3.5 w-3.5" />
-            {currentInfo.date}
+            {new Date().toLocaleDateString('pt-BR')}
           </Badge>
         </div>
       </div>
@@ -151,10 +151,10 @@ function DashboardPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Status Atual</p>
-              <CardTitle className="text-2xl font-black">{currentInfo.block}</CardTitle>
+              <CardTitle className="text-2xl font-black">{activeSession ? `Quarteirão ${activeSession.block_number}` : "Nenhum trabalho iniciado"}</CardTitle>
             </div>
             <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
-              {currentInfo.cycle}
+              {activeCycle ? activeCycle.name : "Ciclo --"}
             </div>
           </div>
         </CardHeader>
