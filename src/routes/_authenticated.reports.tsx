@@ -212,24 +212,26 @@ function ReportsPage() {
           <Card className="border-none shadow-md rounded-3xl p-4">
             <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Distribuição de Depósitos</h4>
             <div className="h-[200px] w-full flex items-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={depositData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {depositData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <ClientOnly fallback={<div className="h-full w-1/2 bg-slate-50 rounded-full animate-pulse" />}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={depositData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {depositData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ClientOnly>
               <div className="w-1/2 space-y-1">
                 {depositData.map((item, i) => (
                   <div key={i} className="flex items-center gap-2">
