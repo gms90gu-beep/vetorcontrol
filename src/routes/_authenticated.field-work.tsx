@@ -31,15 +31,9 @@ export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
-const BLOCKS = [
-  { id: "1", number: "3", street: "Rua das Flores", properties: 45, pending: 12, lastVisit: "10/05/2026" },
-  { id: "2", number: "7", street: "Rua Central", properties: 32, pending: 5, lastVisit: "12/05/2026" },
-  { id: "3", number: "12", street: "Av. Brasil", properties: 58, pending: 20, lastVisit: "08/05/2026" },
-  { id: "4", number: "15", street: "Rua das Palmeiras", properties: 28, pending: 3, lastVisit: "14/05/2026" },
-];
-
 function FieldWorkPage() {
   const [date, setDate] = useState<Date>(new Date());
+  const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [selectedCycleId, setSelectedCycleId] = useState<string>("");
   const [selectedWeekId, setSelectedWeekId] = useState<string>("");
@@ -56,6 +50,7 @@ function FieldWorkPage() {
   async function fetchInitialData() {
     setIsLoading(true);
     try {
+      // Fetch cycles
       const { data: cyclesData } = await supabase
         .from("cycles")
         .select("*")
@@ -64,15 +59,28 @@ function FieldWorkPage() {
       
       if (cyclesData) {
         setCycles(cyclesData);
-        // Default to active cycle if exists
         const activeCycle = cyclesData.find(c => c.status === "in_progress") || cyclesData[0];
         if (activeCycle) {
           setSelectedCycleId(activeCycle.id);
           fetchWeeks(activeCycle.id);
         }
       }
+
+      // Fetch blocks
+      const { data: blocksData } = await supabase
+        .from("blocks")
+        .select(`
+          *,
+          subareas (
+            name
+          )
+        `)
+        .order("number", { ascending: true });
+      
+      if (blocksData) setBlocks(blocksData);
+
     } catch (error) {
-      console.error("Error fetching cycles:", error);
+      console.error("Error fetching initial data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +96,6 @@ function FieldWorkPage() {
       
       if (weeksData) {
         setWeeks(weeksData);
-        // Default to first week
         if (weeksData.length > 0) {
           setSelectedWeekId(weeksData[0].id);
         }
@@ -98,11 +105,10 @@ function FieldWorkPage() {
     }
   }
 
-  const selectedBlock = BLOCKS.find(b => b.id === selectedBlockId);
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
-  const filteredBlocks = BLOCKS.filter(b => 
-    b.number.includes(searchQuery) || 
-    b.street.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredBlocks = blocks.filter(b => 
+    b.number.includes(searchQuery)
   );
 
   const handleStartWork = async () => {
@@ -120,8 +126,8 @@ function FieldWorkPage() {
         cycle_id: selectedCycleId,
         week_id: selectedWeekId,
         block_number: selectedBlock?.number || "",
-        street_name: selectedBlock?.street || "",
-        property_count: selectedBlock?.properties || 0,
+        street_name: selectedBlock?.subareas?.name || "Rua",
+        property_count: selectedBlock?.total_properties || 0,
         session_date: date.toISOString().split('T')[0],
         status: "in_progress"
       });
@@ -142,7 +148,7 @@ function FieldWorkPage() {
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <Building2 className="h-32 w-32 text-white" />
         </div>
-        <h2 className="text-3xl font-black tracking-tight text-white mb-2">Início de Trabalho</h2>
+        <h2 className="text-3xl font-black tracking-tight text-white mb-2 underline underline-offset-8 decoration-blue-500/30">Início de Trabalho</h2>
         <p className="text-slate-400 font-medium">Configure sua jornada diária</p>
       </div>
 
@@ -224,7 +230,7 @@ function FieldWorkPage() {
           <div className="relative group">
             <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
             <Input 
-              placeholder="Buscar quarteirão ou rua..." 
+              placeholder="Buscar quarteirão pelo número..." 
               className="pl-12 h-14 rounded-2xl border-none bg-white shadow-md text-base font-bold focus-visible:ring-blue-500/20"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -232,7 +238,12 @@ function FieldWorkPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {filteredBlocks.map((block) => (
+            {isLoading ? (
+               <div className="flex flex-col items-center justify-center py-10 gap-3">
+                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
+              </div>
+            ) : filteredBlocks.map((block) => (
               <Card 
                 key={block.id}
                 className={cn(
@@ -247,16 +258,18 @@ function FieldWorkPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className={cn(
-                        "h-14 w-14 rounded-2xl flex items-center justify-center transition-colors",
+                        "h-14 w-14 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
                         selectedBlockId === block.id ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"
                       )}>
                         <span className="text-xl font-black">{block.number}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-lg font-black tracking-tight text-slate-800">{block.street}</span>
+                        <span className="text-lg font-black tracking-tight text-slate-800">
+                          {block.subareas?.name || "Sem Rua"}
+                        </span>
                         <div className="flex items-center gap-2">
                           <Users className="h-3 w-3 text-slate-400" />
-                          <span className="text-xs font-bold text-slate-500">{block.properties} imóveis</span>
+                          <span className="text-xs font-bold text-slate-500">{block.total_properties || 0} imóveis</span>
                         </div>
                       </div>
                     </div>
@@ -285,20 +298,25 @@ function FieldWorkPage() {
               <CardContent className="grid grid-cols-2 gap-4 p-5">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Imóveis</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.properties}</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.total_properties || 0}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pendentes</p>
-                  <p className="text-xl font-black text-red-500">{selectedBlock.pending}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
+                  <p className={cn(
+                    "text-xl font-black uppercase tracking-tighter",
+                    selectedBlock.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
+                  )}>
+                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última Visita</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.lastVisit}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bairro/Subárea</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.subareas?.name || "--"}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Atual</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>
                   <p className="text-xl font-black text-blue-600">
-                    {cycles.find(c => c.id === selectedCycleId)?.number || "03/2026"}
+                    {cycles.find(c => c.id === selectedCycleId)?.number || "--"}
                   </p>
                 </div>
               </CardContent>
@@ -323,4 +341,3 @@ function FieldWorkPage() {
     </div>
   );
 }
-

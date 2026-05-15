@@ -17,7 +17,8 @@ import {
   AlertCircle,
   RefreshCw,
   Search,
-  Plus
+  Plus,
+  Target
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -69,16 +70,18 @@ function DashboardPage() {
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [coverageData, setCoverageData] = useState<any>(null);
+  const [blockProgress, setBlockProgress] = useState(0);
 
   const [stats, setStats] = useState({
-    worked: 142,
-    visited: 158,
-    closed: 12,
-    refused: 4,
-    eliminated: 85,
-    treated: 42,
-    focus: 3,
-    progress: 65,
+    worked: 0,
+    visited: 0,
+    closed: 0,
+    refused: 0,
+    eliminated: 0,
+    treated: 0,
+    focus: 0,
+    progress: 0,
   });
 
   useEffect(() => {
@@ -87,28 +90,76 @@ function DashboardPage() {
 
   async function fetchCurrentStatus() {
     try {
-      // Get current cycle
-      const { data: cycles } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Get current cycle
+      const { data: cycle } = await supabase
         .from("cycles")
         .select("*")
         .eq("status", "in_progress")
-        .single();
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
-      if (cycles) setActiveCycle(cycles);
-
-      // Get current session
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: session } = await supabase
-          .from("field_work_sessions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("status", "in_progress")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
+      if (cycle) {
+        setActiveCycle(cycle);
         
-        if (session) setActiveSession(session);
+        // 2. Get coverage for this cycle
+        const { data: coverage } = await supabase
+          .from("cycle_coverage_summary")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .maybeSingle();
+        
+        if (coverage) setCoverageData(coverage);
+
+        // 3. Get visit stats for this cycle
+        const { data: visits } = await supabase
+          .from("visits")
+          .select("id, status")
+          .eq("cycle_id", cycle.id);
+        
+        if (visits) {
+          setStats(prev => ({
+            ...prev,
+            worked: visits.length,
+            closed: visits.filter(v => v.status === 'closed').length,
+            refused: visits.filter(v => v.status === 'refused').length,
+          }));
+        }
+      }
+
+      // 4. Get current session
+      const { data: session } = await supabase
+        .from("field_work_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (session) {
+        setActiveSession(session);
+        
+        // Calculate block progress
+        const { data: blockProps } = await supabase
+          .from("properties")
+          .select("id")
+          .eq("block_number", session.block_number);
+        
+        if (blockProps && blockProps.length > 0 && session.cycle_id) {
+          const { data: sessionVisits } = await supabase
+            .from("visits")
+            .select("id")
+            .eq("cycle_id", session.cycle_id)
+            .in("property_id", blockProps.map(p => p.id));
+          
+          if (sessionVisits) {
+            setBlockProgress(Math.round((sessionVisits.length / blockProps.length) * 100));
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching status:", error);
@@ -122,6 +173,7 @@ function DashboardPage() {
     setTimeout(() => {
       setIsSyncing(false);
       setLastSync(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      fetchCurrentStatus();
       toast.success("Dados sincronizados com sucesso!");
     }, 2000);
   };
@@ -132,7 +184,7 @@ function DashboardPage() {
       <div className="flex items-center justify-between px-1">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-slate-800">VetorControl</h2>
-          <p className="text-sm font-medium text-slate-500">Olá, Agente</p>
+          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest font-mono">Unidade Operacional</p>
         </div>
         <div className="flex gap-2">
           <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
@@ -142,57 +194,81 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Progress Card */}
-      <Card className="border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-primary-foreground overflow-hidden relative rounded-[2rem]">
-        <div className="absolute top-0 right-0 p-8 opacity-10">
+      {/* Cycle Coverage Card */}
+      <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden relative group">
+        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
           <TrendingUp className="h-32 w-32" />
         </div>
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Status Atual</p>
-              <CardTitle className="text-2xl font-black">{activeSession ? `Quarteirão ${activeSession.block_number}` : "Nenhum trabalho iniciado"}</CardTitle>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Cobertura do Ciclo</p>
+              <CardTitle className="text-3xl font-black tracking-tighter">
+                {coverageData ? `${coverageData.coverage_percentage}%` : "0%"}
+              </CardTitle>
             </div>
-            <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
-              {activeCycle ? activeCycle.name : "Ciclo --"}
+            <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
+              {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold opacity-90">{stats.progress}% concluído</span>
-            <span className="text-sm font-bold opacity-90">{stats.worked}/218 imóveis</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Progresso Geral</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              {coverageData ? `${coverageData.worked_properties}/${coverageData.total_properties}` : "0/0"} imóveis
+            </span>
           </div>
-          <Progress value={stats.progress} className="h-2.5 bg-white/20" />
+          <Progress value={coverageData?.coverage_percentage || 0} className="h-2 bg-white/10" />
         </CardContent>
       </Card>
+
+      {/* Active Session Progress */}
+      {activeSession && (
+        <Card className="border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-primary-foreground overflow-hidden relative rounded-[2rem] animate-in slide-in-from-top-4 duration-500">
+          <div className="absolute top-0 right-0 p-6 opacity-20">
+            <Target className="h-20 w-20" />
+          </div>
+          <CardHeader className="pb-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Trabalho em Andamento</p>
+            <CardTitle className="text-xl font-black">Quarteirão {activeSession.block_number}</CardTitle>
+          </CardHeader>
+          <CardContent>
+             <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold opacity-90">{blockProgress}% do quarteirão</span>
+              <span className="text-xs font-bold opacity-70 underline underline-offset-4 decoration-white/30">{activeSession.street_name}</span>
+            </div>
+            <Progress value={blockProgress} className="h-2 bg-white/20" />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Grid Actions */}
       <div className="grid grid-cols-2 gap-4">
         <ActionCard 
           title="Diário" 
-          description="Iniciar atividades do dia" 
+          description="Iniciar jornada" 
           icon={CalendarCheck} 
-          color="bg-blue-500 shadow-blue-200"
+          color="bg-emerald-500 shadow-emerald-200"
           to="/field-work"
         />
         <ActionCard 
           title="RG" 
-          description="Registro Geográfico" 
+          description="Cadastro de imóveis" 
           icon={MapPin} 
-          color="bg-emerald-500 shadow-emerald-200"
+          color="bg-blue-500 shadow-blue-200"
           to="/rg"
         />
         <ActionCard 
           title="Boletim" 
-          description="Resumo semanal automático" 
+          description="Resumo operacional" 
           icon={BarChart3} 
           color="bg-indigo-600 shadow-indigo-200"
           to="/reports"
         />
         <ActionCard 
           title="Pendências" 
-          description="Imóveis fechados" 
+          description="Recuperar visitas" 
           icon={AlertCircle} 
           color="bg-red-500 shadow-red-200"
           to="/pending"
@@ -200,11 +276,11 @@ function DashboardPage() {
         <div className="col-span-2">
           <ActionCard 
             title="Sincronizar" 
-            description={isSyncing ? "Sincronizando..." : `Última sync: ${lastSync}`}
-            icon={isSyncing ? RefreshCw : RefreshCw} 
+            description={isSyncing ? "Enviando dados..." : `Sync: ${lastSync}`}
+            icon={RefreshCw} 
             color="bg-slate-800 shadow-slate-200"
             onClick={handleSync}
-            className={isSyncing ? "animate-pulse" : ""}
+            className={isSyncing ? "animate-spin duration-[3s]" : ""}
           />
         </div>
       </div>
@@ -212,38 +288,20 @@ function DashboardPage() {
       {/* Quick Summary Section */}
       <div className="pt-2">
         <div className="flex items-center justify-between mb-4 px-1">
-          <h3 className="text-lg font-bold text-slate-800">Resumo do Ciclo</h3>
-          <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700 p-0 h-auto">Ver tudo</Button>
+          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Produção do Ciclo</h3>
+          <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 p-0 h-auto">Ver Detalhes</Button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trabalhados</p>
-            <p className="text-2xl font-black text-slate-800">{stats.worked}</p>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Trabalhados</p>
+            <p className="text-3xl font-black text-slate-800">{stats.worked}</p>
           </div>
-          <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tratados</p>
-            <p className="text-2xl font-black text-blue-600">{stats.treated}</p>
+          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Fechados</p>
+            <p className="text-3xl font-black text-blue-600">{stats.closed}</p>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, color, isFocus }: any) {
-  return (
-    <Card className={`border-none shadow-lg overflow-hidden transition-all hover:shadow-xl active:scale-95 cursor-pointer group ${isFocus ? 'bg-red-50' : 'bg-card'}`}>
-      <CardHeader className="p-5 pb-0 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">
-          {title}
-        </CardTitle>
-        <div className={`p-2 rounded-xl transition-colors ${isFocus ? 'bg-red-100/50' : 'bg-accent/50'} group-hover:bg-accent`}>
-          <Icon className={`h-4 w-4 ${color}`} />
-        </div>
-      </CardHeader>
-      <CardContent className="p-5 pt-1">
-        <div className="text-3xl font-black tracking-tight">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

@@ -97,9 +97,13 @@ function FieldWorkListPage() {
     }
   };
 
-  const filteredProperties = properties.filter(p => 
-    p.number.includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase())
-  );
+  const filteredProperties = properties.filter(p => {
+    const matchesSearch = p.number.includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+    if (filter === "all") return matchesSearch;
+    if (filter === "completed") return matchesSearch && (p.status === "visited" || p.status === "closed" || p.status === "refused" || p.status === "abandoned");
+    if (filter === "pending") return matchesSearch && (!p.status || p.status === "not_visited");
+    return matchesSearch;
+  });
 
   const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
   const progressPercent = properties.length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
