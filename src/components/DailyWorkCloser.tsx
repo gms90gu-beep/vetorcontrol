@@ -99,7 +99,7 @@ export function DailyWorkCloser() {
             eliminated: 18, // Mocked production stats as specified in example
             treated: 7,
             focus: 1,
-            pending: todayVisits.filter(v => v.status === 'recuperada').length
+            pending: todayVisits.filter(v => v.status === 'refused').length // Simplified for logic check, 'refused' is closest to pending in this context
           });
         }
       }
