@@ -31,15 +31,9 @@ export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
-const BLOCKS = [
-  { id: "1", number: "3", street: "Rua das Flores", properties: 45, pending: 12, lastVisit: "10/05/2026" },
-  { id: "2", number: "7", street: "Rua Central", properties: 32, pending: 5, lastVisit: "12/05/2026" },
-  { id: "3", number: "12", street: "Av. Brasil", properties: 58, pending: 20, lastVisit: "08/05/2026" },
-  { id: "4", number: "15", street: "Rua das Palmeiras", properties: 28, pending: 3, lastVisit: "14/05/2026" },
-];
-
 function FieldWorkPage() {
   const [date, setDate] = useState<Date>(new Date());
+  const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [selectedCycleId, setSelectedCycleId] = useState<string>("");
   const [selectedWeekId, setSelectedWeekId] = useState<string>("");
@@ -56,6 +50,7 @@ function FieldWorkPage() {
   async function fetchInitialData() {
     setIsLoading(true);
     try {
+      // Fetch cycles
       const { data: cyclesData } = await supabase
         .from("cycles")
         .select("*")
@@ -64,15 +59,31 @@ function FieldWorkPage() {
       
       if (cyclesData) {
         setCycles(cyclesData);
-        // Default to active cycle if exists
         const activeCycle = cyclesData.find(c => c.status === "in_progress") || cyclesData[0];
         if (activeCycle) {
           setSelectedCycleId(activeCycle.id);
           fetchWeeks(activeCycle.id);
         }
       }
+
+      // Fetch blocks
+      const { data: blocksData } = await supabase
+        .from("blocks")
+        .select(`
+          *,
+          subareas (
+            name,
+            localities (
+              name
+            )
+          )
+        `)
+        .order("number", { ascending: true });
+      
+      if (blocksData) setBlocks(blocksData);
+
     } catch (error) {
-      console.error("Error fetching cycles:", error);
+      console.error("Error fetching initial data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +99,6 @@ function FieldWorkPage() {
       
       if (weeksData) {
         setWeeks(weeksData);
-        // Default to first week
         if (weeksData.length > 0) {
           setSelectedWeekId(weeksData[0].id);
         }
@@ -98,11 +108,10 @@ function FieldWorkPage() {
     }
   }
 
-  const selectedBlock = BLOCKS.find(b => b.id === selectedBlockId);
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
-  const filteredBlocks = BLOCKS.filter(b => 
-    b.number.includes(searchQuery) || 
-    b.street.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredBlocks = blocks.filter(b => 
+    b.number.includes(searchQuery)
   );
 
   const handleStartWork = async () => {
