@@ -4,123 +4,208 @@ import {
   Search, 
   MapPin, 
   ChevronRight, 
-  Filter,
-  Home,
-  Store,
-  Warehouse,
-  Plus,
+  Calendar as CalendarIcon,
   CheckCircle2,
-  XCircle,
-  AlertCircle
+  Users,
+  Building2,
+  Clock,
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
+const BLOCKS = [
+  { id: "1", number: "3", street: "Rua das Flores", properties: 45, pending: 12, lastVisit: "10/05/2026" },
+  { id: "2", number: "7", street: "Rua Central", properties: 32, pending: 5, lastVisit: "12/05/2026" },
+  { id: "3", number: "12", street: "Av. Brasil", properties: 58, pending: 20, lastVisit: "08/05/2026" },
+  { id: "4", number: "15", street: "Rua das Palmeiras", properties: 28, pending: 3, lastVisit: "14/05/2026" },
+];
+
 function FieldWorkPage() {
+  const [date, setDate] = useState<Date>(new Date());
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState("all");
   const navigate = useNavigate();
 
-  const properties = [
-    { id: 1, number: "142", street: "Rua das Palmeiras", type: "residence", status: "visited", lastVisit: "Ontem" },
-    { id: 2, number: "150", street: "Rua das Palmeiras", type: "commerce", status: "not_visited", lastVisit: "15 dias" },
-    { id: 3, number: "158", street: "Rua das Palmeiras", type: "vacant_lot", status: "closed", lastVisit: "7 dias" },
-    { id: 4, number: "164", street: "Rua das Palmeiras", type: "residence", status: "refused", lastVisit: "12 dias" },
-    { id: 5, number: "172", street: "Rua das Palmeiras", type: "strategic_point", status: "not_visited", lastVisit: "2 dias" },
-  ];
+  const selectedBlock = BLOCKS.find(b => b.id === selectedBlockId);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "visited":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"><CheckCircle2 className="w-3 h-3 mr-1" /> Visitado</Badge>;
-      case "closed":
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"><XCircle className="w-3 h-3 mr-1" /> Fechado</Badge>;
-      case "refused":
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"><AlertCircle className="w-3 h-3 mr-1" /> Recusado</Badge>;
-      default:
-        return <Badge variant="outline" className="border-dashed text-muted-foreground rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Não Visitado</Badge>;
-    }
-  };
+  const filteredBlocks = BLOCKS.filter(b => 
+    b.number.includes(searchQuery) || 
+    b.street.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "residence": return <Home className="w-5 h-5 text-blue-500" />;
-      case "commerce": return <Store className="w-5 h-5 text-purple-500" />;
-      case "vacant_lot": return <MapPin className="w-5 h-5 text-amber-600" />;
-      case "strategic_point": return <Warehouse className="w-5 h-5 text-emerald-600" />;
-      default: return <Home className="w-5 h-5" />;
+  const handleStartWork = () => {
+    if (!selectedBlockId) {
+      toast.error("Por favor, selecione um quarteirão");
+      return;
     }
+    
+    toast.success("Trabalho iniciado com sucesso!");
+    // In a real app, we would save the session to Supabase here
+    navigate({ to: `/dashboard` }); // Redirect to properties list (which we'll refine next)
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black tracking-tighter text-primary">Trabalho de Campo</h2>
-        <p className="text-muted-foreground font-medium">Quarteirão 042 • Rua das Palmeiras</p>
+    <div className="pb-24 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header */}
+      <div className="bg-slate-900 -mx-4 -mt-4 p-8 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-10">
+          <Building2 className="h-32 w-32 text-white" />
+        </div>
+        <h2 className="text-3xl font-black tracking-tight text-white mb-2">Início de Trabalho</h2>
+        <p className="text-slate-400 font-medium">Configure sua jornada diária</p>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="relative group">
-          <Search className="absolute left-4 top-4 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="Buscar imóvel..." 
-            className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base font-medium shadow-inner"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <div className="space-y-6 px-1">
+        {/* Date Selection */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Data da Atividade</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full h-16 rounded-2xl border-none bg-white shadow-md text-left font-bold text-lg justify-start px-5 active:scale-95 transition-all",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-3 h-6 w-6 text-blue-500" />
+                {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 rounded-3xl overflow-hidden border-none shadow-2xl" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(d) => d && setDate(d)}
+                initialFocus
+                locale={ptBR}
+                className="bg-white"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
-        <Tabs defaultValue="all" className="w-full" onValueChange={setFilter}>
-          <TabsList className="w-full h-12 bg-accent/30 rounded-2xl p-1">
-            <TabsTrigger value="all" className="flex-1 rounded-xl font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-md">Todos</TabsTrigger>
-            <TabsTrigger value="pending" className="flex-1 rounded-xl font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-md">Pendentes</TabsTrigger>
-            <TabsTrigger value="completed" className="flex-1 rounded-xl font-bold text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-md">Concluídos</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+        {/* Block Selection */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between ml-1">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Seleção do Quarteirão</label>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 font-bold rounded-lg border-none">
+              {filteredBlocks.length} disponíveis
+            </Badge>
+          </div>
 
-      <div className="space-y-3">
-        {properties.map((prop) => (
-          <Card 
-            key={prop.id} 
-            className="border-none shadow-lg hover:shadow-xl active:scale-[0.98] transition-all cursor-pointer rounded-[2rem] overflow-hidden group"
-            onClick={() => navigate({ to: `/property/${prop.id}` })}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-accent/50 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    {getTypeIcon(prop.type)}
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-black tracking-tight">{prop.number}</span>
-                      {getStatusBadge(prop.status)}
+          <div className="relative group">
+            <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+            <Input 
+              placeholder="Buscar quarteirão ou rua..." 
+              className="pl-12 h-14 rounded-2xl border-none bg-white shadow-md text-base font-bold focus-visible:ring-blue-500/20"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            {filteredBlocks.map((block) => (
+              <Card 
+                key={block.id}
+                className={cn(
+                  "border-2 transition-all duration-300 rounded-3xl cursor-pointer active:scale-95",
+                  selectedBlockId === block.id 
+                    ? "border-blue-500 bg-blue-50 shadow-blue-100" 
+                    : "border-transparent bg-white shadow-md hover:shadow-lg"
+                )}
+                onClick={() => setSelectedBlockId(block.id)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "h-14 w-14 rounded-2xl flex items-center justify-center transition-colors",
+                        selectedBlockId === block.id ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"
+                      )}>
+                        <span className="text-xl font-black">{block.number}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-lg font-black tracking-tight text-slate-800">{block.street}</span>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3 w-3 text-slate-400" />
+                          <span className="text-xs font-bold text-slate-500">{block.properties} imóveis</span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                      {prop.street}
-                    </span>
+                    {selectedBlockId === block.id && (
+                      <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="h-10 w-10 rounded-full bg-accent/30 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-                  <ChevronRight className="w-5 h-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
 
-      <Button className="fixed bottom-8 right-8 h-16 w-16 rounded-3xl shadow-2xl shadow-primary/40 p-0 active:scale-90 transition-all z-40">
-        <Plus className="h-8 w-8" />
-      </Button>
+        {/* Summary (Conditional) */}
+        {selectedBlock && (
+          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+            <Card className="border-none shadow-xl bg-slate-50 rounded-[2.5rem] overflow-hidden">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Resumo do Quarteirão {selectedBlock.number}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4 p-5">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Imóveis</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.properties}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pendentes</p>
+                  <p className="text-xl font-black text-red-500">{selectedBlock.pending}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última Visita</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.lastVisit}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Atual</p>
+                  <p className="text-xl font-black text-blue-600">03/2026</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Start Button */}
+        <Button 
+          className={cn(
+            "w-full h-20 rounded-[2.5rem] text-xl font-black shadow-2xl transition-all gap-3 active:scale-95 mt-4",
+            selectedBlockId 
+              ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200" 
+              : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+          )}
+          onClick={handleStartWork}
+        >
+          Iniciar Trabalho
+          <ArrowRight className="h-6 w-6" />
+        </Button>
+      </div>
     </div>
   );
 }
+
