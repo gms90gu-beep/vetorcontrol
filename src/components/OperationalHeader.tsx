@@ -32,6 +32,7 @@ export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
@@ -57,7 +58,21 @@ export function OperationalHeader() {
         setWorkStatus(agentData.work_status || 'available');
       }
 
-      // 2. Get current cycle
+      // 2. Get active session
+      const { data: session } = await supabase
+        .from("field_work_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (session) {
+        setActiveSession(session);
+      }
+
+      // 3. Get current cycle
       const { data: cycle } = await supabase
         .from("cycles")
         .select("*")
@@ -69,7 +84,7 @@ export function OperationalHeader() {
       if (cycle) {
         setActiveCycle(cycle);
 
-        // 3. Get current week
+        // 4. Get current week
         const { data: week } = await supabase
           .from("weeks")
           .select("*")
@@ -80,21 +95,21 @@ export function OperationalHeader() {
         
         if (week) setActiveWeek(week);
 
-        // 4. Get today's stats
+        // 5. Get today's stats
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         
         const { data: todayVisits } = await supabase
           .from("visits")
           .select("id, status")
-          .eq("cycle_id", cycle.id)
+          .eq("agent_id", user.id)
           .gte("visit_date", startOfDay.toISOString());
         
         if (todayVisits) {
           setTodayStats({
             worked: todayVisits.length,
             pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
-            progress: 78 // Mocked as requested in example
+            progress: 78 // Placeholder progress
           });
         }
       }
@@ -138,8 +153,13 @@ export function OperationalHeader() {
                   Ciclo {activeCycle?.number || "-"}/{activeCycle?.year || "-"}
                 </Badge>
                 <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[9px] uppercase tracking-widest h-5">
-                  Semana {activeWeek?.number || "-"}
+                    Semana {activeWeek?.number || "-"}
                 </Badge>
+                {activeSession && (
+                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 font-bold text-[9px] uppercase tracking-widest h-5 bg-blue-500/5">
+                    Q: {activeSession.block_number} • {activeSession.street_name}
+                  </Badge>
+                )}
               </div>
             </div>
 
