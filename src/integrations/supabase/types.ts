@@ -179,7 +179,7 @@ export type Database = {
       }
       properties: {
         Row: {
-          block_id: string
+          block_id: string | null
           block_number: string | null
           complement: string | null
           container_count: number | null
@@ -195,13 +195,13 @@ export type Database = {
           observations: string | null
           reference: string | null
           status: Database["public"]["Enums"]["property_status"] | null
-          street_id: string
+          street_id: string | null
           street_name: string | null
           type: Database["public"]["Enums"]["property_type"]
           user_id: string | null
         }
         Insert: {
-          block_id: string
+          block_id?: string | null
           block_number?: string | null
           complement?: string | null
           container_count?: number | null
@@ -217,13 +217,13 @@ export type Database = {
           observations?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["property_status"] | null
-          street_id: string
+          street_id?: string | null
           street_name?: string | null
           type?: Database["public"]["Enums"]["property_type"]
           user_id?: string | null
         }
         Update: {
-          block_id?: string
+          block_id?: string | null
           block_number?: string | null
           complement?: string | null
           container_count?: number | null
@@ -239,7 +239,7 @@ export type Database = {
           observations?: string | null
           reference?: string | null
           status?: Database["public"]["Enums"]["property_status"] | null
-          street_id?: string
+          street_id?: string | null
           street_name?: string | null
           type?: Database["public"]["Enums"]["property_type"]
           user_id?: string | null
