@@ -41,10 +41,10 @@ function SignupPage() {
       
       if (data.user && data.session) {
         toast.success("Conta criada com sucesso!");
-        navigate({ to: "/dashboard" as any });
+        navigate({ to: "/dashboard" });
       } else {
         toast.success("Verifique seu e-mail para confirmar o cadastro.");
-        navigate({ to: "/login" as any });
+        navigate({ to: "/login" });
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar conta");
@@ -123,7 +123,7 @@ function SignupPage() {
         </form>
         <CardFooter className="flex justify-center pb-10">
           <p className="text-sm text-muted-foreground font-medium">
-            Já tem uma conta? <Button variant="link" onClick={() => navigate({ to: "/login" as any })} className="p-0 h-auto text-primary font-bold hover:underline">Entrar</Button>
+            Já tem uma conta? <Button variant="link" onClick={() => navigate({ to: "/login" })} className="p-0 h-auto text-primary font-bold hover:underline">Entrar</Button>
           </p>
         </CardFooter>
       </Card>
