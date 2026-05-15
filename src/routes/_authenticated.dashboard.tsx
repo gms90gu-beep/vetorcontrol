@@ -73,6 +73,7 @@ function DashboardPage() {
   const [coverageData, setCoverageData] = useState<any>(null);
   const [blockProgress, setBlockProgress] = useState(0);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [activeWeek, setActiveWeek] = useState<any>(null);
 
   const [stats, setStats] = useState({
     worked: 0,
@@ -118,6 +119,29 @@ function DashboardPage() {
           .maybeSingle();
         
         if (coverage) setCoverageData(coverage);
+
+        // 2.5 Get current week
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .lte("start_date", new Date().toISOString().split('T')[0])
+          .gte("end_date", new Date().toISOString().split('T')[0])
+          .maybeSingle();
+        
+        if (week) {
+          setActiveWeek(week);
+        } else {
+          // Fallback to first week if none matches dates
+          const { data: firstWeek } = await supabase
+            .from("weeks")
+            .select("*")
+            .eq("cycle_id", cycle.id)
+            .order("number", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (firstWeek) setActiveWeek(firstWeek);
+        }
 
         // 3. Get visit stats for this cycle
         const { data: visits } = await supabase
@@ -217,8 +241,15 @@ function DashboardPage() {
                 {coverageData ? `${coverageData.coverage_percentage}%` : "0%"}
               </CardTitle>
             </div>
-            <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
-              {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
+            <div className="flex flex-col items-end gap-1">
+              <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
+                {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
+              </div>
+              {activeWeek && (
+                <div className="bg-primary/20 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 text-primary-foreground">
+                  Semana {activeWeek.number}
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
