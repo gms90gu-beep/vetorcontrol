@@ -161,8 +161,8 @@ function PropertyVisitPage() {
           .insert({
             property_id: propertyId as string,
             agent_id: user.id,
-            cycle_id: activeSession.cycle_id,
-            week_id: activeSession.week_id,
+            cycle_id: activeSession.cycle_id as string,
+            week_id: activeSession.week_id as string,
             status: newStatus as any,
             activity_type: (activityMap[activity] || "routine") as any,
             visit_date: new Date().toISOString()
@@ -211,8 +211,8 @@ function PropertyVisitPage() {
           .insert({
             property_id: propertyId as string,
             agent_id: user.id,
-            cycle_id: activeSession.cycle_id,
-            week_id: activeSession.week_id,
+            cycle_id: activeSession.cycle_id as string,
+            week_id: activeSession.week_id as string,
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
             visit_date: new Date().toISOString()
