@@ -95,7 +95,6 @@ function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Get current cycle
       const currentYearVal = new Date().getFullYear();
       setCurrentYear(currentYearVal);
 
@@ -111,7 +110,6 @@ function DashboardPage() {
       if (cycle) {
         setActiveCycle(cycle);
         
-        // 2. Get coverage for this cycle
         const { data: coverage } = await supabase
           .from("cycle_coverage_summary")
           .select("*")
@@ -120,7 +118,6 @@ function DashboardPage() {
         
         if (coverage) setCoverageData(coverage);
 
-        // 2.5 Get current week
         const { data: week } = await supabase
           .from("weeks")
           .select("*")
@@ -132,7 +129,6 @@ function DashboardPage() {
         if (week) {
           setActiveWeek(week);
         } else {
-          // Fallback to first week if none matches dates
           const { data: firstWeek } = await supabase
             .from("weeks")
             .select("*")
@@ -143,7 +139,6 @@ function DashboardPage() {
           if (firstWeek) setActiveWeek(firstWeek);
         }
 
-        // 3. Get visit stats for this cycle
         const { data: visits } = await supabase
           .from("visits")
           .select("id, status")
@@ -159,7 +154,6 @@ function DashboardPage() {
         }
       }
 
-      // 4. Get current session
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -172,7 +166,6 @@ function DashboardPage() {
       if (session) {
         setActiveSession(session);
         
-        // Calculate block progress
         const { data: blockProps } = await supabase
           .from("properties")
           .select("id")
@@ -209,25 +202,6 @@ function DashboardPage() {
 
   return (
     <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Header Info */}
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-800">VetorControl</h2>
-          <div className="flex items-center gap-2 mt-0.5">
-            <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-500 py-0 h-4">
-              Ano {currentYear}
-            </Badge>
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.2em] font-mono">Unidade Operacional</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
-            <Calendar className="mr-1 h-3.5 w-3.5" />
-            {new Date().toLocaleDateString('pt-BR')}
-          </Badge>
-        </div>
-      </div>
-
       {/* Cycle Coverage Card */}
       <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden relative group">
         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
