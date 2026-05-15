@@ -60,10 +60,46 @@ function FieldWorkListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [indexSurvey, setIndexSurvey] = useState(false);
   const navigate = useNavigate();
+  const isLandscape = useOrientation();
+  const [agent, setAgent] = useState<any>(null);
+  const [activeCycle, setActiveCycle] = useState<any>(null);
+  const [activeWeek, setActiveWeek] = useState<any>(null);
 
   useEffect(() => {
     fetchSessionAndProperties();
+    fetchAgentAndPeriod();
   }, []);
+
+  async function fetchAgentAndPeriod() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: agentData } = await supabase
+        .from("agents")
+        .select("*")
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (agentData) setAgent(agentData);
+
+      const { data: cycle } = await supabase
+        .from("cycles")
+        .select("*")
+        .eq("status", "in_progress")
+        .maybeSingle();
+      if (cycle) {
+        setActiveCycle(cycle);
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .order("number", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (week) setActiveWeek(week);
+      }
+    } catch (e) { console.error(e); }
+  }
 
   async function fetchSessionAndProperties() {
     setIsLoading(true);
