@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   MapPin, 
@@ -10,7 +10,9 @@ import {
   Building2,
   Clock,
   ArrowRight,
-  Info
+  Info,
+  Layers,
+  CalendarDays
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,10 +20,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
@@ -37,8 +41,62 @@ const BLOCKS = [
 function FieldWorkPage() {
   const [date, setDate] = useState<Date>(new Date());
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("");
+  const [selectedWeekId, setSelectedWeekId] = useState<string>("");
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [weeks, setWeeks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
+  async function fetchInitialData() {
+    setIsLoading(true);
+    try {
+      const { data: cyclesData } = await supabase
+        .from("cycles")
+        .select("*")
+        .eq("year", new Date().getFullYear())
+        .order("number", { ascending: true });
+      
+      if (cyclesData) {
+        setCycles(cyclesData);
+        // Default to active cycle if exists
+        const activeCycle = cyclesData.find(c => c.status === "in_progress") || cyclesData[0];
+        if (activeCycle) {
+          setSelectedCycleId(activeCycle.id);
+          fetchWeeks(activeCycle.id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching cycles:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function fetchWeeks(cycleId: string) {
+    try {
+      const { data: weeksData } = await supabase
+        .from("weeks")
+        .select("*")
+        .eq("cycle_id", cycleId)
+        .order("number", { ascending: true });
+      
+      if (weeksData) {
+        setWeeks(weeksData);
+        // Default to first week
+        if (weeksData.length > 0) {
+          setSelectedWeekId(weeksData[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching weeks:", error);
+    }
+  }
 
   const selectedBlock = BLOCKS.find(b => b.id === selectedBlockId);
 
@@ -47,15 +105,34 @@ function FieldWorkPage() {
     b.street.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleStartWork = () => {
-    if (!selectedBlockId) {
-      toast.error("Por favor, selecione um quarteirão");
+  const handleStartWork = async () => {
+    if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
+      toast.error("Por favor, preencha todos os campos");
       return;
     }
     
-    toast.success("Trabalho iniciado com sucesso!");
-    // In a real app, we would save the session to Supabase here
-    navigate({ to: `/field-work-list` });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from("field_work_sessions").insert({
+        user_id: user.id,
+        cycle_id: selectedCycleId,
+        week_id: selectedWeekId,
+        block_number: selectedBlock?.number || "",
+        street_name: selectedBlock?.street || "",
+        property_count: selectedBlock?.properties || 0,
+        session_date: date.toISOString().split('T')[0],
+        status: "in_progress"
+      });
+
+      if (error) throw error;
+
+      toast.success("Trabalho iniciado com sucesso!");
+      navigate({ to: `/field-work-list` });
+    } catch (error: any) {
+      toast.error("Erro ao iniciar trabalho: " + error.message);
+    }
   };
 
   return (
@@ -70,6 +147,42 @@ function FieldWorkPage() {
       </div>
 
       <div className="space-y-6 px-1">
+        {/* Cycle and Week Selection */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Ciclo</label>
+            <Select value={selectedCycleId} onValueChange={(val) => {
+              setSelectedCycleId(val);
+              fetchWeeks(val);
+            }}>
+              <SelectTrigger className="h-14 rounded-2xl border-none bg-white shadow-md text-sm font-bold active:scale-95 transition-all">
+                <Layers className="h-4 w-4 mr-2 text-blue-500" />
+                <SelectValue placeholder="Ciclo" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-xl">
+                {cycles.map(c => (
+                  <SelectItem key={c.id} value={c.id} className="rounded-xl font-bold">Ciclo {c.number}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana</label>
+            <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
+              <SelectTrigger className="h-14 rounded-2xl border-none bg-white shadow-md text-sm font-bold active:scale-95 transition-all">
+                <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
+                <SelectValue placeholder="Semana" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-none shadow-xl">
+                {weeks.map(w => (
+                  <SelectItem key={w.id} value={w.id} className="rounded-xl font-bold">Semana {w.number}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* Date Selection */}
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Data da Atividade</label>
@@ -184,7 +297,9 @@ function FieldWorkPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Atual</p>
-                  <p className="text-xl font-black text-blue-600">03/2026</p>
+                  <p className="text-xl font-black text-blue-600">
+                    {cycles.find(c => c.id === selectedCycleId)?.number || "03/2026"}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -195,7 +310,7 @@ function FieldWorkPage() {
         <Button 
           className={cn(
             "w-full h-20 rounded-[2.5rem] text-xl font-black shadow-2xl transition-all gap-3 active:scale-95 mt-4",
-            selectedBlockId 
+            selectedBlockId && selectedCycleId && selectedWeekId
               ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200" 
               : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
           )}

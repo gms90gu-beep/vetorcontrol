@@ -70,24 +70,33 @@ export type Database = {
           end_date: string
           id: string
           name: string
+          number: number | null
           start_date: string
           status: Database["public"]["Enums"]["cycle_status"]
+          updated_at: string | null
+          year: number | null
         }
         Insert: {
           created_at?: string
           end_date: string
           id?: string
           name: string
+          number?: number | null
           start_date: string
           status?: Database["public"]["Enums"]["cycle_status"]
+          updated_at?: string | null
+          year?: number | null
         }
         Update: {
           created_at?: string
           end_date?: string
           id?: string
           name?: string
+          number?: number | null
           start_date?: string
           status?: Database["public"]["Enums"]["cycle_status"]
+          updated_at?: string | null
+          year?: number | null
         }
         Relationships: []
       }
@@ -95,6 +104,7 @@ export type Database = {
         Row: {
           block_number: string
           created_at: string
+          cycle_id: string | null
           id: string
           property_count: number
           session_date: string
@@ -102,10 +112,12 @@ export type Database = {
           street_name: string
           updated_at: string
           user_id: string
+          week_id: string | null
         }
         Insert: {
           block_number: string
           created_at?: string
+          cycle_id?: string | null
           id?: string
           property_count: number
           session_date?: string
@@ -113,10 +125,12 @@ export type Database = {
           street_name: string
           updated_at?: string
           user_id: string
+          week_id?: string | null
         }
         Update: {
           block_number?: string
           created_at?: string
+          cycle_id?: string | null
           id?: string
           property_count?: number
           session_date?: string
@@ -124,8 +138,24 @@ export type Database = {
           street_name?: string
           updated_at?: string
           user_id?: string
+          week_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "field_work_sessions_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_work_sessions_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "weeks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       localities: {
         Row: {
@@ -376,6 +406,7 @@ export type Database = {
           treatment_amount: number | null
           treatment_applied: boolean | null
           visit_date: string
+          week_id: string | null
           week_number: number | null
         }
         Insert: {
@@ -392,6 +423,7 @@ export type Database = {
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string
+          week_id?: string | null
           week_number?: number | null
         }
         Update: {
@@ -408,6 +440,7 @@ export type Database = {
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string
+          week_id?: string | null
           week_number?: number | null
         }
         Relationships: [
@@ -423,6 +456,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "weeks"
             referencedColumns: ["id"]
           },
         ]
@@ -542,6 +582,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "weekly_bulletins_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weeks: {
+        Row: {
+          created_at: string | null
+          cycle_id: string
+          end_date: string
+          id: string
+          number: number
+          start_date: string
+        }
+        Insert: {
+          created_at?: string | null
+          cycle_id: string
+          end_date: string
+          id?: string
+          number: number
+          start_date: string
+        }
+        Update: {
+          created_at?: string | null
+          cycle_id?: string
+          end_date?: string
+          id?: string
+          number?: number
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weeks_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"

@@ -67,6 +67,8 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 function DashboardPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  const [activeCycle, setActiveCycle] = useState<any>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
 
   const [stats, setStats] = useState({
     worked: 142,
@@ -79,12 +81,39 @@ function DashboardPage() {
     progress: 65,
   });
 
-  const [currentInfo] = useState({
-    date: new Date().toLocaleDateString('pt-BR'),
-    cycle: "Ciclo 03/2026",
-    week: "Semana 14",
-    block: "Quarteirão 042",
-  });
+  useEffect(() => {
+    fetchCurrentStatus();
+  }, []);
+
+  async function fetchCurrentStatus() {
+    try {
+      // Get current cycle
+      const { data: cycles } = await supabase
+        .from("cycles")
+        .select("*")
+        .eq("status", "in_progress")
+        .single();
+      
+      if (cycles) setActiveCycle(cycles);
+
+      // Get current session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: session } = await supabase
+          .from("field_work_sessions")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("status", "in_progress")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (session) setActiveSession(session);
+      }
+    } catch (error) {
+      console.error("Error fetching status:", error);
+    }
+  }
 
   const handleSync = () => {
     setIsSyncing(true);
@@ -108,7 +137,7 @@ function DashboardPage() {
         <div className="flex gap-2">
           <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
             <Calendar className="mr-1 h-3.5 w-3.5" />
-            {currentInfo.date}
+            {new Date().toLocaleDateString('pt-BR')}
           </Badge>
         </div>
       </div>
@@ -122,10 +151,10 @@ function DashboardPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Status Atual</p>
-              <CardTitle className="text-2xl font-black">{currentInfo.block}</CardTitle>
+              <CardTitle className="text-2xl font-black">{activeSession ? `Quarteirão ${activeSession.block_number}` : "Nenhum trabalho iniciado"}</CardTitle>
             </div>
             <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
-              {currentInfo.cycle}
+              {activeCycle ? activeCycle.name : "Ciclo --"}
             </div>
           </div>
         </CardHeader>
