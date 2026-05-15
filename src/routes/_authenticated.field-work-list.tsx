@@ -19,7 +19,8 @@ import {
   FileText,
   ClipboardList,
   Layers,
-  LayoutDashboard
+  LayoutDashboard,
+  History as HistoryIcon
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   component: FieldWorkListPage,
@@ -340,7 +342,7 @@ function FieldWorkListPage() {
         <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
           <div className="bg-slate-900 p-8 text-white relative">
             <div className="absolute top-0 right-0 p-8 opacity-10">
-              <History className="h-24 w-24" />
+              <HistoryIcon className="h-24 w-24" />
             </div>
             <DialogHeader>
               <div className="flex items-center gap-3 mb-2">
@@ -370,7 +372,7 @@ function FieldWorkListPage() {
 
               <div className="space-y-3">
                 <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <History className="h-3 w-3 text-blue-500" /> Histórico de Visitas
+                  <HistoryIcon className="h-3 w-3 text-blue-500" /> Histórico de Visitas
                 </h4>
                 <div className="space-y-2">
                   {[1, 2].map((i) => (
