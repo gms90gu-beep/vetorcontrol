@@ -610,7 +610,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
           <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Quantidade de Depósitos</Label>
           <Input 
             type="number"
-            value={formData.container_count} 
+            value={formData.container_count ?? 0} 
             onChange={(e) => setFormData({...formData, container_count: parseInt(e.target.value) || 0})}
             className="rounded-2xl h-12 bg-slate-50 border-none shadow-inner font-bold"
           />
@@ -623,7 +623,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Terreno ou casa sem morador</span>
             </div>
             <Switch 
-              checked={formData.is_abandoned} 
+              checked={formData.is_abandoned ?? false} 
               onCheckedChange={(val) => setFormData({...formData, is_abandoned: val})}
             />
           </div>
@@ -634,7 +634,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Dificuldade de acesso recorrente</span>
             </div>
             <Switch 
-              checked={formData.is_frequently_closed} 
+              checked={formData.is_frequently_closed ?? false} 
               onCheckedChange={(val) => setFormData({...formData, is_frequently_closed: val})}
             />
           </div>
@@ -645,7 +645,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Histórico de focos no local</span>
             </div>
             <Switch 
-              checked={formData.had_previous_focus} 
+              checked={formData.had_previous_focus ?? false} 
               onCheckedChange={(val) => setFormData({...formData, had_previous_focus: val})}
             />
           </div>
@@ -664,7 +664,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
         <div className="space-y-2">
           <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-1">Status do Imóvel</Label>
           <Select 
-            value={formData.status} 
+            value={formData.status ?? "active"} 
             onValueChange={(val: any) => setFormData({...formData, status: val})}
           >
             <SelectTrigger className="h-12 rounded-2xl bg-slate-50 border-none shadow-inner font-bold">
