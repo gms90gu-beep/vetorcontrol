@@ -6,10 +6,9 @@ import {
   Map as MapIcon, 
   FileText, 
   Settings, 
-  Menu,
-  ChevronLeft,
+  LogOut,
   RefreshCw,
-  LogOut
+  ChevronLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -23,14 +22,13 @@ import {
   SidebarProvider,
   SidebarTrigger
 } from "@/components/ui/sidebar";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
 function AuthenticatedLayout() {
-  const isMobile = useMobile();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
 
@@ -64,12 +62,12 @@ function AuthenticatedLayout() {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <Button variant="ghost" size="icon" className="text-muted-foreground transition-transform active:rotate-180 duration-500">
                 <RefreshCw className="h-5 w-5" />
               </Button>
             </div>
           </header>
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
             <Outlet />
           </div>
         </main>
@@ -79,7 +77,7 @@ function AuthenticatedLayout() {
 }
 
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
@@ -93,7 +91,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
       <SidebarHeader className="h-16 flex items-center px-4 border-b">
         <div className="flex items-center gap-2 font-bold text-primary">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/30">
             V
           </div>
           <span className="group-data-[collapsible=icon]:hidden">VetorControl</span>
@@ -105,7 +103,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
             <SidebarMenuItem key={item.to}>
               <SidebarMenuButton asChild tooltip={item.label}>
                 <Link 
-                  to={item.to} 
+                  to={item.to as any} 
                   className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all hover:bg-accent active:scale-95"
                   activeProps={{ className: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" }}
                 >
