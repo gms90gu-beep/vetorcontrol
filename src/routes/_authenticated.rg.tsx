@@ -69,14 +69,34 @@ function RGPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchProperties();
+    fetchInitialData();
   }, []);
 
-  async function fetchProperties() {
+  async function fetchInitialData() {
     setIsLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch active session to know current block/street
+      const { data: session } = await supabase
+        .from("field_work_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (session) {
+        setActiveSession(session);
+        setBlockFilter(session.block_number || "all");
+      }
+
       const { data, error } = await supabase
         .from("properties")
         .select("*")
@@ -86,7 +106,7 @@ function RGPage() {
       if (error) throw error;
       setProperties(data as Property[]);
     } catch (error: any) {
-      toast.error("Erro ao carregar imóveis: " + error.message);
+      toast.error("Erro ao carregar dados: " + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -109,27 +129,27 @@ function RGPage() {
     return Array.from(blocks).sort();
   }, [properties]);
 
-  const handleEdit = (property: Property) => {
+  const stats = useMemo(() => {
+    const currentBlockProps = properties.filter(p => p.block_number === activeSession?.block_number);
+    const residences = properties.filter(p => p.type === 'residence').length;
+    const commerce = properties.filter(p => p.type === 'commerce').length;
+    const lots = properties.filter(p => p.type === 'vacant_lot').length;
+    const others = properties.filter(p => p.type === 'others' || p.type === 'strategic_point').length;
+    
+    return {
+      total: properties.length,
+      residences,
+      commerce,
+      lots,
+      others,
+      blockTotal: currentBlockProps.length,
+      blockProgress: currentBlockProps.length > 0 ? Math.min(100, Math.round((currentBlockProps.length / 50) * 100)) : 0 // Mock 50 as target
+    };
+  }, [properties, activeSession]);
+
+  const handlePropertyClick = (property: Property) => {
     setEditingProperty(property);
     setIsFormOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este imóvel?")) return;
-    
-    try {
-      const { error } = await supabase
-        .from("properties")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      
-      setProperties(properties.filter(p => p.id !== id));
-      toast.success("Imóvel excluído com sucesso");
-    } catch (error: any) {
-      toast.error("Erro ao excluir imóvel: " + error.message);
-    }
   };
 
   const handleSaveProperty = (savedProperty: Property) => {
