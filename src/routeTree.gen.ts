@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
+import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
 import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
@@ -49,6 +50,11 @@ const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedFieldWorkRoute = AuthenticatedFieldWorkRouteImport.update({
   id: '/field-work',
   path: '/field-work',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
+  '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
+  '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/field-work': typeof AuthenticatedFieldWorkRoute
+  '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/cycles'
     | '/dashboard'
     | '/field-work'
+    | '/map'
     | '/pending'
     | '/reports'
     | '/settings'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/cycles'
     | '/dashboard'
     | '/field-work'
+    | '/map'
     | '/pending'
     | '/reports'
     | '/settings'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cycles'
     | '/_authenticated/dashboard'
     | '/_authenticated/field-work'
+    | '/_authenticated/map'
     | '/_authenticated/pending'
     | '/_authenticated/reports'
     | '/_authenticated/settings'
@@ -193,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPendingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/map': {
+      id: '/_authenticated/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof AuthenticatedMapRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/field-work': {
       id: '/_authenticated/field-work'
       path: '/field-work'
@@ -228,6 +247,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCyclesRoute: typeof AuthenticatedCyclesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFieldWorkRoute: typeof AuthenticatedFieldWorkRoute
+  AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -238,6 +258,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCyclesRoute: AuthenticatedCyclesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFieldWorkRoute: AuthenticatedFieldWorkRoute,
+  AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
