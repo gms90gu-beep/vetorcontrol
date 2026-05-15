@@ -39,6 +39,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
+import { useOrientation } from "@/hooks/useOrientation";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
