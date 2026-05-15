@@ -91,7 +91,7 @@ function PropertyVisitPage() {
           cycle_id: activeSession.cycle_id,
           week_id: activeSession.week_id,
           status: status,
-          activity_type: activity === "routine" ? "LI" : activity === "survey" ? "LIA" : "PE",
+          activity_type: activity === "routine" ? "routine" : activity === "survey" ? "infestation_survey" : "pending",
           visit_date: new Date().toISOString()
         })
         .select()
