@@ -320,6 +320,7 @@ function FieldWorkListPage() {
         ) : filteredProperties.length > 0 ? (
           <DigitalBulletinTable 
             properties={filteredProperties} 
+            indexSurvey={indexSurvey}
             onPropertyClick={(prop) => {
               setSelectedProperty(prop);
               setIsModalOpen(true);

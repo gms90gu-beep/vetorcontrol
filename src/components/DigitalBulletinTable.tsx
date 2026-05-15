@@ -49,9 +49,10 @@ interface DigitalBulletinTableProps {
   properties: Property[];
   onPropertyClick: (property: Property) => void;
   onStatusUpdate: (propertyId: string, status: string) => void;
+  indexSurvey?: boolean;
 }
 
-export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpdate }: DigitalBulletinTableProps) {
+export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpdate, indexSurvey }: DigitalBulletinTableProps) {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "residence": return <Home className="w-4 h-4 text-blue-500" />;
@@ -89,6 +90,12 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
               <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Trat.</TableHead>
               <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Foco</TableHead>
               <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Pend.</TableHead>
+              {indexSurvey && (
+                <>
+                  <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Dep.</TableHead>
+                  <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Col.</TableHead>
+                </>
+              )}
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Obs.</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
@@ -138,6 +145,16 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                     {prop.is_pending && <Clock className="h-3 w-3" />}
                   </div>
                 </TableCell>
+                {indexSurvey && (
+                  <>
+                    <TableCell className="text-center">
+                      <span className="text-[10px] font-bold text-blue-500">--</span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-[10px] font-bold text-amber-500">--</span>
+                    </TableCell>
+                  </>
+                )}
                 <TableCell>
                   <span className="text-[10px] text-slate-400 font-medium truncate max-w-[100px] block">
                     {prop.observation || "--"}
