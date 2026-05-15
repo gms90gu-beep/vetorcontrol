@@ -52,7 +52,10 @@ export function OperationalHeader() {
         .eq("profile_id", user.id)
         .maybeSingle();
       
-      if (agentData) setAgent(agentData);
+      if (agentData) {
+        setAgent(agentData);
+        setWorkStatus(agentData.work_status || 'available');
+      }
 
       // 2. Get current cycle
       const { data: cycle } = await supabase
