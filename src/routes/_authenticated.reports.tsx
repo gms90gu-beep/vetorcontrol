@@ -48,6 +48,7 @@ function ReportsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
+  const [annualSummaries, setAnnualSummaries] = useState<any[]>([]);
   
   // Mock data for the bulletin
   const [currentBulletin, setCurrentBulletin] = useState({
@@ -62,7 +63,21 @@ function ReportsPage() {
 
   useEffect(() => {
     fetchActivePeriod();
+    fetchAnnualSummaries();
   }, []);
+
+  async function fetchAnnualSummaries() {
+    try {
+      const { data } = await supabase
+        .from("annual_report_summary")
+        .select("*")
+        .order("year", { ascending: false });
+      
+      if (data) setAnnualSummaries(data);
+    } catch (error) {
+      console.error("Error fetching annual summaries:", error);
+    }
+  }
 
   async function fetchActivePeriod() {
     try {
@@ -207,9 +222,10 @@ function ReportsPage() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="productivity" className="w-full">
-        <TabsList className="w-full grid grid-cols-2 bg-slate-100 p-1 rounded-2xl mb-4">
+        <TabsList className="w-full grid grid-cols-3 bg-slate-100 p-1 rounded-2xl mb-4">
           <TabsTrigger value="productivity" className="rounded-xl font-bold text-xs uppercase tracking-tighter">Produtividade</TabsTrigger>
           <TabsTrigger value="deposits" className="rounded-xl font-bold text-xs uppercase tracking-tighter">Depósitos</TabsTrigger>
+          <TabsTrigger value="annual" className="rounded-xl font-bold text-xs uppercase tracking-tighter">Anual</TabsTrigger>
         </TabsList>
         
         <TabsContent value="productivity">
@@ -267,6 +283,55 @@ function ReportsPage() {
               </div>
             </div>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="annual">
+          <div className="space-y-4">
+            {annualSummaries.length === 0 ? (
+              <Card className="border-none shadow-md rounded-3xl p-8 flex flex-col items-center justify-center text-center bg-slate-50">
+                <Calendar className="h-12 w-12 text-slate-300 mb-4" />
+                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Aguardando dados anuais...</p>
+              </Card>
+            ) : (
+              annualSummaries.map((summary) => (
+                <Card key={summary.year} className="border-none shadow-md rounded-3xl overflow-hidden bg-white">
+                  <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
+                    <div>
+                      <h4 className="font-black text-xl tracking-tighter uppercase">Consolidado {summary.year}</h4>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ano Operacional Completo</p>
+                    </div>
+                    <Badge className="bg-blue-600 font-black">{summary.completed_cycles}/6 Ciclos</Badge>
+                  </div>
+                  <CardContent className="p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Visitas</span>
+                        <span className="text-xl font-black text-slate-800">{summary.total_visits}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Imóveis</span>
+                        <span className="text-xl font-black text-blue-600">{summary.properties_worked}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Focos</span>
+                        <span className="text-xl font-black text-red-600">{summary.total_focus}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tratamentos</span>
+                        <span className="text-xl font-black text-emerald-600">{summary.total_treatments}</span>
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full rounded-2xl h-12 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest"
+                      onClick={() => toast.success(`Gerando relatório anual de ${summary.year}...`)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" /> Baixar Relatório Anual
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 

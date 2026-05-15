@@ -40,7 +40,6 @@ function CyclesPage() {
   async function fetchCycles() {
     setIsLoading(true);
     try {
-      // 1. Fetch cycles
       const { data: cyclesData, error } = await supabase
         .from("cycles")
         .select("*")
@@ -50,7 +49,6 @@ function CyclesPage() {
       if (error) throw error;
       setCycles(cyclesData || []);
 
-      // 2. Fetch coverage summary
       const { data: coverage } = await supabase
         .from("cycle_coverage_summary")
         .select("*");
@@ -64,13 +62,29 @@ function CyclesPage() {
         });
         setCoverageData(coverageMap);
       }
-
     } catch (error) {
       console.error("Error fetching cycles:", error);
     } finally {
       setIsLoading(false);
     }
   }
+
+  const handleFinishCycle = async (cycleId: string) => {
+    try {
+      const { error } = await supabase
+        .from("cycles")
+        .update({ status: 'finished' })
+        .eq("id", cycleId);
+
+      if (error) throw error;
+      
+      toast.success("Ciclo concluído! O próximo ciclo será iniciado automaticamente.");
+      fetchCycles();
+    } catch (error) {
+      console.error("Error finishing cycle:", error);
+      toast.error("Erro ao finalizar ciclo.");
+    }
+  };
 
   const handleGenerateReport = (cycle: any) => {
     toast.promise(
@@ -83,11 +97,20 @@ function CyclesPage() {
     );
   };
 
+  const groupedCycles = cycles.reduce((acc: Record<number, any[]>, cycle) => {
+    const year = cycle.year || new Date().getFullYear();
+    if (!acc[year]) acc[year] = [];
+    acc[year].push(cycle);
+    return acc;
+  }, {});
+
+  const years = Object.keys(groupedCycles).map(Number).sort((a, b) => b - a);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
       <div className="flex flex-col gap-1 px-1">
-        <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase underline decoration-primary/20 decoration-4 underline-offset-8">Ciclos de Atividade</h2>
-        <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Vigilância Vetorial Urbana</p>
+        <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase underline decoration-primary/20 decoration-4 underline-offset-8">Ciclos Operacionais</h2>
+        <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Gestão Anual de Vigilância</p>
       </div>
 
       {isLoading ? (
@@ -96,76 +119,96 @@ function CyclesPage() {
           <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Sincronizando períodos...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {cycles.map((cycle) => {
-            const coverage = (cycle.id && coverageData[cycle.id]) || { coverage_percentage: 0, worked_properties: 0, total_properties: 0 };
-            const isActive = cycle.status === 'in_progress';
-            const isCompleted = cycle.status === 'finished';
+        <div className="space-y-12">
+          {years.map(year => (
+            <div key={year} className="space-y-6">
+              <div className="flex items-center gap-4 px-1">
+                <div className="h-px flex-1 bg-slate-100" />
+                <Badge variant="outline" className="rounded-xl px-4 py-1.5 border-slate-200 bg-white shadow-sm font-black text-slate-500 uppercase tracking-widest">
+                  Ano Operacional {year}
+                </Badge>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
 
-            return (
-              <Card key={cycle.id} className={cn(
-                "border-none shadow-xl rounded-[2.5rem] overflow-hidden group transition-all duration-500 bg-white",
-                isActive && "ring-4 ring-primary/5 scale-[1.01]"
-              )}>
-                <CardHeader className="pb-4">
-                  <div className="flex justify-between items-start">
-                    <div className={cn(
-                      "h-14 w-14 rounded-2xl flex items-center justify-center mb-2 shadow-inner transition-colors duration-500",
-                      isActive ? "bg-primary text-primary-foreground shadow-primary/20" : 
-                      isCompleted ? "bg-emerald-500 text-white shadow-emerald-100" : 
-                      "bg-slate-100 text-slate-400"
+              <div className="grid grid-cols-1 gap-6">
+                {groupedCycles[year].map((cycle) => {
+                  const coverage = (cycle.id && coverageData[cycle.id]) || { coverage_percentage: 0, worked_properties: 0, total_properties: 0 };
+                  const isActive = cycle.status === 'in_progress';
+                  const isCompleted = cycle.status === 'finished';
+
+                  return (
+                    <Card key={cycle.id} className={cn(
+                      "border-none shadow-xl rounded-[2.5rem] overflow-hidden group transition-all duration-500 bg-white",
+                      isActive && "ring-4 ring-primary/5 scale-[1.01]"
                     )}>
-                      {isActive ? <Play className="h-7 w-7 ml-1" /> : 
-                       isCompleted ? <CheckCircle2 className="h-7 w-7" /> : 
-                       <Clock className="h-7 w-7" />}
-                    </div>
-                    <Badge variant={isActive ? 'default' : 'secondary'} className={cn(
-                      "rounded-lg font-black text-[9px] uppercase tracking-widest border-none px-3 py-1.5",
-                      isActive ? "bg-primary" : isCompleted ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-                    )}>
-                      {isActive ? 'Em Andamento' : isCompleted ? 'Concluído' : 'Não Iniciado'}
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-2xl font-black tracking-tighter text-slate-800">{cycle.name}</CardTitle>
-                  <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-blue-500/70" />
-                      {new Date(cycle.start_date).toLocaleDateString('pt-BR')} - {new Date(cycle.end_date).toLocaleDateString('pt-BR')}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-2 pb-6 space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      <span>Cobertura de Visitas</span>
-                      <span className={cn(isActive && "text-primary font-black")}>{coverage.coverage_percentage}%</span>
-                    </div>
-                    <Progress value={coverage.coverage_percentage} className={cn("h-2 rounded-full", isActive ? "bg-primary/10" : "bg-slate-100")} />
-                  </div>
+                      <CardHeader className="pb-4">
+                        <div className="flex justify-between items-start">
+                          <div className={cn(
+                            "h-14 w-14 rounded-2xl flex items-center justify-center mb-2 shadow-inner transition-colors duration-500",
+                            isActive ? "bg-primary text-primary-foreground shadow-primary/20" : 
+                            isCompleted ? "bg-emerald-500 text-white shadow-emerald-100" : 
+                            "bg-slate-100 text-slate-400"
+                          )}>
+                            {isActive ? <Play className="h-7 w-7 ml-1" /> : 
+                             isCompleted ? <CheckCircle2 className="h-7 w-7" /> : 
+                             <Clock className="h-7 w-7" />}
+                          </div>
+                          <Badge variant={isActive ? 'default' : 'secondary'} className={cn(
+                            "rounded-lg font-black text-[9px] uppercase tracking-widest border-none px-3 py-1.5",
+                            isActive ? "bg-primary" : isCompleted ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                          )}>
+                            {isActive ? 'Em Andamento' : isCompleted ? 'Concluído' : 'Não Iniciado'}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-2xl font-black tracking-tighter text-slate-800">{cycle.name}</CardTitle>
+                        <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-blue-500/70" />
+                            {new Date(cycle.start_date).toLocaleDateString('pt-BR')} - {new Date(cycle.end_date).toLocaleDateString('pt-BR')}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-2 pb-6 space-y-6">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
+                            <span>Cobertura de Visitas</span>
+                            <span className={cn(isActive && "text-primary font-black")}>{coverage.coverage_percentage}%</span>
+                          </div>
+                          <Progress value={coverage.coverage_percentage} className={cn("h-2 rounded-full", isActive ? "bg-primary/10" : "bg-slate-100")} />
+                        </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <CycleStatCard label="Imóveis" value={coverage.worked_properties} icon={Home} color="text-blue-600" bgColor="bg-blue-50/50" />
-                    <CycleStatCard label="Focos" value={isActive ? 12 : 0} icon={AlertTriangle} color="text-red-600" bgColor="bg-red-50/50" />
-                  </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <CycleStatCard label="Imóveis" value={coverage.worked_properties} icon={Home} color="text-blue-600" bgColor="bg-blue-50/50" />
+                          <CycleStatCard label="Focos" value={isActive ? 12 : 0} icon={AlertTriangle} color="text-red-600" bgColor="bg-red-50/50" />
+                        </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <CycleStatCard label="Fechados" value={isActive ? 18 : 0} icon={XCircle} color="text-orange-600" bgColor="bg-orange-50/50" />
-                    <CycleStatCard label="Recusados" value={isActive ? 4 : 0} icon={AlertTriangle} color="text-rose-600" bgColor="bg-rose-50/50" />
-                  </div>
-
-                  <Button 
-                    onClick={() => handleGenerateReport(cycle)}
-                    className={cn(
-                      "w-full h-16 rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] gap-2 border-none transition-all shadow-lg active:scale-95",
-                      isActive ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200 shadow-none"
-                    )}
-                  >
-                    <FileText className="h-4 w-4" /> Gerar Relatório Consolidado
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+                        <div className="flex flex-col gap-3">
+                          {isActive && (
+                            <Button 
+                              onClick={() => handleFinishCycle(cycle.id)}
+                              className="w-full h-16 rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] gap-2 bg-emerald-500 hover:bg-emerald-600 text-white border-none transition-all shadow-lg active:scale-95 shadow-emerald-100"
+                            >
+                              <CheckCircle2 className="h-4 w-4" /> Finalizar Ciclo Atual
+                            </Button>
+                          )}
+                          
+                          <Button 
+                            onClick={() => handleGenerateReport(cycle)}
+                            className={cn(
+                              "w-full h-16 rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] gap-2 border-none transition-all shadow-lg active:scale-95",
+                              isActive || isCompleted ? "bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200" : "bg-slate-100 text-slate-400 hover:bg-slate-200 shadow-none"
+                            )}
+                          >
+                            <FileText className="h-4 w-4" /> Gerar Relatório {isCompleted ? 'Final' : 'Parcial'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

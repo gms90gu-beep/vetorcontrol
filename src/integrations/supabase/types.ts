@@ -415,6 +415,7 @@ export type Database = {
           visit_date: string
           week_id: string | null
           week_number: number | null
+          year: number | null
         }
         Insert: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
@@ -432,6 +433,7 @@ export type Database = {
           visit_date?: string
           week_id?: string | null
           week_number?: number | null
+          year?: number | null
         }
         Update: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
@@ -449,6 +451,7 @@ export type Database = {
           visit_date?: string
           week_id?: string | null
           week_number?: number | null
+          year?: number | null
         }
         Relationships: [
           {
@@ -654,6 +657,18 @@ export type Database = {
       }
     }
     Views: {
+      annual_report_summary: {
+        Row: {
+          completed_cycles: number | null
+          properties_worked: number | null
+          total_cycles: number | null
+          total_focus: number | null
+          total_treatments: number | null
+          total_visits: number | null
+          year: number | null
+        }
+        Relationships: []
+      }
       cycle_coverage_summary: {
         Row: {
           coverage_percentage: number | null
@@ -668,6 +683,10 @@ export type Database = {
     Functions: {
       check_block_completion: {
         Args: { p_block_id: string; p_cycle_id: string }
+        Returns: undefined
+      }
+      ensure_annual_cycles: {
+        Args: { target_year: number }
         Returns: undefined
       }
       get_epi_week: { Args: { d: string }; Returns: number }

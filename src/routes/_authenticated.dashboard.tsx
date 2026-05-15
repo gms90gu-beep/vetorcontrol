@@ -72,6 +72,8 @@ function DashboardPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [coverageData, setCoverageData] = useState<any>(null);
   const [blockProgress, setBlockProgress] = useState(0);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [activeWeek, setActiveWeek] = useState<any>(null);
 
   const [stats, setStats] = useState({
     worked: 0,
@@ -94,11 +96,15 @@ function DashboardPage() {
       if (!user) return;
 
       // 1. Get current cycle
+      const currentYearVal = new Date().getFullYear();
+      setCurrentYear(currentYearVal);
+
       const { data: cycle } = await supabase
         .from("cycles")
         .select("*")
         .eq("status", "in_progress")
-        .order("start_date", { ascending: false })
+        .eq("year", currentYearVal)
+        .order("number", { ascending: false })
         .limit(1)
         .maybeSingle();
       
@@ -113,6 +119,29 @@ function DashboardPage() {
           .maybeSingle();
         
         if (coverage) setCoverageData(coverage);
+
+        // 2.5 Get current week
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .lte("start_date", new Date().toISOString().split('T')[0])
+          .gte("end_date", new Date().toISOString().split('T')[0])
+          .maybeSingle();
+        
+        if (week) {
+          setActiveWeek(week);
+        } else {
+          // Fallback to first week if none matches dates
+          const { data: firstWeek } = await supabase
+            .from("weeks")
+            .select("*")
+            .eq("cycle_id", cycle.id)
+            .order("number", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (firstWeek) setActiveWeek(firstWeek);
+        }
 
         // 3. Get visit stats for this cycle
         const { data: visits } = await supabase
@@ -184,7 +213,12 @@ function DashboardPage() {
       <div className="flex items-center justify-between px-1">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-slate-800">VetorControl</h2>
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest font-mono">Unidade Operacional</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-500 py-0 h-4">
+              Ano {currentYear}
+            </Badge>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.2em] font-mono">Unidade Operacional</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
@@ -207,8 +241,15 @@ function DashboardPage() {
                 {coverageData ? `${coverageData.coverage_percentage}%` : "0%"}
               </CardTitle>
             </div>
-            <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
-              {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
+            <div className="flex flex-col items-end gap-1">
+              <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
+                {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
+              </div>
+              {activeWeek && (
+                <div className="bg-primary/20 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 text-primary-foreground">
+                  Semana {activeWeek.number}
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
