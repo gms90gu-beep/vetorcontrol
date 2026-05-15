@@ -206,10 +206,9 @@ function PropertyVisitPage() {
         visitId = visit.id;
       }
 
-      // 2. Save deposits if any
       if (deposits.length > 0) {
         const depositsToSave = deposits.map(d => ({
-          visit_id: visit.id,
+          visit_id: visitId,
           type_code: d.type,
           description: d.description,
           quantity: d.quantity,
