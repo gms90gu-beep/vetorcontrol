@@ -45,17 +45,48 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 function ReportsPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [activeCycle, setActiveCycle] = useState<any>(null);
+  const [activeWeek, setActiveWeek] = useState<any>(null);
   
   // Mock data for the bulletin
   const [currentBulletin, setCurrentBulletin] = useState({
-    week: 14,
-    cycle: "03/2026",
-    coverage: 78,
-    blocksWorked: 12,
+    week: 1,
+    cycle: "01/2026",
+    coverage: 65,
+    blocksWorked: 8,
     propertiesWorked: 342,
-    positiveFocus: 5,
+    positiveFocus: 12,
     lastSync: "Hoje, 10:30"
   });
+
+  useEffect(() => {
+    fetchActivePeriod();
+  }, []);
+
+  async function fetchActivePeriod() {
+    try {
+      const { data: cycle } = await supabase
+        .from("cycles")
+        .select("*")
+        .eq("status", "in_progress")
+        .single();
+      
+      if (cycle) {
+        setActiveCycle(cycle);
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .order("number", { ascending: true })
+          .limit(1)
+          .single();
+        
+        if (week) setActiveWeek(week);
+      }
+    } catch (error) {
+      console.error("Error fetching active period:", error);
+    }
+  }
 
   const productivityData = [
     { name: 'Seg', visitas: 45 },
@@ -73,20 +104,13 @@ function ReportsPage() {
     { name: 'E', value: 5 },
   ];
 
-  const focusTrendData = [
-    { week: 'Sem 11', focos: 2 },
-    { week: 'Sem 12', focos: 4 },
-    { week: 'Sem 13', focos: 3 },
-    { week: 'Sem 14', focos: 5 },
-  ];
-
   const handleGeneratePDF = () => {
     setIsLoading(true);
-    toast.info("Gerando Boletim Semanal...");
+    toast.info("Gerando Relatório de Ciclo...");
     
     setTimeout(() => {
       setIsLoading(false);
-      toast.success("Boletim gerado com sucesso!");
+      toast.success("Relatório gerado com sucesso!");
     }, 2500);
   };
 
