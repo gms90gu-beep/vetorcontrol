@@ -79,7 +79,7 @@ function PropertyVisitPage() {
           const { data: existingVisit } = await supabase
             .from("visits")
             .select("id, status, activity_type")
-            .eq("property_id", propertyId)
+            .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
             .eq("cycle_id", session.cycle_id)
             .order("visit_date", { ascending: false })
