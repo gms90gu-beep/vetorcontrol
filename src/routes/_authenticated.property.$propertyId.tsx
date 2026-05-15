@@ -38,7 +38,7 @@ function PropertyVisitPage() {
 
   const handleSave = () => {
     toast.success("Visita registrada com sucesso!");
-    navigate({ to: "/field-work" as any });
+    navigate({ to: "/field-work" });
   };
 
   const addDeposit = () => {
@@ -61,7 +61,7 @@ function PropertyVisitPage() {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work" as any })} className="rounded-2xl bg-accent/50">
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work" })} className="rounded-2xl bg-accent/50">
           <ChevronLeft className="h-6 w-6" />
         </Button>
         <div className="flex flex-col">
