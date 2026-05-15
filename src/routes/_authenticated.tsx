@@ -8,7 +8,10 @@ import {
   Settings, 
   LogOut,
   RefreshCw,
-  ChevronLeft
+  ChevronLeft,
+  Layers,
+  AlertTriangle,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -81,8 +84,10 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
+    { label: "Ciclos", icon: Layers, to: "/cycles" },
     { label: "Trabalho", icon: MapIcon, to: "/field-work" },
-    { label: "Pendências", icon: ChevronLeft, to: "/pending" },
+    { label: "Pendências", icon: AlertTriangle, to: "/pending" },
+    { label: "Mapa", icon: MapPin, to: "/map" },
     { label: "Relatórios", icon: FileText, to: "/reports" },
     { label: "Configurações", icon: Settings, to: "/settings" },
   ];

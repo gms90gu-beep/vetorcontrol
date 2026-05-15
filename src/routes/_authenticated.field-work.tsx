@@ -91,7 +91,7 @@ function FieldWorkPage() {
           <Card 
             key={prop.id} 
             className="border-none shadow-lg hover:shadow-xl active:scale-[0.98] transition-all cursor-pointer rounded-[2rem] overflow-hidden group"
-            onClick={() => navigate({ to: `/property/${prop.id}` as any })}
+            onClick={() => navigate({ to: `/property/${prop.id}` })}
           >
             <CardContent className="p-5">
               <div className="flex items-center justify-between">

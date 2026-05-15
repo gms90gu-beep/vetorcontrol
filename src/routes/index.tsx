@@ -12,9 +12,9 @@ function Index() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate({ to: "/dashboard" as any });
+        navigate({ to: "/dashboard" });
       } else {
-        navigate({ to: "/login" as any });
+        navigate({ to: "/login" });
       }
     });
   }, [navigate]);

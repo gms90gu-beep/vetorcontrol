@@ -26,7 +26,7 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success("Login realizado com sucesso!");
-      navigate({ to: "/dashboard" as any });
+      navigate({ to: "/dashboard" });
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
     } finally {
@@ -136,7 +136,7 @@ function LoginPage() {
         </form>
         <CardFooter className="flex justify-center pb-10">
           <p className="text-sm text-muted-foreground font-medium">
-            Não tem uma conta? <Link to={"/signup" as any} className="text-primary font-bold hover:underline">Solicitar acesso</Link>
+            Não tem uma conta? <Link to="/signup" className="text-primary font-bold hover:underline">Solicitar acesso</Link>
           </p>
         </CardFooter>
       </Card>
