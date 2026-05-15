@@ -36,19 +36,21 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [propertyId]);
 
   async function fetchData() {
+    setIsLoading(true);
+    setError(null);
     try {
-      // Get property details
-      const { data: propData } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("id", propertyId)
-        .single();
+      if (!propertyId) {
+        setError("ID do imóvel inválido.");
+        return;
+      }
       
       if (propData) setProperty(propData);
 
