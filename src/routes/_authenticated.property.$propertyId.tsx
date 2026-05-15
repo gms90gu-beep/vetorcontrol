@@ -81,7 +81,7 @@ function PropertyVisitPage() {
           // Check for existing visit for this property in the current cycle
           const { data: existingVisit } = await supabase
             .from("visits")
-            .select("id, status, activity_type")
+            .select("id, status, activity_type, has_focus, sample_collected, treatment_applied, treatment_amount, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
             .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
             .eq("cycle_id", session.cycle_id as string)
