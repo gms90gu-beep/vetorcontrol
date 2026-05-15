@@ -52,7 +52,19 @@ function PropertyVisitPage() {
         return;
       }
       
-      if (propData) setProperty(propData);
+      // Get property details
+      const { data: propData, error: propError } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("id", propertyId)
+        .maybeSingle();
+      
+      if (propError) throw propError;
+      if (!propData) {
+        setError("Imóvel não encontrado.");
+        return;
+      }
+      setProperty(propData);
 
       // Get current active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,12 +76,15 @@ function PropertyVisitPage() {
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
         
         if (session) setActiveSession(session);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching data:", error);
+      setError("Falha ao carregar dados do imóvel.");
+    } finally {
+      setIsLoading(false);
     }
   }
 
