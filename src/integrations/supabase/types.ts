@@ -539,8 +539,11 @@ export type Database = {
           cycle_id: string
           elimination_amount: number | null
           elimination_done: boolean | null
+          guidance_given: boolean | null
           has_focus: boolean | null
           id: string
+          is_recovered: boolean | null
+          notes: string | null
           property_id: string
           sample_collected: boolean | null
           status: Database["public"]["Enums"]["visit_status"]
@@ -557,8 +560,11 @@ export type Database = {
           cycle_id: string
           elimination_amount?: number | null
           elimination_done?: boolean | null
+          guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
+          is_recovered?: boolean | null
+          notes?: string | null
           property_id: string
           sample_collected?: boolean | null
           status: Database["public"]["Enums"]["visit_status"]
@@ -575,8 +581,11 @@ export type Database = {
           cycle_id?: string
           elimination_amount?: number | null
           elimination_done?: boolean | null
+          guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
+          is_recovered?: boolean | null
+          notes?: string | null
           property_id?: string
           sample_collected?: boolean | null
           status?: Database["public"]["Enums"]["visit_status"]
