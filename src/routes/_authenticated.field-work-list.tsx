@@ -421,41 +421,38 @@ function FieldWorkListPage() {
       {/* Operational Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 z-50 shadow-[0_-10px_40px_rgba(15,23,42,0.3)] md:rounded-t-[3rem] safe-area-bottom animate-in slide-in-from-bottom-full duration-700">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Trabalhados</span>
+          <div className="flex items-center gap-4 md:gap-8 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+            <div className="flex flex-col min-w-[60px]">
+              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Trabalhados</span>
               <span className="text-sm font-black text-white">{workedCount}</span>
             </div>
-            <div className="flex flex-col border-l border-white/10 pl-4">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Fechados</span>
+            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Fechados</span>
               <span className="text-sm font-black text-yellow-400">{closedCount}</span>
             </div>
-            <div className="flex flex-col border-l border-white/10 pl-4">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Focos</span>
-              <span className="text-sm font-black text-red-400">{focusCount}</span>
+            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Recusados</span>
+              <span className="text-sm font-black text-red-400">{refusedCount}</span>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-             <div className="hidden sm:flex flex-col items-end mr-2">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Cobertura</span>
+            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Focos</span>
+              <span className="text-sm font-black text-red-500">{focusCount}</span>
+            </div>
+            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Cobertura</span>
               <span className="text-sm font-black text-blue-400">{progressPercent}%</span>
             </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
             <Button 
               className="h-12 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
               onClick={() => navigate({ to: '/field-work' })}
             >
-              Novo Registro
+              Novo Bloco
             </Button>
           </div>
         </div>
       </div>
-
-      <Button 
-        className="fixed bottom-24 right-6 h-16 w-16 rounded-[2rem] shadow-2xl shadow-blue-500/20 bg-blue-600 hover:bg-blue-700 p-0 active:scale-90 transition-all z-40"
-        onClick={() => navigate({ to: '/rg' })}
-      >
-        <Plus className="h-8 w-8 text-white" />
-      </Button>
     </div>
   );
 }
