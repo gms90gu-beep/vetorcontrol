@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedFieldWorkRoute = AuthenticatedFieldWorkRouteImport.update({
   id: '/field-work',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
 export interface FileRoutesByTo {
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
 export interface FileRoutesById {
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/field-work': typeof AuthenticatedFieldWorkRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
 export interface FileRouteTypes {
@@ -77,9 +86,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/field-work'
+    | '/reports'
     | '/property/$propertyId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/field-work' | '/property/$propertyId'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/field-work'
+    | '/reports'
+    | '/property/$propertyId'
   id:
     | '__root__'
     | '/'
@@ -87,6 +103,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/dashboard'
     | '/_authenticated/field-work'
+    | '/_authenticated/reports'
     | '/_authenticated/property/$propertyId'
   fileRoutesById: FileRoutesById
 }
@@ -119,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/field-work': {
       id: '/_authenticated/field-work'
       path: '/field-work'
@@ -146,12 +170,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFieldWorkRoute: typeof AuthenticatedFieldWorkRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFieldWorkRoute: AuthenticatedFieldWorkRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
 
