@@ -65,7 +65,7 @@ function FieldWorkPage() {
       if (cyclesData) {
         setCycles(cyclesData);
         // Default to active cycle if exists
-        const activeCycle = cyclesData.find(c => c.status === "em andamento") || cyclesData[0];
+        const activeCycle = cyclesData.find(c => c.status === "in_progress") || cyclesData[0];
         if (activeCycle) {
           setSelectedCycleId(activeCycle.id);
           fetchWeeks(activeCycle.id);
