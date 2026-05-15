@@ -179,34 +179,70 @@ export type Database = {
       }
       properties: {
         Row: {
-          block_id: string
+          block_id: string | null
+          block_number: string | null
+          complement: string | null
+          container_count: number | null
           created_at: string
+          had_previous_focus: boolean | null
           id: string
+          is_abandoned: boolean | null
+          is_frequently_closed: boolean | null
           latitude: number | null
           longitude: number | null
+          neighborhood: string | null
           number: string
-          street_id: string
+          observations: string | null
+          reference: string | null
+          status: Database["public"]["Enums"]["property_status"] | null
+          street_id: string | null
+          street_name: string | null
           type: Database["public"]["Enums"]["property_type"]
+          user_id: string | null
         }
         Insert: {
-          block_id: string
+          block_id?: string | null
+          block_number?: string | null
+          complement?: string | null
+          container_count?: number | null
           created_at?: string
+          had_previous_focus?: boolean | null
           id?: string
+          is_abandoned?: boolean | null
+          is_frequently_closed?: boolean | null
           latitude?: number | null
           longitude?: number | null
+          neighborhood?: string | null
           number: string
-          street_id: string
+          observations?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["property_status"] | null
+          street_id?: string | null
+          street_name?: string | null
           type?: Database["public"]["Enums"]["property_type"]
+          user_id?: string | null
         }
         Update: {
-          block_id?: string
+          block_id?: string | null
+          block_number?: string | null
+          complement?: string | null
+          container_count?: number | null
           created_at?: string
+          had_previous_focus?: boolean | null
           id?: string
+          is_abandoned?: boolean | null
+          is_frequently_closed?: boolean | null
           latitude?: number | null
           longitude?: number | null
+          neighborhood?: string | null
           number?: string
-          street_id?: string
+          observations?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["property_status"] | null
+          street_id?: string | null
+          street_name?: string | null
           type?: Database["public"]["Enums"]["property_type"]
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -406,6 +442,7 @@ export type Database = {
       app_role: "admin" | "supervisor" | "agent"
       block_status: "not_started" | "in_progress" | "completed"
       cycle_status: "not_started" | "in_progress" | "finished"
+      property_status: "active" | "pending" | "deactivated"
       property_type:
         | "residence"
         | "commerce"
@@ -544,6 +581,7 @@ export const Constants = {
       app_role: ["admin", "supervisor", "agent"],
       block_status: ["not_started", "in_progress", "completed"],
       cycle_status: ["not_started", "in_progress", "finished"],
+      property_status: ["active", "pending", "deactivated"],
       property_type: [
         "residence",
         "commerce",

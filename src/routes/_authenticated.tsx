@@ -88,10 +88,11 @@ function BottomNav() {
   if (!isMobile) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-6 py-3 flex items-center justify-between pb-8">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-3 flex items-center justify-between pb-8">
       <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
       <NavItem to="/field-work" icon={CheckSquare} label="Diário" />
-      <NavItem to="/map" icon={MapPin} label="Mapa" />
+      <NavItem to="/rg" icon={MapPin} label="RG" />
+      <NavItem to="/map" icon={MapIcon} label="Mapa" />
       <NavItem to="/reports" icon={FileText} label="Relatórios" />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
@@ -118,8 +119,9 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
     { label: "Ciclos", icon: Layers, to: "/cycles" },
     { label: "Trabalho", icon: MapIcon, to: "/field-work" },
+    { label: "RG", icon: MapPin, to: "/rg" },
     { label: "Pendências", icon: AlertTriangle, to: "/pending" },
-    { label: "Mapa", icon: MapPin, to: "/map" },
+    { label: "Mapa", icon: MapIcon, to: "/map" },
     { label: "Relatórios", icon: FileText, to: "/reports" },
     { label: "Configurações", icon: Settings, to: "/settings" },
   ];

@@ -152,7 +152,7 @@ function DashboardPage() {
           description="Registro Geográfico" 
           icon={MapPin} 
           color="bg-emerald-500 shadow-emerald-200"
-          to="/map"
+          to="/rg"
         />
         <ActionCard 
           title="Semanal" 
