@@ -123,7 +123,7 @@ function FieldWorkPage() {
         street_name: selectedBlock?.street || "",
         property_count: selectedBlock?.properties || 0,
         session_date: date.toISOString().split('T')[0],
-        status: "em andamento"
+        status: "in_progress"
       });
 
       if (error) throw error;
