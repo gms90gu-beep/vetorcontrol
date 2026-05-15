@@ -23,17 +23,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface Property {
+type Property = {
   id: string;
   number: string;
-  complement?: string | null;
-  type: string;
-  status?: string | null;
-  street_name?: string | null;
-  observations?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-}
+  complement: string | null;
+  type: "residence" | "commerce" | "vacant_lot" | "strategic_point" | "others";
+  street_name: string | null;
+  neighborhood: string | null;
+  block_number: string | null;
+  reference: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  container_count: number | null;
+  observations: string | null;
+  is_abandoned: boolean | null;
+  is_frequently_closed: boolean | null;
+  had_previous_focus: boolean | null;
+  status: "active" | "pending" | "deactivated" | null;
+  user_id: string | null;
+  block_id?: string | null;
+  street_id?: string | null;
+};
 
 interface RGDigitalBulletinTableProps {
   properties: Property[];
