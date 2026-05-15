@@ -108,7 +108,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
             <SidebarMenuItem key={item.to}>
               <SidebarMenuButton asChild tooltip={item.label}>
                 <Link 
-                  to={item.to} 
+                  to={item.to as any} 
                   className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all hover:bg-accent active:scale-95"
                   activeProps={{ className: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" }}
                 >
