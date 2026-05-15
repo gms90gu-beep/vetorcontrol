@@ -17,6 +17,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
 import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
+import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -58,6 +59,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCyclesRoute = AuthenticatedCyclesRouteImport.update({
+  id: '/cycles',
+  path: '/cycles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPropertyPropertyIdRoute =
   AuthenticatedPropertyPropertyIdRouteImport.update({
     id: '/property/$propertyId',
@@ -68,6 +74,7 @@ const AuthenticatedPropertyPropertyIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
   '/pending': typeof AuthenticatedPendingRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
   '/pending': typeof AuthenticatedPendingRoute
@@ -90,6 +98,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/field-work': typeof AuthenticatedFieldWorkRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
@@ -102,6 +111,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/cycles'
     | '/dashboard'
     | '/field-work'
     | '/pending'
@@ -112,6 +122,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/cycles'
     | '/dashboard'
     | '/field-work'
     | '/pending'
@@ -123,6 +134,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/cycles'
     | '/_authenticated/dashboard'
     | '/_authenticated/field-work'
     | '/_authenticated/pending'
@@ -195,6 +207,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cycles': {
+      id: '/_authenticated/cycles'
+      path: '/cycles'
+      fullPath: '/cycles'
+      preLoaderRoute: typeof AuthenticatedCyclesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/property/$propertyId': {
       id: '/_authenticated/property/$propertyId'
       path: '/property/$propertyId'
@@ -206,6 +225,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedCyclesRoute: typeof AuthenticatedCyclesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFieldWorkRoute: typeof AuthenticatedFieldWorkRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
@@ -215,6 +235,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedCyclesRoute: AuthenticatedCyclesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFieldWorkRoute: AuthenticatedFieldWorkRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
