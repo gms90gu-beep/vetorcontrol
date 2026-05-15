@@ -35,10 +35,13 @@ function PropertyVisitPage() {
   const [activity, setActivity] = useState<any>("routine");
   const [property, setProperty] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
     fetchData();
