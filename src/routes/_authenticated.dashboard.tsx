@@ -30,32 +30,35 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function ActionCard({ title, description, icon: Icon, color, to, onClick }: any) {
+function ActionCard({ title, description, icon: Icon, color, to, onClick, className }: any) {
   const content = (
     <div className={cn(
-      "flex flex-col h-full p-5 rounded-[2rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-none text-white",
-      color
+      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-xl hover:shadow-2xl border-none text-white relative overflow-hidden group",
+      color,
+      className
     )}>
-      <div className="bg-white/20 p-3 rounded-2xl w-fit mb-4 group-hover:scale-110 transition-transform">
+      <div className="absolute -right-4 -top-4 bg-white/10 h-24 w-24 rounded-full blur-2xl group-hover:bg-white/20 transition-all duration-500" />
+      
+      <div className="bg-white/20 backdrop-blur-md p-3.5 rounded-2xl w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
         <Icon className="h-6 w-6" />
       </div>
-      <div>
-        <h3 className="text-lg font-bold leading-tight mb-1">{title}</h3>
-        <p className="text-[10px] text-white/80 font-medium uppercase tracking-wider">{description}</p>
+      <div className="relative z-10">
+        <h3 className="text-xl font-black leading-tight mb-1 tracking-tight">{title}</h3>
+        <p className="text-[10px] text-white/90 font-bold uppercase tracking-wider leading-relaxed">{description}</p>
       </div>
     </div>
   );
 
   if (to) {
     return (
-      <Link to={to} className="h-40 block">
+      <Link to={to} className="h-44 block">
         {content}
       </Link>
     );
   }
 
   return (
-    <button onClick={onClick} className="h-40 text-left w-full block">
+    <button onClick={onClick} className="h-44 text-left w-full block">
       {content}
     </button>
   );
