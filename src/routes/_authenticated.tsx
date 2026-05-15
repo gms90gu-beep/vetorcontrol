@@ -76,9 +76,38 @@ function AuthenticatedLayout() {
           <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
             <Outlet />
           </div>
+          <BottomNav />
         </main>
       </div>
     </SidebarProvider>
+  );
+}
+
+function BottomNav() {
+  const isMobile = useIsMobile();
+  if (!isMobile) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-6 py-3 flex items-center justify-between pb-8">
+      <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
+      <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
+      <NavItem to="/map" icon={MapPin} label="Mapa" />
+      <NavItem to="/reports" icon={FileText} label="Relatórios" />
+      <NavItem to="/settings" icon={Settings} label="Ajustes" />
+    </div>
+  );
+}
+
+function NavItem({ to, icon: Icon, label }: any) {
+  return (
+    <Link 
+      to={to} 
+      className="flex flex-col items-center gap-1 text-muted-foreground transition-all active:scale-90"
+      activeProps={{ className: "text-primary" }}
+    >
+      <Icon className="h-6 w-6" />
+      <span className="text-[10px] font-bold uppercase tracking-tight">{label}</span>
+    </Link>
   );
 }
 
