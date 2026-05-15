@@ -29,6 +29,7 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
