@@ -27,6 +27,7 @@ export type Database = {
           status: string | null
           team: string | null
           updated_at: string | null
+          work_status: string | null
         }
         Insert: {
           created_at?: string | null
@@ -40,6 +41,7 @@ export type Database = {
           status?: string | null
           team?: string | null
           updated_at?: string | null
+          work_status?: string | null
         }
         Update: {
           created_at?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           status?: string | null
           team?: string | null
           updated_at?: string | null
+          work_status?: string | null
         }
         Relationships: []
       }
@@ -141,6 +144,95 @@ export type Database = {
           year?: number | null
         }
         Relationships: []
+      }
+      daily_work_records: {
+        Row: {
+          agent_id: string
+          created_at: string
+          cycle_id: string
+          deposits_eliminated: number | null
+          deposits_treated: number | null
+          end_time: string | null
+          id: string
+          pending_visits: number | null
+          positive_foci: number | null
+          properties_closed: number | null
+          properties_refused: number | null
+          properties_worked: number | null
+          start_time: string
+          status: string
+          updated_at: string
+          week_id: string | null
+          work_date: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          cycle_id: string
+          deposits_eliminated?: number | null
+          deposits_treated?: number | null
+          end_time?: string | null
+          id?: string
+          pending_visits?: number | null
+          positive_foci?: number | null
+          properties_closed?: number | null
+          properties_refused?: number | null
+          properties_worked?: number | null
+          start_time?: string
+          status: string
+          updated_at?: string
+          week_id?: string | null
+          work_date?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          cycle_id?: string
+          deposits_eliminated?: number | null
+          deposits_treated?: number | null
+          end_time?: string | null
+          id?: string
+          pending_visits?: number | null
+          positive_foci?: number | null
+          properties_closed?: number | null
+          properties_refused?: number | null
+          properties_worked?: number | null
+          start_time?: string
+          status?: string
+          updated_at?: string
+          week_id?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_work_records_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_work_records_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "daily_work_records_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_work_records_week_id_fkey"
+            columns: ["week_id"]
+            isOneToOne: false
+            referencedRelation: "weeks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       field_work_sessions: {
         Row: {
