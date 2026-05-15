@@ -102,7 +102,11 @@ export function DailyWorkCloser() {
     } catch (error) {
       console.error("Error fetching daily context:", error);
     }
-  }
+  }, [agent, activeCycle, activeWeek, stats]);
+
+  useEffect(() => {
+    fetchDailyContext();
+  }, [fetchDailyContext]);
 
   const handleCloseDay = async () => {
     setIsLoading(true);
