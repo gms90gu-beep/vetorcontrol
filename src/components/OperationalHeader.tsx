@@ -33,6 +33,7 @@ export function OperationalHeader() {
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
+  const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
 
   useEffect(() => {
