@@ -99,6 +99,25 @@ function PropertyVisitPage() {
               "pending": "pending"
             };
             setActivity(activityMap[existingVisit.activity_type] || "routine");
+            
+            setRoutineData({
+              treatment: existingVisit.treatment_applied || false,
+              treatmentAmount: Number(existingVisit.treatment_amount) || 0,
+              elimination: existingVisit.elimination_done || false,
+              eliminationAmount: existingVisit.elimination_amount || 0,
+              guidance: existingVisit.guidance_given || false,
+              notes: existingVisit.notes || ""
+            });
+            
+            setSurveyData({
+              hasFocus: existingVisit.has_focus || false,
+              sampleCollected: existingVisit.sample_collected || false
+            });
+            
+            setPendingData({
+              isRecovered: existingVisit.is_recovered || false,
+              notes: existingVisit.notes || ""
+            });
 
             // Load deposits
             const { data: existingDeposits } = await supabase
