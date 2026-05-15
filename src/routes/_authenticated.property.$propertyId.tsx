@@ -81,7 +81,7 @@ function PropertyVisitPage() {
             .select("id, status, activity_type")
             .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
-            .eq("cycle_id", session.cycle_id)
+            .eq("cycle_id", session.cycle_id as string)
             .order("visit_date", { ascending: false })
             .limit(1)
             .maybeSingle();
