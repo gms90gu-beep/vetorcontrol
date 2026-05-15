@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
@@ -45,6 +46,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRgRoute = AuthenticatedRgRouteImport.update({
+  id: '/rg',
+  path: '/rg',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/rg': typeof AuthenticatedRgRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/pending'
     | '/reports'
+    | '/rg'
     | '/settings'
     | '/property/$propertyId'
   fileRoutesByTo: FileRoutesByTo
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/pending'
     | '/reports'
+    | '/rg'
     | '/settings'
     | '/'
     | '/property/$propertyId'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/_authenticated/map'
     | '/_authenticated/pending'
     | '/_authenticated/reports'
+    | '/_authenticated/rg'
     | '/_authenticated/settings'
     | '/_authenticated/'
     | '/_authenticated/property/$propertyId'
@@ -221,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/rg': {
+      id: '/_authenticated/rg'
+      path: '/rg'
+      fullPath: '/rg'
+      preLoaderRoute: typeof AuthenticatedRgRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/reports': {
@@ -290,6 +309,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedRgRoute: typeof AuthenticatedRgRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
@@ -303,6 +323,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedRgRoute: AuthenticatedRgRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
@@ -320,3 +341,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
