@@ -43,11 +43,7 @@ export function DailyWorkCloser() {
     pending: 0
   });
 
-  useEffect(() => {
-    fetchDailyContext();
-  }, []);
-
-  async function fetchDailyContext() {
+  const fetchDailyContext = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
