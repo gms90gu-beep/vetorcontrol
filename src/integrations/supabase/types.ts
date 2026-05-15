@@ -145,6 +145,13 @@ export type Database = {
             foreignKeyName: "field_work_sessions_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "field_work_sessions_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -448,6 +455,13 @@ export type Database = {
             foreignKeyName: "visits_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "visits_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -584,6 +598,13 @@ export type Database = {
             foreignKeyName: "weekly_bulletins_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "weekly_bulletins_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -619,6 +640,13 @@ export type Database = {
             foreignKeyName: "weeks_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "weeks_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
             referencedRelation: "cycles"
             referencedColumns: ["id"]
           },
@@ -626,9 +654,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      cycle_coverage_summary: {
+        Row: {
+          coverage_percentage: number | null
+          cycle_id: string | null
+          cycle_name: string | null
+          total_properties: number | null
+          worked_properties: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      check_block_completion: {
+        Args: { p_block_id: string; p_cycle_id: string }
+        Returns: undefined
+      }
       get_epi_week: { Args: { d: string }; Returns: number }
       has_role: {
         Args: {
