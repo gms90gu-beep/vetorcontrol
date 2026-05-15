@@ -376,6 +376,7 @@ export type Database = {
           treatment_amount: number | null
           treatment_applied: boolean | null
           visit_date: string
+          week_number: number | null
         }
         Insert: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
@@ -391,6 +392,7 @@ export type Database = {
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string
+          week_number?: number | null
         }
         Update: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
@@ -406,6 +408,7 @@ export type Database = {
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string
+          week_number?: number | null
         }
         Relationships: [
           {
@@ -424,11 +427,134 @@ export type Database = {
           },
         ]
       }
+      weekly_bulletins: {
+        Row: {
+          abandoned_count: number | null
+          agent_id: string | null
+          closed_count: number | null
+          commerce_count: number | null
+          completion_percentage: number | null
+          created_at: string | null
+          cycle_id: string | null
+          deposits_eliminated: Json | null
+          deposits_inspected: Json | null
+          deposits_positive: Json | null
+          deposits_treated: Json | null
+          end_date: string
+          focal_treatment_count: number | null
+          id: string
+          infestation_index: number | null
+          informed_count: number | null
+          insecticide_amount: number | null
+          insecticide_type: string | null
+          inspected_count: number | null
+          other_type_count: number | null
+          pdf_url: string | null
+          perifocal_treatment_count: number | null
+          positive_focus_count: number | null
+          positive_property_count: number | null
+          refused_count: number | null
+          residence_count: number | null
+          start_date: string
+          status: string | null
+          strategic_point_count: number | null
+          territory_property_count: number | null
+          updated_at: string | null
+          vacant_lot_count: number | null
+          visited_count: number | null
+          week_number: number
+          worked_property_count: number | null
+        }
+        Insert: {
+          abandoned_count?: number | null
+          agent_id?: string | null
+          closed_count?: number | null
+          commerce_count?: number | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          cycle_id?: string | null
+          deposits_eliminated?: Json | null
+          deposits_inspected?: Json | null
+          deposits_positive?: Json | null
+          deposits_treated?: Json | null
+          end_date: string
+          focal_treatment_count?: number | null
+          id?: string
+          infestation_index?: number | null
+          informed_count?: number | null
+          insecticide_amount?: number | null
+          insecticide_type?: string | null
+          inspected_count?: number | null
+          other_type_count?: number | null
+          pdf_url?: string | null
+          perifocal_treatment_count?: number | null
+          positive_focus_count?: number | null
+          positive_property_count?: number | null
+          refused_count?: number | null
+          residence_count?: number | null
+          start_date: string
+          status?: string | null
+          strategic_point_count?: number | null
+          territory_property_count?: number | null
+          updated_at?: string | null
+          vacant_lot_count?: number | null
+          visited_count?: number | null
+          week_number: number
+          worked_property_count?: number | null
+        }
+        Update: {
+          abandoned_count?: number | null
+          agent_id?: string | null
+          closed_count?: number | null
+          commerce_count?: number | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          cycle_id?: string | null
+          deposits_eliminated?: Json | null
+          deposits_inspected?: Json | null
+          deposits_positive?: Json | null
+          deposits_treated?: Json | null
+          end_date?: string
+          focal_treatment_count?: number | null
+          id?: string
+          infestation_index?: number | null
+          informed_count?: number | null
+          insecticide_amount?: number | null
+          insecticide_type?: string | null
+          inspected_count?: number | null
+          other_type_count?: number | null
+          pdf_url?: string | null
+          perifocal_treatment_count?: number | null
+          positive_focus_count?: number | null
+          positive_property_count?: number | null
+          refused_count?: number | null
+          residence_count?: number | null
+          start_date?: string
+          status?: string | null
+          strategic_point_count?: number | null
+          territory_property_count?: number | null
+          updated_at?: string | null
+          vacant_lot_count?: number | null
+          visited_count?: number | null
+          week_number?: number
+          worked_property_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_bulletins_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_epi_week: { Args: { d: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
