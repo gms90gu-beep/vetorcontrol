@@ -1,55 +1,39 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Plus, 
   Search, 
-  Filter, 
   MapPin, 
   Navigation, 
   ChevronRight, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  Map as MapIcon, 
-  List,
-  CheckCircle2,
-  AlertCircle,
-  XCircle,
-  Save,
-  X,
-  Crosshair,
   Home,
   Building,
   TreePine,
   Flag,
-  HelpCircle
+  HelpCircle,
+  ClipboardList,
+  FileText,
+  Target,
+  LayoutDashboard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
-  Drawer, 
-  DrawerContent, 
-  DrawerHeader, 
-  DrawerTitle, 
-  DrawerTrigger,
-  DrawerClose,
-  DrawerFooter
-} from "@/components/ui/drawer";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { OperationalHeader } from "@/components/OperationalHeader";
+import { RGDigitalBulletinTable } from "@/components/RGDigitalBulletinTable";
 
 export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
