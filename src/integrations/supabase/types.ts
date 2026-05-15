@@ -91,6 +91,42 @@ export type Database = {
         }
         Relationships: []
       }
+      field_work_sessions: {
+        Row: {
+          block_number: string
+          created_at: string
+          id: string
+          property_count: number
+          session_date: string
+          status: string
+          street_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          block_number: string
+          created_at?: string
+          id?: string
+          property_count: number
+          session_date?: string
+          status?: string
+          street_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          block_number?: string
+          created_at?: string
+          id?: string
+          property_count?: number
+          session_date?: string
+          status?: string
+          street_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       localities: {
         Row: {
           area_id: string

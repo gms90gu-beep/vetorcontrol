@@ -90,7 +90,7 @@ function BottomNav() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-6 py-3 flex items-center justify-between pb-8">
       <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
-      <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
+      <NavItem to="/field-work" icon={CheckSquare} label="Diário" />
       <NavItem to="/map" icon={MapPin} label="Mapa" />
       <NavItem to="/reports" icon={FileText} label="Relatórios" />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
