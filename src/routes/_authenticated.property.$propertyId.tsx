@@ -82,7 +82,25 @@ function PropertyVisitPage() {
           .limit(1)
           .maybeSingle();
         
-        if (session) setActiveSession(session);
+        if (session) {
+          setActiveSession(session);
+          
+          const { data: existingVisit } = await supabase
+            .from("visits")
+            .select("id, status, activity_type")
+            .eq("property_id", propertyId)
+            .eq("agent_id", user.id)
+            .eq("cycle_id", session.cycle_id)
+            .order("visit_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (existingVisit) {
+            setCurrentVisitId(existingVisit.id);
+            setStatus(existingVisit.status);
+          }
+        }
+
       }
     } catch (error: any) {
       console.error("Error fetching data:", error);
