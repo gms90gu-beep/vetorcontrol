@@ -1,5 +1,6 @@
 import { createFileRoute, Link, ClientOnly } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   FileText, 
   Download, 
@@ -119,11 +120,11 @@ function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-slate-800">Boletim Semanal</h2>
+          <h2 className="text-2xl font-black tracking-tight text-slate-800 uppercase">Boletim Semanal</h2>
           <p className="text-sm font-medium text-slate-500">Resumo operacional automático</p>
         </div>
         <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full">
-          Semana {currentBulletin.week}
+          Semana {activeWeek?.number || 1}
         </Badge>
       </div>
 
@@ -157,7 +158,7 @@ function ReportsPage() {
         </div>
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
-            <CardTitle className="text-lg font-bold">Cobertura da Semana</CardTitle>
+            <CardTitle className="text-lg font-bold uppercase tracking-tighter">Cobertura do Ciclo</CardTitle>
             <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none font-bold">
               {currentBulletin.coverage}%
             </Badge>
@@ -166,8 +167,8 @@ function ReportsPage() {
         <CardContent>
           <div className="space-y-4">
             <Progress value={currentBulletin.coverage} className="h-3 bg-white/10" />
-            <div className="flex justify-between text-xs font-medium text-slate-400">
-              <span>Ciclo {currentBulletin.cycle}</span>
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+              <span>{activeCycle?.name || "Ciclo --"}</span>
               <span>{currentBulletin.blocksWorked} quarteirões concluídos</span>
             </div>
           </div>
@@ -179,21 +180,21 @@ function ReportsPage() {
         <Button 
           onClick={handleGeneratePDF}
           disabled={isLoading}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 font-black shadow-lg shadow-blue-200"
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 font-black shadow-lg shadow-blue-200 uppercase tracking-widest text-xs"
         >
           {isLoading ? (
             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
           ) : (
             <Printer className="mr-2 h-5 w-5" />
           )}
-          Gerar PDF Semanal
+          Gerar Relatório de Ciclo
         </Button>
       </div>
 
       {/* Detailed Indicators */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-lg font-bold text-slate-800">Indicadores Detalhados</h3>
+          <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tighter">Indicadores Detalhados</h3>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
@@ -213,13 +214,13 @@ function ReportsPage() {
         
         <TabsContent value="productivity">
           <Card className="border-none shadow-md rounded-3xl p-4">
-            <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Visitas por dia</h4>
+            <h4 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">Visitas por dia</h4>
             <div className="h-[200px] w-full">
               <ClientOnly fallback={<div className="h-full w-full bg-slate-50 rounded-2xl animate-pulse" />}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={productivityData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 600, fill: '#64748b'}} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900, fill: '#64748b'}} />
                     <Tooltip 
                       cursor={{fill: '#f8fafc'}}
                       contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
@@ -234,7 +235,7 @@ function ReportsPage() {
 
         <TabsContent value="deposits">
           <Card className="border-none shadow-md rounded-3xl p-4">
-            <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Distribuição de Depósitos</h4>
+            <h4 className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-widest">Distribuição de Depósitos</h4>
             <div className="h-[200px] w-full flex items-center">
               <ClientOnly fallback={<div className="h-full w-1/2 bg-slate-50 rounded-full animate-pulse" />}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -256,11 +257,11 @@ function ReportsPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </ClientOnly>
-              <div className="w-1/2 space-y-1">
+              <div className="w-1/2 space-y-1 pl-4">
                 {depositData.map((item, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i]}} />
-                    <span className="text-[10px] font-bold text-slate-600">{item.name}</span>
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">{item.name}</span>
                   </div>
                 ))}
               </div>
@@ -272,13 +273,12 @@ function ReportsPage() {
       {/* History Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-lg font-bold text-slate-800">Relatórios Gerados</h3>
+          <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tighter">Relatórios do Ciclo</h3>
         </div>
         
         <div className="space-y-3">
-          <HistoryItem week="13" date="08/05/2026" status="Concluído" />
-          <HistoryItem week="12" date="01/05/2026" status="Concluído" />
-          <HistoryItem week="11" date="24/04/2026" status="Concluído" />
+          <HistoryItem week="1" date="01/01/2026" status="Pendente" />
+          <HistoryItem week="2" date="15/01/2026" status="Pendente" />
         </div>
       </div>
     </div>
@@ -287,7 +287,7 @@ function ReportsPage() {
 
 function IndicatorItem({ label, value, icon: Icon, color, bgColor }: any) {
   return (
-    <div className={cn("flex flex-col p-4 rounded-3xl border border-slate-100 bg-white shadow-sm")}>
+    <div className={cn("flex flex-col p-4 rounded-3xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow")}>
       <div className={cn("p-2 rounded-xl w-fit mb-2", bgColor)}>
         <Icon className={cn("h-4 w-4", color)} />
       </div>
@@ -305,15 +305,15 @@ function HistoryItem({ week, date, status }: any) {
           <FileText className="h-5 w-5 text-slate-500" />
         </div>
         <div>
-          <h4 className="font-bold text-slate-800">Semana {week}</h4>
-          <p className="text-[10px] font-bold text-slate-400 uppercase">{date}</p>
+          <h4 className="font-bold text-slate-800 tracking-tight">Semana {week}</h4>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{date}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-600 border-emerald-100 bg-emerald-50">
+        <Badge variant="outline" className="text-[10px] font-black uppercase text-slate-400 border-slate-200 bg-slate-50">
           {status}
         </Badge>
-        <Button variant="ghost" size="icon" className="text-slate-400">
+        <Button variant="ghost" size="icon" className="text-slate-400 rounded-full">
           <Eye className="h-5 w-5" />
         </Button>
       </div>
