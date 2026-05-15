@@ -30,6 +30,32 @@ export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
 });
 
+function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{label}</span>
+      <div className="grid grid-cols-2 gap-2">
+        <Button 
+          type="button"
+          variant={value === true ? "default" : "outline"}
+          onClick={() => onChange(true)}
+          className={`h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${value === true ? 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200' : 'border-slate-200'}`}
+        >
+          SIM
+        </Button>
+        <Button 
+          type="button"
+          variant={value === false ? "default" : "outline"}
+          onClick={() => onChange(false)}
+          className={`h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${value === false ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200' : 'border-slate-200'}`}
+        >
+          NÃO
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function PropertyVisitPage() {
   const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
