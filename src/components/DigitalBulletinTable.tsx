@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -8,11 +7,7 @@ import {
   Store, 
   MapPin, 
   Warehouse,
-  History,
-  Info,
-  ChevronRight,
-  MoreVertical,
-  FileText
+  ChevronRight
 } from "lucide-react";
 import {
   Table,
@@ -24,13 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface Property {
@@ -66,25 +55,25 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "visited":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Visitado</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Visitado</Badge>;
       case "closed":
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><Clock className="w-2.5 h-2.5 mr-1" /> Fechado</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> Fechado</Badge>;
       case "refused":
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><XCircle className="w-2.5 h-2.5 mr-1" /> Recusado</Badge>;
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><XCircle className="w-2.5 h-2.5 mr-1" /> Recusado</Badge>;
       case "abandoned":
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><AlertCircle className="w-2.5 h-2.5 mr-1" /> Abandonado</Badge>;
+        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><AlertCircle className="w-2.5 h-2.5 mr-1" /> Abandonado</Badge>;
       default:
-        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase">Não Visitado</Badge>;
+        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">Não Visitado</Badge>;
     }
   };
 
   return (
-    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden h-full flex flex-col">
+      <ScrollArea className="flex-1">
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
             <TableRow className="hover:bg-transparent border-slate-100">
-              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4">Nº Imóvel</TableHead>
+              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 pl-6 sticky left-0 bg-slate-50/80 backdrop-blur-md z-20">Nº Imóvel</TableHead>
               <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo</TableHead>
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Situação</TableHead>
               <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Trat.</TableHead>
@@ -97,7 +86,7 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                 </>
               )}
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Obs.</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[50px] pr-6"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -107,7 +96,7 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                 className="group hover:bg-blue-50/30 cursor-pointer border-slate-50 transition-colors"
                 onClick={() => onPropertyClick(prop)}
               >
-                <TableCell className="py-4">
+                <TableCell className="py-4 pl-6">
                   <span className="text-sm font-black text-slate-900">{prop.number}</span>
                 </TableCell>
                 <TableCell>
@@ -156,11 +145,11 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                   </>
                 )}
                 <TableCell>
-                  <span className="text-[10px] text-slate-400 font-medium truncate max-w-[100px] block">
+                  <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px] block">
                     {prop.observation || "--"}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="pr-6 text-right">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 group-hover:text-blue-500 group-hover:bg-white transition-all">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -169,7 +158,8 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
             ))}
           </TableBody>
         </Table>
-      </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
   );
 }

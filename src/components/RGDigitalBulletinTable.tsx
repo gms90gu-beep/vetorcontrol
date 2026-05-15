@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { 
   CheckCircle2, 
   Clock, 
@@ -6,7 +5,6 @@ import {
   Store, 
   MapPin, 
   Warehouse,
-  History,
   ChevronRight,
   Navigation,
   HelpCircle
@@ -21,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 type Property = {
@@ -64,27 +63,27 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
   const getStatusBadge = (status?: string | null) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Ativo</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Ativo</Badge>;
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase"><Clock className="w-2.5 h-2.5 mr-1" /> Pendente</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> Pendente</Badge>;
       default:
-        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase">Novo</Badge>;
+        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">Novo</Badge>;
     }
   };
 
   return (
-    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden h-full flex flex-col">
+      <ScrollArea className="flex-1">
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
             <TableRow className="hover:bg-transparent border-slate-100">
-              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4">Nº Imóvel</TableHead>
+              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 pl-6 sticky left-0 bg-slate-50/80 backdrop-blur-md z-20">Nº Imóvel</TableHead>
               <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-slate-500">Comp.</TableHead>
               <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo</TableHead>
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Situação</TableHead>
               <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">GPS</TableHead>
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Obs.</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[50px] pr-6"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -94,7 +93,7 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
                 className="group hover:bg-blue-50/30 cursor-pointer border-slate-50 transition-colors"
                 onClick={() => onPropertyClick(prop)}
               >
-                <TableCell className="py-4">
+                <TableCell className="py-4 pl-6">
                   <span className="text-sm font-black text-slate-900">{prop.number}</span>
                 </TableCell>
                 <TableCell>
@@ -122,11 +121,11 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="text-[10px] text-slate-400 font-medium truncate max-w-[100px] block">
+                  <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px] block">
                     {prop.observations || "--"}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="pr-6 text-right">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 group-hover:text-blue-500 group-hover:bg-white transition-all">
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -135,7 +134,8 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
             ))}
           </TableBody>
         </Table>
-      </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
   );
 }

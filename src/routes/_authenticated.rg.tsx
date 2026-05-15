@@ -45,7 +45,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { OperationalHeader } from "@/components/OperationalHeader";
+import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
+import { useOrientation } from "@/hooks/useOrientation";
 import { RGDigitalBulletinTable } from "@/components/RGDigitalBulletinTable";
 
 export const Route = createFileRoute("/_authenticated/rg")({
@@ -82,7 +83,11 @@ function RGPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [agent, setAgent] = useState<any>(null);
+  const [activeCycle, setActiveCycle] = useState<any>(null);
+  const [activeWeek, setActiveWeek] = useState<any>(null);
   const navigate = useNavigate();
+  const isLandscape = useOrientation();
 
   useEffect(() => {
     fetchInitialData();
@@ -94,6 +99,11 @@ function RGPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Agent
+      const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (agentData) setAgent(agentData);
+
+      // Session
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -106,6 +116,14 @@ function RGPage() {
       if (session) {
         setActiveSession(session);
         setBlockFilter(session.block_number || "all");
+      }
+
+      // Cycle/Week
+      const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
+      if (cycle) {
+        setActiveCycle(cycle);
+        const { data: week } = await supabase.from("weeks").select("*").eq("cycle_id", cycle.id).order("number", { ascending: true }).limit(1).maybeSingle();
+        if (week) setActiveWeek(week);
       }
 
       const { data, error } = await supabase
@@ -169,154 +187,185 @@ function RGPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-700 pb-24">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-[1.25rem] bg-slate-900 flex items-center justify-center shadow-xl">
-            <ClipboardList className="h-6 w-6 text-emerald-400" />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <h2 className="text-2xl font-black tracking-tight text-slate-900">Boletim RG</h2>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              {activeSession ? `Quarteirão ${activeSession.block_number} • ${activeSession.street_name}` : "Reconhecimento Geográfico"}
-            </p>
-          </div>
-        </div>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate({ to: '/field-work-list' })}
-          className="rounded-2xl border-none bg-white shadow-md hover:shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2 h-12"
-        >
-          <Target className="h-4 w-4 text-emerald-500" />
-          Continuar RG
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-6 opacity-10">
-            <Target className="h-16 w-16" />
-          </div>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-end mb-3">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Quarteirão {activeSession?.block_number}</p>
-                <h3 className="text-2xl font-black tracking-tighter">{stats.blockProgress}%</h3>
+    <LandscapeBulletinLayout
+      isLandscape={isLandscape}
+      title="Boletim RG"
+      subtitle={activeSession ? `Quarteirão ${activeSession.block_number} • ${activeSession.street_name}` : "Reconhecimento Geográfico"}
+      agentInfo={{
+        municipality: agent?.municipality || "Município",
+        name: agent?.name || "Agente",
+        registrationId: agent?.registration_id || "MAT-0000",
+        cycle: activeCycle?.number || "01/26",
+        week: activeWeek?.number?.toString() || "1",
+        block: activeSession?.block_number || "--",
+        street: activeSession?.street_name || "--"
+      }}
+      stats={{
+        worked: stats.total,
+        total: 500, // Placeholder
+        closed: 0,
+        refused: 0,
+        focus: 0,
+        treated: 0,
+        eliminated: 0,
+        progress: stats.blockProgress
+      }}
+    >
+      <div className={cn("flex flex-col gap-6 animate-in fade-in duration-700 pb-24", isLandscape && "pb-0 h-full flex flex-col")}>
+        {!isLandscape && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-[1.25rem] bg-slate-900 flex items-center justify-center shadow-xl">
+                <ClipboardList className="h-6 w-6 text-emerald-400" />
               </div>
-              <p className="text-[10px] font-bold text-slate-400">{stats.blockTotal}/50</p>
-            </div>
-            <Progress value={stats.blockProgress} className="h-1.5 bg-white/10" />
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-6 opacity-10">
-            <LayoutDashboard className="h-16 w-16" />
-          </div>
-          <CardContent className="p-6">
-            <div className="flex justify-between items-end mb-3">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-200 mb-1">Total Cadastro</p>
-                <h3 className="text-2xl font-black tracking-tighter">{stats.total}</h3>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="border-white/20 text-white font-black text-[8px]">{stats.residences} R</Badge>
-                <Badge variant="outline" className="border-white/20 text-white font-black text-[8px]">{stats.commerce} C</Badge>
+              <div className="flex flex-col gap-0.5">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900">Boletim RG</h2>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  {activeSession ? `Quarteirão ${activeSession.block_number} • ${activeSession.street_name}` : "Reconhecimento Geográfico"}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-            <Input 
-              placeholder="Buscar imóvel..." 
-              className="pl-12 h-14 rounded-2xl border-none bg-white shadow-lg text-base font-bold focus-visible:ring-emerald-500/20"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <Button 
+              variant="outline" 
+              onClick={() => navigate({ to: '/field-work-list' })}
+              className="rounded-2xl border-none bg-white shadow-md hover:shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2 h-12"
+            >
+              <Target className="h-4 w-4 text-emerald-500" />
+              Continuar RG
+            </Button>
           </div>
-          <Button 
-            className="h-14 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
-            onClick={() => {
-              setEditingProperty(null);
-              setIsFormOpen(true);
-            }}
-          >
-            <Plus className="h-5 w-5" /> Adicionar
-          </Button>
+        )}
+
+        {!isLandscape && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-6 opacity-10">
+                <Target className="h-16 w-16" />
+              </div>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-end mb-3">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Quarteirão {activeSession?.block_number}</p>
+                    <h3 className="text-2xl font-black tracking-tighter">{stats.blockProgress}%</h3>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400">{stats.blockTotal}/50</p>
+                </div>
+                <Progress value={stats.blockProgress} className="h-1.5 bg-white/10" />
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-6 opacity-10">
+                <LayoutDashboard className="h-16 w-16" />
+              </div>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-end mb-3">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-200 mb-1">Total Cadastro</p>
+                    <h3 className="text-2xl font-black tracking-tighter">{stats.total}</h3>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="border-white/20 text-white font-black text-[8px]">{stats.residences} R</Badge>
+                    <Badge variant="outline" className="border-white/20 text-white font-black text-[8px]">{stats.commerce} C</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+              <Input 
+                placeholder="Buscar imóvel..." 
+                className="pl-12 h-14 rounded-2xl border-none bg-white shadow-lg text-base font-bold focus-visible:ring-emerald-500/20"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button 
+              className="h-14 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
+              onClick={() => {
+                setEditingProperty(null);
+                setIsFormOpen(true);
+              }}
+            >
+              <Plus className="h-5 w-5" /> Adicionar
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <div className="space-y-4">
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acessando Território...</p>
+        <div className={cn("space-y-4", isLandscape && "flex-1 overflow-hidden")}>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="h-10 w-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acessando Território...</p>
+            </div>
+          ) : (
+            <div className={cn(isLandscape && "h-full overflow-hidden")}>
+              <RGDigitalBulletinTable 
+                properties={filteredProperties} 
+                onPropertyClick={handlePropertyClick}
+              />
+            </div>
+          )}
+        </div>
+
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
+            <div className="bg-slate-900 p-8 text-white relative">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <HistoryIcon className="h-24 w-24" />
+              </div>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black tracking-tighter">
+                  {editingProperty ? `Imóvel ${editingProperty.number}` : "Novo Imóvel"}
+                </DialogTitle>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">
+                  {editingProperty ? "Atualizar Cadastro" : "Cadastro de Território"}
+                </p>
+              </DialogHeader>
+            </div>
+            
+            <ScrollArea className="max-h-[60vh] p-6">
+              <PropertyForm 
+                initialData={editingProperty} 
+                activeSession={activeSession}
+                onSave={handleSaveProperty} 
+                onCancel={() => setIsFormOpen(false)}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        {!isLandscape && (
+          <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 z-50 shadow-[0_-10px_40px_rgba(15,23,42,0.3)] md:rounded-t-[3rem] safe-area-bottom">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              <div className="flex items-center gap-6 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                <div className="flex flex-col min-w-[60px]">
+                  <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Cadastrados</span>
+                  <span className="text-sm font-black text-white">{stats.total}</span>
+                </div>
+                <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+                  <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Residências</span>
+                  <span className="text-sm font-black text-emerald-400">{stats.residences}</span>
+                </div>
+                <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+                  <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Comércios</span>
+                  <span className="text-sm font-black text-blue-400">{stats.commerce}</span>
+                </div>
+                <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
+                  <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Terrenos</span>
+                  <span className="text-sm font-black text-amber-400">{stats.lots}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
-          <RGDigitalBulletinTable 
-            properties={filteredProperties} 
-            onPropertyClick={handlePropertyClick}
-          />
         )}
       </div>
-
-      {/* Property Modal */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
-          <div className="bg-slate-900 p-8 text-white relative">
-            <div className="absolute top-0 right-0 p-8 opacity-10">
-              <HistoryIcon className="h-24 w-24" />
-            </div>
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter">
-                {editingProperty ? `Imóvel ${editingProperty.number}` : "Novo Imóvel"}
-              </DialogTitle>
-              <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">
-                {editingProperty ? "Atualizar Cadastro" : "Cadastro de Território"}
-              </p>
-            </DialogHeader>
-          </div>
-          
-          <ScrollArea className="max-h-[60vh] p-6">
-            <PropertyForm 
-              initialData={editingProperty} 
-              activeSession={activeSession}
-              onSave={handleSaveProperty} 
-              onCancel={() => setIsFormOpen(false)}
-            />
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
-      {/* Operational Footer */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 z-50 shadow-[0_-10px_40px_rgba(15,23,42,0.3)] md:rounded-t-[3rem] safe-area-bottom">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar pb-1 md:pb-0">
-            <div className="flex flex-col min-w-[60px]">
-              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Cadastrados</span>
-              <span className="text-sm font-black text-white">{stats.total}</span>
-            </div>
-            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
-              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Residências</span>
-              <span className="text-sm font-black text-emerald-400">{stats.residences}</span>
-            </div>
-            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
-              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Comércios</span>
-              <span className="text-sm font-black text-blue-400">{stats.commerce}</span>
-            </div>
-            <div className="flex flex-col border-l border-white/10 pl-4 min-w-[60px]">
-              <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Terrenos</span>
-              <span className="text-sm font-black text-amber-400">{stats.lots}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </LandscapeBulletinLayout>
   );
 }
 
@@ -457,66 +506,20 @@ function PropertyForm({ initialData, activeSession, onSave, onCancel }: { initia
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Quarteirão</Label>
-          <Input 
-            value={formData.block_number || ""} 
-            onChange={(e) => setFormData({...formData, block_number: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rua/Logradouro</Label>
-          <Input 
-            value={formData.street_name || ""} 
-            onChange={(e) => setFormData({...formData, street_name: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
-        </div>
-      </div>
-
-      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            "h-10 w-10 rounded-xl flex items-center justify-center transition-all",
-            formData.latitude ? "bg-blue-500 text-white" : "bg-slate-200 text-slate-400"
-          )}>
-            <Navigation className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Coordenadas GPS</span>
-            <span className="text-xs font-bold text-slate-800">
-              {formData.latitude ? `${formData.latitude.toFixed(4)}, ${formData.longitude?.toFixed(4)}` : "Não capturado"}
-            </span>
-          </div>
-        </div>
-        <Button 
-          type="button"
-          variant="ghost" 
-          size="icon" 
-          onClick={handleCaptureGPS}
-          disabled={isCapturing}
-          className="rounded-xl text-blue-500 hover:bg-blue-50"
-        >
-          <Crosshair className={cn("h-5 w-5", isCapturing && "animate-spin")} />
-        </Button>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-800">Imóvel Abandonado?</span>
-            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Sem moradores ou fechado</span>
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className="space-y-0.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Abandonado</Label>
+            <p className="text-[8px] text-slate-400 font-bold uppercase">Imóvel Vazio</p>
           </div>
           <Switch 
             checked={formData.is_abandoned || false} 
             onCheckedChange={(val) => setFormData({...formData, is_abandoned: val})}
           />
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-slate-800">Fechado Frequentemente?</span>
-            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Dificuldade de acesso</span>
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className="space-y-0.5">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Fechado</Label>
+            <p className="text-[8px] text-slate-400 font-bold uppercase">Recorrência</p>
           </div>
           <Switch 
             checked={formData.is_frequently_closed || false} 
@@ -530,15 +533,27 @@ function PropertyForm({ initialData, activeSession, onSave, onCancel }: { initia
         <Textarea 
           value={formData.observations || ""} 
           onChange={(e) => setFormData({...formData, observations: e.target.value})}
-          placeholder="Ex: Cão bravo, portão lateral..."
-          className="rounded-xl border-slate-100 bg-slate-50 font-bold min-h-[80px]"
+          placeholder="Detalhes adicionais do imóvel..."
+          className="rounded-2xl border-slate-100 bg-slate-50 font-bold min-h-[100px]"
         />
       </div>
 
-      <Button type="submit" className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all gap-2">
-        <Save className="h-5 w-5" />
-        {initialData ? "Salvar Alterações" : "Concluir Cadastro"}
-      </Button>
+      <div className="flex gap-3">
+        <Button 
+          type="button" 
+          variant="outline" 
+          className="flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest"
+          onClick={onCancel}
+        >
+          Cancelar
+        </Button>
+        <Button 
+          type="submit" 
+          className="flex-[2] h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
+        >
+          <Save className="h-4 w-4" /> Salvar Cadastro
+        </Button>
+      </div>
     </form>
   );
 }
