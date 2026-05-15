@@ -198,10 +198,6 @@ function DashboardPage() {
   );
 }
 
-    </div>
-  );
-}
-
 function StatCard({ title, value, icon: Icon, color, isFocus }: any) {
   return (
     <Card className={`border-none shadow-lg overflow-hidden transition-all hover:shadow-xl active:scale-95 cursor-pointer group ${isFocus ? 'bg-red-50' : 'bg-card'}`}>
