@@ -1,127 +1,294 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { 
   FileText, 
   Download, 
   Share2, 
+  Eye, 
   Calendar, 
+  BarChart3, 
+  TrendingUp, 
   CheckCircle2, 
   XCircle, 
+  Home, 
   AlertTriangle,
   ChevronRight,
-  TrendingUp,
-  Mail,
-  MessageSquare
+  Printer
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  LineChart,
+  Line
+} from "recharts";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   component: ReportsPage,
 });
 
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
 function ReportsPage() {
-  const [reports] = useState([
-    { id: 1, type: "daily", date: "15/05/2026", title: "Boletim Diário", status: "Gerado" },
-    { id: 2, type: "weekly", date: "11/05 - 17/05", title: "Resumo Semanal", status: "Gerado" },
-    { id: 3, type: "cycle", date: "Ciclo 03/2026", title: "Fechamento de Ciclo", status: "Aberto" },
-  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Mock data for the bulletin
+  const [currentBulletin, setCurrentBulletin] = useState({
+    week: 14,
+    cycle: "03/2026",
+    coverage: 78,
+    blocksWorked: 12,
+    propertiesWorked: 342,
+    positiveFocus: 5,
+    lastSync: "Hoje, 10:30"
+  });
 
-  const handleShare = (title: string) => {
-    toast.success(`Compartilhando ${title}...`);
-  };
+  const productivityData = [
+    { name: 'Seg', visitas: 45 },
+    { name: 'Ter', visitas: 52 },
+    { name: 'Qua', visitas: 48 },
+    { name: 'Qui', visitas: 61 },
+    { name: 'Sex', visitas: 55 },
+  ];
 
-  const handleDownload = (title: string) => {
-    toast.success(`Iniciando download de ${title}...`);
+  const depositData = [
+    { name: 'A1/A2', value: 35 },
+    { name: 'B', value: 25 },
+    { name: 'C', value: 15 },
+    { name: 'D1/D2', value: 20 },
+    { name: 'E', value: 5 },
+  ];
+
+  const focusTrendData = [
+    { week: 'Sem 11', focos: 2 },
+    { week: 'Sem 12', focos: 4 },
+    { week: 'Sem 13', focos: 3 },
+    { week: 'Sem 14', focos: 5 },
+  ];
+
+  const handleGeneratePDF = () => {
+    setIsLoading(true);
+    toast.info("Gerando Boletim Semanal...");
+    
+    setTimeout(() => {
+      setIsLoading(false);
+      toast.success("Boletim gerado com sucesso!");
+    }, 2500);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black tracking-tighter text-primary">Relatórios</h2>
-        <p className="text-muted-foreground font-medium">Geração automática de boletins oficiais</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {reports.map((report) => (
-          <Card key={report.id} className="border-none shadow-xl rounded-[2.5rem] overflow-hidden group hover:scale-[1.02] transition-all">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-500">
-                  <FileText className="h-7 w-7" />
-                </div>
-                <Badge variant={report.status === "Gerado" ? "secondary" : "outline"} className="rounded-lg font-bold text-[10px] uppercase tracking-wider">
-                  {report.status}
-                </Badge>
-              </div>
-              <CardTitle className="text-xl font-black tracking-tight">{report.title}</CardTitle>
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                {report.date}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4 border-t border-accent/50 bg-accent/10">
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-1 rounded-2xl h-12 font-bold text-[10px] uppercase tracking-widest border-none bg-background hover:bg-accent active:scale-95 transition-all gap-2"
-                  onClick={() => handleDownload(report.title)}
-                >
-                  <Download className="h-4 w-4" /> Baixar
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 rounded-2xl h-12 font-bold text-[10px] uppercase tracking-widest border-none bg-background hover:bg-accent active:scale-95 transition-all gap-2"
-                  onClick={() => handleShare(report.title)}
-                >
-                  <Share2 className="h-4 w-4" /> Compartilhar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between ml-1">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Estatísticas do Período</h3>
-          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-lg px-2 py-0.5 text-[10px] font-bold">
-            <TrendingUp className="w-3 h-3 mr-1" /> Meta Alcançada
-          </Badge>
+    <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header */}
+      <div className="flex items-center justify-between px-1">
+        <div>
+          <h2 className="text-2xl font-black tracking-tight text-slate-800">Boletim Semanal</h2>
+          <p className="text-sm font-medium text-slate-500">Resumo operacional automático</p>
         </div>
+        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 font-bold px-3 py-1 rounded-full">
+          Semana {currentBulletin.week}
+        </Badge>
+      </div>
 
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-none shadow-md bg-white rounded-3xl overflow-hidden">
+          <CardContent className="p-4">
+            <div className="bg-blue-100 p-2 rounded-xl w-fit mb-3">
+              <Home className="h-4 w-4 text-blue-600" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trabalhados</p>
+            <p className="text-2xl font-black text-slate-800">{currentBulletin.propertiesWorked}</p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-none shadow-md bg-white rounded-3xl overflow-hidden">
+          <CardContent className="p-4">
+            <div className="bg-red-100 p-2 rounded-xl w-fit mb-3">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Focos Positivos</p>
+            <p className="text-2xl font-black text-red-600">{currentBulletin.positiveFocus}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Coverage Card */}
+      <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-10">
+          <TrendingUp className="h-24 w-24" />
+        </div>
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg font-bold">Cobertura da Semana</CardTitle>
+            <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none font-bold">
+              {currentBulletin.coverage}%
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Progress value={currentBulletin.coverage} className="h-3 bg-white/10" />
+            <div className="flex justify-between text-xs font-medium text-slate-400">
+              <span>Ciclo {currentBulletin.cycle}</span>
+              <span>{currentBulletin.blocksWorked} quarteirões concluídos</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className="flex gap-3 px-1">
+        <Button 
+          onClick={handleGeneratePDF}
+          disabled={isLoading}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 font-black shadow-lg shadow-blue-200"
+        >
+          {isLoading ? (
+            <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+          ) : (
+            <Printer className="mr-2 h-5 w-5" />
+          )}
+          Gerar PDF Semanal
+        </Button>
+      </div>
+
+      {/* Detailed Indicators */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-lg font-bold text-slate-800">Indicadores Detalhados</h3>
+        </div>
+        
         <div className="grid grid-cols-2 gap-3">
-          <QuickStat icon={CheckCircle2} label="Inspecionados" value="842" color="text-emerald-500" />
-          <QuickStat icon={XCircle} label="Fechados" value="56" color="text-yellow-500" />
-          <QuickStat icon={AlertTriangle} label="Focos" value="12" color="text-red-500" />
-          <QuickStat icon={TrendingUp} label="Produtividade" value="98%" color="text-blue-500" />
+          <IndicatorItem label="Fechados" value={18} icon={XCircle} color="text-orange-500" bgColor="bg-orange-50" />
+          <IndicatorItem label="Recusados" value={4} icon={AlertTriangle} color="text-red-500" bgColor="bg-red-50" />
+          <IndicatorItem label="Tratados" value={142} icon={CheckCircle2} color="text-emerald-500" bgColor="bg-emerald-50" />
+          <IndicatorItem label="Eliminados" value={85} icon={BarChart3} color="text-blue-500" bgColor="bg-blue-50" />
         </div>
-      </section>
+      </div>
 
-      <div className="flex flex-col gap-3">
-        <Button className="w-full h-16 rounded-[2rem] text-sm font-bold shadow-xl shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-700 transition-all gap-2">
-          <MessageSquare className="h-5 w-5" /> Enviar para Supervisor via WhatsApp
-        </Button>
-        <Button variant="outline" className="w-full h-16 rounded-[2rem] text-sm font-bold border-none bg-accent/30 hover:bg-accent/50 transition-all gap-2">
-          <Mail className="h-5 w-5" /> Enviar por E-mail
-        </Button>
+      {/* Analytics Tabs */}
+      <Tabs defaultValue="productivity" className="w-full">
+        <TabsList className="w-full grid grid-cols-2 bg-slate-100 p-1 rounded-2xl mb-4">
+          <TabsTrigger value="productivity" className="rounded-xl font-bold text-xs uppercase tracking-tighter">Produtividade</TabsTrigger>
+          <TabsTrigger value="deposits" className="rounded-xl font-bold text-xs uppercase tracking-tighter">Depósitos</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="productivity">
+          <Card className="border-none shadow-md rounded-3xl p-4">
+            <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Visitas por dia</h4>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={productivityData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 600, fill: '#64748b'}} />
+                  <Tooltip 
+                    cursor={{fill: '#f8fafc'}}
+                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  />
+                  <Bar dataKey="visitas" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deposits">
+          <Card className="border-none shadow-md rounded-3xl p-4">
+            <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-widest">Distribuição de Depósitos</h4>
+            <div className="h-[200px] w-full flex items-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={depositData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {depositData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="w-1/2 space-y-1">
+                {depositData.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i]}} />
+                    <span className="text-[10px] font-bold text-slate-600">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* History Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-lg font-bold text-slate-800">Relatórios Gerados</h3>
+        </div>
+        
+        <div className="space-y-3">
+          <HistoryItem week="13" date="08/05/2026" status="Concluído" />
+          <HistoryItem week="12" date="01/05/2026" status="Concluído" />
+          <HistoryItem week="11" date="24/04/2026" status="Concluído" />
+        </div>
       </div>
     </div>
   );
 }
 
-function QuickStat({ icon: Icon, label, value, color }: any) {
+function IndicatorItem({ label, value, icon: Icon, color, bgColor }: any) {
   return (
-    <Card className="border-none shadow-md bg-card rounded-[1.5rem] overflow-hidden">
-      <CardContent className="p-4 flex flex-col items-center text-center gap-1">
-        <div className={`p-2 rounded-xl bg-accent/50 mb-1 ${color}`}>
-          <Icon className="h-5 w-5" />
+    <div className={cn("flex flex-col p-4 rounded-3xl border border-slate-100 bg-white shadow-sm")}>
+      <div className={cn("p-2 rounded-xl w-fit mb-2", bgColor)}>
+        <Icon className={cn("h-4 w-4", color)} />
+      </div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-xl font-black text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function HistoryItem({ week, date, status }: any) {
+  return (
+    <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between active:bg-slate-50 transition-colors">
+      <div className="flex items-center gap-4">
+        <div className="bg-slate-100 p-3 rounded-2xl">
+          <FileText className="h-5 w-5 text-slate-500" />
         </div>
-        <div className="text-xl font-black">{value}</div>
-        <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">{label}</div>
-      </CardContent>
-    </Card>
+        <div>
+          <h4 className="font-bold text-slate-800">Semana {week}</h4>
+          <p className="text-[10px] font-bold text-slate-400 uppercase">{date}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-600 border-emerald-100 bg-emerald-50">
+          {status}
+        </Badge>
+        <Button variant="ghost" size="icon" className="text-slate-400">
+          <Eye className="h-5 w-5" />
+        </Button>
+      </div>
+    </div>
   );
 }
