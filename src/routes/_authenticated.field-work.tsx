@@ -55,7 +55,7 @@ function FieldWorkPage() {
     
     toast.success("Trabalho iniciado com sucesso!");
     // In a real app, we would save the session to Supabase here
-    navigate({ to: `/dashboard` }); // Redirect to properties list (which we'll refine next)
+    navigate({ to: `/field-work-list` });
   };
 
   return (
