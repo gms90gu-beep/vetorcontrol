@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -83,29 +83,37 @@ function DashboardPage() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Button className="h-28 rounded-[2rem] flex-col gap-2 shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 active:scale-95 transition-all">
-          <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
-            <MapPin className="h-6 w-6" />
-          </div>
-          <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Continuar</span>
+        <Button asChild className="h-28 rounded-[2rem] flex-col gap-2 shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 active:scale-95 transition-all">
+          <Link to="/field-work">
+            <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
+              <MapPin className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Continuar</span>
+          </Link>
         </Button>
-        <Button variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-yellow-100/80 hover:bg-yellow-200 text-yellow-700 shadow-xl shadow-yellow-100/10 active:scale-95 transition-all">
-          <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-yellow-700">
-            <AlertTriangle className="h-6 w-6" />
-          </div>
-          <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Pendências</span>
+        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-yellow-100/80 hover:bg-yellow-200 text-yellow-700 shadow-xl shadow-yellow-100/10 active:scale-95 transition-all">
+          <Link to="/pending">
+            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-yellow-700">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Pendências</span>
+          </Link>
         </Button>
-        <Button variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-blue-100/80 hover:bg-blue-200 text-blue-700 shadow-xl shadow-blue-100/10 active:scale-95 transition-all">
-          <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-blue-700">
-            <Home className="h-6 w-6" />
-          </div>
-          <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Imóveis</span>
+        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-blue-100/80 hover:bg-blue-200 text-blue-700 shadow-xl shadow-blue-100/10 active:scale-95 transition-all">
+          <Link to="/field-work">
+            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-blue-700">
+              <Home className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Imóveis</span>
+          </Link>
         </Button>
-        <Button variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-emerald-100/80 hover:bg-emerald-200 text-emerald-700 shadow-xl shadow-emerald-100/10 active:scale-95 transition-all">
-          <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-emerald-700">
-            <FileText className="h-6 w-6" />
-          </div>
-          <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Relatórios</span>
+        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-emerald-100/80 hover:bg-emerald-200 text-emerald-700 shadow-xl shadow-emerald-100/10 active:scale-95 transition-all">
+          <Link to="/reports">
+            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-emerald-700">
+              <FileText className="h-6 w-6" />
+            </div>
+            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Relatórios</span>
+          </Link>
         </Button>
       </div>
 
