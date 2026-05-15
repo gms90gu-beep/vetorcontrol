@@ -301,6 +301,11 @@ function DashboardPage() {
         </div>
       </div>
 
+      {/* Daily Work Closer Button */}
+      <div className="pt-2">
+        <DailyWorkCloser />
+      </div>
+
       {/* Quick Summary Section */}
       <div className="pt-2">
         <div className="flex items-center justify-between mb-4 px-1">
