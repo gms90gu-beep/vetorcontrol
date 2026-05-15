@@ -93,7 +93,7 @@ function BottomNav() {
       <NavItem to="/field-work" icon={CheckSquare} label="Diário" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
       <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Relatórios" />
+      <NavItem to="/reports" icon={FileText} label="Boletim" />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
