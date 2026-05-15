@@ -66,13 +66,15 @@ type Property = {
   reference: string | null;
   latitude: number | null;
   longitude: number | null;
-  container_count: number;
+  container_count: number | null;
   observations: string | null;
-  is_abandoned: boolean;
-  is_frequently_closed: boolean;
-  had_previous_focus: boolean;
-  status: "active" | "pending" | "deactivated";
-  user_id: string;
+  is_abandoned: boolean | null;
+  is_frequently_closed: boolean | null;
+  had_previous_focus: boolean | null;
+  status: "active" | "pending" | "deactivated" | null;
+  user_id: string | null;
+  block_id?: string | null;
+  street_id?: string | null;
 };
 
 function RGPage() {
@@ -439,7 +441,21 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
       if (!user) throw new Error("Usuário não autenticado");
 
       const propertyToSave = {
-        ...formData,
+        number: formData.number!,
+        complement: formData.complement || null,
+        type: formData.type || "residence",
+        street_name: formData.street_name || null,
+        neighborhood: formData.neighborhood || null,
+        block_number: formData.block_number || null,
+        reference: formData.reference || null,
+        latitude: formData.latitude || null,
+        longitude: formData.longitude || null,
+        container_count: formData.container_count || 0,
+        observations: formData.observations || null,
+        is_abandoned: formData.is_abandoned ?? false,
+        is_frequently_closed: formData.is_frequently_closed ?? false,
+        had_previous_focus: formData.had_previous_focus ?? false,
+        status: formData.status || "active",
         user_id: user.id,
         id: initialData?.id || undefined
       };
