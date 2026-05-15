@@ -26,7 +26,7 @@ function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success("Login realizado com sucesso!");
-      navigate({ to: "/dashboard" });
+      navigate({ to: "/dashboard" as any });
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
     } finally {
@@ -45,29 +45,29 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md border-none shadow-2xl bg-background/80 backdrop-blur-xl">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-xl shadow-primary/30">
+      <Card className="w-full max-w-md border-none shadow-2xl bg-background/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="space-y-1 text-center pt-10 pb-6">
+          <div className="flex justify-center mb-6">
+            <div className="h-20 w-20 rounded-[2rem] bg-primary flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 rotate-12 transition-transform hover:rotate-0">
               <ShieldCheck className="h-10 w-10" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight">VetorControl</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-4xl font-black tracking-tighter text-primary">VetorControl</CardTitle>
+          <CardDescription className="text-base font-medium">
             Sistema de Controle Vetorial Urbano
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
-          <CardContent className="grid gap-6">
+          <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1">E-mail</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="seu@email.com"
-                  className="pl-10 h-12 rounded-xl"
+                  className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -76,14 +76,14 @@ function LoginPage() {
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest ml-1">Senha</Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="password"
                   type="password"
-                  className="pl-10 h-12 rounded-xl"
+                  className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -91,7 +91,7 @@ function LoginPage() {
               </div>
             </div>
             <Button 
-              className="w-full h-12 rounded-xl text-lg font-medium shadow-lg shadow-primary/20 active:scale-[0.98] transition-all" 
+              className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2" 
               disabled={isLoading}
             >
               {isLoading ? "Entrando..." : "Entrar"}
@@ -101,18 +101,18 @@ function LoginPage() {
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Ou continue com</span>
+              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
+                <span className="bg-background px-4 text-muted-foreground">Ou continue com</span>
               </div>
             </div>
 
             <Button 
               type="button" 
               variant="outline" 
-              className="w-full h-12 rounded-xl font-medium active:scale-[0.98] transition-all"
+              className="w-full h-14 rounded-2xl font-bold active:scale-[0.98] transition-all border-none bg-accent/30 hover:bg-accent/50"
               onClick={handleGoogleLogin}
             >
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+              <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -134,9 +134,9 @@ function LoginPage() {
             </Button>
           </CardContent>
         </form>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Não tem uma conta? <Link to="/signup" className="text-primary font-medium hover:underline">Solicitar acesso</Link>
+        <CardFooter className="flex justify-center pb-10">
+          <p className="text-sm text-muted-foreground font-medium">
+            Não tem uma conta? <Link to={"/signup" as any} className="text-primary font-bold hover:underline">Solicitar acesso</Link>
           </p>
         </CardFooter>
       </Card>
