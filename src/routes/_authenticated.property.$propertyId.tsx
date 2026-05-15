@@ -258,7 +258,16 @@ function PropertyVisitPage() {
         await supabase
           .from("visits")
           .update({ 
-            activity_type: (activityMap[activity] || "routine") as any 
+            activity_type: (activityMap[activity] || "routine") as any,
+            has_focus: activity === 'survey' ? surveyData.hasFocus : false,
+            sample_collected: activity === 'survey' ? surveyData.sampleCollected : false,
+            treatment_applied: activity === 'routine' ? routineData.treatment : false,
+            treatment_amount: activity === 'routine' ? routineData.treatmentAmount : 0,
+            elimination_done: activity === 'routine' ? routineData.elimination : false,
+            elimination_amount: activity === 'routine' ? routineData.eliminationAmount : 0,
+            guidance_given: activity === 'routine' ? routineData.guidance : false,
+            is_recovered: activity === 'pending' ? pendingData.isRecovered : false,
+            notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
           })
           .eq("id", visitId);
       }
