@@ -149,7 +149,7 @@ function DashboardPage() {
           .select("id")
           .eq("block_number", session.block_number);
         
-        if (blockProps && blockProps.length > 0) {
+        if (blockProps && blockProps.length > 0 && session.cycle_id) {
           const { data: sessionVisits } = await supabase
             .from("visits")
             .select("id")
