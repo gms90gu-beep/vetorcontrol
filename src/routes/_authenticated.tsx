@@ -15,6 +15,7 @@ import {
   Home,
   CheckSquare,
 } from "lucide-react";
+import { OperationalHeader } from "@/components/OperationalHeader";
 import { Button } from "@/components/ui/button";
 import { 
   Sidebar, 
@@ -57,23 +58,11 @@ function AuthenticatedLayout() {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background overflow-hidden">
+      <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
         <AppSidebar onLogout={handleLogout} />
         <main className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur px-4 md:px-6 shrink-0">
-            <SidebarTrigger className="md:hidden" />
-            <div className="flex-1">
-              <h1 className="text-lg font-semibold tracking-tight text-foreground truncate">
-                VetorControl
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground transition-transform active:rotate-180 duration-500">
-                <RefreshCw className="h-5 w-5" />
-              </Button>
-            </div>
-          </header>
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
+          <OperationalHeader />
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8">
             <Outlet />
           </div>
           <BottomNav />
