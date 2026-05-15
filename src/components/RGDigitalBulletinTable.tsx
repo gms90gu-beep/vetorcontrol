@@ -77,7 +77,7 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
         <Table>
           <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
             <TableRow className="hover:bg-transparent border-slate-100">
-              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 pl-6">Nº Imóvel</TableHead>
+              <TableHead className="w-[80px] text-[10px] font-black uppercase tracking-widest text-slate-500 py-4 pl-6 sticky left-0 bg-slate-50/80 backdrop-blur-md z-20">Nº Imóvel</TableHead>
               <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-slate-500">Comp.</TableHead>
               <TableHead className="w-[100px] text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo</TableHead>
               <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-500">Situação</TableHead>
