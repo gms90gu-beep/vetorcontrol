@@ -39,6 +39,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const isLandscape = useOrientation();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -60,13 +61,16 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
-        <AppSidebar onLogout={handleLogout} />
+        {!isLandscape && <AppSidebar onLogout={handleLogout} />}
         <main className="flex-1 flex flex-col min-w-0">
-          <OperationalHeader />
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8">
+          {!isLandscape && <OperationalHeader />}
+          <div className={cn(
+            "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8",
+            isLandscape && "p-2 md:p-4 pb-4"
+          )}>
             <Outlet />
           </div>
-          <BottomNav />
+          {!isLandscape && <BottomNav />}
         </main>
       </div>
     </SidebarProvider>
