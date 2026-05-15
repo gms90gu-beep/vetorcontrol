@@ -155,10 +155,10 @@ function DashboardPage() {
           to="/rg"
         />
         <ActionCard 
-          title="Semanal" 
-          description="Resumo de produtividade" 
+          title="Boletim" 
+          description="Resumo semanal automático" 
           icon={BarChart3} 
-          color="bg-orange-500 shadow-orange-200"
+          color="bg-indigo-600 shadow-indigo-200"
           to="/reports"
         />
         <ActionCard 
