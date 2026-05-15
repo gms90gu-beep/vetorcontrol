@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -298,6 +299,11 @@ function DashboardPage() {
             className={isSyncing ? "animate-spin duration-[3s]" : ""}
           />
         </div>
+      </div>
+
+      {/* Daily Work Closer Button */}
+      <div className="pt-2">
+        <DailyWorkCloser />
       </div>
 
       {/* Quick Summary Section */}

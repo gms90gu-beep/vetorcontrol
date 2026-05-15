@@ -33,6 +33,7 @@ export function OperationalHeader() {
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
+  const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +52,10 @@ export function OperationalHeader() {
         .eq("profile_id", user.id)
         .maybeSingle();
       
-      if (agentData) setAgent(agentData);
+      if (agentData) {
+        setAgent(agentData);
+        setWorkStatus(agentData.work_status || 'available');
+      }
 
       // 2. Get current cycle
       const { data: cycle } = await supabase
@@ -174,8 +178,15 @@ export function OperationalHeader() {
                     {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 bg-emerald-500 h-4 w-4 rounded-full border-2 border-slate-900 shadow-lg flex items-center justify-center">
-                  <div className="h-1.5 w-1.5 bg-white rounded-full animate-pulse" />
+                <div className={cn(
+                  "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-slate-900 shadow-lg flex items-center justify-center",
+                  workStatus === 'in_work' ? "bg-emerald-500" : 
+                  workStatus === 'work_completed' ? "bg-blue-500" : "bg-slate-500"
+                )}>
+                  <div className={cn(
+                    "h-1.5 w-1.5 bg-white rounded-full",
+                    workStatus === 'in_work' && "animate-pulse"
+                  )} />
                 </div>
               </button>
             </DropdownMenuTrigger>
