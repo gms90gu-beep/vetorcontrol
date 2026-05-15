@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          created_at: string | null
+          id: string
+          municipality: string | null
+          name: string
+          phone: string | null
+          photo_url: string | null
+          profile_id: string | null
+          registration_id: string | null
+          status: string | null
+          team: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          municipality?: string | null
+          name: string
+          phone?: string | null
+          photo_url?: string | null
+          profile_id?: string | null
+          registration_id?: string | null
+          status?: string | null
+          team?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          municipality?: string | null
+          name?: string
+          phone?: string | null
+          photo_url?: string | null
+          profile_id?: string | null
+          registration_id?: string | null
+          status?: string | null
+          team?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       areas: {
         Row: {
           code: string | null

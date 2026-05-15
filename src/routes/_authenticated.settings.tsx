@@ -10,104 +10,196 @@ import {
   LogOut,
   Info,
   Clock,
-  Globe
+  Globe,
+  Camera,
+  Mail,
+  Phone,
+  Briefcase,
+  Trophy,
+  History,
+  TrendingUp,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black tracking-tighter text-primary">Configurações</h2>
-        <p className="text-muted-foreground font-medium">Perfil, sistema e sincronização</p>
-      </div>
+  const [agent, setAgent] = useState<any>(null);
+  const [stats, setStats] = useState({
+    worked: 1240,
+    foci: 42,
+    pending: 15,
+    productivity: 94
+  });
 
+  useEffect(() => {
+    fetchAgentProfile();
+  }, []);
+
+  async function fetchAgentProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    
+    if (data) setAgent(data);
+  }
+
+  const handleUpdatePhoto = () => {
+    toast.info("Acessando câmera...");
+    // Future: implement actual camera/gallery picker
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
+      {/* Premium Profile Header */}
       <section className="space-y-4">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Perfil do Agente</h3>
-        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-[2rem] bg-primary/10 flex items-center justify-center text-primary relative shadow-inner">
-                <User className="h-10 w-10" />
-                <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-emerald-500 border-4 border-background flex items-center justify-center">
-                  <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Perfil Profissional</h3>
+        <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-gradient-to-br from-white to-slate-50">
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center text-center gap-6">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-tr from-primary to-blue-500 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-500" />
+                <Avatar className="h-32 w-32 rounded-[2.5rem] border-4 border-white shadow-2xl relative">
+                  <AvatarImage src={agent?.photo_url} alt={agent?.name} className="object-cover" />
+                  <AvatarFallback className="bg-slate-100 text-slate-400 font-black text-3xl">
+                    {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
+                  </AvatarFallback>
+                </Avatar>
+                <button 
+                  onClick={handleUpdatePhoto}
+                  className="absolute -bottom-2 -right-2 bg-primary text-white h-10 w-10 rounded-2xl shadow-lg border-4 border-white flex items-center justify-center hover:scale-110 active:scale-90 transition-all"
+                >
+                  <Camera className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-1">
+                <h4 className="text-2xl font-black tracking-tight text-slate-900">{agent?.name || "Agente"}</h4>
+                <div className="flex items-center justify-center gap-2">
+                  <Badge variant="outline" className="text-[10px] font-black tracking-widest uppercase border-slate-200 text-slate-500">
+                    {agent?.registration_id || "ACE-0000"}
+                  </Badge>
+                  <Badge className="bg-blue-600 text-white border-none rounded-lg text-[10px] font-black tracking-widest uppercase">
+                    {agent?.team || "Equipe A"}
+                  </Badge>
                 </div>
               </div>
-              <div className="flex flex-col">
-                <h4 className="text-xl font-black tracking-tight">João Silva</h4>
-                <p className="text-sm font-medium text-muted-foreground">ID: #42098 - Agente de Endemias</p>
-                <div className="flex gap-2 mt-2">
-                  <Badge className="bg-primary/10 text-primary border-none rounded-lg text-[10px] font-bold">Equipe A</Badge>
-                  <Badge className="bg-blue-100 text-blue-700 border-none rounded-lg text-[10px] font-bold tracking-wider uppercase">Setor 04</Badge>
-                </div>
+
+              <div className="grid grid-cols-3 w-full gap-4 pt-4">
+                <ProfileMiniStat icon={Trophy} label="Eficiência" value={`${stats.productivity}%`} color="text-emerald-500" />
+                <ProfileMiniStat icon={Briefcase} label="Visitas" value={stats.worked} color="text-blue-500" />
+                <ProfileMiniStat icon={AlertCircle} label="Focos" value={stats.foci} color="text-red-500" />
               </div>
             </div>
           </CardContent>
         </Card>
       </section>
 
+      {/* Operational Details */}
+      <section className="space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Detalhes Operacionais</h3>
+        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
+          <CardContent className="p-2">
+            <SettingsItem icon={MapPin} label="Município" description={agent?.municipality || "São Paulo"} />
+            <Separator className="bg-slate-50 mx-4" />
+            <SettingsItem icon={Phone} label="Telefone" description={agent?.phone || "(11) 99999-9999"} />
+            <Separator className="bg-slate-50 mx-4" />
+            <SettingsItem icon={History} label="Histórico Operacional" description="Ver registro de atividades passadas" isAction />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* System Preferences */}
       <section className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Preferências do Sistema</h3>
-        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
+        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
           <CardContent className="p-2">
             <SettingsItem icon={Globe} label="Modo Offline" description="Salvar dados localmente quando sem rede" hasSwitch defaultChecked />
-            <Separator className="bg-accent/50 mx-4" />
+            <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={Bell} label="Notificações" description="Alertas de pendências e novos ciclos" hasSwitch defaultChecked />
-            <Separator className="bg-accent/50 mx-4" />
-            <SettingsItem icon={MapPin} label="Localização GPS" description="Alta precisão para registro de imóveis" hasSwitch defaultChecked />
-            <Separator className="bg-accent/50 mx-4" />
+            <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={Smartphone} label="Sincronização Automática" description="Enviar dados ao retomar conexão" hasSwitch defaultChecked />
           </CardContent>
         </Card>
       </section>
 
+      {/* Security & Maintenance */}
       <section className="space-y-3">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Banco de Dados e Cache</h3>
-        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Segurança e Manutenção</h3>
+        <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
           <CardContent className="p-2">
-            <SettingsItem icon={Database} label="Limpar Cache Local" description="Remove histórico de visitas offline" isAction />
-            <Separator className="bg-accent/50 mx-4" />
-            <SettingsItem icon={Clock} label="Histórico do Ciclo" description="Ver visitas de ciclos anteriores" isAction />
-            <Separator className="bg-accent/50 mx-4" />
-            <SettingsItem icon={Shield} label="Segurança" description="Configurar biometria e senha" isAction />
+            <SettingsItem icon={Shield} label="Privacidade" description="Gerenciar acesso e biometria" isAction />
+            <Separator className="bg-slate-50 mx-4" />
+            <SettingsItem icon={Database} label="Limpar Dados Locais" description="Libera espaço no dispositivo" isAction />
           </CardContent>
         </Card>
       </section>
 
       <div className="pt-4 px-2">
-        <div className="flex items-center justify-center gap-2 text-muted-foreground mb-8">
+        <Button 
+          variant="outline" 
+          className="w-full h-14 rounded-2xl border-red-100 text-red-500 hover:bg-red-50 hover:text-red-600 font-black uppercase tracking-widest text-[10px]"
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.href = "/login";
+          }}
+        >
+          <LogOut className="h-4 w-4 mr-2" /> Encerrar Sessão
+        </Button>
+        <div className="flex items-center justify-center gap-2 text-slate-300 mt-8">
           <Info className="h-4 w-4" />
-          <span className="text-xs font-bold tracking-wider uppercase">Versão 1.2.4 (Prod)</span>
+          <span className="text-[10px] font-black tracking-widest uppercase">Versão 2.1.0 (Build 2026)</span>
         </div>
       </div>
     </div>
   );
 }
 
+function ProfileMiniStat({ icon: Icon, label, value, color }: any) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className={cn("p-2 rounded-xl bg-slate-50", color)}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <span className="text-lg font-black tracking-tighter text-slate-900">{value}</span>
+      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+    </div>
+  );
+}
+
 function SettingsItem({ icon: Icon, label, description, hasSwitch, defaultChecked, isAction }: any) {
   return (
-    <div className="flex items-center justify-between p-4 hover:bg-accent/30 transition-colors cursor-pointer rounded-2xl group">
+    <div className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer rounded-2xl group">
       <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-2xl bg-accent/50 flex items-center justify-center text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-          <Icon className="h-6 w-6" />
+        <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+          <Icon className="h-5 w-5" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-sm tracking-tight">{label}</span>
-          <span className="text-xs font-medium text-muted-foreground">{description}</span>
+          <span className="font-bold text-sm tracking-tight text-slate-900">{label}</span>
+          <span className="text-xs font-medium text-slate-500">{description}</span>
         </div>
       </div>
       {hasSwitch ? (
         <Switch defaultChecked={defaultChecked} />
       ) : isAction ? (
-        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
       ) : null}
     </div>
   );
