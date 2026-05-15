@@ -165,6 +165,44 @@ function PropertyVisitPage() {
     setDeposits(deposits.map(d => d.id === id ? { ...d, [field]: value } : d));
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4 animate-in fade-in duration-500">
+        <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Carregando dados do imóvel...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6 animate-in fade-in duration-500">
+        <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
+          <AlertCircle className="h-10 w-10 text-red-500" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error}</h3>
+          <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações deste imóvel.</p>
+        </div>
+        <div className="flex gap-3 w-full max-w-xs">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate({ to: "/field-work-list" })}
+            className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+          >
+            Voltar
+          </Button>
+          <Button 
+            onClick={fetchData}
+            className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]"
+          >
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex items-center gap-3">
@@ -300,6 +338,7 @@ function PropertyVisitPage() {
       </div>
     </div>
   );
+}
 }
 
 function StatusButton({ active, onClick, icon: Icon, label, color, activeColor }: any) {
