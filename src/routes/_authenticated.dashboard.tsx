@@ -11,18 +11,60 @@ import {
   TrendingUp,
   Calendar,
   ChevronRight,
-  FileText
+  FileText,
+  CalendarCheck,
+  BarChart3,
+  AlertCircle,
+  RefreshCw,
+  Search,
+  Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
+function ActionCard({ title, description, icon: Icon, color, to, onClick }: any) {
+  const content = (
+    <div className={cn(
+      "flex flex-col h-full p-5 rounded-[2rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-none text-white",
+      color
+    )}>
+      <div className="bg-white/20 p-3 rounded-2xl w-fit mb-4 group-hover:scale-110 transition-transform">
+        <Icon className="h-6 w-6" />
+      </div>
+      <div>
+        <h3 className="text-lg font-bold leading-tight mb-1">{title}</h3>
+        <p className="text-[10px] text-white/80 font-medium uppercase tracking-wider">{description}</p>
+      </div>
+    </div>
+  );
+
+  if (to) {
+    return (
+      <Link to={to} className="h-40 block">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} className="h-40 text-left w-full block">
+      {content}
+    </button>
+  );
+}
+
 function DashboardPage() {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+
   const [stats, setStats] = useState({
     worked: 142,
     visited: 158,
@@ -41,92 +83,121 @@ function DashboardPage() {
     block: "Quarteirão 042",
   });
 
+  const handleSync = () => {
+    setIsSyncing(true);
+    toast.info("Sincronizando dados...");
+    
+    setTimeout(() => {
+      setIsSyncing(false);
+      setLastSync(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      toast.success("Dados sincronizados com sucesso!");
+    }, 2000);
+  };
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header Info */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-primary">Olá, Agente</h2>
-          <p className="text-muted-foreground">Aqui está o resumo do seu trabalho hoje.</p>
+          <h2 className="text-2xl font-black tracking-tight text-slate-800">VetorControl</h2>
+          <p className="text-sm font-medium text-slate-500">Olá, Agente</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="px-3 py-1 rounded-full bg-primary/10 text-primary border-none">
+        <div className="flex gap-2">
+          <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
             <Calendar className="mr-1 h-3.5 w-3.5" />
             {currentInfo.date}
-          </Badge>
-          <Badge variant="outline" className="px-3 py-1 rounded-full text-muted-foreground">
-            {currentInfo.cycle}
           </Badge>
         </div>
       </div>
 
       {/* Progress Card */}
-      <Card className="border-none shadow-2xl bg-gradient-to-br from-primary via-primary/90 to-blue-900 text-primary-foreground overflow-hidden relative">
+      <Card className="border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-primary-foreground overflow-hidden relative rounded-[2rem]">
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <TrendingUp className="h-32 w-32" />
         </div>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium opacity-90">Progresso do Quarteirão</CardTitle>
-          <div className="flex items-end justify-between">
-            <span className="text-4xl font-bold">{currentInfo.block}</span>
-            <span className="text-xl font-semibold">{stats.progress}%</span>
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest opacity-70 mb-1">Status Atual</p>
+              <CardTitle className="text-2xl font-black">{currentInfo.block}</CardTitle>
+            </div>
+            <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
+              {currentInfo.cycle}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <Progress value={stats.progress} className="h-3 bg-white/20" />
-          <div className="mt-4 flex justify-between text-sm font-medium opacity-90">
-            <span>{stats.worked} de 218 imóveis</span>
-            <span>Restam 76</span>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-bold opacity-90">{stats.progress}% concluído</span>
+            <span className="text-sm font-bold opacity-90">{stats.worked}/218 imóveis</span>
           </div>
+          <Progress value={stats.progress} className="h-2.5 bg-white/20" />
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Button asChild className="h-28 rounded-[2rem] flex-col gap-2 shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 active:scale-95 transition-all">
-          <Link to="/field-work">
-            <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
-              <MapPin className="h-6 w-6" />
-            </div>
-            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Continuar</span>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-yellow-100/80 hover:bg-yellow-200 text-yellow-700 shadow-xl shadow-yellow-100/10 active:scale-95 transition-all">
-          <Link to="/pending">
-            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-yellow-700">
-              <AlertTriangle className="h-6 w-6" />
-            </div>
-            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Pendências</span>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-blue-100/80 hover:bg-blue-200 text-blue-700 shadow-xl shadow-blue-100/10 active:scale-95 transition-all">
-          <Link to="/field-work">
-            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-blue-700">
-              <Home className="h-6 w-6" />
-            </div>
-            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Imóveis</span>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-28 rounded-[2rem] flex-col gap-2 border-none bg-emerald-100/80 hover:bg-emerald-200 text-emerald-700 shadow-xl shadow-emerald-100/10 active:scale-95 transition-all">
-          <Link to="/reports">
-            <div className="h-12 w-12 rounded-2xl bg-white/50 flex items-center justify-center text-emerald-700">
-              <FileText className="h-6 w-6" />
-            </div>
-            <span className="font-bold text-[10px] uppercase tracking-[0.1em]">Relatórios</span>
-          </Link>
-        </Button>
+      {/* Main Grid Actions */}
+      <div className="grid grid-cols-2 gap-4">
+        <ActionCard 
+          title="Diário" 
+          description="Iniciar atividades do dia" 
+          icon={CalendarCheck} 
+          color="bg-blue-500 shadow-blue-200"
+          to="/field-work"
+        />
+        <ActionCard 
+          title="RG" 
+          description="Registro Geográfico" 
+          icon={MapPin} 
+          color="bg-emerald-500 shadow-emerald-200"
+          to="/map"
+        />
+        <ActionCard 
+          title="Semanal" 
+          description="Resumo de produtividade" 
+          icon={BarChart3} 
+          color="bg-orange-500 shadow-orange-200"
+          to="/reports"
+        />
+        <ActionCard 
+          title="Pendências" 
+          description="Imóveis fechados" 
+          icon={AlertCircle} 
+          color="bg-red-500 shadow-red-200"
+          to="/pending"
+        />
+        <div className="col-span-2">
+          <ActionCard 
+            title="Sincronizar" 
+            description={isSyncing ? "Sincronizando..." : `Última sync: ${lastSync}`}
+            icon={isSyncing ? RefreshCw : RefreshCw} 
+            color="bg-slate-800 shadow-slate-200"
+            onClick={handleSync}
+            className={isSyncing ? "animate-pulse" : ""}
+          />
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Trabalhados" value={stats.worked} icon={CheckCircle2} color="text-emerald-500" />
-        <StatCard title="Visitados" value={stats.visited} icon={TrendingUp} color="text-blue-500" />
-        <StatCard title="Fechados" value={stats.closed} icon={XCircle} color="text-yellow-500" />
-        <StatCard title="Recusados" value={stats.refused} icon={AlertTriangle} color="text-red-500" />
-        <StatCard title="Eliminados" value={stats.eliminated} icon={CheckCircle2} color="text-emerald-500" />
-        <StatCard title="Tratados" value={stats.treated} icon={CheckCircle2} color="text-blue-500" />
-        <StatCard title="Focos Positivos" value={stats.focus} icon={AlertTriangle} color="text-red-500" isFocus />
+      {/* Quick Summary Section */}
+      <div className="pt-2">
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h3 className="text-lg font-bold text-slate-800">Resumo do Ciclo</h3>
+          <Button variant="ghost" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700 p-0 h-auto">Ver tudo</Button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Trabalhados</p>
+            <p className="text-2xl font-black text-slate-800">{stats.worked}</p>
+          </div>
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tratados</p>
+            <p className="text-2xl font-black text-blue-600">{stats.treated}</p>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
     </div>
   );
 }
