@@ -178,8 +178,15 @@ export function OperationalHeader() {
                     {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 bg-emerald-500 h-4 w-4 rounded-full border-2 border-slate-900 shadow-lg flex items-center justify-center">
-                  <div className="h-1.5 w-1.5 bg-white rounded-full animate-pulse" />
+                <div className={cn(
+                  "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-slate-900 shadow-lg flex items-center justify-center",
+                  workStatus === 'in_work' ? "bg-emerald-500" : 
+                  workStatus === 'work_completed' ? "bg-blue-500" : "bg-slate-500"
+                )}>
+                  <div className={cn(
+                    "h-1.5 w-1.5 bg-white rounded-full",
+                    workStatus === 'in_work' && "animate-pulse"
+                  )} />
                 </div>
               </button>
             </DropdownMenuTrigger>
