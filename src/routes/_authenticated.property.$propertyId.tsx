@@ -339,7 +339,6 @@ function PropertyVisitPage() {
     </div>
   );
 }
-}
 
 function StatusButton({ active, onClick, icon: Icon, label, color, activeColor }: any) {
   return (
