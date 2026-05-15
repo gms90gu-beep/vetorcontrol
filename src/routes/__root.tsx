@@ -76,9 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "VetorControl - Combate às Endemias" },
       { name: "description", content: "Sistema de Controle Vetorial Urbano" },
       { name: "theme-color", content: "#0f172a" },
-      { property: "og:title", content: "VetorControl" },
+      { property: "og:title", content: "VetorControl - Combate às Endemias" },
       { property: "og:description", content: "Sistema de Controle Vetorial Urbano" },
       { property: "og:type", content: "website" },
+      { name: "twitter:title", content: "VetorControl - Combate às Endemias" },
+      { name: "twitter:description", content: "Sistema de Controle Vetorial Urbano" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/84ad7e97-8031-4253-b897-0dbbe888ccd4/id-preview-6e008d88--6c8e08f2-bdfd-4ad0-9598-5ac2a165d068.lovable.app-1778865061247.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/84ad7e97-8031-4253-b897-0dbbe888ccd4/id-preview-6e008d88--6c8e08f2-bdfd-4ad0-9598-5ac2a165d068.lovable.app-1778865061247.png" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {
