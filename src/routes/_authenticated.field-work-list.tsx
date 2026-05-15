@@ -100,7 +100,7 @@ function FieldWorkListPage() {
             )
           `)
           .eq("block_number", session.block_number)
-          .eq("visits.cycle_id", session.cycle_id)
+          .eq("visits.cycle_id", session.cycle_id as string)
           .order("number", { ascending: true });
         
         if (props) {
