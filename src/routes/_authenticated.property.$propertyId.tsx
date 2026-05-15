@@ -110,8 +110,66 @@ function PropertyVisitPage() {
     }
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!activeSession || isUpdatingStatus || !propertyId) return;
+    
+    const previousStatus = status;
+    setStatus(newStatus);
+    setIsUpdatingStatus(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const activityMap: Record<string, string> = {
+        "routine": "routine",
+        "survey": "infestation_survey",
+        "pending": "pending"
+      };
+
+      if (currentVisitId) {
+        const { error: updateError } = await supabase
+          .from("visits")
+          .update({ 
+            status: newStatus as any,
+            visit_date: new Date().toISOString()
+          })
+          .eq("id", currentVisitId);
+        
+        if (updateError) throw updateError;
+      } else {
+        const { data: newVisit, error: insertError } = await supabase
+          .from("visits")
+          .insert({
+            property_id: propertyId,
+            agent_id: user.id,
+            cycle_id: activeSession.cycle_id,
+            week_id: activeSession.week_id,
+            status: newStatus as any,
+            activity_type: (activityMap[activity] || "routine") as any,
+            visit_date: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (insertError) throw insertError;
+        setCurrentVisitId(newVisit.id);
+      }
+      
+      toast.success(`Status atualizado`, {
+        description: `Imóvel marcado como ${newStatus === 'visited' ? 'Visitado' : newStatus === 'closed' ? 'Fechado' : newStatus === 'refused' ? 'Recusado' : 'Abandonado'}`,
+      });
+    } catch (error: any) {
+      console.error("Error updating status:", error);
+      setStatus(previousStatus);
+      toast.error("Não foi possível atualizar o status do imóvel.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const handleSave = async () => {
-    if (!activeSession) {
+    if (!activeSession || !propertyId) {
       toast.error("Nenhuma sessão de trabalho ativa encontrada.");
       return;
     }
@@ -121,22 +179,32 @@ function PropertyVisitPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Create the visit
-      const { data: visit, error: visitError } = await supabase
-        .from("visits")
-        .insert({
-          property_id: propertyId,
-          agent_id: user.id,
-          cycle_id: activeSession.cycle_id,
-          week_id: activeSession.week_id,
-          status: status,
-          activity_type: activity === "routine" ? "routine" : activity === "survey" ? "infestation_survey" : "pending",
-          visit_date: new Date().toISOString()
-        })
-        .select()
-        .single();
+      let visitId = currentVisitId;
 
-      if (visitError) throw visitError;
+      if (!visitId) {
+        const activityMap: Record<string, string> = {
+          "routine": "routine",
+          "survey": "infestation_survey",
+          "pending": "pending"
+        };
+
+        const { data: visit, error: visitError } = await supabase
+          .from("visits")
+          .insert({
+            property_id: propertyId,
+            agent_id: user.id,
+            cycle_id: activeSession.cycle_id,
+            week_id: activeSession.week_id,
+            status: status,
+            activity_type: (activityMap[activity] || "routine") as any,
+            visit_date: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (visitError) throw visitError;
+        visitId = visit.id;
+      }
 
       // 2. Save deposits if any
       if (deposits.length > 0) {
