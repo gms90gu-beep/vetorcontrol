@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/property/$propertyId")({
 });
 
 function PropertyVisitPage() {
-  const { propertyId } = useParams({ from: "/_authenticated/property.$propertyId" });
+  const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
   const [status, setStatus] = useState<any>("visited");
   const [activity, setActivity] = useState<any>("routine");
