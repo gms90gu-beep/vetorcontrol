@@ -12,6 +12,8 @@ import {
   Layers,
   AlertTriangle,
   MapPin,
+  Home,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -26,6 +28,7 @@ import {
   SidebarTrigger
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
