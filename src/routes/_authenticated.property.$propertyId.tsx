@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
