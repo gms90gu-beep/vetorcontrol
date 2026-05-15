@@ -72,6 +72,7 @@ function DashboardPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [coverageData, setCoverageData] = useState<any>(null);
   const [blockProgress, setBlockProgress] = useState(0);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   const [stats, setStats] = useState({
     worked: 0,
@@ -94,11 +95,15 @@ function DashboardPage() {
       if (!user) return;
 
       // 1. Get current cycle
+      const currentYearVal = new Date().getFullYear();
+      setCurrentYear(currentYearVal);
+
       const { data: cycle } = await supabase
         .from("cycles")
         .select("*")
         .eq("status", "in_progress")
-        .order("start_date", { ascending: false })
+        .eq("year", currentYearVal)
+        .order("number", { ascending: false })
         .limit(1)
         .maybeSingle();
       
@@ -184,7 +189,12 @@ function DashboardPage() {
       <div className="flex items-center justify-between px-1">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-slate-800">VetorControl</h2>
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-widest font-mono">Unidade Operacional</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-500 py-0 h-4">
+              Ano {currentYear}
+            </Badge>
+            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-[0.2em] font-mono">Unidade Operacional</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Badge variant="secondary" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 border-none font-bold">
