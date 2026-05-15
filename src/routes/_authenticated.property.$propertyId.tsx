@@ -50,7 +50,7 @@ function PropertyVisitPage() {
       const { data: propData, error: propError } = await supabase
         .from("properties")
         .select("*")
-        .eq("id", propertyId)
+        .eq("id", propertyId as string)
         .maybeSingle();
       
       if (propError) throw propError;
