@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useRouter, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -40,8 +40,10 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthenticatedLayout() {
   const router = useRouter();
+  const location = useLocation();
   const [user, setUser] = useState<any>(null);
   const isLandscape = useOrientation();
+  const { isOperational, isLoading: isOperationalLoading, userRole } = useOperationalDate();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,12 +55,15 @@ function AuthenticatedLayout() {
     });
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  };
+  if (!user || isOperationalLoading) return null;
 
-  if (!user) return null;
+  const isSettingsPage = location.pathname === "/settings";
+  const canOverride = userRole === "admin" || userRole === "supervisor";
+
+  // Allow access to settings page for admins/supervisors even on weekends
+  if (!isOperational && !(isSettingsPage && canOverride)) {
+    return <WeekendBlock />;
+  }
 
   return (
     <SidebarProvider>
@@ -77,6 +82,11 @@ function AuthenticatedLayout() {
       </div>
     </SidebarProvider>
   );
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
 }
 
 function BottomNav() {
