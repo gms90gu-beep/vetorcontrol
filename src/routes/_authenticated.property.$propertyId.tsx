@@ -26,6 +26,16 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 
+const DEPOSIT_TYPES = [
+  { code: "A1", name: "Caixa d'água" },
+  { code: "A2", name: "Tambor/Barril" },
+  { code: "B", name: "Vasos/Pratos" },
+  { code: "C", name: "Pneus" },
+  { code: "D1", name: "Lixo" },
+  { code: "D2", name: "Entulho" },
+  { code: "E", name: "Depósitos naturais" }
+];
+
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
 });
