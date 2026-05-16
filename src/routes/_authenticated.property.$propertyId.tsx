@@ -508,6 +508,21 @@ function PropertyVisitPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-slate-900 p-4 rounded-3xl text-white shadow-xl shadow-slate-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-1">Trabalhados</p>
+          <p className="text-xl font-black">{dailyStats.worked}</p>
+        </div>
+        <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl shadow-blue-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-blue-200 mb-1">Tratados</p>
+          <p className="text-xl font-black">{dailyStats.treated}</p>
+        </div>
+        <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl shadow-indigo-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-indigo-200 mb-1">Larvicida</p>
+          <p className="text-xl font-black">{dailyStats.larvicide}</p>
+        </div>
+      </div>
+
       <div className="space-y-6">
         <section>
           <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 mb-3 block">Situação do Imóvel</Label>
