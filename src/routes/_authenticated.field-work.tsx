@@ -120,10 +120,7 @@ function FieldWorkPage() {
       return;
     }
 
-    if (!allowWeekend && isWeekend(date)) {
-      toast.error("Não é possível iniciar trabalho em finais de semana");
-      return;
-    }
+    // Weekend restriction removed - access allowed every day
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
