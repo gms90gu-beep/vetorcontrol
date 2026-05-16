@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { isWeekend } from "date-fns";
+
 
 export function useOperationalDate() {
   const [isOperational, setIsOperational] = useState(true);
