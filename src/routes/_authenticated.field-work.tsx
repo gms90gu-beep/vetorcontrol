@@ -121,6 +121,12 @@ function FieldWorkPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { data: agent } = await supabase.from("agents").select("work_status").eq("profile_id", user.id).maybeSingle();
+      if (agent?.work_status === 'work_completed') {
+         // Reset status if starting new session
+         await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+      }
+
       const { error } = await supabase.from("field_work_sessions").insert({
         user_id: user.id,
         cycle_id: selectedCycleId,

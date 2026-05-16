@@ -39,6 +39,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { useOrientation } from "@/hooks/useOrientation";
 import { toast } from "sonner";
@@ -59,11 +60,13 @@ function FieldWorkListPage() {
   const [selectedProperty, setSelectedProperty] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [indexSurvey, setIndexSurvey] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const navigate = useNavigate();
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>("agent");
 
   useEffect(() => {
     fetchSessionAndProperties();
@@ -80,7 +83,17 @@ function FieldWorkListPage() {
         .select("*")
         .eq("profile_id", user.id)
         .maybeSingle();
-      if (agentData) setAgent(agentData);
+      if (agentData) {
+        setAgent(agentData);
+        setIsLocked(agentData.work_status === 'work_completed');
+      }
+
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (roleData) setUserRole(roleData.role);
 
       const { data: cycle } = await supabase
         .from("cycles")
@@ -252,6 +265,38 @@ function FieldWorkListPage() {
         eliminated: eliminationCount,
         progress: progressPercent
       }}
+      sidebarFooter={
+        <div className="mt-auto">
+          <DailyWorkCloser 
+            stats={{
+              worked: workedCount,
+              closed: closedCount,
+              refused: refusedCount,
+              eliminated: eliminationCount,
+              treated: treatedCount,
+              focus: focusCount,
+              pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
+              treatedDeposits: treatedDepositsCount,
+              larvicideUsed: larvicideUsed,
+              progress: progressPercent
+            }}
+            onGeneratePDF={generatePDF}
+            isLocked={isLocked}
+            userRole={userRole}
+            onReopen={async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                setIsLocked(false);
+                toast.success("Boletim reaberto com sucesso!");
+              } catch (e) {
+                toast.error("Erro ao reabrir boletim.");
+              }
+            }}
+          />
+        </div>
+      }
     >
       <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col")}>
         {!isLandscape && (
@@ -391,11 +436,45 @@ function FieldWorkListPage() {
                 properties={filteredProperties} 
                 indexSurvey={indexSurvey}
                 onPropertyClick={(prop) => {
+                  if (isLocked) {
+                    toast.error("O boletim está encerrado. Reabra para fazer alterações.");
+                    return;
+                  }
                   setSelectedProperty(prop);
                   setIsModalOpen(true);
                 }}
                 onStatusUpdate={() => {}} 
               />
+              <div className="pt-8 pb-12">
+                <DailyWorkCloser 
+                  stats={{
+                    worked: workedCount,
+                    closed: closedCount,
+                    refused: refusedCount,
+                    eliminated: eliminationCount,
+                    treated: treatedCount,
+                    focus: focusCount,
+                    pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
+                    treatedDeposits: treatedDepositsCount,
+                    larvicideUsed: larvicideUsed,
+                    progress: progressPercent
+                  }}
+                  onGeneratePDF={generatePDF}
+                  isLocked={isLocked}
+                  userRole={userRole}
+                  onReopen={async () => {
+                    try {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) return;
+                      await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                      setIsLocked(false);
+                      toast.success("Boletim reaberto com sucesso!");
+                    } catch (e) {
+                      toast.error("Erro ao reabrir boletim.");
+                    }
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <div className="bg-white p-12 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
@@ -464,9 +543,14 @@ function FieldWorkListPage() {
                 <Button 
                   className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20"
                   onClick={() => {
+                    if (isLocked) {
+                      toast.error("Boletim encerrado.");
+                      return;
+                    }
                     setIsModalOpen(false);
                     navigate({ to: `/property/${selectedProperty?.id}` });
                   }}
+                  disabled={isLocked}
                 >
                   Registrar Nova Visita
                 </Button>
