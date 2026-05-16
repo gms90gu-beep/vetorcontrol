@@ -114,7 +114,7 @@ function PropertyVisitPage() {
 
       if (visits) {
         const stats = visits.reduce((acc, v) => ({
-          worked: acc.worked + (v.status !== 'not_visited' ? 1 : 0),
+          worked: acc.worked + 1,
           treated: acc.treated + (v.treated_deposits || 0),
           larvicide: acc.larvicide + (Number(v.treatment_amount) || 0)
         }), { worked: 0, treated: 0, larvicide: 0 });
