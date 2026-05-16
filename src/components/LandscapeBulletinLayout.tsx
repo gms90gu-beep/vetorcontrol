@@ -27,6 +27,8 @@ interface LandscapeBulletinLayoutProps {
     refused: number;
     focus: number;
     treated: number;
+    treatedDeposits: number;
+    larvicideUsed: number;
     eliminated: number;
     progress: number;
   };
