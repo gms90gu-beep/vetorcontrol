@@ -372,7 +372,7 @@ function PropertyVisitPage() {
   useEffect(() => {
     if (activity === "survey" && deposits.length === 0) {
       const initialDeposits = DEPOSIT_TYPES.map((type, index) => ({
-        id: index,
+        id: `init-${index}`,
         type: type.code,
         description: type.name,
         quantity: 0,
@@ -383,7 +383,7 @@ function PropertyVisitPage() {
       }));
       setDeposits(initialDeposits);
     }
-  }, [activity]);
+  }, [activity, deposits.length]);
 
   const updateDeposit = (id: number, field: string, value: any) => {
     setDeposits(deposits.map(d => {
