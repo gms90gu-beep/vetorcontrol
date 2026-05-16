@@ -27,7 +27,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
-import { isWeekend } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
