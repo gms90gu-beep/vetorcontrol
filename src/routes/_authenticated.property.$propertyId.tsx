@@ -310,8 +310,10 @@ function PropertyVisitPage() {
       // First clear old ones
       await supabase.from("visit_deposits").delete().eq("visit_id", visitId);
 
-      if (deposits.length > 0 && status === 'visited' && activity === 'survey') {
-        const depositsToSave = deposits.map(d => ({
+      const selectedDeposits = deposits.filter(d => d.selected);
+
+      if (selectedDeposits.length > 0 && status === 'visited' && activity === 'survey') {
+        const depositsToSave = selectedDeposits.map(d => ({
           visit_id: visitId as string,
           type_code: d.type,
           description: d.description,
