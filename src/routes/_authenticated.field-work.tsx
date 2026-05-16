@@ -119,6 +119,11 @@ function FieldWorkPage() {
       toast.error("Por favor, preencha todos os campos");
       return;
     }
+
+    if (!allowWeekend && isWeekend(date)) {
+      toast.error("Não é possível iniciar trabalho em finais de semana");
+      return;
+    }
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
