@@ -13,7 +13,8 @@ import {
   Droplets,
   Bug,
   ShieldCheck,
-  FileText
+  FileText,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
+import { cn } from "@/lib/utils";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
