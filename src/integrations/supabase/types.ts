@@ -543,10 +543,12 @@ export type Database = {
           has_focus: boolean | null
           id: string
           is_recovered: boolean | null
+          larvicide_unit: string | null
           notes: string | null
           property_id: string
           sample_collected: boolean | null
           status: Database["public"]["Enums"]["visit_status"]
+          treated_deposits: number | null
           treatment_amount: number | null
           treatment_applied: boolean | null
           visit_date: string
@@ -564,10 +566,12 @@ export type Database = {
           has_focus?: boolean | null
           id?: string
           is_recovered?: boolean | null
+          larvicide_unit?: string | null
           notes?: string | null
           property_id: string
           sample_collected?: boolean | null
           status: Database["public"]["Enums"]["visit_status"]
+          treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string
@@ -585,10 +589,12 @@ export type Database = {
           has_focus?: boolean | null
           id?: string
           is_recovered?: boolean | null
+          larvicide_unit?: string | null
           notes?: string | null
           property_id?: string
           sample_collected?: boolean | null
           status?: Database["public"]["Enums"]["visit_status"]
+          treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
           visit_date?: string

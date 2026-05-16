@@ -1,0 +1,3 @@
+ALTER TABLE public.visits 
+ADD COLUMN IF NOT EXISTS larvicide_unit TEXT,
+ADD COLUMN IF NOT EXISTS treated_deposits INTEGER DEFAULT 0;
