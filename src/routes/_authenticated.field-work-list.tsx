@@ -195,6 +195,40 @@ function FieldWorkListPage() {
 
   const generatePDF = () => {
     const doc = new jsPDF();
+    
+    // Add Summary Section
+    doc.setFontSize(22);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text("Resumo Operacional Diário", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`Agente: ${agent?.name || "Agente"}`, 14, 30);
+    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+    doc.text(`Quarteirão: ${activeSession?.block_number} | Ciclo: ${activeCycle?.number}`, 14, 40);
+
+    // Summary Box
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.roundedRect(14, 45, 182, 35, 3, 3, "FD");
+
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Imóveis Trabalhados: ${workedCount}`, 20, 55);
+    doc.text(`Imóveis Fechados: ${closedCount}`, 20, 62);
+    doc.text(`Imóveis Recusados: ${refusedCount}`, 20, 69);
+    
+    doc.text(`Depósitos Tratados: ${treatedDepositsCount}`, 85, 55);
+    doc.text(`Depósitos Eliminados: ${eliminationCount}`, 85, 62);
+    doc.text(`Focos Positivos: ${focusCount}`, 85, 69);
+
+    doc.text(`Larvicida Utilizado: ${larvicideUsed}g/ml`, 145, 55);
+    doc.text(`Cobertura: ${progressPercent}%`, 145, 62);
+
+    // Detailed Table
+    doc.setFontSize(16);
+    doc.text("Boletim Diário de Visitas", 14, 95);
+
     const tableData = properties.map(p => {
       const treatmentInfo = p.latest_visit?.treatment_applied 
         ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
@@ -202,7 +236,7 @@ function FieldWorkListPage() {
       
       return [
         p.number,
-        p.type,
+        p.type || "Res.",
         p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
         treatmentInfo,
         p.has_focus ? "Sim" : "Não",
@@ -211,22 +245,25 @@ function FieldWorkListPage() {
       ];
     });
 
-    doc.setFontSize(18);
-    doc.text("Boletim Diário de Trabalho", 14, 22);
-    doc.text(`Agente: ${agent?.name || "Agente"}`, 14, 30);
-    doc.text(`Data: ${new Date().toLocaleDateString()}`, 14, 35);
-    doc.text(`Quarteirão: ${activeSession?.block_number}`, 14, 40);
-
     autoTable(doc, {
-      startY: 45,
+      startY: 100,
       head: [['Nº', 'Tipo', 'Situação', 'Trat.', 'Foco', 'Pend.', 'Obs.']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] }
+      headStyles: { fillColor: [15, 23, 42], fontSize: 9 },
+      styles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 15 },
+      }
     });
 
-    doc.save(`boletim-${activeSession?.block_number}-${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success("PDF gerado com sucesso!");
+    doc.save(`boletim-diario-${activeSession?.block_number}-${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 
   const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
