@@ -552,14 +552,49 @@ function PropertyVisitPage() {
                       onChange={(v) => setRoutineData({...routineData, treatment: v})} 
                     />
                     {routineData.treatment && (
-                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade tratada (g/ml)</Label>
-                        <Input 
-                          type="number" 
-                          value={routineData.treatmentAmount} 
-                          onChange={(e) => setRoutineData({...routineData, treatmentAmount: Number(e.target.value)})}
-                          className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
-                        />
+                      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de larvicida utilizado</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={routineData.treatmentAmount} 
+                            onChange={(e) => setRoutineData({...routineData, treatmentAmount: Math.max(0, Number(e.target.value))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Unidade</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {["gramas", "ml", "tabletes", "sachês"].map((unit) => (
+                              <Button
+                                key={unit}
+                                type="button"
+                                variant={routineData.larvicideUnit === unit ? "default" : "outline"}
+                                onClick={() => setRoutineData({...routineData, larvicideUnit: unit})}
+                                className={`h-10 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${
+                                  routineData.larvicideUnit === unit 
+                                    ? 'bg-primary shadow-md shadow-primary/20' 
+                                    : 'border-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {unit}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de depósitos tratados</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={routineData.treatedDeposits} 
+                            onChange={(e) => setRoutineData({...routineData, treatedDeposits: Math.max(0, Math.floor(Number(e.target.value)))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
                       </div>
                     )}
                     
