@@ -240,8 +240,10 @@ function FieldWorkListPage() {
         closed: closedCount,
         refused: refusedCount,
         focus: focusCount,
-        treated: properties.filter(p => p.treatment_applied).length,
-        eliminated: Math.round(workedCount * 0.4),
+        treated: treatedCount,
+        treatedDeposits: treatedDepositsCount,
+        larvicideUsed: larvicideUsed,
+        eliminated: eliminationCount,
         progress: progressPercent
       }}
     >
