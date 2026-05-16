@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { isWeekend } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
@@ -43,7 +44,7 @@ function FieldWorkPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  
+  const { allowWeekend } = useOperationalDate();
 
   useEffect(() => {
     fetchInitialData();
@@ -53,13 +54,11 @@ function FieldWorkPage() {
     setIsLoading(true);
     try {
       // Fetch cycles
-      const { data: cyclesData, error: cyclesError } = await supabase
+      const { data: cyclesData } = await supabase
         .from("cycles")
         .select("*")
         .eq("year", new Date().getFullYear())
         .order("number", { ascending: true });
-      
-      if (cyclesError) throw cyclesError;
       
       if (cyclesData) {
         setCycles(cyclesData);
@@ -71,7 +70,7 @@ function FieldWorkPage() {
       }
 
       // Fetch blocks
-      const { data: blocksData, error: blocksError } = await supabase
+      const { data: blocksData } = await supabase
         .from("blocks")
         .select(`
           *,
@@ -80,8 +79,6 @@ function FieldWorkPage() {
           )
         `)
         .order("number", { ascending: true });
-      
-      if (blocksError) throw blocksError;
       
       if (blocksData) setBlocks(blocksData);
 
@@ -111,11 +108,11 @@ function FieldWorkPage() {
     }
   }
 
-  const selectedBlock = blocks?.find(b => b?.id === selectedBlockId);
+  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
-  const filteredBlocks = blocks?.filter(b => 
-    b?.number?.toString()?.includes(searchQuery)
-  ) || [];
+  const filteredBlocks = blocks.filter(b => 
+    b.number.includes(searchQuery)
+  );
 
   const handleStartWork = async () => {
     if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
@@ -123,7 +120,10 @@ function FieldWorkPage() {
       return;
     }
 
-    // Weekend restriction removed - access allowed every day
+    if (!allowWeekend && isWeekend(date)) {
+      toast.error("Não é possível iniciar trabalho em finais de semana");
+      return;
+    }
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -180,8 +180,8 @@ function FieldWorkPage() {
                 <SelectValue placeholder="Ciclo" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
-                {cycles?.map(c => (
-                  <SelectItem key={c?.id} value={c?.id} className="rounded-xl font-bold">Ciclo {c?.number}</SelectItem>
+                {cycles.map(c => (
+                  <SelectItem key={c.id} value={c.id} className="rounded-xl font-bold">Ciclo {c.number}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -195,8 +195,8 @@ function FieldWorkPage() {
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
-                {weeks?.map(w => (
-                  <SelectItem key={w?.id} value={w?.id} className="rounded-xl font-bold">Semana {w?.number}</SelectItem>
+                {weeks.map(w => (
+                  <SelectItem key={w.id} value={w.id} className="rounded-xl font-bold">Semana {w.number}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -227,7 +227,7 @@ function FieldWorkPage() {
                 initialFocus
                 locale={ptBR}
                 className="bg-white"
-                disabled={undefined}
+                disabled={allowWeekend ? undefined : (date) => isWeekend(date)}
               />
             </PopoverContent>
           </Popover>
@@ -258,9 +258,9 @@ function FieldWorkPage() {
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
               </div>
-            ) : filteredBlocks?.map((block) => (
+            ) : filteredBlocks.map((block) => (
               <Card 
-                key={block?.id}
+                key={block.id}
                 className={cn(
                   "border-2 transition-all duration-300 rounded-3xl cursor-pointer active:scale-95",
                   selectedBlockId === block.id 
@@ -313,25 +313,25 @@ function FieldWorkPage() {
               <CardContent className="grid grid-cols-2 gap-4 p-5">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Imóveis</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock?.total_properties || 0}</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.total_properties || 0}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
                   <p className={cn(
                     "text-xl font-black uppercase tracking-tighter",
-                    selectedBlock?.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
+                    selectedBlock.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
                   )}>
-                    {selectedBlock?.status === 'finished' ? 'Concluído' : selectedBlock?.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
+                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bairro/Subárea</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock?.subareas?.name || "--"}</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock.subareas?.name || "--"}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>
                   <p className="text-xl font-black text-blue-600">
-                    {cycles?.find(c => c?.id === selectedCycleId)?.number || "--"}
+                    {cycles.find(c => c.id === selectedCycleId)?.number || "--"}
                   </p>
                 </div>
               </CardContent>

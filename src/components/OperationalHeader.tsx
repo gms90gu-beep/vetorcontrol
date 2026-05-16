@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { isWeekend } from "date-fns";
 
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
@@ -37,7 +38,7 @@ export function OperationalHeader() {
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
-  
+  const { allowWeekend } = useOperationalDate();
 
   useEffect(() => {
     fetchHeaderData();
