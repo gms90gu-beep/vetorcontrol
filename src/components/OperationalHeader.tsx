@@ -38,7 +38,7 @@ export function OperationalHeader() {
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
-  const { allowWeekend } = useOperationalDate();
+  
 
   useEffect(() => {
     fetchHeaderData();
