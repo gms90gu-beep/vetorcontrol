@@ -112,9 +112,9 @@ function FieldWorkListPage() {
         if (week) setActiveWeek(week);
       }
     } catch (e) { console.error(e); }
-  }
+  };
 
-  async function fetchSessionAndProperties() {
+  const fetchSessionAndProperties = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
