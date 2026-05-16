@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  BarChart3
+  BarChart3,
+  Droplets
 } from "lucide-react";
 
 interface LandscapeBulletinLayoutProps {
