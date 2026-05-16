@@ -168,8 +168,16 @@ export function LandscapeBulletinLayout({
             <div className="h-8 w-8 rounded-xl bg-blue-100 flex items-center justify-center mb-2">
               <Layers className="h-4 w-4 text-blue-600" />
             </div>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Tratados</p>
-            <p className="text-lg font-black text-slate-900">{stats.treated}</p>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Dep. Tratados</p>
+            <p className="text-lg font-black text-slate-900">{stats.treatedDeposits}</p>
+          </div>
+          
+          <div className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
+            <div className="h-8 w-8 rounded-xl bg-cyan-100 flex items-center justify-center mb-2">
+              <Droplets className="h-4 w-4 text-cyan-600" />
+            </div>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Larvicida (g/ml)</p>
+            <p className="text-lg font-black text-slate-900">{stats.larvicideUsed}</p>
           </div>
 
           <div className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
