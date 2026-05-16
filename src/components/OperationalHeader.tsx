@@ -28,7 +28,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
-import { isWeekend } from "date-fns";
 
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
