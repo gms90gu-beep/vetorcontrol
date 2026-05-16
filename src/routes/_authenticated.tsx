@@ -65,6 +65,11 @@ function AuthenticatedLayout() {
     return <WeekendBlock />;
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
@@ -82,11 +87,6 @@ function AuthenticatedLayout() {
       </div>
     </SidebarProvider>
   );
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
 }
 
 function BottomNav() {
