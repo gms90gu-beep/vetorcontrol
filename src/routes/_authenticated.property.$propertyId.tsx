@@ -337,26 +337,54 @@ function PropertyVisitPage() {
     }
   };
 
-  const addDeposit = () => {
-    const newId = Date.now();
-    setDeposits([...deposits, { 
-      id: newId, 
-      type: "A1", 
-      description: "Caixa d'água", 
-      quantity: 1, 
-      positive: false, 
-      treated: false, 
-      eliminated: false 
-    }]);
-  };
+  const DEPOSIT_TYPES = [
+    { code: "A1", name: "Caixa d'água" },
+    { code: "A2", name: "Tambor/Barril" },
+    { code: "B", name: "Vasos/Pratos" },
+    { code: "C", name: "Pneus" },
+    { code: "D1", name: "Lixo" },
+    { code: "D2", name: "Entulho" },
+    { code: "E", name: "Depósitos naturais" }
+  ];
 
-  const removeDeposit = (id: number) => {
-    setDeposits(deposits.filter(d => d.id !== id));
-  };
+  useEffect(() => {
+    if (activity === "survey" && deposits.length === 0) {
+      const initialDeposits = DEPOSIT_TYPES.map((type, index) => ({
+        id: index,
+        type: type.code,
+        description: type.name,
+        quantity: 0,
+        positive: false,
+        treated: false,
+        eliminated: false,
+        selected: false
+      }));
+      setDeposits(initialDeposits);
+    }
+  }, [activity]);
 
   const updateDeposit = (id: number, field: string, value: any) => {
-    setDeposits(deposits.map(d => d.id === id ? { ...d, [field]: value } : d));
+    setDeposits(deposits.map(d => {
+      if (d.id === id) {
+        const updated = { ...d, [field]: value };
+        // Auto-select if quantity > 0 or any action is checked
+        if (field === 'quantity' && Number(value) > 0) updated.selected = true;
+        if (['positive', 'treated', 'eliminated'].includes(field) && value === true) updated.selected = true;
+        return updated;
+      }
+      return d;
+    }));
   };
+
+  const surveySummary = deposits.reduce((acc, d) => {
+    if (!d.selected) return acc;
+    return {
+      found: acc.found + (Number(d.quantity) || 0),
+      positive: acc.positive + (d.positive ? 1 : 0),
+      treated: acc.treated + (d.treated ? 1 : 0),
+      eliminated: acc.eliminated + (d.eliminated ? 1 : 0)
+    };
+  }, { found: 0, positive: 0, treated: 0, eliminated: 0 });
 
   if (isLoading) {
     return (
