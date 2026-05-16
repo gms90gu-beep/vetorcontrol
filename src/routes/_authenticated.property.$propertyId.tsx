@@ -27,6 +27,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
+import { useOrientation } from "@/hooks/useOrientation";
+import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
+import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -94,11 +97,24 @@ function PropertyVisitPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
+  const [blockProperties, setBlockProperties] = useState<any[]>([]);
+  const isLandscape = useOrientation();
+  const [agent, setAgent] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
     fetchDailyStats();
+    fetchAgentData();
   }, [propertyId]);
+
+  async function fetchAgentData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (data) setAgent(data);
+    } catch (e) { console.error(e); }
+  }
 
   async function fetchDailyStats() {
     try {
@@ -144,6 +160,17 @@ function PropertyVisitPage() {
         return;
       }
       setProperty(propData);
+      
+      // Fetch all properties in the block for landscape table
+      if (propData.block_id) {
+        const { data: allProps } = await supabase
+          .from("properties")
+          .select("*")
+          .eq("block_id", propData.block_id)
+          .order("number", { ascending: true });
+        
+        if (allProps) setBlockProperties(allProps);
+      }
 
       // Get current active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -473,7 +500,44 @@ function PropertyVisitPage() {
   }
 
   if (error) {
+  if (isLandscape) {
     return (
+      <LandscapeBulletinLayout
+        isLandscape={true}
+        title={`Quarteirão ${activeSession?.block_number || "--"}`}
+        subtitle={activeSession?.street_name || "--"}
+        agentInfo={{
+          name: agent?.name || "Agente",
+          municipality: agent?.municipality || "Município",
+          registrationId: agent?.registration_id || "0000",
+          cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
+          week: activeSession?.week_id?.substring(0, 2) || "--",
+          block: activeSession?.block_number || "--",
+          street: activeSession?.street_name || "--"
+        }}
+        stats={{
+          worked: dailyStats.worked,
+          total: activeSession?.property_count || 45,
+          closed: 0,
+          refused: 0,
+          focus: 0,
+          treated: 0,
+          treatedDeposits: routineData.treatedDeposits,
+          larvicideUsed: routineData.treatmentAmount,
+          eliminated: routineData.eliminationAmount,
+          progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
+        }}
+      >
+        <DigitalBulletinTable 
+          properties={blockProperties} 
+          onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
+          onStatusUpdate={() => {}}
+        />
+      </LandscapeBulletinLayout>
+    );
+  }
+
+  return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6">
         <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
           <AlertCircle className="h-10 w-10 text-red-500" />
