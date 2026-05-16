@@ -119,7 +119,7 @@ export function OperationalHeader() {
     } catch (error) {
       console.error("Error fetching header data:", error);
     }
-  }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
