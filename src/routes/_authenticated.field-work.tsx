@@ -53,11 +53,13 @@ function FieldWorkPage() {
     setIsLoading(true);
     try {
       // Fetch cycles
-      const { data: cyclesData } = await supabase
+      const { data: cyclesData, error: cyclesError } = await supabase
         .from("cycles")
         .select("*")
         .eq("year", new Date().getFullYear())
         .order("number", { ascending: true });
+      
+      if (cyclesError) throw cyclesError;
       
       if (cyclesData) {
         setCycles(cyclesData);
@@ -69,7 +71,7 @@ function FieldWorkPage() {
       }
 
       // Fetch blocks
-      const { data: blocksData } = await supabase
+      const { data: blocksData, error: blocksError } = await supabase
         .from("blocks")
         .select(`
           *,
@@ -78,6 +80,8 @@ function FieldWorkPage() {
           )
         `)
         .order("number", { ascending: true });
+      
+      if (blocksError) throw blocksError;
       
       if (blocksData) setBlocks(blocksData);
 
@@ -107,7 +111,7 @@ function FieldWorkPage() {
     }
   }
 
-  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
+  const selectedBlock = blocks?.find(b => b?.id === selectedBlockId);
 
   const filteredBlocks = blocks?.filter(b => 
     b?.number?.toString()?.includes(searchQuery)
