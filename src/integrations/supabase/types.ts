@@ -432,6 +432,33 @@ export type Database = {
           },
         ]
       }
+      rg_pdf_exports: {
+        Row: {
+          created_at: string | null
+          filter_type: string
+          filter_value: string | null
+          id: string
+          metadata: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          filter_type: string
+          filter_value?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          filter_type?: string
+          filter_value?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       streets: {
         Row: {
           id: string
