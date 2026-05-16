@@ -26,7 +26,13 @@ export function ReportsDashboard() {
     productivity: 0
   });
 
-  const [chartData, setChartData] = useState({
+  const [chartData, setChartData] = useState<{
+    production: any[];
+    deposits: any[];
+    coverage: any[];
+    evolution: any[];
+    pendencies: any[];
+  }>({
     production: [],
     deposits: [],
     coverage: [],
