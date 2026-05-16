@@ -214,6 +214,10 @@ function FieldWorkListPage() {
   const closedCount = properties.filter(p => p.status === "closed").length;
   const refusedCount = properties.filter(p => p.status === "refused").length;
   const focusCount = properties.filter(p => p.has_focus).length;
+  const treatedCount = properties.filter(p => p.treatment_applied).length;
+  const treatedDepositsCount = properties.reduce((acc, p) => acc + (p.latest_visit?.treated_deposits || 0), 0);
+  const larvicideUsed = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.treatment_amount) || 0), 0);
+  const eliminationCount = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.elimination_amount) || 0), 0);
   const progressPercent = properties.length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
 
   return (
