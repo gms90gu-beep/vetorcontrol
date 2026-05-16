@@ -13,7 +13,8 @@ import {
   Droplets,
   Bug,
   ShieldCheck,
-  FileText
+  FileText,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,10 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
+import { cn } from "@/lib/utils";
+import { useOrientation } from "@/hooks/useOrientation";
+import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
+import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -92,11 +97,24 @@ function PropertyVisitPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
+  const [blockProperties, setBlockProperties] = useState<any[]>([]);
+  const isLandscape = useOrientation();
+  const [agent, setAgent] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
     fetchDailyStats();
+    fetchAgentData();
   }, [propertyId]);
+
+  async function fetchAgentData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (data) setAgent(data);
+    } catch (e) { console.error(e); }
+  }
 
   async function fetchDailyStats() {
     try {
@@ -142,6 +160,17 @@ function PropertyVisitPage() {
         return;
       }
       setProperty(propData);
+      
+      // Fetch all properties in the block for landscape table
+      if (propData.block_id) {
+        const { data: allProps } = await supabase
+          .from("properties")
+          .select("*")
+          .eq("block_id", propData.block_id)
+          .order("number", { ascending: true });
+        
+        if (allProps) setBlockProperties(allProps);
+      }
 
       // Get current active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -471,7 +500,44 @@ function PropertyVisitPage() {
   }
 
   if (error) {
+  if (isLandscape) {
     return (
+      <LandscapeBulletinLayout
+        isLandscape={true}
+        title={`Quarteirão ${activeSession?.block_number || "--"}`}
+        subtitle={activeSession?.street_name || "--"}
+        agentInfo={{
+          name: agent?.name || "Agente",
+          municipality: agent?.municipality || "Município",
+          registrationId: agent?.registration_id || "0000",
+          cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
+          week: activeSession?.week_id?.substring(0, 2) || "--",
+          block: activeSession?.block_number || "--",
+          street: activeSession?.street_name || "--"
+        }}
+        stats={{
+          worked: dailyStats.worked,
+          total: activeSession?.property_count || 45,
+          closed: 0,
+          refused: 0,
+          focus: 0,
+          treated: 0,
+          treatedDeposits: routineData.treatedDeposits,
+          larvicideUsed: routineData.treatmentAmount,
+          eliminated: routineData.eliminationAmount,
+          progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
+        }}
+      >
+        <DigitalBulletinTable 
+          properties={blockProperties} 
+          onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
+          onStatusUpdate={() => {}}
+        />
+      </LandscapeBulletinLayout>
+    );
+  }
+
+  return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6">
         <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
           <AlertCircle className="h-10 w-10 text-red-500" />
@@ -492,87 +558,138 @@ function PropertyVisitPage() {
     );
   }
 
+  const [nextProperty, setNextProperty] = useState<any>(null);
+
+  useEffect(() => {
+    if (property && activeSession) {
+      fetchNextProperty();
+    }
+  }, [property, activeSession]);
+
+  async function fetchNextProperty() {
+    try {
+      const { data: nextProp } = await supabase
+        .from("properties")
+        .select("id, number")
+        .eq("block_id", property.block_id)
+        .gt("number", property.number)
+        .order("number", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      setNextProperty(nextProp);
+    } catch (e) { console.error(e); }
+  }
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 max-w-lg mx-auto">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-accent/50 active:scale-95 transition-all">
-          <ChevronLeft className="h-6 w-6" />
-        </Button>
-        <div className="flex flex-col">
-          <h2 className="text-2xl font-black tracking-tighter text-primary">
-            Imóvel {property?.number || "..."}
-          </h2>
-          <p className="text-sm font-medium text-muted-foreground">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
+      {/* Header Operational */}
+      <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+            <ChevronLeft className="h-6 w-6 text-slate-600" />
+          </Button>
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Identificação do Imóvel</span>
+            <h2 className="text-3xl font-black tracking-tighter text-slate-900">
+              IMÓVEL {property?.number || "..."}
+            </h2>
+          </div>
+          <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 bg-emerald-50 font-bold uppercase tracking-tight py-1">
+            ATIVO
+          </Badge>
+        </div>
+
+        <div className="flex flex-col items-center gap-1 text-center py-2 border-y border-slate-50">
+          <p className="text-lg font-black text-slate-800 tracking-tight">
             {property?.street_name || "..."}
           </p>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-lg font-bold">Quarteirão {activeSession?.block_number || "--"}</Badge>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última visita: {property?.last_visit ? new Date(property.last_visit).toLocaleDateString() : 'Nunca'}</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-slate-900 p-4 rounded-3xl text-white shadow-xl shadow-slate-200/50">
-          <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-1">Trabalhados</p>
-          <p className="text-xl font-black">{dailyStats.worked}</p>
+      {/* Cards Operacionais */}
+      <div className="grid grid-cols-3 gap-3 px-1">
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-1 group active:scale-95 transition-all">
+          <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Trabalhados</p>
+          <p className="text-xl font-black text-slate-900">{dailyStats.worked}</p>
         </div>
-        <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl shadow-blue-200/50">
-          <p className="text-[7px] font-black uppercase tracking-widest text-blue-200 mb-1">Tratados</p>
-          <p className="text-xl font-black">{dailyStats.treated}</p>
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-1 group active:scale-95 transition-all">
+          <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+            <Droplets className="h-5 w-5" />
+          </div>
+          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Tratados</p>
+          <p className="text-xl font-black text-slate-900">{dailyStats.treated}</p>
         </div>
-        <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl shadow-indigo-200/50">
-          <p className="text-[7px] font-black uppercase tracking-widest text-indigo-200 mb-1">Larvicida</p>
-          <p className="text-xl font-black">{dailyStats.larvicide}</p>
+        <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-1 group active:scale-95 transition-all">
+          <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+            <Bug className="h-5 w-5" />
+          </div>
+          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Larvicida</p>
+          <p className="text-xl font-black text-slate-900">{dailyStats.larvicide}</p>
         </div>
       </div>
 
       <div className="space-y-6">
-        <section>
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 mb-3 block">Situação do Imóvel</Label>
-          <div className="grid grid-cols-2 gap-3">
-            <StatusButton 
-              active={status === "visited"} 
+        <section className="bg-white p-6 rounded-[2.5rem] shadow-lg shadow-slate-200/40 border border-slate-100">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1 mb-4 block text-center">Situação do Imóvel</Label>
+          <div className="flex flex-wrap gap-2 justify-center">
+            <button
               onClick={() => handleStatusChange("visited")}
               disabled={isUpdatingStatus}
-              icon={CheckCircle2} 
-              label="Visitado" 
-              color="text-emerald-600 bg-emerald-50"
-              activeColor="bg-emerald-600 text-white"
-            />
-            <StatusButton 
-              active={status === "closed"} 
+              className={cn(
+                "flex-1 min-w-[100px] h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2",
+                status === "visited" ? "bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-200" : "bg-white text-emerald-600 border-emerald-50 shadow-sm"
+              )}
+            >
+              <CheckCircle2 className="h-4 w-4" /> Visitado
+            </button>
+            <button
               onClick={() => handleStatusChange("closed")}
               disabled={isUpdatingStatus}
-              icon={Clock} 
-              label="Fechado" 
-              color="text-yellow-600 bg-yellow-50"
-              activeColor="bg-yellow-600 text-white"
-            />
-            <StatusButton 
-              active={status === "refused"} 
+              className={cn(
+                "flex-1 min-w-[100px] h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2",
+                status === "closed" ? "bg-yellow-500 text-white border-yellow-500 shadow-lg shadow-yellow-100" : "bg-white text-yellow-600 border-yellow-50 shadow-sm"
+              )}
+            >
+              <Clock className="h-4 w-4" /> Fechado
+            </button>
+            <button
               onClick={() => handleStatusChange("refused")}
               disabled={isUpdatingStatus}
-              icon={XCircle} 
-              label="Recusado" 
-              color="text-red-600 bg-red-50"
-              activeColor="bg-red-600 text-white"
-            />
-            <StatusButton 
-              active={status === "abandoned"} 
+              className={cn(
+                "flex-1 min-w-[100px] h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2",
+                status === "refused" ? "bg-red-500 text-white border-red-500 shadow-lg shadow-red-100" : "bg-white text-red-600 border-red-50 shadow-sm"
+              )}
+            >
+              <XCircle className="h-4 w-4" /> Recusado
+            </button>
+            <button
               onClick={() => handleStatusChange("abandoned")}
               disabled={isUpdatingStatus}
-              icon={AlertCircle} 
-              label="Abandonado" 
-              color="text-gray-600 bg-gray-50"
-              activeColor="bg-gray-600 text-white"
-            />
+              className={cn(
+                "flex-1 min-w-[100px] h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border-2",
+                status === "abandoned" ? "bg-slate-500 text-white border-slate-500 shadow-lg shadow-slate-100" : "bg-white text-slate-600 border-slate-50 shadow-sm"
+              )}
+            >
+              <AlertCircle className="h-4 w-4" /> Abandonado
+            </button>
           </div>
         </section>
 
-        <section>
-          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 mb-3 block">Tipo de Atividade</Label>
+        <section className="bg-slate-900 p-6 rounded-[2.5rem] shadow-2xl">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-4 block text-center">Ações Operacionais</Label>
           <Tabs value={activity} onValueChange={setActivity} className="w-full">
-            <TabsList className="w-full h-14 bg-accent/30 rounded-2xl p-1 gap-1">
-              <TabsTrigger value="routine" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">Rotina</TabsTrigger>
-              <TabsTrigger value="survey" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">L. Índice</TabsTrigger>
-              <TabsTrigger value="pending" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all h-full">Pendência</TabsTrigger>
+            <TabsList className="w-full h-14 bg-white/5 rounded-2xl p-1 gap-1 border border-white/5">
+              <TabsTrigger value="routine" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-slate-900 transition-all h-full text-white/60">Rotina</TabsTrigger>
+              <TabsTrigger value="survey" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-slate-900 transition-all h-full text-white/60">L. Índice</TabsTrigger>
+              <TabsTrigger value="pending" className="flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:text-slate-900 transition-all h-full text-white/60">Pendência</TabsTrigger>
             </TabsList>
           </Tabs>
         </section>
@@ -831,19 +948,34 @@ function PropertyVisitPage() {
           </div>
         )}
 
-        <Button 
-          className="w-full h-16 rounded-[2.5rem] text-lg font-black shadow-2xl shadow-primary/30 active:scale-95 transition-all gap-3 bg-primary hover:bg-primary/90"
-          onClick={handleSave}
-          disabled={isSaving || isUpdatingStatus}
-        >
-          {isSaving ? (
-            <div className="h-6 w-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="h-6 w-6" /> FINALIZAR VISITA
-            </>
+      </div>
+
+      {/* Fixed Footer: Next Property */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximo Imóvel</span>
+          <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+        </div>
+        <div className="flex gap-2">
+           <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-8 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2"
+          >
+            {isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}
+            {!isSaving && <CheckCircle2 className="h-5 w-5" />}
+          </Button>
+          {nextProperty && (
+            <Button 
+              variant="outline"
+              onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
+              className="h-14 w-14 rounded-2xl border-slate-200 active:scale-95 transition-all p-0"
+              title="Ir para o próximo"
+            >
+              <ArrowRight className="h-6 w-6 text-slate-600" />
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
     </div>
   );
