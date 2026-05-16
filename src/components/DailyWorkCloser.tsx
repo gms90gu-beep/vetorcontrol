@@ -13,7 +13,8 @@ import {
   Lock,
   Unlock,
   BarChart3,
-  Droplets
+  Droplets,
+  Layers
 } from "lucide-react";
 import {
   Dialog,
@@ -123,7 +124,7 @@ export function DailyWorkCloser({
           .gte("visit_date", startOfDay.toISOString());
         
         if (todayVisits) {
-          const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (v.treated_deposits || 0), 0);
+          const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (Number(v.treated_deposits) || 0), 0);
           const totalLarvicide = todayVisits.reduce((acc, v) => acc + (Number(v.treatment_amount) || 0), 0);
           const totalEliminated = todayVisits.reduce((acc, v) => acc + (Number(v.elimination_amount) || 0), 0);
           const totalFocus = todayVisits.filter(v => v.has_focus).length;
@@ -133,12 +134,12 @@ export function DailyWorkCloser({
             closed: todayVisits.filter(v => v.status === 'closed').length,
             refused: todayVisits.filter(v => v.status === 'refused').length,
             eliminated: totalEliminated,
-            treated: todayVisits.filter(v => v.status === 'visited' && (v.treated_deposits > 0 || v.treatment_amount > 0)).length,
+            treated: todayVisits.filter(v => v.status === 'visited' && ((Number(v.treated_deposits) || 0) > 0 || (Number(v.treatment_amount) || 0) > 0)).length,
             focus: totalFocus,
             pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
             treatedDeposits: totalTreatedDeposits,
             larvicideUsed: totalLarvicide,
-            progress: 0 // Will be calculated if needed
+            progress: 0 
           });
         }
       }
@@ -169,7 +170,6 @@ export function DailyWorkCloser({
 
       if (!currentAgent) throw new Error("Agent not found");
 
-      // 1. Create or update daily work record
       const { data: existingRecord } = await supabase
         .from("daily_work_records")
         .select("id")
@@ -205,7 +205,6 @@ export function DailyWorkCloser({
           .insert(recordData);
       }
 
-      // 2. Update agent status
       await supabase
         .from("agents")
         .update({ work_status: 'work_completed' })
