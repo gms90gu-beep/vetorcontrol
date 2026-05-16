@@ -43,7 +43,7 @@ function FieldWorkPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const { allowWeekend } = useOperationalDate();
+  
 
   useEffect(() => {
     fetchInitialData();
