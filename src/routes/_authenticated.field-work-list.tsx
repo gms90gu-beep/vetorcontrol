@@ -128,6 +128,11 @@ function FieldWorkListPage() {
               activity_type,
               has_focus,
               treatment_applied,
+              treatment_amount,
+              larvicide_unit,
+              treated_deposits,
+              elimination_done,
+              elimination_amount,
               visit_date,
               visit_deposits (
                 id,
