@@ -316,6 +316,8 @@ function PropertyVisitPage() {
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
             treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
+            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
