@@ -18,8 +18,13 @@ import {
   LayoutDashboard,
   Save,
   Crosshair,
-  History as HistoryIcon
+  History as HistoryIcon,
+  Download,
+  Printer,
+  Share2,
+  Filter
 } from "lucide-react";
+import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -171,6 +176,84 @@ function RGPage() {
     };
   }, [properties, activeSession]);
 
+  const handleExportPDF = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Usuário não autenticado");
+        return;
+      }
+
+      toast.loading("Gerando boletim oficial...");
+      
+      const agentInfo = {
+        municipality: agent?.municipality || "Município",
+        name: agent?.name || "Agente",
+        registrationId: agent?.registration_id || "MAT-0000",
+        cycle: activeCycle?.number || "01/26",
+        week: activeWeek?.number?.toString() || "1",
+        block: activeSession?.block_number,
+        street: activeSession?.street_name
+      };
+
+      const metadata = {
+        total: filteredProperties.length,
+        residences: filteredProperties.filter(p => p.type === 'residence').length,
+        commerce: filteredProperties.filter(p => p.type === 'commerce').length,
+        lots: filteredProperties.filter(p => p.type === 'vacant_lot').length,
+        strategicPoints: filteredProperties.filter(p => p.type === 'strategic_point').length
+      };
+
+      const doc = await generateRGPDF(
+        filteredProperties,
+        agentInfo,
+        metadata,
+        { type: blockFilter === 'all' ? 'total' : 'block', value: blockFilter }
+      );
+
+      // Save to history
+      await supabase.from("rg_pdf_exports").insert({
+        user_id: user.id,
+        filter_type: blockFilter === 'all' ? 'total' : 'block',
+        filter_value: blockFilter,
+        metadata: {
+          ...metadata,
+          agent_name: agentInfo.name,
+          generation_date: new Date().toISOString()
+        }
+      });
+
+      doc.save(`RG_BOLETIM_${agentInfo.municipality.toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`);
+      
+      toast.dismiss();
+      toast.success("PDF gerado com sucesso!");
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error("Erro ao gerar PDF: " + error.message);
+      console.error(error);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Boletim RG - Vigilância em Endemias',
+          text: `Boletim RG do Quarteirão ${activeSession?.block_number || '---'}`,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error("Share failed", err);
+      }
+    } else {
+      toast.info("Compartilhamento não suportado neste navegador");
+    }
+  };
+
   const handlePropertyClick = (property: Property) => {
     setEditingProperty(property);
     setIsFormOpen(true);
@@ -277,8 +360,8 @@ function RGPage() {
         )}
 
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 group">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 group min-w-[200px]">
               <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
               <Input 
                 placeholder="Buscar imóvel..." 
@@ -287,15 +370,60 @@ function RGPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button 
-              className="h-14 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={() => {
-                setEditingProperty(null);
-                setIsFormOpen(true);
-              }}
-            >
-              <Plus className="h-5 w-5" /> Adicionar
-            </Button>
+            
+            <div className="flex items-center gap-2">
+              <Select value={blockFilter} onValueChange={setBlockFilter}>
+                <SelectTrigger className="w-[140px] h-14 rounded-2xl border-none bg-white shadow-lg font-bold">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-slate-400" />
+                    <SelectValue placeholder="Filtrar" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border-none shadow-2xl">
+                  <SelectItem value="all" className="font-bold">Todos</SelectItem>
+                  {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
+                    <SelectItem key={block} value={block!} className="font-bold">Qtr {block}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button 
+                variant="outline"
+                className="h-14 w-14 rounded-2xl border-none bg-white shadow-lg hover:bg-slate-50 transition-all text-slate-600"
+                onClick={handleExportPDF}
+                title="Gerar PDF do RG"
+              >
+                <FileText className="h-6 w-6 text-emerald-600" />
+              </Button>
+
+              <Button 
+                variant="outline"
+                className="h-14 w-14 rounded-2xl border-none bg-white shadow-lg hover:bg-slate-50 transition-all text-slate-600 hidden md:flex"
+                onClick={handlePrint}
+                title="Imprimir"
+              >
+                <Printer className="h-6 w-6" />
+              </Button>
+
+              <Button 
+                variant="outline"
+                className="h-14 w-14 rounded-2xl border-none bg-white shadow-lg hover:bg-slate-50 transition-all text-slate-600"
+                onClick={handleShare}
+                title="Compartilhar"
+              >
+                <Share2 className="h-6 w-6" />
+              </Button>
+
+              <Button 
+                className="h-14 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
+                onClick={() => {
+                  setEditingProperty(null);
+                  setIsFormOpen(true);
+                }}
+              >
+                <Plus className="h-5 w-5" /> Adicionar
+              </Button>
+            </div>
           </div>
         </div>
 
