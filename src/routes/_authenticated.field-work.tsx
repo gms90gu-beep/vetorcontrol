@@ -313,25 +313,25 @@ function FieldWorkPage() {
               <CardContent className="grid grid-cols-2 gap-4 p-5">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Imóveis</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.total_properties || 0}</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock?.total_properties || 0}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
                   <p className={cn(
                     "text-xl font-black uppercase tracking-tighter",
-                    selectedBlock.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
+                    selectedBlock?.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
                   )}>
-                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
+                    {selectedBlock?.status === 'finished' ? 'Concluído' : selectedBlock?.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bairro/Subárea</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.subareas?.name || "--"}</p>
+                  <p className="text-xl font-black text-slate-800">{selectedBlock?.subareas?.name || "--"}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>
                   <p className="text-xl font-black text-blue-600">
-                    {cycles.find(c => c.id === selectedCycleId)?.number || "--"}
+                    {cycles?.find(c => c?.id === selectedCycleId)?.number || "--"}
                   </p>
                 </div>
               </CardContent>
