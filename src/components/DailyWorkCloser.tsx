@@ -9,7 +9,11 @@ import {
   Power,
   ChevronRight,
   Printer,
-  Calendar
+  Calendar,
+  Lock,
+  Unlock,
+  BarChart3,
+  Droplets
 } from "lucide-react";
 import {
   Dialog,
@@ -26,24 +30,56 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-export function DailyWorkCloser() {
+interface DailyWorkCloserProps {
+  stats?: {
+    worked: number;
+    closed: number;
+    refused: number;
+    eliminated: number;
+    treated: number;
+    focus: number;
+    pending: number;
+    treatedDeposits?: number;
+    larvicideUsed?: number;
+    progress?: number;
+  };
+  onGeneratePDF?: () => void;
+  isLocked?: boolean;
+  onReopen?: () => void;
+  userRole?: string;
+}
+
+export function DailyWorkCloser({ 
+  stats: externalStats, 
+  onGeneratePDF, 
+  isLocked, 
+  onReopen,
+  userRole 
+}: DailyWorkCloserProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
-  const [stats, setStats] = useState({
+  const [localStats, setLocalStats] = useState({
     worked: 0,
     closed: 0,
     refused: 0,
     eliminated: 0,
     treated: 0,
     focus: 0,
-    pending: 0
+    pending: 0,
+    treatedDeposits: 0,
+    larvicideUsed: 0,
+    progress: 0
   });
 
+  const stats = externalStats || localStats;
+
   const fetchDailyContext = useCallback(async () => {
+    if (externalStats) return;
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -82,27 +118,34 @@ export function DailyWorkCloser() {
         
         const { data: todayVisits } = await supabase
           .from("visits")
-          .select("id, status, property_id")
+          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus")
           .eq("cycle_id", cycle.id)
           .gte("visit_date", startOfDay.toISOString());
         
         if (todayVisits) {
-          // In a real app, we'd fetch deposits as well, but for now we aggregate visits
-          setStats({
+          const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (v.treated_deposits || 0), 0);
+          const totalLarvicide = todayVisits.reduce((acc, v) => acc + (Number(v.treatment_amount) || 0), 0);
+          const totalEliminated = todayVisits.reduce((acc, v) => acc + (Number(v.elimination_amount) || 0), 0);
+          const totalFocus = todayVisits.filter(v => v.has_focus).length;
+
+          setLocalStats({
             worked: todayVisits.length,
             closed: todayVisits.filter(v => v.status === 'closed').length,
             refused: todayVisits.filter(v => v.status === 'refused').length,
-            eliminated: 18, // Mocked production stats as specified in example
-            treated: 7,
-            focus: 1,
-            pending: todayVisits.filter(v => v.status === 'refused').length // Simplified for logic check, 'refused' is closest to pending in this context
+            eliminated: totalEliminated,
+            treated: todayVisits.filter(v => v.status === 'visited' && (v.treated_deposits > 0 || v.treatment_amount > 0)).length,
+            focus: totalFocus,
+            pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
+            treatedDeposits: totalTreatedDeposits,
+            larvicideUsed: totalLarvicide,
+            progress: 0 // Will be calculated if needed
           });
         }
       }
     } catch (error) {
       console.error("Error fetching daily context:", error);
     }
-  }, [agent, activeCycle, activeWeek, stats]);
+  }, [externalStats]);
 
   useEffect(() => {
     fetchDailyContext();
@@ -112,57 +155,61 @@ export function DailyWorkCloser() {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !agent || !activeCycle) return;
+      if (!user) return;
+
+      let currentAgent = agent;
+      if (!currentAgent) {
+        const { data: agentData } = await supabase
+          .from("agents")
+          .select("*")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        currentAgent = agentData;
+      }
+
+      if (!currentAgent) throw new Error("Agent not found");
 
       // 1. Create or update daily work record
       const { data: existingRecord } = await supabase
         .from("daily_work_records")
         .select("id")
-        .eq("agent_id", agent.id)
+        .eq("agent_id", currentAgent.id)
         .eq("work_date", new Date().toISOString().split('T')[0])
         .maybeSingle();
+
+      const recordData = {
+        agent_id: currentAgent.id,
+        cycle_id: activeCycle?.id,
+        week_id: activeWeek?.id,
+        work_date: new Date().toISOString().split('T')[0],
+        status: 'completed',
+        end_time: new Date().toISOString(),
+        properties_worked: stats.worked,
+        properties_closed: stats.closed,
+        properties_refused: stats.refused,
+        deposits_treated: stats.treatedDeposits || 0,
+        deposits_eliminated: stats.eliminated,
+        positive_foci: stats.focus,
+        pending_visits: stats.pending,
+        updated_at: new Date().toISOString()
+      };
 
       if (existingRecord) {
         await supabase
           .from("daily_work_records")
-          .update({
-            end_time: new Date().toISOString(),
-            status: 'completed',
-            properties_worked: stats.worked,
-            properties_closed: stats.closed,
-            properties_refused: stats.refused,
-            deposits_treated: stats.treated,
-            deposits_eliminated: stats.eliminated,
-            positive_foci: stats.focus,
-            pending_visits: stats.pending,
-            updated_at: new Date().toISOString()
-          })
+          .update(recordData)
           .eq("id", existingRecord.id);
       } else {
         await supabase
           .from("daily_work_records")
-          .insert({
-            agent_id: agent.id,
-            cycle_id: activeCycle.id,
-            week_id: activeWeek?.id,
-            work_date: new Date().toISOString().split('T')[0],
-            status: 'completed',
-            end_time: new Date().toISOString(),
-            properties_worked: stats.worked,
-            properties_closed: stats.closed,
-            properties_refused: stats.refused,
-            deposits_treated: stats.treated,
-            deposits_eliminated: stats.eliminated,
-            positive_foci: stats.focus,
-            pending_visits: stats.pending
-          });
+          .insert(recordData);
       }
 
       // 2. Update agent status
       await supabase
         .from("agents")
         .update({ work_status: 'work_completed' })
-        .eq("id", agent.id);
+        .eq("id", currentAgent.id);
 
       toast.success("Trabalho do dia encerrado com sucesso!");
       setShowSummary(true);
@@ -175,15 +222,47 @@ export function DailyWorkCloser() {
     }
   };
 
-  const handleGeneratePDF = () => {
-    toast.success("Gerando PDF do boletim diário...");
-    // Future PDF implementation
-  };
+  const canReopen = userRole === 'supervisor' || userRole === 'admin';
+
+  if (isLocked) {
+    return (
+      <Card className="border-none shadow-xl bg-slate-100 rounded-[2rem] overflow-hidden border-2 border-dashed border-slate-300">
+        <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-4">
+          <div className="h-16 w-16 bg-slate-200 rounded-full flex items-center justify-center">
+            <Lock className="h-8 w-8 text-slate-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">🔒 Boletim Encerrado</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+              O expediente deste dia foi finalizado.
+            </p>
+          </div>
+          <div className="flex gap-3 w-full pt-2">
+            <Button 
+              onClick={onGeneratePDF}
+              className="flex-1 h-12 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 font-black uppercase tracking-widest text-[9px] gap-2 shadow-sm"
+            >
+              <Printer className="h-4 w-4 text-blue-500" /> PDF Diário
+            </Button>
+            {canReopen && (
+              <Button 
+                onClick={onReopen}
+                variant="outline"
+                className="flex-1 h-12 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 font-black uppercase tracking-widest text-[9px] gap-2"
+              >
+                <Unlock className="h-4 w-4" /> Reabrir
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (showSummary) {
     return (
       <Dialog open={showSummary} onOpenChange={setShowSummary}>
-        <DialogContent className="max-w-sm rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl bg-slate-50">
+        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl bg-slate-50">
           <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <CheckCircle2 className="h-24 w-24" />
@@ -198,19 +277,28 @@ export function DailyWorkCloser() {
           </div>
           
           <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <SummaryItem icon={Target} label="Trabalhados" value={stats.worked} color="text-slate-800" />
               <SummaryItem icon={XCircle} label="Fechados" value={stats.closed} color="text-blue-600" />
               <SummaryItem icon={XCircle} label="Recusados" value={stats.refused} color="text-red-500" />
-              <SummaryItem icon={FileText} label="Eliminados" value={stats.eliminated} color="text-emerald-500" />
-              <SummaryItem icon={FileText} label="Tratados" value={stats.treated} color="text-indigo-600" />
+              <SummaryItem icon={BarChart3} label="Eliminados" value={stats.eliminated} color="text-emerald-500" />
+              <SummaryItem icon={Layers} label="Tratados" value={stats.treatedDeposits || stats.treated} color="text-indigo-600" />
               <SummaryItem icon={CheckCircle2} label="Focos Pos." value={stats.focus} color="text-orange-500" />
+              <div className="col-span-2 md:col-span-1">
+                 <SummaryItem icon={Droplets} label="Larvicida" value={`${stats.larvicideUsed || 0}g`} color="text-cyan-600" />
+              </div>
+              <div className="col-span-2">
+                 <SummaryItem icon={BarChart3} label="Cobertura" value={`${stats.progress || 0}%`} color="text-blue-700" />
+              </div>
             </div>
 
             <div className="pt-4 space-y-3">
               <Button 
-                onClick={handleGeneratePDF}
-                className="w-full h-14 rounded-2xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 font-black uppercase tracking-widest text-xs gap-3 shadow-sm"
+                onClick={() => {
+                  onGeneratePDF?.();
+                  setShowSummary(false);
+                }}
+                className="w-full h-14 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 font-black uppercase tracking-widest text-xs gap-3 shadow-lg shadow-blue-200"
               >
                 <Printer className="h-5 w-5" /> Gerar PDF Diário
               </Button>
@@ -232,49 +320,47 @@ export function DailyWorkCloser() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button 
-          className={cn(
-            "w-full h-20 rounded-[2rem] bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-slate-800 hover:to-slate-700 text-white shadow-xl group relative overflow-hidden border-none transition-all duration-300 active:scale-95",
-            agent?.work_status === 'work_completed' && "opacity-60 cursor-not-allowed"
-          )}
-          disabled={agent?.work_status === 'work_completed'}
+          className="w-full h-24 rounded-[2rem] bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-2xl group relative overflow-hidden border-none transition-all duration-300 active:scale-95"
         >
           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="flex items-center justify-between px-6 w-full relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="bg-red-500/20 p-3 rounded-2xl">
-                <Power className="h-6 w-6 text-red-500" />
+          <div className="flex items-center justify-between px-8 w-full relative z-10">
+            <div className="flex items-center gap-5">
+              <div className="bg-white/20 p-4 rounded-[1.5rem] shadow-inner backdrop-blur-sm">
+                <Power className="h-8 w-8 text-white" />
               </div>
               <div className="text-left">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Operacional</p>
-                <h3 className="text-lg font-black tracking-tight uppercase">Encerrar Trabalho</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200 mb-0.5">Operacional</p>
+                <h3 className="text-xl font-black tracking-tight uppercase">Encerrar Trabalho do Dia</h3>
               </div>
             </div>
-            <ChevronRight className="h-6 w-6 text-slate-600 group-hover:translate-x-1 transition-transform" />
+            <ChevronRight className="h-8 w-8 text-white/50 group-hover:translate-x-2 group-hover:text-white transition-all" />
           </div>
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-sm rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
         <div className="bg-gradient-to-br from-red-600 to-red-700 p-8 text-white">
-          <div className="bg-white/20 p-3 rounded-2xl w-fit mb-4">
-            <Power className="h-8 w-8" />
+          <div className="bg-white/20 p-4 rounded-2xl w-fit mb-4">
+            <Power className="h-10 w-10" />
           </div>
-          <DialogTitle className="text-2xl font-black tracking-tighter leading-tight mb-2">
-            Encerrar o trabalho do dia?
+          <DialogTitle className="text-3xl font-black tracking-tighter leading-tight mb-2">
+            Finalizar o expediente?
           </DialogTitle>
           <DialogDescription className="text-white/80 font-bold text-xs uppercase tracking-widest leading-relaxed">
-            Sua produção diária será salva e o relatório gerado automaticamente.
+            Sua produção será consolidada e os indicadores do ciclo serão atualizados automaticamente.
           </DialogDescription>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="space-y-3">
+        <div className="p-8 space-y-6">
+          <div className="space-y-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <SummaryItemSmall label="Imóveis" value={stats.worked} />
-              <SummaryItemSmall label="Fechados" value={stats.closed} />
-              <SummaryItemSmall label="Focos" value={stats.focus} />
-              <SummaryItemSmall label="Pendências" value={stats.pending} />
+            <div className="grid grid-cols-2 gap-3">
+              <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
+              <SummaryItemSmall label="Fechados" value={stats.closed} icon={XCircle} />
+              <SummaryItemSmall label="Recusados" value={stats.refused} icon={XCircle} />
+              <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Tratados" value={stats.treatedDeposits || stats.treated} icon={Layers} />
+              <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
             </div>
           </div>
 
@@ -282,9 +368,16 @@ export function DailyWorkCloser() {
             <Button 
               onClick={handleCloseDay}
               disabled={isLoading}
-              className="w-full h-16 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-sm shadow-lg shadow-red-200"
+              className="w-full h-16 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-sm shadow-xl shadow-red-200 flex items-center justify-center gap-3"
             >
-              {isLoading ? "Sincronizando..." : "Confirmar Encerramento"}
+              {isLoading ? (
+                <>
+                  <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Sincronizando...
+                </>
+              ) : (
+                "Confirmar Encerramento"
+              )}
             </Button>
             <Button 
               variant="ghost" 
@@ -303,21 +396,24 @@ export function DailyWorkCloser() {
 function SummaryItem({ icon: Icon, label, value, color }: any) {
   return (
     <Card className="border-none shadow-sm bg-white rounded-2xl p-4 flex flex-col items-center text-center gap-2">
-      <div className={cn("p-2 rounded-xl bg-slate-50", color.replace('text-', 'bg-').replace('600', '100').replace('500', '100'))}>
+      <div className={cn("p-2 rounded-xl bg-slate-50", color.replace('text-', 'bg-').replace('600', '100').replace('500', '100').replace('700', '100'))}>
         <Icon className={cn("h-4 w-4", color)} />
       </div>
       <div>
-        <p className="text-2xl font-black tracking-tighter text-slate-800">{value}</p>
-        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <p className="text-xl font-black tracking-tighter text-slate-800">{value}</p>
+        <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 leading-tight">{label}</p>
       </div>
     </Card>
   );
 }
 
-function SummaryItemSmall({ label, value }: any) {
+function SummaryItemSmall({ label, value, icon: Icon }: any) {
   return (
-    <div className="bg-slate-50 p-3 rounded-xl flex items-center justify-between">
-      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+    <div className="bg-slate-50 p-4 rounded-2xl flex items-center justify-between border border-slate-100">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3 w-3 text-slate-400" />
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+      </div>
       <span className="text-sm font-black text-slate-800">{value}</span>
     </div>
   );
