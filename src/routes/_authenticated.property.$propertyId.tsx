@@ -8,12 +8,20 @@ import {
   Clock,
   Plus,
   Trash2,
-  Save
+  Save,
+  Activity,
+  Droplets,
+  Bug,
+  ShieldCheck,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
@@ -21,6 +29,32 @@ import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
 });
+
+function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">{label}</span>
+      <div className="grid grid-cols-2 gap-2">
+        <Button 
+          type="button"
+          variant={value === true ? "default" : "outline"}
+          onClick={() => onChange(true)}
+          className={`h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${value === true ? 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200' : 'border-slate-200'}`}
+        >
+          SIM
+        </Button>
+        <Button 
+          type="button"
+          variant={value === false ? "default" : "outline"}
+          onClick={() => onChange(false)}
+          className={`h-12 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${value === false ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200' : 'border-slate-200'}`}
+        >
+          NÃO
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function PropertyVisitPage() {
   const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
@@ -31,6 +65,9 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
+  const [routineData, setRoutineData] = useState({ treatment: false, treatmentAmount: 0, elimination: false, eliminationAmount: 0, guidance: false, notes: "" });
+  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false });
+  const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +115,7 @@ function PropertyVisitPage() {
           // Check for existing visit for this property in the current cycle
           const { data: existingVisit } = await supabase
             .from("visits")
-            .select("id, status, activity_type")
+            .select("id, status, activity_type, has_focus, sample_collected, treatment_applied, treatment_amount, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
             .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
             .eq("cycle_id", session.cycle_id as string)
@@ -96,6 +133,25 @@ function PropertyVisitPage() {
               "pending": "pending"
             };
             setActivity(activityMap[existingVisit.activity_type] || "routine");
+            
+            setRoutineData({
+              treatment: existingVisit.treatment_applied || false,
+              treatmentAmount: Number(existingVisit.treatment_amount) || 0,
+              elimination: existingVisit.elimination_done || false,
+              eliminationAmount: existingVisit.elimination_amount || 0,
+              guidance: existingVisit.guidance_given || false,
+              notes: existingVisit.notes || ""
+            });
+            
+            setSurveyData({
+              hasFocus: existingVisit.has_focus || false,
+              sampleCollected: existingVisit.sample_collected || false
+            });
+            
+            setPendingData({
+              isRecovered: existingVisit.is_recovered || false,
+              notes: existingVisit.notes || ""
+            });
 
             // Load deposits
             const { data: existingDeposits } = await supabase
@@ -215,7 +271,16 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString()
+            visit_date: new Date().toISOString(),
+            has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
+            sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
+            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+            elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
+            elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
+            guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
+            is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
+            notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
           })
           .select()
           .single();
@@ -227,16 +292,25 @@ function PropertyVisitPage() {
         await supabase
           .from("visits")
           .update({ 
-            activity_type: (activityMap[activity] || "routine") as any 
+            activity_type: (activityMap[activity] || "routine") as any,
+            has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
+            sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
+            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+            elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
+            elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
+            guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
+            is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
+            notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
           })
           .eq("id", visitId);
       }
 
       // Sync deposits
-      // First clear old ones to keep it simple for this session
+      // First clear old ones
       await supabase.from("visit_deposits").delete().eq("visit_id", visitId);
 
-      if (deposits.length > 0) {
+      if (deposits.length > 0 && status === 'visited' && activity === 'survey') {
         const depositsToSave = deposits.map(d => ({
           visit_id: visitId as string,
           type_code: d.type,
@@ -385,63 +459,190 @@ function PropertyVisitPage() {
           </Tabs>
         </section>
 
-        <section className="space-y-4">
-          <div className="flex items-center justify-between ml-1">
-            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Depósitos e Focos</Label>
-            <Button variant="ghost" size="sm" onClick={addDeposit} className="h-10 text-primary font-black gap-2 rounded-xl hover:bg-primary/5 transition-all">
-              <Plus className="h-5 w-5" /> ADICIONAR
-            </Button>
-          </div>
-          
-          <div className="space-y-3">
-            {deposits.length === 0 && (
-              <div className="py-8 px-4 rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
-                <p className="text-xs font-medium text-slate-400">Nenhum depósito registrado.</p>
-              </div>
-            )}
-            {deposits.map((deposit) => (
-              <Card key={deposit.id} className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
-                <CardContent className="p-5 space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center font-black text-primary text-lg">
-                        {deposit.type}
+        {status === "visited" && (
+          <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
+            {activity === "routine" && (
+              <section className="space-y-6">
+                <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-wider">
+                      <Activity className="h-4 w-4" /> Ações Realizadas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <BooleanButton 
+                      label="Tratamento realizado?" 
+                      value={routineData.treatment} 
+                      onChange={(v) => setRoutineData({...routineData, treatment: v})} 
+                    />
+                    {routineData.treatment && (
+                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade tratada (g/ml)</Label>
+                        <Input 
+                          type="number" 
+                          value={routineData.treatmentAmount} 
+                          onChange={(e) => setRoutineData({...routineData, treatmentAmount: Number(e.target.value)})}
+                          className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                        />
                       </div>
-                      <span className="font-black text-sm text-slate-700 tracking-tight">{deposit.description}</span>
+                    )}
+                    
+                    <BooleanButton 
+                      label="Eliminação realizada?" 
+                      value={routineData.elimination} 
+                      onChange={(v) => setRoutineData({...routineData, elimination: v})} 
+                    />
+                    {routineData.elimination && (
+                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade eliminada</Label>
+                        <Input 
+                          type="number" 
+                          value={routineData.eliminationAmount} 
+                          onChange={(e) => setRoutineData({...routineData, eliminationAmount: Number(e.target.value)})}
+                          className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                        />
+                      </div>
+                    )}
+
+                    <BooleanButton 
+                      label="Orientação realizada?" 
+                      value={routineData.guidance} 
+                      onChange={(v) => setRoutineData({...routineData, guidance: v})} 
+                    />
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Observação</Label>
+                      <Textarea 
+                        placeholder="Descreva observações importantes..."
+                        value={routineData.notes}
+                        onChange={(e) => setRoutineData({...routineData, notes: e.target.value})}
+                        className="min-h-[100px] rounded-2xl border-slate-200 focus:ring-primary p-4 resize-none bg-slate-50/50"
+                      />
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeDeposit(deposit.id)} className="text-red-400 rounded-full hover:bg-red-50 hover:text-red-600 transition-all h-10 w-10">
-                      <Trash2 className="h-5 w-5" />
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+
+            {activity === "survey" && (
+              <section className="space-y-6">
+                <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-wider">
+                      <Bug className="h-4 w-4" /> Levantamento de Índice
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <BooleanButton 
+                      label="Teve foco?" 
+                      value={surveyData.hasFocus} 
+                      onChange={(v) => setSurveyData({...surveyData, hasFocus: v})} 
+                    />
+                    <BooleanButton 
+                      label="Coleta realizada?" 
+                      value={surveyData.sampleCollected} 
+                      onChange={(v) => setSurveyData({...surveyData, sampleCollected: v})} 
+                    />
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between ml-1">
+                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Depósitos Encontrados</Label>
+                    <Button variant="ghost" size="sm" onClick={addDeposit} className="h-10 text-primary font-black gap-2 rounded-xl hover:bg-primary/5 transition-all">
+                      <Plus className="h-5 w-5" /> ADICIONAR
                     </Button>
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-2">
-                    <ToggleButton 
-                      active={deposit.positive} 
-                      onClick={() => updateDeposit(deposit.id, 'positive', !deposit.positive)} 
-                      label="Foco" 
-                      color="bg-red-50 text-red-600"
-                      activeColor="bg-red-600 text-white shadow-lg shadow-red-200"
-                    />
-                    <ToggleButton 
-                      active={deposit.treated} 
-                      onClick={() => updateDeposit(deposit.id, 'treated', !deposit.treated)} 
-                      label="Tratado" 
-                      color="bg-blue-50 text-blue-600"
-                      activeColor="bg-blue-600 text-white shadow-lg shadow-blue-200"
-                    />
-                    <ToggleButton 
-                      active={deposit.eliminated} 
-                      onClick={() => updateDeposit(deposit.id, 'eliminated', !deposit.eliminated)} 
-                      label="Eliminado" 
-                      color="bg-emerald-50 text-emerald-600"
-                      activeColor="bg-emerald-600 text-white shadow-lg shadow-emerald-200"
-                    />
+                  <div className="space-y-3">
+                    {deposits.length === 0 && (
+                      <div className="py-8 px-4 rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
+                        <p className="text-xs font-medium text-slate-400">Nenhum depósito registrado.</p>
+                      </div>
+                    )}
+                    {deposits.map((deposit) => (
+                      <Card key={deposit.id} className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+                        <CardContent className="p-5 space-y-5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <select 
+                                className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center font-black text-primary text-sm border-none appearance-none text-center cursor-pointer"
+                                value={deposit.type}
+                                onChange={(e) => updateDeposit(deposit.id, 'type', e.target.value)}
+                              >
+                                {["A1", "A2", "B", "C", "D1", "D2", "E"].map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                              <Input 
+                                value={deposit.description} 
+                                onChange={(e) => updateDeposit(deposit.id, 'description', e.target.value)}
+                                className="border-none shadow-none font-black text-sm text-slate-700 tracking-tight p-0 h-auto focus-visible:ring-0 w-full"
+                              />
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => removeDeposit(deposit.id)} className="text-red-400 rounded-full hover:bg-red-50 hover:text-red-600 transition-all h-10 w-10">
+                              <Trash2 className="h-5 w-5" />
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            <ToggleButton 
+                              active={deposit.positive} 
+                              onClick={() => updateDeposit(deposit.id, 'positive', !deposit.positive)} 
+                              label="Foco" 
+                              color="bg-red-50 text-red-600"
+                              activeColor="bg-red-600 text-white shadow-lg shadow-red-200"
+                            />
+                            <ToggleButton 
+                              active={deposit.treated} 
+                              onClick={() => updateDeposit(deposit.id, 'treated', !deposit.treated)} 
+                              label="Tratado" 
+                              color="bg-blue-50 text-blue-600"
+                              activeColor="bg-blue-600 text-white shadow-lg shadow-blue-200"
+                            />
+                            <ToggleButton 
+                              active={deposit.eliminated} 
+                              onClick={() => updateDeposit(deposit.id, 'eliminated', !deposit.eliminated)} 
+                              label="Eliminado" 
+                              color="bg-emerald-50 text-emerald-600"
+                              activeColor="bg-emerald-600 text-white shadow-lg shadow-emerald-200"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              </section>
+            )}
+
+            {activity === "pending" && (
+              <section className="space-y-6">
+                <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-wider">
+                      <ShieldCheck className="h-4 w-4" /> Pendência
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <BooleanButton 
+                      label="Imóvel recuperado?" 
+                      value={pendingData.isRecovered} 
+                      onChange={(v) => setPendingData({...pendingData, isRecovered: v})} 
+                    />
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Observação</Label>
+                      <Textarea 
+                        placeholder="Detalhes sobre a pendência..."
+                        value={pendingData.notes}
+                        onChange={(e) => setPendingData({...pendingData, notes: e.target.value})}
+                        className="min-h-[100px] rounded-2xl border-slate-200 focus:ring-primary p-4 resize-none bg-slate-50/50"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+            )}
           </div>
-        </section>
+        )}
 
         <Button 
           className="w-full h-16 rounded-[2.5rem] text-lg font-black shadow-2xl shadow-primary/30 active:scale-95 transition-all gap-3 bg-primary hover:bg-primary/90"
