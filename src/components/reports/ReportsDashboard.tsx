@@ -181,6 +181,38 @@ export function ReportsDashboard() {
         pendencyData={chartData.pendencies}
       />
 
+      {/* Ranking de Produtividade (Preview) */}
+      <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tighter text-slate-800">Ranking de Produtividade</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Top performance da semana</p>
+          </div>
+          <Button variant="ghost" className="text-blue-600 font-bold text-xs">Ver todos</Button>
+        </div>
+        <div className="space-y-4">
+          {[
+            { name: "Carlos Silva", visits: 245, coverage: 98 },
+            { name: "Maria Oliveira", visits: 232, coverage: 95 },
+            { name: "João Santos", visits: 210, coverage: 89 }
+          ].map((agent, i) => (
+            <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm">{agent.name}</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.visits} visitas</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-black text-emerald-600">{agent.coverage}%</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cobertura</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {(isSupervisor || true) && ( // Allow viewing for now to test
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-200">
