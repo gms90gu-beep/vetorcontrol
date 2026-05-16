@@ -109,9 +109,9 @@ function FieldWorkPage() {
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
-  const filteredBlocks = blocks.filter(b => 
-    b.number.includes(searchQuery)
-  );
+  const filteredBlocks = blocks?.filter(b => 
+    b?.number?.toString()?.includes(searchQuery)
+  ) || [];
 
   const handleStartWork = async () => {
     if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
@@ -176,8 +176,8 @@ function FieldWorkPage() {
                 <SelectValue placeholder="Ciclo" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
-                {cycles.map(c => (
-                  <SelectItem key={c.id} value={c.id} className="rounded-xl font-bold">Ciclo {c.number}</SelectItem>
+                {cycles?.map(c => (
+                  <SelectItem key={c?.id} value={c?.id} className="rounded-xl font-bold">Ciclo {c?.number}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -191,8 +191,8 @@ function FieldWorkPage() {
                 <SelectValue placeholder="Semana" />
               </SelectTrigger>
               <SelectContent className="rounded-2xl border-none shadow-xl">
-                {weeks.map(w => (
-                  <SelectItem key={w.id} value={w.id} className="rounded-xl font-bold">Semana {w.number}</SelectItem>
+                {weeks?.map(w => (
+                  <SelectItem key={w?.id} value={w?.id} className="rounded-xl font-bold">Semana {w?.number}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -254,9 +254,9 @@ function FieldWorkPage() {
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
               </div>
-            ) : filteredBlocks.map((block) => (
+            ) : filteredBlocks?.map((block) => (
               <Card 
-                key={block.id}
+                key={block?.id}
                 className={cn(
                   "border-2 transition-all duration-300 rounded-3xl cursor-pointer active:scale-95",
                   selectedBlockId === block.id 
