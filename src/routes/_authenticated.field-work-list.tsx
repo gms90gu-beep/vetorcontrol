@@ -182,15 +182,21 @@ function FieldWorkListPage() {
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const tableData = properties.map(p => [
-      p.number,
-      p.type,
-      p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
-      p.treatment_applied ? "Sim" : "Não",
-      p.has_focus ? "Sim" : "Não",
-      p.is_pending ? "Sim" : "Não",
-      p.observation || ""
-    ]);
+    const tableData = properties.map(p => {
+      const treatmentInfo = p.latest_visit?.treatment_applied 
+        ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
+        : "Não";
+      
+      return [
+        p.number,
+        p.type,
+        p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
+        treatmentInfo,
+        p.has_focus ? "Sim" : "Não",
+        p.is_pending ? "Sim" : "Não",
+        p.observation || ""
+      ];
+    });
 
     doc.setFontSize(18);
     doc.text("Boletim Diário de Trabalho", 14, 22);
