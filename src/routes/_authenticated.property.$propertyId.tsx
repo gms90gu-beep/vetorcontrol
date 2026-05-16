@@ -308,17 +308,22 @@ function PropertyVisitPage() {
         
         if (updateError) throw updateError;
       } else {
+        const visitData: any = {
+          property_id: propertyId as string,
+          agent_id: user.id,
+          cycle_id: activeSession.cycle_id as string,
+          week_id: activeSession.week_id as string,
+          status: newStatus as any,
+          activity_type: (activityMap[activity] || "routine") as any,
+          visit_date: new Date().toISOString(),
+          start_time: new Date().toISOString(),
+          block_number: activeSession.block_number || "0",
+          rg: activeSession.rg || "0"
+        };
+
         const { data: newVisit, error: insertError } = await supabase
           .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: newStatus as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString()
-          })
+          .insert(visitData)
           .select()
           .single();
         
