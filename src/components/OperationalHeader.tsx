@@ -44,7 +44,7 @@ export function OperationalHeader() {
     fetchHeaderData();
   }, []);
 
-  async function fetchHeaderData() {
+  const fetchHeaderData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -119,7 +119,7 @@ export function OperationalHeader() {
     } catch (error) {
       console.error("Error fetching header data:", error);
     }
-  }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();

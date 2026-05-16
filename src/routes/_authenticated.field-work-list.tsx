@@ -73,7 +73,7 @@ function FieldWorkListPage() {
     fetchAgentAndPeriod();
   }, []);
 
-  async function fetchAgentAndPeriod() {
+  const fetchAgentAndPeriod = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -112,9 +112,9 @@ function FieldWorkListPage() {
         if (week) setActiveWeek(week);
       }
     } catch (e) { console.error(e); }
-  }
+  };
 
-  async function fetchSessionAndProperties() {
+  const fetchSessionAndProperties = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -181,7 +181,7 @@ function FieldWorkListPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const filteredProperties = properties.filter(p => {
     const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
