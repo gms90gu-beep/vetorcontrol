@@ -416,9 +416,9 @@ function FieldWorkListPage() {
         )}
 
         <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
             <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               <Input 
                 placeholder="Buscar imóvel..." 
                 className="pl-12 h-14 rounded-2xl border-none bg-white shadow-lg text-base font-bold focus-visible:ring-blue-500/20"
@@ -426,12 +426,12 @@ function FieldWorkListPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 h-14">
               <Button 
                 variant="outline" 
                 size="icon" 
                 className={cn(
-                  "h-14 w-14 rounded-2xl border-none shadow-lg transition-all",
+                  "h-full w-14 rounded-2xl border-none shadow-lg transition-all",
                   indexSurvey ? "bg-amber-500 text-white" : "bg-white text-slate-400"
                 )}
                 onClick={() => setIndexSurvey(!indexSurvey)}
@@ -442,7 +442,7 @@ function FieldWorkListPage() {
                 <Button 
                   variant="outline" 
                   onClick={generatePDF}
-                  className="h-14 px-6 rounded-2xl border-none bg-white shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2"
+                  className="h-full px-6 rounded-2xl border-none bg-white shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2"
                 >
                   <FileText className="h-4 w-4 text-red-500" />
                   PDF
