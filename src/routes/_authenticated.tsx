@@ -59,11 +59,6 @@ function AuthenticatedLayout() {
   const isSettingsPage = location.pathname === "/settings";
   const canOverride = userRole === "admin" || userRole === "supervisor";
 
-  // Allow access to settings page for admins/supervisors even on weekends
-  if (!isOperational && !(isSettingsPage && canOverride)) {
-    return <WeekendBlock />;
-  }
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/login";
