@@ -96,10 +96,10 @@ function BottomNav() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-3 flex items-center justify-between pb-8">
       <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
-      <NavItem to="/field-work" icon={CheckSquare} label="Diário" />
+      <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
       <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Boletim" />
+      <NavItem to="/reports" icon={FileText} label="Relatórios" />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
@@ -128,7 +128,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     { label: "RG", icon: MapPin, to: "/rg" },
     { label: "Pendências", icon: AlertTriangle, to: "/pending" },
     { label: "Mapa", icon: MapIcon, to: "/map" },
-    { label: "Boletim Semanal", icon: FileText, to: "/reports" },
+    { label: "Relatórios", icon: FileText, to: "/reports" },
     { label: "Configurações", icon: Settings, to: "/settings" },
   ];
 
