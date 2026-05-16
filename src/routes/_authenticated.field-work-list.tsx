@@ -73,7 +73,7 @@ function FieldWorkListPage() {
     fetchAgentAndPeriod();
   }, []);
 
-  async function fetchAgentAndPeriod() {
+  const fetchAgentAndPeriod = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
