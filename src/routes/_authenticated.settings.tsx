@@ -140,19 +140,7 @@ function SettingsPage() {
             <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={Smartphone} label="Sincronização Automática" description="Enviar dados ao retomar conexão" hasSwitch defaultChecked />
             
-            {(userRole === "admin" || userRole === "supervisor") && (
-              <>
-                <Separator className="bg-slate-50 mx-4" />
-                <SettingsItem 
-                  icon={CalendarLucide} 
-                  label="Operação em Finais de Semana" 
-                  description="Permitir registros e atividades operacionais aos sábados e domingos" 
-                  hasSwitch 
-                  checked={allowWeekend} 
-                  onCheckedChange={toggleWeekendOperation}
-                />
-              </>
-            )}
+            {/* Removed weekend operation setting as it is now always allowed */}
           </CardContent>
         </Card>
       </section>
