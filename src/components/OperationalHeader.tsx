@@ -112,7 +112,7 @@ export function OperationalHeader() {
           setTodayStats({
             worked: todayVisits.length,
             pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
-            progress: 78 // Placeholder progress
+            progress: session?.property_count ? Math.round((todayVisits.length / session.property_count) * 100) : 0
           });
         }
       }
