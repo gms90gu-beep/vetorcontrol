@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const { userRole } = useOperationalDate();
   const [filters, setFilters] = useState({
     agent: "all",
     cycle: "all",
@@ -129,35 +130,46 @@ export function ReportsDashboard() {
     }
   }
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     toast.info("Preparando PDF para exportação...");
-    // Future implementation: PDF generation logic
+    const success = await generateOperationalPDF("reports-content", kpiData);
+    if (success) {
+      toast.success("Relatório PDF exportado com sucesso!");
+    } else {
+      toast.error("Erro ao gerar PDF");
+    }
   };
 
+  const isSupervisor = userRole === "supervisor" || userRole === "admin";
+
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div id="reports-content" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Dashboard Operacional</h2>
-          <p className="text-sm font-medium text-slate-500">Inteligência de campo e análise de ciclo</p>
+          <div className="flex items-center gap-2 mb-1">
+            <Badge className="bg-blue-600 text-white font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md">VetorControl Intelligence</Badge>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">• Real Time Data</span>
+          </div>
+          <h2 className="text-4xl font-black tracking-tighter text-slate-900 uppercase">Inteligência Operacional</h2>
+          <p className="text-sm font-bold text-slate-500 mt-1">Dashboards analíticos e cobertura territorial</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Button 
             onClick={handleExportPDF}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-12 px-6 font-black shadow-lg shadow-blue-100 transition-all active:scale-95 text-xs uppercase tracking-widest"
+            className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-14 px-8 font-black shadow-xl shadow-slate-200 transition-all active:scale-95 text-xs uppercase tracking-widest"
           >
-            <Printer className="mr-2 h-4 w-4" /> Exportar PDF
+            <Printer className="mr-2 h-4 w-4" /> Exportar Relatório
           </Button>
           <Button 
             variant="outline"
-            className="border-slate-200 hover:bg-slate-50 text-slate-600 rounded-2xl h-12 px-6 font-black transition-all active:scale-95 text-xs uppercase tracking-widest"
+            className="border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl h-14 w-14 p-0 flex items-center justify-center shadow-md transition-all active:scale-95"
           >
-            <Share2 className="mr-2 h-4 w-4" /> Compartilhar
+            <Share2 className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
-      <ReportsFilters onFilterChange={setFilters} />
+      <ReportsFilters onFilterChange={setFilters} className="reports-filters" />
 
       <OperationalKPIs data={kpiData} isLoading={isLoading} />
 
@@ -169,29 +181,37 @@ export function ReportsDashboard() {
         pendencyData={chartData.pendencies}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
-        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-500">
-            <LayoutDashboard className="h-40 w-40" />
+      {(isSupervisor || true) && ( // Allow viewing for now to test
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-200">
+            <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
+              <LayoutDashboard className="h-48 w-48" />
+            </div>
+            <div className="relative z-10">
+              <Badge className="bg-emerald-500 mb-6 font-black uppercase tracking-widest text-[9px]">Acesso Supervisor</Badge>
+              <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 leading-none">Painel de<br/>Alta Performance</h3>
+              <p className="text-slate-400 text-sm mb-8 max-w-xs font-medium leading-relaxed">Monitore o ranking da equipe, identifique gargalos operacionais e acompanhe o progresso de cada área em tempo real.</p>
+              <Button className="bg-white text-slate-900 hover:bg-slate-100 rounded-[1.25rem] h-14 px-10 font-black uppercase tracking-widest text-xs shadow-lg shadow-white/10 group-hover:translate-x-2 transition-transform">
+                Entrar no Modo Supervisão <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Modo Supervisão</h3>
-          <p className="text-slate-400 text-sm mb-6 max-w-xs font-medium">Análise completa da equipe, ranking de produtividade e acompanhamento de áreas pendentes.</p>
-          <Button className="bg-white text-slate-900 hover:bg-slate-100 rounded-2xl h-12 px-8 font-black uppercase tracking-widest text-xs">
-            Acessar Painel Supervisor
-          </Button>
-        </div>
 
-        <div className="bg-blue-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform duration-500">
-            <FileText className="h-40 w-40" />
+          <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-blue-200">
+            <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
+              <FileText className="h-48 w-48" />
+            </div>
+            <div className="relative z-10">
+              <Badge className="bg-white/20 backdrop-blur-md mb-6 font-black uppercase tracking-widest text-[9px]">Geração de Documentos</Badge>
+              <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 leading-none">Boletins Oficiais<br/>Automáticos</h3>
+              <p className="text-blue-100 text-sm mb-8 max-w-xs font-medium leading-relaxed">Gere boletins semanais e consolidados de ciclo seguindo as normas oficiais do Ministério da Saúde com um clique.</p>
+              <Button className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-[1.25rem] h-14 px-10 font-black uppercase tracking-widest text-xs group-hover:translate-x-2 transition-transform">
+                Gerar Boletim Semanal <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <h3 className="text-xl font-black uppercase tracking-tighter mb-2">Relatórios Oficiais</h3>
-          <p className="text-blue-100 text-sm mb-6 max-w-xs font-medium">Geração automática de boletins semanais e anuais em formato oficial para envio institucional.</p>
-          <Button className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-2xl h-12 px-8 font-black uppercase tracking-widest text-xs">
-            Gerar Boletim Semanal
-          </Button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
