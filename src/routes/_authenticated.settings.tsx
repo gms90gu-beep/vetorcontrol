@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsPage() {
   const [agent, setAgent] = useState<any>(null);
-  const { allowWeekend, toggleWeekendOperation, userRole } = useOperationalDate();
+  const { userRole } = useOperationalDate();
   const [stats, setStats] = useState({
     worked: 1240,
     foci: 42,
