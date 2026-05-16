@@ -128,6 +128,11 @@ function FieldWorkListPage() {
               activity_type,
               has_focus,
               treatment_applied,
+              treatment_amount,
+              larvicide_unit,
+              treated_deposits,
+              elimination_done,
+              elimination_amount,
               visit_date,
               visit_deposits (
                 id,
@@ -177,15 +182,21 @@ function FieldWorkListPage() {
 
   const generatePDF = () => {
     const doc = new jsPDF();
-    const tableData = properties.map(p => [
-      p.number,
-      p.type,
-      p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
-      p.treatment_applied ? "Sim" : "Não",
-      p.has_focus ? "Sim" : "Não",
-      p.is_pending ? "Sim" : "Não",
-      p.observation || ""
-    ]);
+    const tableData = properties.map(p => {
+      const treatmentInfo = p.latest_visit?.treatment_applied 
+        ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
+        : "Não";
+      
+      return [
+        p.number,
+        p.type,
+        p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
+        treatmentInfo,
+        p.has_focus ? "Sim" : "Não",
+        p.is_pending ? "Sim" : "Não",
+        p.observation || ""
+      ];
+    });
 
     doc.setFontSize(18);
     doc.text("Boletim Diário de Trabalho", 14, 22);
@@ -209,6 +220,10 @@ function FieldWorkListPage() {
   const closedCount = properties.filter(p => p.status === "closed").length;
   const refusedCount = properties.filter(p => p.status === "refused").length;
   const focusCount = properties.filter(p => p.has_focus).length;
+  const treatedCount = properties.filter(p => p.treatment_applied).length;
+  const treatedDepositsCount = properties.reduce((acc, p) => acc + (p.latest_visit?.treated_deposits || 0), 0);
+  const larvicideUsed = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.treatment_amount) || 0), 0);
+  const eliminationCount = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.elimination_amount) || 0), 0);
   const progressPercent = properties.length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
 
   return (
@@ -231,8 +246,10 @@ function FieldWorkListPage() {
         closed: closedCount,
         refused: refusedCount,
         focus: focusCount,
-        treated: properties.filter(p => p.treatment_applied).length,
-        eliminated: Math.round(workedCount * 0.4),
+        treated: treatedCount,
+        treatedDeposits: treatedDepositsCount,
+        larvicideUsed: larvicideUsed,
+        eliminated: eliminationCount,
         progress: progressPercent
       }}
     >

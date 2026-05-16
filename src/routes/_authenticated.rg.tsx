@@ -207,6 +207,8 @@ function RGPage() {
         refused: 0,
         focus: 0,
         treated: 0,
+        treatedDeposits: 0,
+        larvicideUsed: 0,
         eliminated: 0,
         progress: stats.blockProgress
       }}

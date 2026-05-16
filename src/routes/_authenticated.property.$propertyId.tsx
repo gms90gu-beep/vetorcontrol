@@ -75,17 +75,53 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
-  const [routineData, setRoutineData] = useState({ treatment: false, treatmentAmount: 0, elimination: false, eliminationAmount: 0, guidance: false, notes: "" });
+  const [routineData, setRoutineData] = useState({ 
+    treatment: false, 
+    treatmentAmount: 0, 
+    larvicideUnit: "gramas",
+    treatedDeposits: 0,
+    elimination: false, 
+    eliminationAmount: 0, 
+    guidance: false, 
+    notes: "" 
+  });
   const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false });
   const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
 
   useEffect(() => {
     fetchData();
+    fetchDailyStats();
   }, [propertyId]);
+
+  async function fetchDailyStats() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data: visits } = await supabase
+        .from("visits")
+        .select("status, treatment_amount, treated_deposits")
+        .eq("agent_id", user.id)
+        .gte("visit_date", today.toISOString());
+
+      if (visits) {
+        const stats = visits.reduce((acc, v) => ({
+          worked: acc.worked + 1,
+          treated: acc.treated + (v.treated_deposits || 0),
+          larvicide: acc.larvicide + (Number(v.treatment_amount) || 0)
+        }), { worked: 0, treated: 0, larvicide: 0 });
+        setDailyStats(stats);
+      }
+    } catch (e) { console.error(e); }
+  }
 
   async function fetchData() {
     if (!propertyId) return;
@@ -125,7 +161,7 @@ function PropertyVisitPage() {
           // Check for existing visit for this property in the current cycle
           const { data: existingVisit } = await supabase
             .from("visits")
-            .select("id, status, activity_type, has_focus, sample_collected, treatment_applied, treatment_amount, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
+            .select("id, status, activity_type, has_focus, sample_collected, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
             .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
             .eq("cycle_id", session.cycle_id as string)
@@ -147,6 +183,8 @@ function PropertyVisitPage() {
             setRoutineData({
               treatment: existingVisit.treatment_applied || false,
               treatmentAmount: Number(existingVisit.treatment_amount) || 0,
+              larvicideUnit: existingVisit.larvicide_unit || "gramas",
+              treatedDeposits: existingVisit.treated_deposits || 0,
               elimination: existingVisit.elimination_done || false,
               eliminationAmount: existingVisit.elimination_amount || 0,
               guidance: existingVisit.guidance_given || false,
@@ -277,6 +315,17 @@ function PropertyVisitPage() {
       return;
     }
 
+    if (status === 'visited' && activity === 'routine' && routineData.treatment) {
+      if (routineData.treatmentAmount <= 0) {
+        toast.error("Informe a quantidade de larvicida utilizada.");
+        return;
+      }
+      if (routineData.treatedDeposits <= 0) {
+        toast.error("Informe a quantidade de depósitos tratados.");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -305,6 +354,8 @@ function PropertyVisitPage() {
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
             treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
+            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
@@ -326,6 +377,8 @@ function PropertyVisitPage() {
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
             treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
+            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
@@ -455,6 +508,21 @@ function PropertyVisitPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-slate-900 p-4 rounded-3xl text-white shadow-xl shadow-slate-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mb-1">Trabalhados</p>
+          <p className="text-xl font-black">{dailyStats.worked}</p>
+        </div>
+        <div className="bg-blue-600 p-4 rounded-3xl text-white shadow-xl shadow-blue-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-blue-200 mb-1">Tratados</p>
+          <p className="text-xl font-black">{dailyStats.treated}</p>
+        </div>
+        <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl shadow-indigo-200/50">
+          <p className="text-[7px] font-black uppercase tracking-widest text-indigo-200 mb-1">Larvicida</p>
+          <p className="text-xl font-black">{dailyStats.larvicide}</p>
+        </div>
+      </div>
+
       <div className="space-y-6">
         <section>
           <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1 mb-3 block">Situação do Imóvel</Label>
@@ -526,14 +594,49 @@ function PropertyVisitPage() {
                       onChange={(v) => setRoutineData({...routineData, treatment: v})} 
                     />
                     {routineData.treatment && (
-                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                        <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade tratada (g/ml)</Label>
-                        <Input 
-                          type="number" 
-                          value={routineData.treatmentAmount} 
-                          onChange={(e) => setRoutineData({...routineData, treatmentAmount: Number(e.target.value)})}
-                          className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
-                        />
+                      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de larvicida utilizado</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={routineData.treatmentAmount} 
+                            onChange={(e) => setRoutineData({...routineData, treatmentAmount: Math.max(0, Number(e.target.value))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Unidade</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {["gramas", "ml", "tabletes", "sachês"].map((unit) => (
+                              <Button
+                                key={unit}
+                                type="button"
+                                variant={routineData.larvicideUnit === unit ? "default" : "outline"}
+                                onClick={() => setRoutineData({...routineData, larvicideUnit: unit})}
+                                className={`h-10 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${
+                                  routineData.larvicideUnit === unit 
+                                    ? 'bg-primary shadow-md shadow-primary/20' 
+                                    : 'border-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {unit}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de depósitos tratados</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={routineData.treatedDeposits} 
+                            onChange={(e) => setRoutineData({...routineData, treatedDeposits: Math.max(0, Math.floor(Number(e.target.value)))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
                       </div>
                     )}
                     

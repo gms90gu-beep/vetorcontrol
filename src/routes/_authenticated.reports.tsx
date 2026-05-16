@@ -139,6 +139,8 @@ function ReportsPage() {
         refused: 4,
         focus: currentBulletin.positiveFocus,
         treated: 142,
+        treatedDeposits: 284,
+        larvicideUsed: 500,
         eliminated: 85,
         progress: currentBulletin.coverage
       }}
