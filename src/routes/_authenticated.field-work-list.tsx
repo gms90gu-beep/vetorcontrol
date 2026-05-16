@@ -265,19 +265,6 @@ function FieldWorkListPage() {
     doc.save(`boletim-diario-${activeSession?.block_number}-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
-    doc.text(`Quarteirão: ${activeSession?.block_number}`, 14, 40);
-
-    autoTable(doc, {
-      startY: 45,
-      head: [['Nº', 'Tipo', 'Situação', 'Trat.', 'Foco', 'Pend.', 'Obs.']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] }
-    });
-
-    doc.save(`boletim-${activeSession?.block_number}-${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success("PDF gerado com sucesso!");
-  };
 
   const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
   const closedCount = properties.filter(p => p.status === "closed").length;
