@@ -265,6 +265,38 @@ function FieldWorkListPage() {
         eliminated: eliminationCount,
         progress: progressPercent
       }}
+      sidebarFooter={
+        <div className="mt-auto">
+          <DailyWorkCloser 
+            stats={{
+              worked: workedCount,
+              closed: closedCount,
+              refused: refusedCount,
+              eliminated: eliminationCount,
+              treated: treatedCount,
+              focus: focusCount,
+              pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
+              treatedDeposits: treatedDepositsCount,
+              larvicideUsed: larvicideUsed,
+              progress: progressPercent
+            }}
+            onGeneratePDF={generatePDF}
+            isLocked={isLocked}
+            userRole={userRole}
+            onReopen={async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                setIsLocked(false);
+                toast.success("Boletim reaberto com sucesso!");
+              } catch (e) {
+                toast.error("Erro ao reabrir boletim.");
+              }
+            }}
+          />
+        </div>
+      }
     >
       <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col")}>
         {!isLandscape && (
@@ -404,6 +436,10 @@ function FieldWorkListPage() {
                 properties={filteredProperties} 
                 indexSurvey={indexSurvey}
                 onPropertyClick={(prop) => {
+                  if (isLocked) {
+                    toast.error("O boletim está encerrado. Reabra para fazer alterações.");
+                    return;
+                  }
                   setSelectedProperty(prop);
                   setIsModalOpen(true);
                 }}
