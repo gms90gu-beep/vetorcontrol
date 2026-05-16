@@ -16,6 +16,8 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
+import { WeekendBlock } from "@/components/WeekendBlock";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Button } from "@/components/ui/button";
 import { 
   Sidebar, 
