@@ -26,6 +26,16 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 
+const DEPOSIT_TYPES = [
+  { code: "A1", name: "Caixa d'água" },
+  { code: "A2", name: "Tambor/Barril" },
+  { code: "B", name: "Vasos/Pratos" },
+  { code: "C", name: "Pneus" },
+  { code: "D1", name: "Lixo" },
+  { code: "D2", name: "Entulho" },
+  { code: "E", name: "Depósitos naturais" }
+];
+
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
 });
@@ -160,15 +170,34 @@ function PropertyVisitPage() {
               .eq("visit_id", existingVisit.id);
             
             if (existingDeposits) {
-              setDeposits(existingDeposits.map(d => ({
+              const dbDeposits = existingDeposits.map(d => ({
                 id: d.id,
                 type: d.type_code,
                 description: d.description,
                 quantity: d.quantity,
                 positive: d.is_positive,
                 treated: d.is_treated,
-                eliminated: d.is_eliminated
-              })));
+                eliminated: d.is_eliminated,
+                selected: true
+              }));
+              
+              // Merge with DEPOSIT_TYPES to ensure all are shown
+              const merged = DEPOSIT_TYPES.map((type, index) => {
+                const existing = dbDeposits.find(d => d.type === type.code);
+                if (existing) return existing;
+                return {
+                  id: `new-${index}`,
+                  type: type.code,
+                  description: type.name,
+                  quantity: 0,
+                  positive: false,
+                  treated: false,
+                  eliminated: false,
+                  selected: false
+                };
+              });
+              
+              setDeposits(merged);
             }
           }
         }
@@ -310,8 +339,10 @@ function PropertyVisitPage() {
       // First clear old ones
       await supabase.from("visit_deposits").delete().eq("visit_id", visitId);
 
-      if (deposits.length > 0 && status === 'visited' && activity === 'survey') {
-        const depositsToSave = deposits.map(d => ({
+      const selectedDeposits = deposits.filter(d => d.selected);
+
+      if (selectedDeposits.length > 0 && status === 'visited' && activity === 'survey') {
+        const depositsToSave = selectedDeposits.map(d => ({
           visit_id: visitId as string,
           type_code: d.type,
           description: d.description,
@@ -337,26 +368,45 @@ function PropertyVisitPage() {
     }
   };
 
-  const addDeposit = () => {
-    const newId = Date.now();
-    setDeposits([...deposits, { 
-      id: newId, 
-      type: "A1", 
-      description: "Caixa d'água", 
-      quantity: 1, 
-      positive: false, 
-      treated: false, 
-      eliminated: false 
-    }]);
-  };
 
-  const removeDeposit = (id: number) => {
-    setDeposits(deposits.filter(d => d.id !== id));
-  };
+  useEffect(() => {
+    if (activity === "survey" && deposits.length === 0) {
+      const initialDeposits = DEPOSIT_TYPES.map((type, index) => ({
+        id: `init-${index}`,
+        type: type.code,
+        description: type.name,
+        quantity: 0,
+        positive: false,
+        treated: false,
+        eliminated: false,
+        selected: false
+      }));
+      setDeposits(initialDeposits);
+    }
+  }, [activity, deposits.length]);
 
   const updateDeposit = (id: number, field: string, value: any) => {
-    setDeposits(deposits.map(d => d.id === id ? { ...d, [field]: value } : d));
+    setDeposits(deposits.map(d => {
+      if (d.id === id) {
+        const updated = { ...d, [field]: value };
+        // Auto-select if quantity > 0 or any action is checked
+        if (field === 'quantity' && Number(value) > 0) updated.selected = true;
+        if (['positive', 'treated', 'eliminated'].includes(field) && value === true) updated.selected = true;
+        return updated;
+      }
+      return d;
+    }));
   };
+
+  const surveySummary = deposits.reduce((acc, d) => {
+    if (!d.selected) return acc;
+    return {
+      found: acc.found + (Number(d.quantity) || 0),
+      positive: acc.positive + (d.positive ? 1 : 0),
+      treated: acc.treated + (d.treated ? 1 : 0),
+      eliminated: acc.eliminated + (d.eliminated ? 1 : 0)
+    };
+  }, { found: 0, positive: 0, treated: 0, eliminated: 0 });
 
   if (isLoading) {
     return (
@@ -526,10 +576,110 @@ function PropertyVisitPage() {
 
             {activity === "survey" && (
               <section className="space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] bg-white overflow-hidden">
+                    <CardContent className="p-6">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Encontrados</p>
+                      <p className="text-3xl font-black text-primary">{surveySummary.found}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] bg-white overflow-hidden">
+                    <CardContent className="p-6">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Positivos</p>
+                      <p className="text-3xl font-black text-red-500">{surveySummary.positive}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-wider">
-                      <Bug className="h-4 w-4" /> Levantamento de Índice
+                      <Bug className="h-4 w-4" /> Checklist de Depósitos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50/50 border-y border-slate-100">
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Foco</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Trat</th>
+                            <th className="p-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Elim</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {deposits.map((deposit) => (
+                            <tr key={deposit.id} className={`transition-colors ${deposit.selected ? 'bg-primary/5' : ''}`}>
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={deposit.selected}
+                                    onChange={(e) => updateDeposit(deposit.id, 'selected', e.target.checked)}
+                                    className="h-5 w-5 rounded-lg border-2 border-slate-200 text-primary focus:ring-primary transition-all cursor-pointer"
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-black text-primary">{deposit.type}</span>
+                                    <span className="text-[10px] font-medium text-slate-500 truncate max-w-[80px]">{deposit.description}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <Input 
+                                  type="number" 
+                                  value={deposit.quantity}
+                                  disabled={!deposit.selected}
+                                  onChange={(e) => updateDeposit(deposit.id, 'quantity', Number(e.target.value))}
+                                  className="h-10 w-16 rounded-xl border-slate-200 font-bold text-center bg-white"
+                                />
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => updateDeposit(deposit.id, 'positive', !deposit.positive)}
+                                  disabled={!deposit.selected}
+                                  className={`h-8 w-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
+                                    deposit.positive ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'bg-slate-100 text-slate-400'
+                                  }`}
+                                >
+                                  {deposit.positive && <CheckCircle2 className="h-4 w-4" />}
+                                </button>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => updateDeposit(deposit.id, 'treated', !deposit.treated)}
+                                  disabled={!deposit.selected}
+                                  className={`h-8 w-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
+                                    deposit.treated ? 'bg-blue-500 text-white shadow-lg shadow-blue-100' : 'bg-slate-100 text-slate-400'
+                                  }`}
+                                >
+                                  {deposit.treated && <Droplets className="h-4 w-4" />}
+                                </button>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => updateDeposit(deposit.id, 'eliminated', !deposit.eliminated)}
+                                  disabled={!deposit.selected}
+                                  className={`h-8 w-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
+                                    deposit.eliminated ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-100 text-slate-400'
+                                  }`}
+                                >
+                                  {deposit.eliminated && <Trash2 className="h-4 w-4" />}
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-black flex items-center gap-2 text-primary uppercase tracking-wider">
+                      <FileText className="h-4 w-4" /> Informações Adicionais
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -545,72 +695,6 @@ function PropertyVisitPage() {
                     />
                   </CardContent>
                 </Card>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between ml-1">
-                    <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Depósitos Encontrados</Label>
-                    <Button variant="ghost" size="sm" onClick={addDeposit} className="h-10 text-primary font-black gap-2 rounded-xl hover:bg-primary/5 transition-all">
-                      <Plus className="h-5 w-5" /> ADICIONAR
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {deposits.length === 0 && (
-                      <div className="py-8 px-4 rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
-                        <p className="text-xs font-medium text-slate-400">Nenhum depósito registrado.</p>
-                      </div>
-                    )}
-                    {deposits.map((deposit) => (
-                      <Card key={deposit.id} className="border-none shadow-xl shadow-slate-200/50 rounded-[2.5rem] overflow-hidden bg-white">
-                        <CardContent className="p-5 space-y-5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <select 
-                                className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center font-black text-primary text-sm border-none appearance-none text-center cursor-pointer"
-                                value={deposit.type}
-                                onChange={(e) => updateDeposit(deposit.id, 'type', e.target.value)}
-                              >
-                                {["A1", "A2", "B", "C", "D1", "D2", "E"].map(t => <option key={t} value={t}>{t}</option>)}
-                              </select>
-                              <Input 
-                                value={deposit.description} 
-                                onChange={(e) => updateDeposit(deposit.id, 'description', e.target.value)}
-                                className="border-none shadow-none font-black text-sm text-slate-700 tracking-tight p-0 h-auto focus-visible:ring-0 w-full"
-                              />
-                            </div>
-                            <Button variant="ghost" size="icon" onClick={() => removeDeposit(deposit.id)} className="text-red-400 rounded-full hover:bg-red-50 hover:text-red-600 transition-all h-10 w-10">
-                              <Trash2 className="h-5 w-5" />
-                            </Button>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-2">
-                            <ToggleButton 
-                              active={deposit.positive} 
-                              onClick={() => updateDeposit(deposit.id, 'positive', !deposit.positive)} 
-                              label="Foco" 
-                              color="bg-red-50 text-red-600"
-                              activeColor="bg-red-600 text-white shadow-lg shadow-red-200"
-                            />
-                            <ToggleButton 
-                              active={deposit.treated} 
-                              onClick={() => updateDeposit(deposit.id, 'treated', !deposit.treated)} 
-                              label="Tratado" 
-                              color="bg-blue-50 text-blue-600"
-                              activeColor="bg-blue-600 text-white shadow-lg shadow-blue-200"
-                            />
-                            <ToggleButton 
-                              active={deposit.eliminated} 
-                              onClick={() => updateDeposit(deposit.id, 'eliminated', !deposit.eliminated)} 
-                              label="Eliminado" 
-                              color="bg-emerald-50 text-emerald-600"
-                              activeColor="bg-emerald-600 text-white shadow-lg shadow-emerald-200"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
               </section>
             )}
 
