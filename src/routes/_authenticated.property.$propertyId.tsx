@@ -317,10 +317,7 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: newStatus as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
-            start_time: new Date().toISOString(),
-            block_number: activeSession.block_number || "0",
-            rg: activeSession.rg || "0"
+            visit_date: new Date().toISOString()
           })
           .select()
           .single();
@@ -382,9 +379,6 @@ function PropertyVisitPage() {
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
             visit_date: new Date().toISOString(),
-            start_time: new Date().toISOString(),
-            block_number: activeSession.block_number || "0",
-            rg: activeSession.rg || "0",
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
