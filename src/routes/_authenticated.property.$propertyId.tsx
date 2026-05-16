@@ -75,7 +75,16 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
-  const [routineData, setRoutineData] = useState({ treatment: false, treatmentAmount: 0, elimination: false, eliminationAmount: 0, guidance: false, notes: "" });
+  const [routineData, setRoutineData] = useState({ 
+    treatment: false, 
+    treatmentAmount: 0, 
+    larvicideUnit: "gramas",
+    treatedDeposits: 0,
+    elimination: false, 
+    eliminationAmount: 0, 
+    guidance: false, 
+    notes: "" 
+  });
   const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false });
   const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
