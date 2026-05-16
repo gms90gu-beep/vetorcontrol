@@ -27,6 +27,8 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { isWeekend } from "date-fns";
 
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
@@ -36,6 +38,7 @@ export function OperationalHeader() {
   const [todayStats, setTodayStats] = useState({ worked: 0, pending: 0, progress: 0 });
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
+  const { allowWeekend } = useOperationalDate();
 
   useEffect(() => {
     fetchHeaderData();
@@ -158,6 +161,11 @@ export function OperationalHeader() {
                 {activeSession && (
                   <Badge variant="outline" className="border-blue-500/30 text-blue-400 font-bold text-[9px] uppercase tracking-widest h-5 bg-blue-500/5">
                     Q: {activeSession.block_number} • {activeSession.street_name}
+                  </Badge>
+                )}
+                {isWeekend(new Date()) && allowWeekend && (
+                   <Badge variant="outline" className="border-amber-500/30 text-amber-400 font-bold text-[9px] uppercase tracking-widest h-5 bg-amber-500/5">
+                    Modo FDS Ativo
                   </Badge>
                 )}
               </div>
