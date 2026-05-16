@@ -160,15 +160,34 @@ function PropertyVisitPage() {
               .eq("visit_id", existingVisit.id);
             
             if (existingDeposits) {
-              setDeposits(existingDeposits.map(d => ({
+              const dbDeposits = existingDeposits.map(d => ({
                 id: d.id,
                 type: d.type_code,
                 description: d.description,
                 quantity: d.quantity,
                 positive: d.is_positive,
                 treated: d.is_treated,
-                eliminated: d.is_eliminated
-              })));
+                eliminated: d.is_eliminated,
+                selected: true
+              }));
+              
+              // Merge with DEPOSIT_TYPES to ensure all are shown
+              const merged = DEPOSIT_TYPES.map((type, index) => {
+                const existing = dbDeposits.find(d => d.type === type.code);
+                if (existing) return existing;
+                return {
+                  id: `new-${index}`,
+                  type: type.code,
+                  description: type.name,
+                  quantity: 0,
+                  positive: false,
+                  treated: false,
+                  eliminated: false,
+                  selected: false
+                };
+              });
+              
+              setDeposits(merged);
             }
           }
         }
