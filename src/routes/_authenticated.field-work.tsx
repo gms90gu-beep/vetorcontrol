@@ -224,7 +224,7 @@ function FieldWorkPage() {
                 initialFocus
                 locale={ptBR}
                 className="bg-white"
-                disabled={allowWeekend ? undefined : (date) => isWeekend(date)}
+                disabled={undefined}
               />
             </PopoverContent>
           </Popover>
