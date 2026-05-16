@@ -288,6 +288,17 @@ function PropertyVisitPage() {
       return;
     }
 
+    if (status === 'visited' && activity === 'routine' && routineData.treatment) {
+      if (routineData.treatmentAmount <= 0) {
+        toast.error("Informe a quantidade de larvicida utilizada.");
+        return;
+      }
+      if (routineData.treatedDeposits <= 0) {
+        toast.error("Informe a quantidade de depósitos tratados.");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
