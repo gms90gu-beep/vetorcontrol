@@ -91,10 +91,37 @@ function PropertyVisitPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
 
   useEffect(() => {
     fetchData();
+    fetchDailyStats();
   }, [propertyId]);
+
+  async function fetchDailyStats() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data: visits } = await supabase
+        .from("visits")
+        .select("status, treatment_amount, treated_deposits")
+        .eq("agent_id", user.id)
+        .gte("visit_date", today.toISOString());
+
+      if (visits) {
+        const stats = visits.reduce((acc, v) => ({
+          worked: acc.worked + (v.status !== 'not_visited' ? 1 : 0),
+          treated: acc.treated + (v.treated_deposits || 0),
+          larvicide: acc.larvicide + (Number(v.treatment_amount) || 0)
+        }), { worked: 0, treated: 0, larvicide: 0 });
+        setDailyStats(stats);
+      }
+    } catch (e) { console.error(e); }
+  }
 
   async function fetchData() {
     if (!propertyId) return;
