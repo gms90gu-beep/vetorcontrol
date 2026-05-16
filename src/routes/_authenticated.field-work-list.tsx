@@ -181,7 +181,7 @@ function FieldWorkListPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const filteredProperties = properties.filter(p => {
     const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
