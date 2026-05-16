@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientOnly } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 const STATUS_COLORS = {
-  visitados: '#10b981',
-  fechados: '#f59e0b',
-  recusados: '#ef4444',
-  tratados: '#3b82f6',
-  levantamento: '#8b5cf6'
+  visitados: '#10b981', // Verde
+  fechados: '#f59e0b',  // Amarelo
+  recusados: '#ef4444', // Vermelho
+  tratados: '#3b82f6',  // Azul
+  levantamento: '#8b5cf6' // Roxo
 };
 
 interface OperationalChartsProps {
