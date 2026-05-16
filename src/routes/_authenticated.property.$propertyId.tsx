@@ -884,19 +884,34 @@ function PropertyVisitPage() {
           </div>
         )}
 
-        <Button 
-          className="w-full h-16 rounded-[2.5rem] text-lg font-black shadow-2xl shadow-primary/30 active:scale-95 transition-all gap-3 bg-primary hover:bg-primary/90"
-          onClick={handleSave}
-          disabled={isSaving || isUpdatingStatus}
-        >
-          {isSaving ? (
-            <div className="h-6 w-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="h-6 w-6" /> FINALIZAR VISITA
-            </>
+      </div>
+
+      {/* Fixed Footer: Next Property */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximo Imóvel</span>
+          <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+        </div>
+        <div className="flex gap-2">
+           <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-8 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2"
+          >
+            {isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}
+            {!isSaving && <CheckCircle2 className="h-5 w-5" />}
+          </Button>
+          {nextProperty && (
+            <Button 
+              variant="outline"
+              onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
+              className="h-14 w-14 rounded-2xl border-slate-200 active:scale-95 transition-all p-0"
+              title="Ir para o próximo"
+            >
+              <ArrowRight className="h-6 w-6 text-slate-600" />
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
     </div>
   );
