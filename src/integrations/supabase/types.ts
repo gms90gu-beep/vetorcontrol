@@ -432,6 +432,45 @@ export type Database = {
           },
         ]
       }
+      rg_ocr_imports: {
+        Row: {
+          block_number: string | null
+          created_at: string
+          id: string
+          image_url: string
+          processed_data: Json | null
+          raw_ocr_data: Json | null
+          status: string | null
+          street_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          block_number?: string | null
+          created_at?: string
+          id?: string
+          image_url: string
+          processed_data?: Json | null
+          raw_ocr_data?: Json | null
+          status?: string | null
+          street_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          block_number?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string
+          processed_data?: Json | null
+          raw_ocr_data?: Json | null
+          status?: string | null
+          street_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rg_pdf_exports: {
         Row: {
           created_at: string | null
