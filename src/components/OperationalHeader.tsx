@@ -44,7 +44,7 @@ export function OperationalHeader() {
     fetchHeaderData();
   }, []);
 
-  async function fetchHeaderData() {
+  const fetchHeaderData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
