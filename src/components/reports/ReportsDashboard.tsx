@@ -4,10 +4,12 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, Filter } from "lucide-react";
 import { toast } from "sonner";
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, subDays } from "date-fns";
+import { generateOperationalPDF } from "./PDFReportGenerator";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { Badge } from "@/components/ui/badge";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
