@@ -368,15 +368,6 @@ function PropertyVisitPage() {
     }
   };
 
-  const DEPOSIT_TYPES = [
-    { code: "A1", name: "Caixa d'água" },
-    { code: "A2", name: "Tambor/Barril" },
-    { code: "B", name: "Vasos/Pratos" },
-    { code: "C", name: "Pneus" },
-    { code: "D1", name: "Lixo" },
-    { code: "D2", name: "Entulho" },
-    { code: "E", name: "Depósitos naturais" }
-  ];
 
   useEffect(() => {
     if (activity === "survey" && deposits.length === 0) {
