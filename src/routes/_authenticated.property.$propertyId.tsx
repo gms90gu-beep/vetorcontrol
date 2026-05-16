@@ -156,6 +156,8 @@ function PropertyVisitPage() {
             setRoutineData({
               treatment: existingVisit.treatment_applied || false,
               treatmentAmount: Number(existingVisit.treatment_amount) || 0,
+              larvicideUnit: existingVisit.larvicide_unit || "gramas",
+              treatedDeposits: existingVisit.treated_deposits || 0,
               elimination: existingVisit.elimination_done || false,
               eliminationAmount: existingVisit.elimination_amount || 0,
               guidance: existingVisit.guidance_given || false,
