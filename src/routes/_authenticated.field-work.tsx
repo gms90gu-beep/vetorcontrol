@@ -26,6 +26,8 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { isWeekend } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
@@ -42,6 +44,7 @@ function FieldWorkPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const { allowWeekend } = useOperationalDate();
 
   useEffect(() => {
     fetchInitialData();
@@ -114,6 +117,11 @@ function FieldWorkPage() {
   const handleStartWork = async () => {
     if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
       toast.error("Por favor, preencha todos os campos");
+      return;
+    }
+
+    if (!allowWeekend && isWeekend(date)) {
+      toast.error("Não é possível iniciar trabalho em finais de semana");
       return;
     }
     
@@ -219,6 +227,7 @@ function FieldWorkPage() {
                 initialFocus
                 locale={ptBR}
                 className="bg-white"
+                disabled={allowWeekend ? undefined : (date) => isWeekend(date)}
               />
             </PopoverContent>
           </Popover>
