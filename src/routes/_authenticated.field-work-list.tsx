@@ -584,10 +584,14 @@ function FieldWorkListPage() {
                       toast.error("Boletim encerrado.");
                       return;
                     }
+                    if (!selectedProperty?.id) {
+                      toast.error("Imóvel não identificado para registro.");
+                      return;
+                    }
                     setIsModalOpen(false);
-                    navigate({ to: `/property/${selectedProperty?.id}` });
+                    navigate({ to: `/property/${selectedProperty.id}` });
                   }}
-                  disabled={isLocked}
+                  disabled={isLocked || !selectedProperty?.id}
                 >
                   Registrar Nova Visita
                 </Button>

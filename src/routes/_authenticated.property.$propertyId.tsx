@@ -308,17 +308,22 @@ function PropertyVisitPage() {
         
         if (updateError) throw updateError;
       } else {
+        const visitData: any = {
+          property_id: propertyId as string,
+          agent_id: user.id,
+          cycle_id: activeSession.cycle_id as string,
+          week_id: activeSession.week_id as string,
+          status: newStatus as any,
+          activity_type: (activityMap[activity] || "routine") as any,
+          visit_date: new Date().toISOString(),
+          start_time: new Date().toISOString(),
+          block_number: activeSession.block_number || "0",
+          rg: activeSession.rg || "0"
+        };
+
         const { data: newVisit, error: insertError } = await supabase
           .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: newStatus as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString()
-          })
+          .insert(visitData)
           .select()
           .single();
         
@@ -369,28 +374,33 @@ function PropertyVisitPage() {
       };
 
       if (!visitId) {
+        const visitData: any = {
+          property_id: propertyId as string,
+          agent_id: user.id,
+          cycle_id: activeSession.cycle_id as string,
+          week_id: activeSession.week_id as string,
+          status: status as any,
+          activity_type: (activityMap[activity] || "routine") as any,
+          visit_date: new Date().toISOString(),
+          start_time: new Date().toISOString(),
+          block_number: activeSession.block_number || "0",
+          rg: activeSession.rg || "0",
+          has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
+          sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+          treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
+          treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
+          larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
+          treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
+          elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
+          elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
+          guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
+          is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
+          notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
+        };
+
         const { data: visit, error: visitError } = await supabase
           .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: status as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
-            has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
-            sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
-            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
-            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
-            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
-            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
-            elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
-            elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
-            guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
-            is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
-            notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
-          })
+          .insert(visitData)
           .select()
           .single();
 
