@@ -109,9 +109,10 @@ function PropertyVisitPage() {
 
   async function fetchAgentData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
+      const { data, error: agentError } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (agentError) throw agentError;
       if (data) setAgent(data);
     } catch (e) { console.error(e); }
   }
@@ -156,7 +157,8 @@ function PropertyVisitPage() {
       
       if (propError) throw propError;
       if (!propData) {
-        setError("Imóvel não encontrado.");
+        console.warn("Property not found for ID:", propertyId);
+        setError("Imóvel não encontrado na base de dados.");
         return;
       }
       setProperty(propData);
@@ -509,58 +511,58 @@ function PropertyVisitPage() {
     );
   }
 
-  if (error) {
-  if (isLandscape) {
-    return (
-      <LandscapeBulletinLayout
-        isLandscape={true}
-        title={`Quarteirão ${activeSession?.block_number || "--"}`}
-        subtitle={activeSession?.street_name || "--"}
-        agentInfo={{
-          name: agent?.name || "Agente",
-          municipality: agent?.municipality || "Município",
-          registrationId: agent?.registration_id || "0000",
-          cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
-          week: activeSession?.week_id?.substring(0, 2) || "--",
-          block: activeSession?.block_number || "--",
-          street: activeSession?.street_name || "--"
-        }}
-        stats={{
-          worked: dailyStats.worked,
-          total: activeSession?.property_count || 45,
-          closed: 0,
-          refused: 0,
-          focus: 0,
-          treated: 0,
-          treatedDeposits: routineData.treatedDeposits,
-          larvicideUsed: routineData.treatmentAmount,
-          eliminated: routineData.eliminationAmount,
-          progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
-        }}
-      >
-        <DigitalBulletinTable 
-          properties={blockProperties} 
-          onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
-          onStatusUpdate={() => {}}
-        />
-      </LandscapeBulletinLayout>
-    );
-  }
+  if (error || !property) {
+    if (isLandscape) {
+      return (
+        <LandscapeBulletinLayout
+          isLandscape={true}
+          title={`Quarteirão ${activeSession?.block_number || "--"}`}
+          subtitle={activeSession?.street_name || "--"}
+          agentInfo={{
+            name: agent?.name || "Agente",
+            municipality: agent?.municipality || "Município",
+            registrationId: agent?.registration_id || "0000",
+            cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
+            week: activeSession?.week_id?.substring(0, 2) || "--",
+            block: activeSession?.block_number || "--",
+            street: activeSession?.street_name || "--"
+          }}
+          stats={{
+            worked: dailyStats.worked,
+            total: activeSession?.property_count || 45,
+            closed: 0,
+            refused: 0,
+            focus: 0,
+            treated: 0,
+            treatedDeposits: routineData.treatedDeposits,
+            larvicideUsed: routineData.treatmentAmount,
+            eliminated: routineData.eliminationAmount,
+            progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
+          }}
+        >
+          <DigitalBulletinTable 
+            properties={blockProperties} 
+            onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
+            onStatusUpdate={() => {}}
+          />
+        </LandscapeBulletinLayout>
+      );
+    }
 
-  return (
-      <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6">
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6 animate-in fade-in duration-500">
         <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
           <AlertCircle className="h-10 w-10 text-red-500" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error}</h3>
-          <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações.</p>
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error || "Imóvel indisponível"}</h3>
+          <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações do imóvel.</p>
         </div>
         <div className="flex gap-3 w-full max-w-xs">
           <Button variant="outline" onClick={() => navigate({ to: "/field-work-list" })} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
             Voltar
           </Button>
-          <Button onClick={fetchData} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
+          <Button onClick={() => fetchData()} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
             Tentar Novamente
           </Button>
         </div>
