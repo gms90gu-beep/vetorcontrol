@@ -109,9 +109,10 @@ function PropertyVisitPage() {
 
   async function fetchAgentData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
+      const { data, error: agentError } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (agentError) throw agentError;
       if (data) setAgent(data);
     } catch (e) { console.error(e); }
   }
@@ -156,7 +157,8 @@ function PropertyVisitPage() {
       
       if (propError) throw propError;
       if (!propData) {
-        setError("Imóvel não encontrado.");
+        console.warn("Property not found for ID:", propertyId);
+        setError("Imóvel não encontrado na base de dados.");
         return;
       }
       setProperty(propData);
