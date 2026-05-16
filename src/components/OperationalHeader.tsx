@@ -127,138 +127,109 @@ export function OperationalHeader() {
   };
 
   return (
-    <div className="sticky top-0 z-50 w-full bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-2xl border-b border-white/5 animate-in fade-in slide-in-from-top-4 duration-500">
-      <div className="max-w-7xl mx-auto px-4 py-4 md:py-6">
-        <div className="flex justify-between items-start gap-4">
-          {/* Left Side: Professional Info */}
-          <div className="flex-1 space-y-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <div className="flex items-center gap-1.5 text-blue-400">
-                <MapPin className="h-3 w-3" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{agent?.municipality || "São Paulo"}</span>
+    <div className="sticky top-0 z-50 w-full bg-slate-950 text-white shadow-2xl border-b border-white/5 overflow-hidden">
+      {/* Upper Header: Context & User */}
+      <div className="max-w-7xl mx-auto px-4 py-3 md:py-4 bg-slate-900/50 backdrop-blur-md">
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "h-2 w-2 rounded-full",
+                  workStatus === 'in_work' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" : "bg-slate-500"
+                )} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {workStatus === 'in_work' ? "🟢 Em Trabalho" : "⚫ Expediente Encerrado"}
+                </span>
               </div>
-              <div className="h-1 w-1 rounded-full bg-slate-600 hidden md:block" />
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Calendar className="h-3 w-3" />
-                <span className="text-[10px] font-bold tracking-widest uppercase">{new Date().toLocaleDateString('pt-BR')}</span>
-              </div>
-            </div>
-
-            <div className="space-y-0.5">
-              <h1 className="text-xl md:text-2xl font-black tracking-tight leading-none group flex items-center gap-2">
+              <h1 className="text-lg font-black tracking-tight leading-none text-white">
                 {agent?.name || "Agente"}
-                <Badge variant="outline" className="text-[8px] font-black tracking-tighter border-white/10 text-slate-400 py-0 h-4 uppercase">
-                  {agent?.registration_id || "ID-0000"}
-                </Badge>
               </h1>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <Badge className="bg-primary/20 hover:bg-primary/30 text-primary-foreground border-none font-black text-[9px] uppercase tracking-widest h-5">
-                  Ciclo {activeCycle?.number || "-"}/{activeCycle?.year || "-"}
-                </Badge>
-                <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[9px] uppercase tracking-widest h-5">
-                    Semana {activeWeek?.number || "-"}
-                </Badge>
-                {activeSession && (
-                  <Badge variant="outline" className="border-blue-500/30 text-blue-400 font-bold text-[9px] uppercase tracking-widest h-5 bg-blue-500/5">
-                    Q: {activeSession.block_number} • {activeSession.street_name}
-                  </Badge>
-                )}
-                {isWeekend(new Date()) && allowWeekend && (
-                   <Badge variant="outline" className="border-amber-500/30 text-amber-400 font-bold text-[9px] uppercase tracking-widest h-5 bg-amber-500/5">
-                    Modo FDS Ativo
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Pulse Indicators */}
-            <div className="flex gap-4 pt-1">
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Trabalhados Hoje</span>
-                <span className="text-sm font-black text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> {todayStats.worked}
-                </span>
-              </div>
-              <div className="flex flex-col border-l border-white/10 pl-4">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Pendências</span>
-                <span className="text-sm font-black text-orange-400 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> {todayStats.pending}
-                </span>
-              </div>
-              <div className="flex-1 flex flex-col border-l border-white/10 pl-4 max-w-[120px]">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Cobertura</span>
-                  <span className="text-[9px] font-black text-blue-400">{todayStats.progress}%</span>
-                </div>
-                <Progress value={todayStats.progress} className="h-1 bg-white/5" />
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">{agent?.registration_id || "MATRÍCULA"}</span>
+                <span className="h-1 w-1 rounded-full bg-slate-700" />
+                <span className="text-[9px] font-bold text-blue-400 uppercase tracking-tight">{agent?.municipality || "Município"}</span>
               </div>
             </div>
           </div>
 
-          {/* Right Side: Avatar & Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="relative outline-none group">
-                <div className="absolute -inset-0.5 bg-gradient-to-tr from-primary to-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500" />
-                <Avatar className="h-12 w-12 md:h-14 md:w-14 border-2 border-white/10 relative shadow-xl">
-                  <AvatarImage src={agent?.photo_url} alt={agent?.name} className="object-cover" />
-                  <AvatarFallback className="bg-slate-700 text-slate-300 font-black text-lg">
-                    {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className={cn(
-                  "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-slate-900 shadow-lg flex items-center justify-center",
-                  workStatus === 'in_work' ? "bg-emerald-500" : 
-                  workStatus === 'work_completed' ? "bg-blue-500" : "bg-slate-500"
-                )}>
-                  <div className={cn(
-                    "h-1.5 w-1.5 bg-white rounded-full",
-                    workStatus === 'in_work' && "animate-pulse"
-                  )} />
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 mt-2 bg-slate-900 border-white/10 text-white p-2 rounded-[1.5rem] shadow-2xl">
-              <DropdownMenuLabel className="px-3 pt-3 pb-2">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-black tracking-tight">{agent?.name}</span>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{agent?.registration_id}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/5 mx-2" />
-              <DropdownMenuItem 
-                className="rounded-xl focus:bg-white/5 focus:text-white cursor-pointer py-3"
-                onClick={() => navigate({ to: "/settings" })}
-              >
-                <Camera className="mr-3 h-4 w-4 text-blue-400" />
-                <span className="font-bold text-xs uppercase tracking-widest">Alterar Foto</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="rounded-xl focus:bg-white/5 focus:text-white cursor-pointer py-3"
-                onClick={() => navigate({ to: "/settings" })}
-              >
-                <User className="mr-3 h-4 w-4 text-blue-400" />
-                <span className="font-bold text-xs uppercase tracking-widest">Visualizar Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="rounded-xl focus:bg-white/5 focus:text-white cursor-pointer py-3"
-                onClick={() => navigate({ to: "/settings" })}
-              >
-                <Settings className="mr-3 h-4 w-4 text-blue-400" />
-                <span className="font-bold text-xs uppercase tracking-widest">Configurações</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-white/5 mx-2" />
-              <DropdownMenuItem 
-                className="rounded-xl focus:bg-red-500/10 focus:text-red-400 text-red-400 cursor-pointer py-3"
-                onClick={handleSignOut}
-              >
-                <LogOut className="mr-3 h-4 w-4" />
-                <span className="font-bold text-xs uppercase tracking-widest">Sair da Conta</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-3">
+             <div className="hidden sm:flex flex-col items-end">
+               <span className="text-[9px] font-black text-slate-500 uppercase">Ciclo {activeCycle?.number || "-"} • Semana {activeWeek?.number || "-"}</span>
+               <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
+             </div>
+             
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="relative outline-none group active:scale-95 transition-transform">
+                  <Avatar className="h-10 w-10 border-2 border-white/10 relative shadow-xl">
+                    <AvatarImage src={agent?.photo_url} alt={agent?.name} className="object-cover" />
+                    <AvatarFallback className="bg-slate-800 text-slate-400 font-black text-sm">
+                      {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 mt-2 bg-slate-900 border-white/10 text-white p-2 rounded-2xl shadow-2xl">
+                <DropdownMenuLabel className="px-3 pt-3 pb-2 font-black text-sm uppercase tracking-tight">Menu Operacional</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5 mx-2" />
+                <DropdownMenuItem className="rounded-xl focus:bg-white/5 focus:text-white py-3 cursor-pointer" onClick={() => navigate({ to: "/settings" })}>
+                  <Settings className="mr-3 h-4 w-4 text-blue-400" />
+                  <span className="font-bold text-xs uppercase tracking-widest">Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-xl focus:bg-red-500/10 focus:text-red-400 text-red-400 py-3 cursor-pointer" onClick={handleSignOut}>
+                  <LogOut className="mr-3 h-4 w-4" />
+                  <span className="font-bold text-xs uppercase tracking-widest">Sair da Conta</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
+      </div>
+
+      {/* Lower Header: Progress & Territory */}
+      <div className="bg-slate-950 px-4 py-2 border-t border-white/5">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2">
+          {activeSession ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-end">
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Território Atual</span>
+                  <span className="text-xs font-black text-blue-400 uppercase tracking-tight">
+                    Quarteirão {activeSession.block_number} • {activeSession.street_name}
+                  </span>
+                </div>
+                <span className="text-[10px] font-black text-slate-400">{todayStats.progress}%</span>
+              </div>
+              <Progress value={todayStats.progress} className="h-1.5 bg-slate-900" indicatorClassName="bg-blue-500" />
+              <p className="text-[9px] font-bold text-slate-500">
+                {Math.round((todayStats.progress / 100) * (activeSession.property_count || 45))} de {activeSession.property_count || 45} imóveis trabalhados
+              </p>
+            </div>
+          ) : (
+             <div className="flex items-center justify-center py-2">
+               <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">Nenhuma sessão de trabalho ativa</span>
+             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mini Resumo Operacional */}
+      <div className="bg-slate-900/30 flex divide-x divide-white/5">
+         <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Trabalhados</span>
+            <span className="text-sm font-black text-emerald-500">{todayStats.worked}</span>
+         </div>
+         <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Fechados</span>
+            <span className="text-sm font-black text-amber-500">{todayStats.pending}</span>
+         </div>
+         <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Focos (+)</span>
+            <span className="text-sm font-black text-red-500">0</span>
+         </div>
       </div>
     </div>
   );
+}
 }
