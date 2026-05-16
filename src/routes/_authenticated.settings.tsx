@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { Calendar as CalendarLucide } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -37,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsPage() {
   const [agent, setAgent] = useState<any>(null);
+  const { allowWeekend, toggleWeekendOperation, userRole } = useOperationalDate();
   const [stats, setStats] = useState({
     worked: 1240,
     foci: 42,
@@ -136,6 +139,20 @@ function SettingsPage() {
             <SettingsItem icon={Bell} label="Notificações" description="Alertas de pendências e novos ciclos" hasSwitch defaultChecked />
             <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={Smartphone} label="Sincronização Automática" description="Enviar dados ao retomar conexão" hasSwitch defaultChecked />
+            
+            {(userRole === "admin" || userRole === "supervisor") && (
+              <>
+                <Separator className="bg-slate-50 mx-4" />
+                <SettingsItem 
+                  icon={CalendarLucide} 
+                  label="Operação em Finais de Semana" 
+                  description="Permitir registros e atividades operacionais aos sábados e domingos" 
+                  hasSwitch 
+                  checked={allowWeekend} 
+                  onCheckedChange={toggleWeekendOperation}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -184,7 +201,7 @@ function ProfileMiniStat({ icon: Icon, label, value, color }: any) {
   );
 }
 
-function SettingsItem({ icon: Icon, label, description, hasSwitch, defaultChecked, isAction }: any) {
+function SettingsItem({ icon: Icon, label, description, hasSwitch, defaultChecked, checked, onCheckedChange, isAction }: any) {
   return (
     <div className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors cursor-pointer rounded-2xl group">
       <div className="flex items-center gap-4">
@@ -197,7 +214,11 @@ function SettingsItem({ icon: Icon, label, description, hasSwitch, defaultChecke
         </div>
       </div>
       {hasSwitch ? (
-        <Switch defaultChecked={defaultChecked} />
+        <Switch 
+          defaultChecked={defaultChecked} 
+          checked={checked} 
+          onCheckedChange={onCheckedChange} 
+        />
       ) : isAction ? (
         <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
       ) : null}
