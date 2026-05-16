@@ -543,9 +543,14 @@ function FieldWorkListPage() {
                 <Button 
                   className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20"
                   onClick={() => {
+                    if (isLocked) {
+                      toast.error("Boletim encerrado.");
+                      return;
+                    }
                     setIsModalOpen(false);
                     navigate({ to: `/property/${selectedProperty?.id}` });
                   }}
+                  disabled={isLocked}
                 >
                   Registrar Nova Visita
                 </Button>
