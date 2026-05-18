@@ -541,19 +541,16 @@ export type Database = {
       }
       system_settings: {
         Row: {
-          allow_weekend_operation: boolean
           id: string
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
-          allow_weekend_operation?: boolean
           id?: string
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
-          allow_weekend_operation?: boolean
           id?: string
           updated_at?: string | null
           updated_by?: string | null

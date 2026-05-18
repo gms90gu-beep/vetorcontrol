@@ -16,7 +16,6 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
-import { WeekendBlock } from "@/components/WeekendBlock";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Button } from "@/components/ui/button";
 import { 
@@ -57,13 +56,8 @@ function AuthenticatedLayout() {
 
   if (!user || isOperationalLoading) return null;
 
-  const isSettingsPage = location.pathname === "/settings";
-  const canOverride = userRole === "admin" || userRole === "supervisor";
-
-  // Allow access to settings page for admins/supervisors even on weekends
-  if (!isOperational && !(isSettingsPage && canOverride)) {
-    return <WeekendBlock />;
-  }
+  // System is now always operational
+  // Removed weekend block validation
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

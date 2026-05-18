@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { isWeekend } from "date-fns";
 
+/**
+ * Hook to manage operational availability.
+ * Weekends are now always allowed as requested.
+ */
 export function useOperationalDate() {
-  const [isOperational, setIsOperational] = useState(true);
-  const [allowWeekend, setAllowWeekend] = useState(false);
+  const [isOperational] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    async function checkOperationalStatus() {
+    async function fetchUserRole() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -22,68 +24,25 @@ export function useOperationalDate() {
           .maybeSingle();
         
         setUserRole(roleData?.role || null);
-
-        // Get system settings
-        const { data: settings, error } = await supabase
-          .from("system_settings")
-          .select("allow_weekend_operation")
-          .single();
-
-        if (error) {
-          console.error("Error fetching system settings:", error);
-        }
-
-        const allowWeekendOp = settings?.allow_weekend_operation || false;
-        setAllowWeekend(allowWeekendOp);
-
-        const today = new Date();
-        const weekend = isWeekend(today);
-
-        // If it's weekend and not allowed, it's not operational
-        setIsOperational(!weekend || allowWeekendOp);
       } catch (error) {
-        console.error("Error in checkOperationalStatus:", error);
+        console.error("Error fetching user role:", error);
       } finally {
         setIsLoading(false);
       }
     }
 
-    checkOperationalStatus();
+    fetchUserRole();
   }, []);
 
-  const toggleWeekendOperation = async (allowed: boolean) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { error } = await supabase
-        .from("system_settings")
-        .update({ 
-          allow_weekend_operation: allowed,
-          updated_by: session.user.id,
-          updated_at: new Date().toISOString()
-        })
-        .match({ allow_weekend_operation: !allowed }); // Update all records (there should be only one)
-
-      if (!error) {
-        setAllowWeekend(allowed);
-        const today = new Date();
-        setIsOperational(!isWeekend(today) || allowed);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error toggling weekend operation:", error);
-      return false;
-    }
-  };
+  // For backward compatibility while we remove references
+  const toggleWeekendOperation = async () => true;
 
   return { 
     isOperational, 
-    allowWeekend, 
+    allowWeekend: true, 
     isLoading, 
     userRole, 
-    isWeekendToday: isWeekend(new Date()),
+    isWeekendToday: false, // Weekends are now considered operational days
     toggleWeekendOperation 
   };
 }
