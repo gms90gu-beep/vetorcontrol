@@ -109,13 +109,11 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
       setEditedProperties(ocrResult.properties || []);
       
       // Save import record
-      await supabase.from("rg_ocr_imports").insert({
-        user_id: user.id,
+      await supabase.from("rg_uploads").insert({
+        agent_id: user.id,
         image_url: publicUrl,
-        raw_ocr_data: ocrResult,
-        block_number: ocrResult.block_number,
-        street_name: ocrResult.street_name,
-        status: 'pending'
+        extracted_data: ocrResult,
+        status: 'processed'
       });
 
       setStep("review");
