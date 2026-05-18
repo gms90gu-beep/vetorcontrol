@@ -196,11 +196,11 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
     <>
       <Button 
         variant="outline"
-        className="h-14 px-4 sm:px-6 rounded-2xl bg-white border-2 border-slate-100 shadow-xl hover:bg-slate-50 transition-all font-black text-[10px] sm:text-xs uppercase tracking-tight sm:tracking-widest gap-2 text-slate-900 min-w-[120px] whitespace-normal sm:whitespace-nowrap leading-tight"
+        className="h-14 px-3 sm:px-6 rounded-2xl bg-white border-2 border-slate-100 shadow-xl hover:bg-slate-50 transition-all font-black text-[10px] sm:text-xs uppercase tracking-tight sm:tracking-widest gap-2 text-slate-900 min-w-[100px] leading-tight flex-shrink-0"
         onClick={() => setIsOpen(true)}
       >
         <Camera className="h-5 w-5 text-emerald-500 shrink-0" /> 
-        <span className="text-center">Importar Foto</span>
+        <span className="truncate">Via Foto</span>
       </Button>
 
       <Dialog open={isOpen} onOpenChange={(open) => {
