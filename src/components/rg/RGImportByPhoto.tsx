@@ -109,13 +109,11 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
       setEditedProperties(ocrResult.properties || []);
       
       // Save import record
-      await supabase.from("rg_ocr_imports").insert({
-        user_id: user.id,
+      await supabase.from("rg_uploads").insert({
+        agent_id: user.id,
         image_url: publicUrl,
-        raw_ocr_data: ocrResult,
-        block_number: ocrResult.block_number,
-        street_name: ocrResult.street_name,
-        status: 'pending'
+        extracted_data: ocrResult,
+        status: 'processed'
       });
 
       setStep("review");
@@ -152,8 +150,30 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
     try {
       toast.loading("Importando registros...");
       
-      // Here we would actually save the properties to the database
-      // For this implementation, we pass the data back to the parent
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      // Prepare properties for batch insertion
+      const propertiesToInsert = editedProperties.map(prop => ({
+        number: prop.number,
+        complement: prop.complement || "",
+        type: prop.type,
+        street_name: extractedData.street_name,
+        neighborhood: extractedData.neighborhood,
+        block_number: extractedData.block_number,
+        reference: prop.reference || "",
+        container_count: prop.container_count || 0,
+        observations: prop.observations || "",
+        user_id: user.id,
+        status: "active" as const
+      }));
+
+      const { error: insertError } = await supabase
+        .from("properties")
+        .insert(propertiesToInsert);
+
+      if (insertError) throw insertError;
+
       const finalData = {
         block_number: extractedData.block_number,
         street_name: extractedData.street_name,
@@ -165,7 +185,7 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
       setIsOpen(false);
       resetState();
       toast.dismiss();
-      toast.success("Importação concluída com sucesso!");
+      toast.success(`${editedProperties.length} imóveis importados com sucesso!`);
     } catch (error: any) {
       toast.dismiss();
       toast.error("Erro ao importar: " + error.message);
@@ -269,7 +289,15 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
 
             {step === "review" && (
               <div className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bairro</Label>
+                    <Input 
+                      value={extractedData?.neighborhood} 
+                      onChange={(e) => setExtractedData({...extractedData, neighborhood: e.target.value})}
+                      className="h-12 rounded-xl font-bold border-slate-100"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quarteirão</Label>
                     <Input 

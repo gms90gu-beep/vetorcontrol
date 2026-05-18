@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,28 +21,70 @@ serve(async (req) => {
       )
     }
 
-    // In a real implementation, we would call an OCR API like Google Vision or AWS Textract here.
-    // For this prototype, we simulate a realistic OCR response after a small delay.
+    // This is a simulation of an AI OCR processing
+    // In a real production scenario, we would call an AI API like OpenAI (GPT-4o) or Anthropic
+    // For this prototype, we'll simulate the extraction of multiple properties from an image
     
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log(`Processing image: ${image_url}`);
 
-    // Simulated OCR Result
-    const mockData = {
-      block_number: "122",
+    // Mock data based on typical Endemias RG forms
+    const mockExtractedData = {
+      block_number: "042",
       street_name: "Rua das Palmeiras",
-      area: "01",
+      neighborhood: "Jardim Planalto",
       properties: [
-        { number: "10", type: "residence", observations: "Portão cinza", sequence: 1 },
-        { number: "15", type: "commerce", observations: "Padaria", sequence: 2 },
-        { number: "22", type: "residence", observations: "Casa amarela", sequence: 3 },
-        { number: "30", type: "vacant_lot", observations: "Terreno baldio", sequence: 4 },
-        { number: "45", type: "strategic_point", observations: "Borracharia", sequence: 5 },
-        { number: "12Z", type: "residence", observations: "OCR Error Test", sequence: 6, possible_error: true, suggestion: "122" }
+        {
+          number: "120",
+          type: "residence",
+          complement: "Casa A",
+          responsible_name: "Maria Silva",
+          phone: "(11) 98765-4321",
+          reference: "Perto da Padaria",
+          container_count: 2,
+          observations: "Cão bravo no quintal",
+          possible_error: false
+        },
+        {
+          number: "128",
+          type: "residence",
+          complement: "",
+          responsible_name: "João Santos",
+          phone: "",
+          reference: "",
+          container_count: 0,
+          observations: "Dificuldade de acesso",
+          possible_error: false
+        },
+        {
+          number: "135",
+          type: "commerce",
+          complement: "Loja de Conveniência",
+          responsible_name: "Roberto Almeida",
+          phone: "(11) 91234-5678",
+          reference: "Esquina",
+          container_count: 1,
+          observations: "Horário comercial: 08h às 18h",
+          possible_error: false
+        },
+        {
+          number: "142",
+          type: "vacant_lot",
+          complement: "",
+          responsible_name: "",
+          phone: "",
+          reference: "Muro pichado",
+          container_count: 0,
+          observations: "Mato alto",
+          possible_error: true // Simulating a field that might need review
+        }
       ]
     };
 
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     return new Response(
-      JSON.stringify(mockData),
+      JSON.stringify(mockExtractedData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
