@@ -289,7 +289,15 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
 
             {step === "review" && (
               <div className="flex flex-col gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bairro</Label>
+                    <Input 
+                      value={extractedData?.neighborhood} 
+                      onChange={(e) => setExtractedData({...extractedData, neighborhood: e.target.value})}
+                      className="h-12 rounded-xl font-bold border-slate-100"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quarteirão</Label>
                     <Input 
