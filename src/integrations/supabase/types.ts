@@ -498,6 +498,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rg_uploads: {
+        Row: {
+          agent_id: string | null
+          created_at: string | null
+          extracted_data: Json | null
+          id: string
+          image_url: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string | null
+          extracted_data?: Json | null
+          id?: string
+          image_url?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       streets: {
         Row: {
           id: string
