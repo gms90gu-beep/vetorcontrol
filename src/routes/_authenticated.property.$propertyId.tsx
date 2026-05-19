@@ -565,13 +565,6 @@ function PropertyVisitPage() {
     );
   }
 
-  const [nextProperty, setNextProperty] = useState<any>(null);
-
-  useEffect(() => {
-    if (property && activeSession) {
-      fetchNextProperty();
-    }
-  }, [property, activeSession]);
 
   async function fetchNextProperty() {
     try {
