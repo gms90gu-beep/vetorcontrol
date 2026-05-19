@@ -240,7 +240,9 @@ function RGPage() {
         residences: stats.residence,
         commerce: stats.commerce,
         lots: stats.vacant_lot,
-        strategicPoints: stats.strategic_point
+        strategicPoints: stats.strategic_point,
+        others: stats.others,
+        inhabitants: stats.inhabitants
       };
 
       const doc = await generateRGPDF(
