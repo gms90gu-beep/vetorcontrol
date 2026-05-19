@@ -387,8 +387,8 @@ function RGPage() {
         <div className={cn("space-y-4", currentStep !== 2 && "hidden lg:block")}>
           <div className="flex items-center justify-between lg:hidden">
             <h2 className="text-lg font-black text-slate-900 uppercase">2. Cadastro de Imóveis</h2>
-            <div className="flex items-center gap-2 bg-emerald-100 px-3 py-1 rounded-full">
-              <span className="text-[10px] font-black text-emerald-700 uppercase">Qtr: {bulletinHeader.quarteirao}</span>
+            <div className="flex items-center gap-2">
+              <RGImportByPhoto onImportComplete={fetchInitialData} />
             </div>
           </div>
 
