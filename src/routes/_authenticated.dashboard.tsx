@@ -221,5 +221,7 @@ function DashboardPage() {
         <QuickActionsFAB />
       </div>
     );
+  };
+
   return renderContent();
 }
