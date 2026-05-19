@@ -61,6 +61,8 @@ function RGPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [blockFilter, setBlockFilter] = useState("all");
   const [properties, setProperties] = useState<Property[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -104,6 +106,20 @@ function RGPage() {
         }));
       }
 
+      const { data: blocksData } = await supabase
+        .from("blocks")
+        .select(`
+          *,
+          subareas (
+            name
+          )
+        `)
+        .order("number", { ascending: true });
+      
+      if (blocksData) {
+        setBlocks(blocksData as Block[]);
+      }
+
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -115,11 +131,6 @@ function RGPage() {
       
       if (session) {
         setActiveSession(session);
-        setBlockFilter(session.block_number || "all");
-        setBulletinHeader(prev => ({
-          ...prev,
-          quarteirao: session.block_number || ""
-        }));
       }
 
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
@@ -129,21 +140,47 @@ function RGPage() {
         if (week) setActiveWeek(week);
       }
 
-      const { data, error } = await supabase
-        .from("properties")
-        .select("*")
-        .order("sequence", { ascending: true })
-        .order("street_name", { ascending: true })
-        .order("number", { ascending: true });
-
-      if (error) throw error;
-      setProperties(data as Property[]);
+      await fetchProperties();
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
     } finally {
       setIsLoading(false);
     }
   }
+
+  async function fetchProperties() {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("*")
+      .order("sequence", { ascending: true })
+      .order("street_name", { ascending: true })
+      .order("number", { ascending: true });
+
+    if (error) throw error;
+    setProperties(data as Property[]);
+  }
+
+  const handleBlockSelect = (block: Block) => {
+    setSelectedBlock(block);
+    setBlockFilter(block.number);
+    setBulletinHeader(prev => ({
+      ...prev,
+      quarteirao: block.number,
+      localidade: block.subareas?.name || prev.localidade
+    }));
+    setCurrentStep(1);
+  };
+
+  const handleNewBlock = () => {
+    setSelectedBlock({ id: 'new', number: '' } as Block);
+    setBulletinHeader(prev => ({
+      ...prev,
+      quarteirao: '',
+      localidade: ''
+    }));
+    setBlockFilter('all');
+    setCurrentStep(1);
+  };
 
   const filteredProperties = useMemo(() => {
     return properties.filter(p => {
