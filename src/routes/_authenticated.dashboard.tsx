@@ -161,72 +161,67 @@ function DashboardPage() {
     }, 1500);
   };
 
-  if (isLoading) {
-    return (
-      <div className="pb-32 pt-4 space-y-8 animate-in fade-in duration-500 max-w-lg mx-auto">
-        <Skeleton className="h-[280px] w-full rounded-[2.5rem]" />
-        <Skeleton className="h-[200px] w-full rounded-[2.5rem]" />
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-44 rounded-[2.5rem]" />
-          <Skeleton className="h-44 rounded-[2.5rem]" />
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="pb-32 pt-4 space-y-8 animate-in fade-in duration-500 max-w-lg mx-auto">
+          <Skeleton className="h-[280px] w-full rounded-[2.5rem]" />
+          <Skeleton className="h-[200px] w-full rounded-[2.5rem]" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-44 rounded-[2.5rem]" />
+            <Skeleton className="h-44 rounded-[2.5rem]" />
+          </div>
         </div>
+      );
+    }
+
+    return (
+      <div className="pb-32 pt-2 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-lg mx-auto">
+        <PremiumHeader 
+          agent={agent}
+          activeSession={activeSession}
+          lastSync={lastSync}
+          onSync={handleSync}
+          isSyncing={isSyncing}
+        />
+
+        {activeSession && (
+          <WorkInProgressCard 
+            activeSession={activeSession}
+            blockProgress={blockProgress}
+            onContinue={() => {
+              console.log('Navegando para trabalho atual...');
+              navigate({ to: "/field-work-list" as any });
+            }}
+            onRegister={() => {
+              console.log('Navegando para registrar nova visita...');
+              navigate({ to: "/field-work-list" as any });
+            }}
+            onFinish={() => {
+              console.log('Iniciando processo de finalização de quarteirão...');
+              navigate({ to: "/field-work-list" as any });
+            }}
+          />
+        )}
+
+        <CycleCoverageCard 
+          coverageData={coverageData}
+          activeCycle={activeCycle}
+          activeWeek={activeWeek}
+        />
+
+        <ActionGrid />
+
+        <PendingTasksCard stats={stats} />
+
+        <MiniMapCard />
+
+        <GamificationStats />
+
+        <QuickActionsFAB />
       </div>
     );
-  }
+  };
 
-  return (
-    <div className="pb-32 pt-2 space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-lg mx-auto">
-      {/* 1. Reestruturar o topo da dashboard */}
-      <PremiumHeader 
-        agent={agent}
-        activeSession={activeSession}
-        lastSync={lastSync}
-        onSync={handleSync}
-        isSyncing={isSyncing}
-      />
-
-      {/* 3. Trabalho em andamento */}
-      {activeSession && (
-        <WorkInProgressCard 
-          activeSession={activeSession}
-          blockProgress={blockProgress}
-          onContinue={() => {
-            console.log('Navegando para trabalho atual...');
-            navigate({ to: "/field-work-list" as any });
-
-          }}
-          onRegister={() => {
-            console.log('Navegando para registrar nova visita...');
-            navigate({ to: "/field-work-list" as any }); // Registrar é feito na lista de imóveis
-          }}
-          onFinish={() => {
-            console.log('Iniciando processo de finalização de quarteirão...');
-            navigate({ to: "/field-work-list" as any }); // Finalizar quarteirão é feito via DailyWorkCloser na lista de trabalho
-          }}
-        />
-      )}
-
-      {/* 2. Melhorar card “Cobertura do Ciclo” */}
-      <CycleCoverageCard 
-        coverageData={coverageData}
-        activeCycle={activeCycle}
-        activeWeek={activeWeek}
-      />
-
-      {/* 4. Melhorar os cards principais */}
-      <ActionGrid />
-
-      {/* 5. Adicionar novo card “Pendências” */}
-      <PendingTasksCard stats={stats} />
-
-      {/* 9. Adicionar mini mapa na home */}
-      <MiniMapCard />
-
-      {/* 10. Sistema gamificado */}
-      <GamificationStats />
-
-      {/* 7. Adicionar botão flutuante de ação rápida */}
-      <QuickActionsFAB />
-    </div>
-  );
+  return renderContent();
 }

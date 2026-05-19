@@ -50,15 +50,19 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
-  component: () => (
-    <ErrorBoundary>
-      <FieldWorkListPage />
-    </ErrorBoundary>
-  ),
+  component: FieldWorkListPage,
 });
 
 
 function FieldWorkListPage() {
+  return (
+    <ErrorBoundary>
+      <FieldWorkListContent />
+    </ErrorBoundary>
+  );
+}
+
+function FieldWorkListContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [activeSession, setActiveSession] = useState<any>(null);
