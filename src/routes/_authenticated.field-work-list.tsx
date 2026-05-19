@@ -50,8 +50,13 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
-  component: FieldWorkListPage,
+  component: () => (
+    <ErrorBoundary>
+      <FieldWorkListPage />
+    </ErrorBoundary>
+  ),
 });
+
 
 function FieldWorkListPage() {
   const [searchQuery, setSearchQuery] = useState("");
