@@ -388,7 +388,7 @@ function RGPage() {
           <div className="flex items-center justify-between lg:hidden">
             <h2 className="text-lg font-black text-slate-900 uppercase">2. Cadastro de Imóveis</h2>
             <div className="flex items-center gap-2">
-              <RGImportByPhoto onImportComplete={fetchInitialData} />
+              <RGImportByPhoto onImportComplete={fetchInitialData} className="h-10 w-10 p-0 rounded-full" showText={false} />
             </div>
           </div>
 
