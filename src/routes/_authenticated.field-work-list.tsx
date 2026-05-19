@@ -167,15 +167,16 @@ function FieldWorkListPage() {
         
         if (props) {
           const normalizedProps = (props || []).map(p => {
-            const latestVisit = p.visits && p.visits.length > 0 
-              ? [...p.visits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
+            const visitsArray = Array.isArray(p.visits) ? p.visits : [];
+            const latestVisit = visitsArray.length > 0 
+              ? [...visitsArray].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
             
             return {
               ...p,
               status: latestVisit?.status || "not_visited",
-              has_focus: latestVisit?.has_focus || latestVisit?.visit_deposits?.some((d: any) => d.is_positive) || false,
-              treatment_applied: latestVisit?.treatment_applied || latestVisit?.visit_deposits?.some((d: any) => d.is_treated) || false,
+              has_focus: latestVisit?.has_focus || (Array.isArray(latestVisit?.visit_deposits) && latestVisit.visit_deposits.some((d: any) => d.is_positive)) || false,
+              treatment_applied: latestVisit?.treatment_applied || (Array.isArray(latestVisit?.visit_deposits) && latestVisit.visit_deposits.some((d: any) => d.is_treated)) || false,
               is_pending: latestVisit?.activity_type === 'pending' || latestVisit?.status === 'closed' || latestVisit?.status === 'refused',
               latest_visit: latestVisit
             };
