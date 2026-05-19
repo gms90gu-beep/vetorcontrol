@@ -45,9 +45,11 @@ import { cn } from "@/lib/utils";
 
 interface RGImportByPhotoProps {
   onImportComplete: (data: any) => void;
+  className?: string;
+  showText?: boolean;
 }
 
-export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
+export function RGImportByPhoto({ onImportComplete, className, showText = true }: RGImportByPhotoProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "processing" | "review">("upload");
   const [isProcessing, setIsProcessing] = useState(false);
