@@ -54,7 +54,17 @@ function DashboardPage() {
         .maybeSingle();
       setAgent(agentData);
 
-      // 2. Get Active Cycle
+      // 2. Get Active Session
+      const { data: session } = await supabase
+        .from("field_work_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // 3. Get Active Cycle
       const currentYear = new Date().getFullYear();
       const { data: cycle } = await supabase
         .from("cycles")
@@ -68,7 +78,7 @@ function DashboardPage() {
       if (cycle) {
         setActiveCycle(cycle);
         
-        // 3. Get Cycle Coverage
+        // 4. Get Cycle Coverage
         const { data: coverage } = await supabase
           .from("cycle_coverage_summary")
           .select("*")
@@ -76,7 +86,7 @@ function DashboardPage() {
           .maybeSingle();
         if (coverage) setCoverageData(coverage);
 
-        // 4. Get Current Week
+        // 5. Get Current Week
         const { data: week } = await supabase
           .from("weeks")
           .select("*")
@@ -86,10 +96,10 @@ function DashboardPage() {
           .maybeSingle();
         if (week) setActiveWeek(week);
 
-        // 5. Get Cycle Stats
+        // 6. Get Cycle Stats
         const { data: visits } = await supabase
           .from("visits")
-          .select("id, status, visit_date")
+          .select("id, status, visit_date, property_id")
           .eq("cycle_id", cycle.id);
         
         if (visits) {
