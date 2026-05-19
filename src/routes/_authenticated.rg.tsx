@@ -15,7 +15,8 @@ import {
   Save,
   Trash2,
   LayoutDashboard,
-  ClipboardList
+  ClipboardList,
+  ArrowLeft
 } from "lucide-react";
 import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
@@ -48,17 +49,19 @@ import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
 import { RGPropertyForm } from "@/components/rg/RGPropertyForm";
+import { RGBlockList, type Block } from "@/components/rg/RGBlockList";
 
 export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
 });
-
 
 function RGPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [blockFilter, setBlockFilter] = useState("all");
   const [properties, setProperties] = useState<Property[]>([]);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -102,6 +105,20 @@ function RGPage() {
         }));
       }
 
+      const { data: blocksData } = await supabase
+        .from("blocks")
+        .select(`
+          *,
+          subareas (
+            name
+          )
+        `)
+        .order("number", { ascending: true });
+      
+      if (blocksData) {
+        setBlocks(blocksData as Block[]);
+      }
+
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -113,11 +130,6 @@ function RGPage() {
       
       if (session) {
         setActiveSession(session);
-        setBlockFilter(session.block_number || "all");
-        setBulletinHeader(prev => ({
-          ...prev,
-          quarteirao: session.block_number || ""
-        }));
       }
 
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
@@ -127,21 +139,47 @@ function RGPage() {
         if (week) setActiveWeek(week);
       }
 
-      const { data, error } = await supabase
-        .from("properties")
-        .select("*")
-        .order("sequence", { ascending: true })
-        .order("street_name", { ascending: true })
-        .order("number", { ascending: true });
-
-      if (error) throw error;
-      setProperties(data as Property[]);
+      await fetchProperties();
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
     } finally {
       setIsLoading(false);
     }
   }
+
+  async function fetchProperties() {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("*")
+      .order("sequence", { ascending: true })
+      .order("street_name", { ascending: true })
+      .order("number", { ascending: true });
+
+    if (error) throw error;
+    setProperties(data as Property[]);
+  }
+
+  const handleBlockSelect = (block: Block) => {
+    setSelectedBlock(block);
+    setBlockFilter(block.number);
+    setBulletinHeader(prev => ({
+      ...prev,
+      quarteirao: block.number,
+      localidade: block.subareas?.name || prev.localidade
+    }));
+    setCurrentStep(1);
+  };
+
+  const handleNewBlock = () => {
+    setSelectedBlock({ id: 'new', number: '' } as Block);
+    setBulletinHeader(prev => ({
+      ...prev,
+      quarteirao: '',
+      localidade: ''
+    }));
+    setBlockFilter('all');
+    setCurrentStep(1);
+  };
 
   const filteredProperties = useMemo(() => {
     return properties.filter(p => {
@@ -283,28 +321,64 @@ function RGPage() {
     setEditingProperty(null);
   };
 
+  if (!selectedBlock) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8">
+        <div className="px-4 lg:px-6 py-8 space-y-8 max-w-7xl mx-auto w-full">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+               <div className="h-14 w-14 rounded-[1.5rem] bg-slate-900 flex items-center justify-center shadow-xl">
+                 <LayoutDashboard className="h-7 w-7 text-emerald-400" />
+               </div>
+               <div>
+                 <h1 className="text-3xl font-black tracking-tighter text-slate-900 uppercase leading-none mb-1">Meus Quarteirões</h1>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selecione um quarteirão para o RG</p>
+               </div>
+            </div>
+          </div>
+          <RGBlockList 
+            blocks={blocks} 
+            onSelect={handleBlockSelect} 
+            onNewBlock={handleNewBlock} 
+            isLoading={isLoading} 
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8">
-      {/* Mobile Step Progress Indicator */}
+    <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8 animate-in fade-in duration-500">
+      {/* Mobile Header with Back Button */}
       <div className="lg:hidden sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 1 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>1</div>
-          <div className="h-0.5 w-4 bg-slate-100" />
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 2 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>2</div>
-          <div className="h-0.5 w-4 bg-slate-100" />
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 3 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>3</div>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-10 w-10 rounded-full bg-slate-50 text-slate-900"
+            onClick={() => setSelectedBlock(null)}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+              currentStep >= 1 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+            )}>1</div>
+            <div className="h-0.5 w-4 bg-slate-100" />
+            <div className={cn(
+              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+              currentStep >= 2 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+            )}>2</div>
+            <div className="h-0.5 w-4 bg-slate-100" />
+            <div className={cn(
+              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+              currentStep >= 3 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+            )}>3</div>
+          </div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Etapa {currentStep}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">QTR {bulletinHeader.quarteirao}</p>
           <p className="text-xs font-black text-slate-900 uppercase">
             {currentStep === 1 && "Cabeçalho"}
             {currentStep === 2 && "Imóveis"}
@@ -315,13 +389,23 @@ function RGPage() {
 
       {/* Header Buttons - Desktop only */}
       <div className="hidden lg:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 pt-6 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
-            <ClipboardList className="h-6 w-6 text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">RG Digital</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boletim de Reconhecimento Geográfico</p>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-12 w-12 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-900 hover:bg-slate-50 transition-all"
+            onClick={() => setSelectedBlock(null)}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
+              <ClipboardList className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">RG: QTR {bulletinHeader.quarteirao}</h1>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{bulletinHeader.localidade || "Boletim de Reconhecimento Geográfico"}</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -334,14 +418,6 @@ function RGPage() {
             PDF Oficial
           </Button>
           <RGImportByPhoto onImportComplete={fetchInitialData} />
-          <Button 
-            variant="outline" 
-            className="h-11 px-6 rounded-xl bg-white border-2 border-slate-100 shadow-sm font-black text-[11px] uppercase tracking-widest gap-2 hover:bg-slate-50 transition-all"
-            onClick={() => navigate({ to: '/field-work-list' })}
-          >
-            <HistoryIcon className="h-4 w-4 text-slate-400" />
-            Histórico
-          </Button>
         </div>
       </div>
 
@@ -586,4 +662,3 @@ function RGPage() {
     </div>
   );
 }
-
