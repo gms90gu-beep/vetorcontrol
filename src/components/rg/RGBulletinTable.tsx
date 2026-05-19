@@ -11,7 +11,7 @@ import { Edit2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Align with database Row type for properties
-type Property = {
+export type Property = {
   id: string;
   number: string;
   complement: string | null;
