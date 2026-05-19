@@ -197,7 +197,7 @@ function DashboardPage() {
           }}
           onRegister={() => {
             console.log('Navegando para registrar nova visita...');
-            navigate({ to: "/field-work" as any }); // Registrar costuma ser dentro do fluxo de trabalho de campo selecionando um imóvel
+            navigate({ to: "/field-work-list" as any }); // Registrar é feito na lista de imóveis
           }}
           onFinish={() => {
             console.log('Iniciando processo de finalização de quarteirão...');
