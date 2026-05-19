@@ -159,9 +159,9 @@ function FieldWorkListPage() {
           .order("number", { ascending: true });
         
         if (props) {
-          const normalizedProps = props.map(p => {
+          const normalizedProps = (props || []).map(p => {
             const latestVisit = p.visits && p.visits.length > 0 
-              ? p.visits.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
+              ? [...p.visits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
             
             return {
@@ -173,6 +173,7 @@ function FieldWorkListPage() {
               latest_visit: latestVisit
             };
           });
+
           setProperties(normalizedProps);
         }
       }
