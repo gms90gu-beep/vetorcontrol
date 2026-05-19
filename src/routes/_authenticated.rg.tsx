@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Plus, 
@@ -48,8 +48,29 @@ import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
 
+class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode, fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
 export const Route = createFileRoute("/_authenticated/rg")({
-  component: RGPage,
+  component: () => (
+    <ErrorBoundary fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+        <h2 className="text-xl font-bold mb-4">Erro ao carregar o módulo RG</h2>
+        <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
+      </div>
+    }>
+      <RGPage />
+    </ErrorBoundary>
+  ),
 });
 
 
@@ -315,19 +336,25 @@ function RGPage() {
 
       {/* Official Form Style Container */}
       <div className="px-4 space-y-4">
-        <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
-          <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
-          
-          <div className="p-0 overflow-x-auto">
-            <RGBulletinTable 
-              properties={filteredProperties} 
-              onEdit={handlePropertyClick}
-              onDelete={handleDeleteProperty}
-            />
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
           </div>
-          
-          <RGBulletinFooter stats={stats} />
-        </Card>
+        ) : (
+          <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
+            <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
+            
+            <div className="p-0 overflow-x-auto">
+              <RGBulletinTable 
+                properties={filteredProperties} 
+                onEdit={handlePropertyClick}
+                onDelete={handleDeleteProperty}
+              />
+            </div>
+            
+            <RGBulletinFooter stats={stats} />
+          </Card>
+        )}
 
         {/* Quick Add Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

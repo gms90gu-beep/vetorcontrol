@@ -155,12 +155,12 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
 
       // Prepare properties for batch insertion
       const propertiesToInsert = editedProperties.map(prop => ({
-        number: prop.number,
+        number: String(prop.number || ""),
         complement: prop.complement || "",
         type: prop.type,
-        street_name: extractedData.street_name,
-        neighborhood: extractedData.neighborhood,
-        block_number: extractedData.block_number,
+        street_name: extractedData?.street_name || "",
+        neighborhood: extractedData?.neighborhood || "",
+        block_number: String(extractedData?.block_number || ""),
         reference: prop.reference || "",
         container_count: prop.container_count || 0,
         observations: prop.observations || "",
