@@ -566,20 +566,6 @@ function PropertyVisitPage() {
   }
 
 
-  async function fetchNextProperty() {
-    try {
-      const { data: nextProp } = await supabase
-        .from("properties")
-        .select("id, number")
-        .eq("block_id", property.block_id)
-        .gt("number", property.number)
-        .order("number", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      
-      setNextProperty(nextProp);
-    } catch (e) { console.error(e); }
-  }
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
