@@ -49,6 +49,35 @@ export const Route = createFileRoute("/_authenticated/property/$propertyId")({
       <PropertyVisitPage />
     </ErrorBoundary>
   ),
+  errorComponent: ({ error, reset }) => {
+    console.error("Route error:", error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center gap-6">
+        <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
+          <AlertCircle className="h-10 w-10 text-red-500" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">Erro na Tela de Visita</h3>
+          <p className="text-sm text-slate-500 font-medium max-w-xs mx-auto">
+            Ocorreu um erro ao carregar esta página. Tente recarregar ou voltar à lista.
+          </p>
+          {process.env.NODE_ENV === 'development' && (
+            <pre className="mt-4 p-4 bg-slate-50 rounded-xl text-left text-[10px] text-red-600 overflow-auto max-w-full">
+              {error.message}
+            </pre>
+          )}
+        </div>
+        <div className="flex gap-3 w-full max-w-xs">
+          <Button variant="outline" onClick={() => window.location.href = "/field-work-list"} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
+            Voltar
+          </Button>
+          <Button onClick={() => reset()} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
+            Recarregar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 });
 
 
