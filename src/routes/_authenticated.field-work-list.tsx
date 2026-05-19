@@ -184,15 +184,16 @@ function FieldWorkListPage() {
     }
   };
 
-  const filteredProperties = properties.filter(p => {
-    const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  const filteredProperties = (properties || []).filter(p => {
+    const matchesSearch = (p?.number || "").includes(searchQuery) || (p?.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     if (filter === "all") return matchesSearch;
-    if (filter === "completed") return matchesSearch && (p.status === "visited" || p.status === "closed" || p.status === "refused" || p.status === "abandoned");
-    if (filter === "pending") return matchesSearch && (p.status === "not_visited" || p.status === "closed" || p.status === "refused");
-    if (filter === "focus") return matchesSearch && p.has_focus;
-    if (filter === "survey") return matchesSearch && p.latest_visit?.activity_type === 'infestation_survey';
+    if (filter === "completed") return matchesSearch && (p?.status === "visited" || p?.status === "closed" || p?.status === "refused" || p?.status === "abandoned");
+    if (filter === "pending") return matchesSearch && (p?.status === "not_visited" || p?.status === "closed" || p?.status === "refused");
+    if (filter === "focus") return matchesSearch && p?.has_focus;
+    if (filter === "survey") return matchesSearch && p?.latest_visit?.activity_type === 'infestation_survey';
     return matchesSearch;
   });
+
 
   const generatePDF = () => {
     const doc = new jsPDF();
