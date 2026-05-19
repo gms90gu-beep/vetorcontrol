@@ -159,9 +159,9 @@ function FieldWorkListPage() {
           .order("number", { ascending: true });
         
         if (props) {
-          const normalizedProps = props.map(p => {
+          const normalizedProps = (props || []).map(p => {
             const latestVisit = p.visits && p.visits.length > 0 
-              ? p.visits.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
+              ? [...p.visits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
             
             return {
@@ -173,6 +173,7 @@ function FieldWorkListPage() {
               latest_visit: latestVisit
             };
           });
+
           setProperties(normalizedProps);
         }
       }
@@ -183,15 +184,16 @@ function FieldWorkListPage() {
     }
   };
 
-  const filteredProperties = properties.filter(p => {
-    const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  const filteredProperties = (properties || []).filter(p => {
+    const matchesSearch = (p?.number || "").includes(searchQuery) || (p?.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     if (filter === "all") return matchesSearch;
-    if (filter === "completed") return matchesSearch && (p.status === "visited" || p.status === "closed" || p.status === "refused" || p.status === "abandoned");
-    if (filter === "pending") return matchesSearch && (p.status === "not_visited" || p.status === "closed" || p.status === "refused");
-    if (filter === "focus") return matchesSearch && p.has_focus;
-    if (filter === "survey") return matchesSearch && p.latest_visit?.activity_type === 'infestation_survey';
+    if (filter === "completed") return matchesSearch && (p?.status === "visited" || p?.status === "closed" || p?.status === "refused" || p?.status === "abandoned");
+    if (filter === "pending") return matchesSearch && (p?.status === "not_visited" || p?.status === "closed" || p?.status === "refused");
+    if (filter === "focus") return matchesSearch && p?.has_focus;
+    if (filter === "survey") return matchesSearch && p?.latest_visit?.activity_type === 'infestation_survey';
     return matchesSearch;
   });
+
 
   const generatePDF = () => {
     const doc = new jsPDF();
@@ -266,15 +268,16 @@ function FieldWorkListPage() {
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 
-  const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
-  const closedCount = properties.filter(p => p.status === "closed").length;
-  const refusedCount = properties.filter(p => p.status === "refused").length;
-  const focusCount = properties.filter(p => p.has_focus).length;
-  const treatedCount = properties.filter(p => p.treatment_applied).length;
-  const treatedDepositsCount = properties.reduce((acc, p) => acc + (p.latest_visit?.treated_deposits || 0), 0);
-  const larvicideUsed = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.treatment_amount) || 0), 0);
-  const eliminationCount = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.elimination_amount) || 0), 0);
-  const progressPercent = properties.length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
+  const workedCount = (properties || []).filter(p => p?.status !== "not_visited" && p?.status).length;
+  const closedCount = (properties || []).filter(p => p?.status === "closed").length;
+  const refusedCount = (properties || []).filter(p => p?.status === "refused").length;
+  const focusCount = (properties || []).filter(p => p?.has_focus).length;
+  const treatedCount = (properties || []).filter(p => p?.treatment_applied).length;
+  const treatedDepositsCount = (properties || []).reduce((acc, p) => acc + (p?.latest_visit?.treated_deposits || 0), 0);
+  const larvicideUsed = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.treatment_amount) || 0), 0);
+  const eliminationCount = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.elimination_amount) || 0), 0);
+  const progressPercent = (properties || []).length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
+
 
   return (
     <LandscapeBulletinLayout
