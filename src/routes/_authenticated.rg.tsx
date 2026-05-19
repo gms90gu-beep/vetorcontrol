@@ -54,6 +54,7 @@ export const Route = createFileRoute("/_authenticated/rg")({
 
 
 function RGPage() {
+  const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [blockFilter, setBlockFilter] = useState("all");
   const [properties, setProperties] = useState<Property[]>([]);
@@ -90,7 +91,6 @@ function RGPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Agent
       const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (agentData) {
         setAgent(agentData);
@@ -101,7 +101,6 @@ function RGPage() {
         }));
       }
 
-      // Session
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -120,7 +119,6 @@ function RGPage() {
         }));
       }
 
-      // Cycle/Week
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
       if (cycle) {
         setActiveCycle(cycle);
