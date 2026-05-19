@@ -117,6 +117,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
+    { label: "Veículos", icon: Car, to: "/vehicles" },
     { label: "Ciclos", icon: Layers, to: "/cycles" },
     { label: "Trabalho", icon: MapIcon, to: "/field-work" },
     { label: "RG", icon: MapPin, to: "/rg" },
