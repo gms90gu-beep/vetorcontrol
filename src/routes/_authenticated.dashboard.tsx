@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
@@ -189,9 +190,19 @@ function DashboardPage() {
         <WorkInProgressCard 
           activeSession={activeSession}
           blockProgress={blockProgress}
-          onContinue={() => toast.info("Retomando trabalho...")}
-          onRegister={() => toast.info("Iniciando registro...")}
-          onFinish={() => toast.info("Finalizando quarteirão...")}
+          onContinue={() => {
+            console.log('Navegando para trabalho atual...');
+            navigate({ to: "/field-work-list" as any });
+
+          }}
+          onRegister={() => {
+            console.log('Navegando para registrar nova visita...');
+            navigate({ to: "/field-work-list" as any }); // Registrar é feito na lista de imóveis
+          }}
+          onFinish={() => {
+            console.log('Iniciando processo de finalização de quarteirão...');
+            navigate({ to: "/field-work-list" as any }); // Finalizar quarteirão é feito via DailyWorkCloser na lista de trabalho
+          }}
         />
       )}
 
