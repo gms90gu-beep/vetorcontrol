@@ -441,7 +441,14 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
       if (!user) throw new Error("Não autenticado");
 
       const propertyToSave = {
-        ...formData,
+        number: formData.number || "",
+        complement: formData.complement || null,
+        type: formData.type || "residence",
+        street_name: formData.street_name || null,
+        side: formData.side || null,
+        sequence: formData.sequence || null,
+        inhabitants: formData.inhabitants || 0,
+        status: formData.status || "active",
         user_id: user.id,
         id: initialData?.id || undefined
       };
@@ -451,6 +458,7 @@ function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property
         .upsert(propertyToSave)
         .select()
         .single();
+
 
       if (error) throw error;
       
