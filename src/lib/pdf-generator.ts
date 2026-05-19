@@ -8,8 +8,12 @@ interface Property {
   number: string;
   complement: string | null;
   type: string;
-  status: string | null;
-  observations: string | null;
+  status?: string | null;
+  observations?: string | null;
+  street_name?: string | null;
+  side?: string | null;
+  sequence?: number | null;
+  inhabitants?: number | null;
 }
 
 interface AgentInfo {
