@@ -46,6 +46,8 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   component: FieldWorkListPage,
