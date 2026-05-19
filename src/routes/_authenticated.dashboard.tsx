@@ -189,9 +189,18 @@ function DashboardPage() {
         <WorkInProgressCard 
           activeSession={activeSession}
           blockProgress={blockProgress}
-          onContinue={() => toast.info("Retomando trabalho...")}
-          onRegister={() => toast.info("Iniciando registro...")}
-          onFinish={() => toast.info("Finalizando quarteirão...")}
+          onContinue={() => {
+            console.log('Navegando para trabalho atual...');
+            navigate({ to: "/field-work" as any });
+          }}
+          onRegister={() => {
+            console.log('Navegando para registrar nova visita...');
+            navigate({ to: "/field-work" as any }); // Registrar costuma ser dentro do fluxo de trabalho de campo selecionando um imóvel
+          }}
+          onFinish={() => {
+            console.log('Iniciando processo de finalização de quarteirão...');
+            toast.info("Finalizando quarteirão...");
+          }}
         />
       )}
 
