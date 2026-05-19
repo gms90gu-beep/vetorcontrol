@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
