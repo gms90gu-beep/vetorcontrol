@@ -32,6 +32,7 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -69,7 +70,7 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
         {!isLandscape && <AppSidebar onLogout={handleLogout} />}
         <main className="flex-1 flex flex-col min-w-0">
-          {!isLandscape && <OperationalHeader />}
+          {!isLandscape && location.pathname !== "/dashboard" && <OperationalHeader />}
           <div className={cn(
             "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8",
             isLandscape && "p-2 md:p-4 pb-4"
@@ -88,26 +89,50 @@ function BottomNav() {
   if (!isMobile) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-3 flex items-center justify-between pb-8">
-      <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
-      <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
-      <NavItem to="/rg" icon={MapPin} label="RG" />
-      <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Relatórios" />
-      <NavItem to="/settings" icon={Settings} label="Ajustes" />
+    <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-2">
+      <div className="bg-slate-950/90 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] px-6 py-4 flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.4)]">
+        <NavItem to="/dashboard" icon={LayoutDashboard} label="Home" />
+        <NavItem to="/field-work" icon={CheckSquare} label="Visita" />
+        <NavItem to="/rg" icon={MapPin} label="RG" />
+        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+        <NavItem to="/settings" icon={Settings} label="Perfil" />
+      </div>
     </div>
   );
 }
 
 function NavItem({ to, icon: Icon, label }: any) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
   return (
     <Link 
       to={to} 
-      className="flex flex-col items-center gap-1 text-muted-foreground transition-all active:scale-90"
-      activeProps={{ className: "text-primary" }}
+      className={cn(
+        "flex flex-col items-center gap-1.5 transition-all duration-300 relative",
+        isActive ? "scale-110" : "opacity-40 hover:opacity-70 active:scale-90"
+      )}
     >
-      <Icon className="h-6 w-6" />
-      <span className="text-[10px] font-bold uppercase tracking-tight">{label}</span>
+      <div className={cn(
+        "p-2 rounded-2xl transition-all duration-500",
+        isActive ? "bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]" : "text-white"
+      )}>
+        <Icon className="h-6 w-6" strokeWidth={isActive ? 2.5 : 2} />
+      </div>
+      <span className={cn(
+        "text-[8px] font-black uppercase tracking-widest transition-all duration-300",
+        isActive ? "text-blue-400 opacity-100" : "text-white opacity-0 h-0"
+      )}>
+        {label}
+      </span>
+      
+      {isActive && (
+        <motion.div 
+          layoutId="activeNav"
+          className="absolute -bottom-1 h-1 w-4 bg-blue-500 rounded-full"
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        />
+      )}
     </Link>
   );
 }
