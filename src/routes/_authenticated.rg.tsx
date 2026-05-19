@@ -157,7 +157,7 @@ function RGPage() {
 
     if (error) throw error;
     setProperties(data as Property[]);
-  }
+  };
 
   const handleBlockSelect = (block: Block) => {
     setSelectedBlock(block);
