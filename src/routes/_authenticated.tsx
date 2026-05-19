@@ -70,7 +70,7 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
         {!isLandscape && <AppSidebar onLogout={handleLogout} />}
         <main className="flex-1 flex flex-col min-w-0">
-          {!isLandscape && <OperationalHeader />}
+          {!isLandscape && location.pathname !== "/dashboard" && <OperationalHeader />}
           <div className={cn(
             "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8",
             isLandscape && "p-2 md:p-4 pb-4"
