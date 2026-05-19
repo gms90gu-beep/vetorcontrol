@@ -596,7 +596,11 @@ function FieldWorkListPage() {
                       return;
                     }
                     setIsModalOpen(false);
-                    navigate({ to: `/property/${selectedProperty?.id}` });
+                    if (selectedProperty?.id) {
+                      navigate({ to: '/property/$propertyId', params: { propertyId: selectedProperty.id } });
+                    } else {
+                      toast.error("Erro: Identificador do imóvel não encontrado.");
+                    }
                   }}
                   disabled={isLocked}
                 >

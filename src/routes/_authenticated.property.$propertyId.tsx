@@ -79,7 +79,8 @@ function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (
 }
 
 function PropertyVisitPage() {
-  const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
+  const params = useParams({ strict: false }) as any;
+  const propertyId = params.propertyId;
   const navigate = useNavigate();
   const [status, setStatus] = useState<string>("visited");
   const [activity, setActivity] = useState<string>("routine");
@@ -492,8 +493,8 @@ function PropertyVisitPage() {
     }));
   };
 
-  const surveySummary = deposits.reduce((acc, d) => {
-    if (!d.selected) return acc;
+  const surveySummary = (deposits || []).reduce((acc, d) => {
+    if (!d || !d.selected) return acc;
     return {
       found: acc.found + (Number(d.quantity) || 0),
       positive: acc.positive + (d.positive ? 1 : 0),
