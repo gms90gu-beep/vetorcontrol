@@ -27,9 +27,14 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
-  component: FieldWorkPage,
+  component: () => (
+    <ErrorBoundary>
+      <FieldWorkPage />
+    </ErrorBoundary>
+  ),
 });
 
 function FieldWorkPage() {
