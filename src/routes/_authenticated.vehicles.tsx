@@ -1,11 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect, Component, ReactNode } from "react";
+import { useState, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Car, 
   ChevronLeft, 
   Save, 
-  AlertCircle,
   ShieldCheck,
   ClipboardList
 } from "lucide-react";
@@ -15,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode, fallback: ReactNode }) {
@@ -65,10 +63,8 @@ function VehicleRegistrationPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
-      // Note: This is a placeholder since the table might not exist yet
-      // In a real scenario, we would have run the migration first
       const { error } = await supabase
-        .from('vehicles')
+        .from('vehicles' as any)
         .insert([{
           license_plate: form.placa,
           model: form.modelo,
@@ -85,8 +81,6 @@ function VehicleRegistrationPage() {
 
       toast.success("Veículo registrado com sucesso!");
       setForm({ placa: '', modelo: '', marca: '', cor: '', observacao: '' });
-      // Invalidate queries if using react-query
-      // queryClient.invalidateQueries(['vehicles'])
     } catch (error: any) {
       toast.error("Erro ao salvar veículo: " + (error.message || "Erro desconhecido"));
     } finally {
