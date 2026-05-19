@@ -231,7 +231,7 @@ function FieldWorkListPage() {
     doc.setFontSize(16);
     doc.text("Boletim Diário de Visitas", 14, 95);
 
-    const tableData = properties.map(p => {
+    const tableData = (properties || []).map(p => {
       const treatmentInfo = p.latest_visit?.treatment_applied 
         ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
         : "Não";
