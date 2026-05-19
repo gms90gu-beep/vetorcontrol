@@ -201,7 +201,7 @@ function DashboardPage() {
           }}
           onFinish={() => {
             console.log('Iniciando processo de finalização de quarteirão...');
-            toast.info("Finalizando quarteirão...");
+            navigate({ to: "/field-work-list" as any }); // Finalizar quarteirão é feito via DailyWorkCloser na lista de trabalho
           }}
         />
       )}
