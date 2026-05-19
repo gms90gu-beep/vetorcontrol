@@ -183,6 +183,10 @@ function RGPage() {
 
   const handleQuickAdd = async (data: any) => {
     try {
+      if (window.navigator.vibrate) {
+        window.navigator.vibrate(50);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
@@ -202,7 +206,10 @@ function RGPage() {
       if (error) throw error;
       
       setProperties(prev => [...prev, saved as Property]);
-      toast.success("Imóvel adicionado!");
+      toast.success("Imóvel adicionado com sucesso!", {
+        description: `Seq: ${saved.sequence} - Nº ${saved.number}`,
+        duration: 2000,
+      });
     } catch (error: any) {
       toast.error("Erro ao adicionar: " + error.message);
     }
