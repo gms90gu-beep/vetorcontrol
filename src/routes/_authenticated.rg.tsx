@@ -55,7 +55,6 @@ export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
 });
 
-
 function RGPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -663,4 +662,3 @@ function RGPage() {
     </div>
   );
 }
-
