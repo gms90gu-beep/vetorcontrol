@@ -198,10 +198,14 @@ export function RGImportByPhoto({ onImportComplete, className, showText = true }
     <>
       <Button 
         variant="outline"
-        className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 shadow-xl hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest gap-2 text-slate-900"
+        className={cn(
+          "h-11 px-4 rounded-xl bg-white border-2 border-slate-100 shadow-sm hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest gap-2 text-slate-900",
+          className
+        )}
         onClick={() => setIsOpen(true)}
       >
-        <Camera className="h-5 w-5 text-emerald-500" /> Importar por Foto
+        <Camera className="h-4 w-4 text-emerald-500" />
+        {showText && <span>Importar por Foto</span>}
       </Button>
 
       <Dialog open={isOpen} onOpenChange={(open) => {
