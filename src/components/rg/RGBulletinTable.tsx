@@ -213,5 +213,3 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
     </div>
   );
 }
-  );
-}
