@@ -108,6 +108,12 @@ function PropertyVisitPage() {
     fetchAgentData();
   }, [propertyId]);
 
+  useEffect(() => {
+    if (property && activeSession) {
+      fetchNextProperty();
+    }
+  }, [property, activeSession]);
+
   async function fetchAgentData() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
