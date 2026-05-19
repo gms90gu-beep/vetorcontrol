@@ -13,10 +13,19 @@ import { GamificationStats } from "@/components/dashboard/GamificationStats";
 import { QuickActionsFAB } from "@/components/dashboard/QuickActionsFAB";
 import { MiniMapCard } from "@/components/dashboard/MiniMapCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  component: DashboardPage,
+  component: DashboardWrapper,
 });
+
+function DashboardWrapper() {
+  return (
+    <ErrorBoundary>
+      <DashboardPage />
+    </ErrorBoundary>
+  );
+}
 
 function DashboardPage() {
   const navigate = useNavigate();
