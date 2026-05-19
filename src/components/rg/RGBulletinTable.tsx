@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Edit2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// Align with database Row type for properties
 type Property = {
   id: string;
   number: string;
@@ -19,6 +20,7 @@ type Property = {
   side: string | null;
   sequence: number | null;
   inhabitants: number | null;
+  [key: string]: any; // Allow other fields from the database row
 };
 
 interface RGBulletinTableProps {
@@ -64,7 +66,7 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
             properties.map((prop, index) => (
               <TableRow key={prop.id || index} className="hover:bg-slate-50 border-b border-slate-200 h-10">
                 <TableCell className="border-r border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-800">
-                  {prop.street_name}
+                  {prop.street_name || "--"}
                 </TableCell>
                 <TableCell className="border-r border-slate-300 px-2 py-1 text-[11px] font-black text-slate-800 text-center">
                   {prop.side || "--"}
