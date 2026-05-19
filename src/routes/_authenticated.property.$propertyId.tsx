@@ -499,51 +499,51 @@ function PropertyVisitPage() {
     );
   }
 
-  if (error) {
-  if (isLandscape) {
-    return (
-      <LandscapeBulletinLayout
-        isLandscape={true}
-        title={`Quarteirão ${activeSession?.block_number || "--"}`}
-        subtitle={activeSession?.street_name || "--"}
-        agentInfo={{
-          name: agent?.name || "Agente",
-          municipality: agent?.municipality || "Município",
-          registrationId: agent?.registration_id || "0000",
-          cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
-          week: activeSession?.week_id?.substring(0, 2) || "--",
-          block: activeSession?.block_number || "--",
-          street: activeSession?.street_name || "--"
-        }}
-        stats={{
-          worked: dailyStats.worked,
-          total: activeSession?.property_count || 45,
-          closed: 0,
-          refused: 0,
-          focus: 0,
-          treated: 0,
-          treatedDeposits: routineData.treatedDeposits,
-          larvicideUsed: routineData.treatmentAmount,
-          eliminated: routineData.eliminationAmount,
-          progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
-        }}
-      >
-        <DigitalBulletinTable 
-          properties={blockProperties} 
-          onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
-          onStatusUpdate={() => {}}
-        />
-      </LandscapeBulletinLayout>
-    );
-  }
+  if (error || !property) {
+    if (isLandscape) {
+      return (
+        <LandscapeBulletinLayout
+          isLandscape={true}
+          title={`Quarteirão ${activeSession?.block_number || "--"}`}
+          subtitle={activeSession?.street_name || "--"}
+          agentInfo={{
+            name: agent?.name || "Agente",
+            municipality: agent?.municipality || "Município",
+            registrationId: agent?.registration_id || "0000",
+            cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
+            week: activeSession?.week_id?.substring(0, 2) || "--",
+            block: activeSession?.block_number || "--",
+            street: activeSession?.street_name || "--"
+          }}
+          stats={{
+            worked: dailyStats.worked,
+            total: activeSession?.property_count || 45,
+            closed: 0,
+            refused: 0,
+            focus: 0,
+            treated: 0,
+            treatedDeposits: routineData.treatedDeposits,
+            larvicideUsed: routineData.treatmentAmount,
+            eliminated: routineData.eliminationAmount,
+            progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
+          }}
+        >
+          <DigitalBulletinTable 
+            properties={blockProperties} 
+            onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
+            onStatusUpdate={() => {}}
+          />
+        </LandscapeBulletinLayout>
+      );
+    }
 
-  return (
+    return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6">
         <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
           <AlertCircle className="h-10 w-10 text-red-500" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error}</h3>
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error || "Imóvel não encontrado"}</h3>
           <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações.</p>
         </div>
         <div className="flex gap-3 w-full max-w-xs">
@@ -557,6 +557,7 @@ function PropertyVisitPage() {
       </div>
     );
   }
+
 
   const [nextProperty, setNextProperty] = useState<any>(null);
 
