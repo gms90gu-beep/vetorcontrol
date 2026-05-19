@@ -44,8 +44,13 @@ const DEPOSIT_TYPES = [
 ];
 
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
-  component: PropertyVisitPage,
+  component: () => (
+    <ErrorBoundary>
+      <PropertyVisitPage />
+    </ErrorBoundary>
+  ),
 });
+
 
 function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
   return (
