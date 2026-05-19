@@ -93,7 +93,7 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="col-span-1 space-y-1">
           <Label className="text-[8px] font-black uppercase text-slate-400">Nº</Label>
           <Input 
