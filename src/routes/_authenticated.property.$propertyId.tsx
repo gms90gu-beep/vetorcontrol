@@ -108,6 +108,20 @@ function PropertyVisitPage() {
     fetchAgentData();
   }, [propertyId]);
 
+  const fetchNextProperty = async () => {
+    try {
+      const { data: nextProp } = await supabase
+        .from("properties")
+        .select("id, number")
+        .eq("block_id", property.block_id)
+        .gt("number", property.number)
+        .order("number", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      setNextProperty(nextProp);
+    } catch (e) { console.error(e); }
+  };
+
   useEffect(() => {
     if (property && activeSession) {
       fetchNextProperty();
