@@ -15,7 +15,8 @@ import {
   Save,
   Trash2,
   LayoutDashboard,
-  ClipboardList
+  ClipboardList,
+  ArrowLeft
 } from "lucide-react";
 import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
 import { RGPropertyForm } from "@/components/rg/RGPropertyForm";
+import { RGBlockList, type Block } from "@/components/rg/RGBlockList";
 
 export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
