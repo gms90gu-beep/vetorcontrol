@@ -45,14 +45,14 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
       <Table className="border-collapse">
         <TableHeader className="bg-slate-50 border-b border-slate-300">
           <TableRow className="hover:bg-transparent h-10">
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[20%] text-center">Rua ou Logradouro</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[10%] text-center">Lado</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[10%] text-center">Número</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[10%] text-center">Seq.</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[15%] text-center">Comp.</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[10%] text-center">Tipo</TableHead>
-            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[10%] text-center">Hab.</TableHead>
-            <TableHead className="text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 w-[15%] text-center">Ações</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[120px] text-center">Rua ou Logradouro</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[50px] text-center">Lado</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[60px] text-center">Número</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[40px] text-center">Seq.</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[60px] text-center">Comp.</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[40px] text-center">Tipo</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[40px] text-center">Hab.</TableHead>
+            <TableHead className="text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[80px] text-center">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

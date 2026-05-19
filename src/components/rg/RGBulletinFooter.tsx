@@ -14,24 +14,24 @@ interface RGBulletinFooterProps {
 
 export function RGBulletinFooter({ stats }: RGBulletinFooterProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-7 border border-t-0 border-slate-300 bg-slate-50 text-[10px] font-black uppercase tracking-tight divide-x divide-slate-300">
-      <div className="p-3 flex flex-col items-center justify-center gap-1">
+    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 border border-t-0 border-slate-300 bg-slate-50 text-[10px] font-black uppercase tracking-tight overflow-hidden">
+      <div className="p-3 flex flex-col items-center justify-center gap-1 border-r border-b border-slate-300 last:border-b-0 sm:[&:nth-child(4)]:border-r-0 md:border-b-0">
         <span className="text-slate-500">Residencial (R)</span>
         <span className="text-sm font-black text-slate-900">{stats.residence}</span>
       </div>
-      <div className="p-3 flex flex-col items-center justify-center gap-1">
+      <div className="p-3 flex flex-col items-center justify-center gap-1 border-r border-b border-slate-300 sm:border-b-0 md:border-b-0">
         <span className="text-slate-500">Comercial (C)</span>
         <span className="text-sm font-black text-slate-900">{stats.commerce}</span>
       </div>
-      <div className="p-3 flex flex-col items-center justify-center gap-1">
+      <div className="p-3 flex flex-col items-center justify-center gap-1 border-r border-b border-slate-300 last:border-r-0 sm:border-b-0 md:border-b-0">
         <span className="text-slate-500">T. Baldio (TB)</span>
         <span className="text-sm font-black text-slate-900">{stats.vacant_lot}</span>
       </div>
-      <div className="p-3 flex flex-col items-center justify-center gap-1">
+      <div className="p-3 flex flex-col items-center justify-center gap-1 border-r border-b border-slate-300 last:border-r-0 sm:border-r-0 md:border-r md:border-b-0">
         <span className="text-slate-500">P. Estrat. (PE)</span>
         <span className="text-sm font-black text-slate-900">{stats.strategic_point}</span>
       </div>
-      <div className="p-3 flex flex-col items-center justify-center gap-1">
+      <div className="p-3 flex flex-col items-center justify-center gap-1 border-r border-b border-slate-300 sm:border-b-0 md:border-b-0">
         <span className="text-slate-500">Outros (O)</span>
         <span className="text-sm font-black text-slate-900">{stats.others}</span>
       </div>
