@@ -47,6 +47,7 @@ import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable"
 import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
+import { RGPropertyForm } from "@/components/rg/RGPropertyForm";
 
 export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
