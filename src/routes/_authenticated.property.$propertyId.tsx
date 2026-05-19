@@ -111,9 +111,14 @@ function PropertyVisitPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      const { data, error: agentError } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (agentError) {
+        console.error("Error fetching agent data:", agentError);
+        return;
+      }
       if (data) setAgent(data);
     } catch (e) { console.error(e); }
+
   }
 
   async function fetchDailyStats() {
