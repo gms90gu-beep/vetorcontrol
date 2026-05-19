@@ -556,9 +556,6 @@ function RGPage() {
       <div className="hidden lg:block">
         <RGBulletinFooter stats={stats} />
       </div>
-    </div>
-  );
-}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
