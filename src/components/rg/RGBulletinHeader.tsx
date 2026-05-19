@@ -19,7 +19,7 @@ interface RGBulletinHeaderProps {
 
 export function RGBulletinHeader({ data, onChange }: RGBulletinHeaderProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-tight">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 p-4 bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-tight">
       <div className="space-y-1">
         <Label className="text-[9px] text-slate-500">UF</Label>
         <Input 
