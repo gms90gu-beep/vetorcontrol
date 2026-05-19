@@ -45,11 +45,9 @@ import { cn } from "@/lib/utils";
 
 interface RGImportByPhotoProps {
   onImportComplete: (data: any) => void;
-  className?: string;
-  showText?: boolean;
 }
 
-export function RGImportByPhoto({ onImportComplete, className, showText = true }: RGImportByPhotoProps) {
+export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "processing" | "review">("upload");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -198,14 +196,10 @@ export function RGImportByPhoto({ onImportComplete, className, showText = true }
     <>
       <Button 
         variant="outline"
-        className={cn(
-          "h-11 px-4 rounded-xl bg-white border-2 border-slate-100 shadow-sm hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest gap-2 text-slate-900",
-          className
-        )}
+        className="h-14 px-6 rounded-2xl bg-white border-2 border-slate-100 shadow-xl hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest gap-2 text-slate-900"
         onClick={() => setIsOpen(true)}
       >
-        <Camera className="h-4 w-4 text-emerald-500" />
-        {showText && <span>Importar por Foto</span>}
+        <Camera className="h-5 w-5 text-emerald-500" /> Importar por Foto
       </Button>
 
       <Dialog open={isOpen} onOpenChange={(open) => {

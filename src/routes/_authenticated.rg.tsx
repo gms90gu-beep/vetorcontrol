@@ -54,7 +54,6 @@ export const Route = createFileRoute("/_authenticated/rg")({
 
 
 function RGPage() {
-  const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [blockFilter, setBlockFilter] = useState("all");
   const [properties, setProperties] = useState<Property[]>([]);
@@ -91,6 +90,7 @@ function RGPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Agent
       const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (agentData) {
         setAgent(agentData);
@@ -101,6 +101,7 @@ function RGPage() {
         }));
       }
 
+      // Session
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -119,6 +120,7 @@ function RGPage() {
         }));
       }
 
+      // Cycle/Week
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
       if (cycle) {
         setActiveCycle(cycle);
@@ -183,10 +185,6 @@ function RGPage() {
 
   const handleQuickAdd = async (data: any) => {
     try {
-      if (window.navigator.vibrate) {
-        window.navigator.vibrate(50);
-      }
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
@@ -206,10 +204,7 @@ function RGPage() {
       if (error) throw error;
       
       setProperties(prev => [...prev, saved as Property]);
-      toast.success("Imóvel adicionado com sucesso!", {
-        description: `Seq: ${saved.sequence} - Nº ${saved.number}`,
-        duration: 2000,
-      });
+      toast.success("Imóvel adicionado!");
     } catch (error: any) {
       toast.error("Erro ao adicionar: " + error.message);
     }
@@ -283,59 +278,33 @@ function RGPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8">
-      {/* Mobile Step Progress Indicator */}
-      <div className="lg:hidden sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 1 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>1</div>
-          <div className="h-0.5 w-4 bg-slate-100" />
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 2 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>2</div>
-          <div className="h-0.5 w-4 bg-slate-100" />
-          <div className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-            currentStep >= 3 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-          )}>3</div>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Etapa {currentStep}</p>
-          <p className="text-xs font-black text-slate-900 uppercase">
-            {currentStep === 1 && "Cabeçalho"}
-            {currentStep === 2 && "Imóveis"}
-            {currentStep === 3 && "Fechamento"}
-          </p>
-        </div>
-      </div>
-
-      {/* Header Buttons - Desktop only */}
-      <div className="hidden lg:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 pt-6 mb-4">
+    <div className="flex flex-col gap-4 bg-slate-100 min-h-screen pb-24 lg:pb-8">
+      {/* Header Buttons */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 pt-4">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
-            <ClipboardList className="h-6 w-6 text-emerald-400" />
+          <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
+            <ClipboardList className="h-5 w-5 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">RG Digital</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boletim de Reconhecimento Geográfico</p>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">RG Digital</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reconhecimento Geográfico</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button 
             variant="outline" 
-            className="h-11 px-6 rounded-xl bg-white border-2 border-slate-100 shadow-sm font-black text-[11px] uppercase tracking-widest gap-2 hover:bg-slate-50 transition-all"
+            className="flex-1 sm:flex-none h-10 rounded-lg bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
             onClick={handleExportPDF}
           >
             <Printer className="h-4 w-4 text-emerald-600" />
-            PDF Oficial
+            PDF
           </Button>
-          <RGImportByPhoto onImportComplete={fetchInitialData} />
+          <div className="flex-1 sm:flex-none">
+            <RGImportByPhoto onImportComplete={fetchInitialData} />
+          </div>
           <Button 
             variant="outline" 
-            className="h-11 px-6 rounded-xl bg-white border-2 border-slate-100 shadow-sm font-black text-[11px] uppercase tracking-widest gap-2 hover:bg-slate-50 transition-all"
+            className="flex-1 sm:flex-none h-10 rounded-lg bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
             onClick={() => navigate({ to: '/field-work-list' })}
           >
             <HistoryIcon className="h-4 w-4 text-slate-400" />
@@ -344,217 +313,83 @@ function RGPage() {
         </div>
       </div>
 
-      <div className="px-4 lg:px-6 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Step 1: Header / Territory Info */}
-        <div className={cn("space-y-4", currentStep !== 1 && "hidden lg:block")}>
-          <div className="flex items-center justify-between lg:hidden">
-            <h2 className="text-lg font-black text-slate-900 uppercase">1. Dados do Quarteirão</h2>
-            <Target className="h-5 w-5 text-emerald-500" />
+      {/* Official Form Style Container */}
+      <div className="px-4 space-y-4">
+        <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
+          <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
+          
+          <div className="p-0 overflow-x-auto">
+            <RGBulletinTable 
+              properties={filteredProperties} 
+              onEdit={handlePropertyClick}
+              onDelete={handleDeleteProperty}
+            />
           </div>
           
-          <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-            <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
-            
-            <div className="p-4 lg:p-6 bg-slate-50/50 border-t border-slate-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Logradouro Principal</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
-                    <Input 
-                      placeholder="Nome da rua para auto-preenchimento..."
-                      className="h-12 pl-11 rounded-2xl border-none bg-white shadow-sm font-bold text-slate-900"
-                      value={bulletinHeader.localidade}
-                      onChange={(e) => handleHeaderChange("localidade", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-end lg:hidden">
-                  <Button 
-                    className="w-full h-14 rounded-2xl bg-slate-900 text-emerald-400 font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 gap-2"
-                    onClick={() => setCurrentStep(2)}
-                  >
-                    Iniciar Cadastro
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+          <RGBulletinFooter stats={stats} />
+        </Card>
 
-        {/* Step 2: Properties Registry */}
-        <div className={cn("space-y-4", currentStep !== 2 && "hidden lg:block")}>
-          <div className="flex items-center justify-between lg:hidden">
-            <h2 className="text-lg font-black text-slate-900 uppercase">2. Cadastro de Imóveis</h2>
-            <div className="flex items-center gap-2">
-              <RGImportByPhoto onImportComplete={fetchInitialData} className="h-10 w-10 p-0 rounded-full" showText={false} />
-            </div>
+        {/* Quick Add Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1">
+            <RGQuickAddForm 
+              onAdd={handleQuickAdd}
+              lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0}
+              defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""}
+              defaultSide={bulletinHeader.lado}
+            />
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-4 sticky top-6 self-start">
-              <RGQuickAddForm 
-                onAdd={handleQuickAdd}
-                lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0}
-                defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""}
-                defaultSide={bulletinHeader.lado}
-              />
-              
-              <div className="mt-4 hidden lg:block">
-                <Card className="border-none shadow-lg bg-white rounded-2xl p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtrar</h3>
-                    <Filter className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input 
-                        placeholder="Buscar rua/número..." 
-                        className="pl-10 h-10 rounded-xl border-slate-100 bg-slate-50 font-bold"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </Card>
+          
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            <Card className="border-none shadow-xl bg-white rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Filtrar Território</h3>
+                <Filter className="h-4 w-4 text-slate-400" />
               </div>
-            </div>
-            
-            <div className="lg:col-span-8 space-y-4">
-              <Card className="border-none shadow-xl rounded-2xl overflow-hidden bg-white min-h-[400px]">
-                <div className="p-0 overflow-x-auto scrollbar-hide">
-                  <RGBulletinTable 
-                    properties={filteredProperties} 
-                    onEdit={handlePropertyClick}
-                    onDelete={handleDeleteProperty}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[200px] relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="Buscar por rua ou número..." 
+                    className="pl-10 h-10 rounded-xl border-slate-100 bg-slate-50 font-bold"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-              </Card>
-
-              <div className="lg:hidden flex gap-3 mt-4">
-                <Button 
-                  variant="outline"
-                  className="flex-1 h-14 rounded-2xl border-2 border-slate-200 font-black text-[11px] uppercase tracking-widest"
-                  onClick={() => setCurrentStep(1)}
-                >
-                  Voltar
-                </Button>
-                <Button 
-                  className="flex-1 h-14 rounded-2xl bg-slate-900 text-emerald-400 font-black uppercase tracking-widest shadow-xl"
-                  onClick={() => setCurrentStep(3)}
-                >
-                  Finalizar
-                  <ChevronRight className="h-5 w-5 ml-1" />
-                </Button>
+                <Select value={blockFilter} onValueChange={setBlockFilter}>
+                  <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
+                    <SelectValue placeholder="Quarteirão" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-2xl">
+                    <SelectItem value="all">Todos Qtrs</SelectItem>
+                    {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
+                      <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3: Closing / Review */}
-        <div className={cn("space-y-6", currentStep !== 3 && "hidden lg:block")}>
-          <div className="flex items-center justify-between lg:hidden">
-            <h2 className="text-lg font-black text-slate-900 uppercase">3. Fechamento e Resumo</h2>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-50 flex flex-col items-center text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Residencial</p>
-              <p className="text-3xl font-black text-blue-600 leading-none">{stats.residence}</p>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-50 flex flex-col items-center text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Comercial</p>
-              <p className="text-3xl font-black text-purple-600 leading-none">{stats.commerce}</p>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-50 flex flex-col items-center text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">T. Baldio</p>
-              <p className="text-3xl font-black text-amber-600 leading-none">{stats.vacant_lot}</p>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-50 flex flex-col items-center text-center">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">P. Estratégico</p>
-              <p className="text-3xl font-black text-emerald-600 leading-none">{stats.strategic_point}</p>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-50 flex flex-col items-center text-center col-span-2 md:col-span-1 lg:col-span-1">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
-              <p className="text-3xl font-black text-slate-900 leading-none">{stats.total}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="border-none shadow-2xl rounded-[2.5rem] bg-slate-900 text-white p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                  <Printer className="h-7 w-7 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black uppercase tracking-tight">Gerar Boletim</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Documento Oficial PDF</p>
-                </div>
-              </div>
-              <p className="text-slate-300 text-sm mb-8 leading-relaxed font-medium">
-                O boletim será gerado seguindo o modelo oficial do Ministério da Saúde com todos os {stats.total} imóveis registrados no quarteirão {bulletinHeader.quarteirao}.
-              </p>
-              <Button 
-                className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all text-sm gap-2"
-                onClick={handleExportPDF}
-              >
-                <Printer className="h-5 w-5" />
-                Gerar PDF para Impressão
-              </Button>
             </Card>
 
-            <div className="space-y-4">
-              <Button 
-                variant="outline"
-                className="w-full h-16 rounded-2xl border-2 border-slate-200 bg-white font-black text-[12px] uppercase tracking-widest gap-2"
-                onClick={() => setCurrentStep(2)}
-              >
-                Revisar Imóveis
-              </Button>
-              <Button 
-                variant="outline"
-                className="w-full h-16 rounded-2xl border-2 border-slate-200 bg-white font-black text-[12px] uppercase tracking-widest gap-2"
-                onClick={() => navigate({ to: '/field-work-list' })}
-              >
-                <HistoryIcon className="h-5 w-5 text-slate-400" />
-                Ir para o Histórico
-              </Button>
-              <Button 
-                className="w-full h-16 rounded-2xl bg-slate-200 text-slate-600 font-black text-[12px] uppercase tracking-widest gap-2"
-                onClick={() => {
-                  toast.success("Rascunho salvo automaticamente!");
-                  navigate({ to: '/dashboard' });
-                }}
-              >
-                Sair e Salvar Rascunho
-              </Button>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Residencial</p>
+                <p className="text-2xl font-black text-blue-600">{stats.residence}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comercial</p>
+                <p className="text-2xl font-black text-purple-600">{stats.commerce}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">T. Baldio</p>
+                <p className="text-2xl font-black text-amber-600">{stats.vacant_lot}</p>
+              </div>
+              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">P. Estratégico</p>
+                <p className="text-2xl font-black text-emerald-600">{stats.strategic_point}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Floating Action Button (Mobile Only) */}
-      {currentStep === 2 && (
-        <div className="lg:hidden fixed bottom-6 right-6 z-50">
-          <Button 
-            className="h-16 w-16 rounded-full bg-slate-900 text-emerald-400 shadow-2xl flex items-center justify-center p-0 border-4 border-white"
-            onClick={() => {
-              const quickFormElement = document.getElementById('quick-add-form');
-              if (quickFormElement) {
-                quickFormElement.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
-          >
-            <Plus className="h-8 w-8" />
-          </Button>
-        </div>
-      )}
-
-      {/* Footer Stats - Final Review Step Only */}
-      <div className="hidden lg:block">
-        <RGBulletinFooter stats={stats} />
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

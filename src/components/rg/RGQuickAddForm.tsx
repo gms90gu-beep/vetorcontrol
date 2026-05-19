@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Plus, Target } from "lucide-react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PropertyType = "residence" | "commerce" | "vacant_lot" | "strategic_point" | "others";
@@ -37,7 +37,6 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
   const [street, setStreet] = useState(defaultStreet);
   const [side, setSide] = useState(defaultSide);
   const [sequence, setSequence] = useState(lastSequence + 1);
-  const numberInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setStreet(defaultStreet);
@@ -64,100 +63,79 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
     setComplement("");
     setInhabitants(0);
     setSequence(prev => prev + 1);
-    
-    // Auto-focus the number input for the next property
-    setTimeout(() => {
-      numberInputRef.current?.focus();
-    }, 100);
   };
 
   return (
-    <form 
-      id="quick-add-form"
-      onSubmit={handleSubmit} 
-      className="bg-slate-900 p-6 rounded-[2.5rem] shadow-2xl flex flex-col gap-5 text-white border-4 border-slate-800"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <Target className="h-4 w-4 text-emerald-400" />
-          </div>
-          <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400">Rápido: Adicionar Imóvel</h3>
-        </div>
-        <div className="bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
-          <span className="text-[10px] font-black text-slate-400 uppercase">Seq: {sequence}</span>
-        </div>
+    <form onSubmit={handleSubmit} className="bg-slate-900 p-4 rounded-xl shadow-2xl flex flex-col gap-4 text-white">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Rápido: Adicionar Imóvel</h3>
+        <span className="text-[10px] font-black text-slate-500 uppercase">Seq: {sequence}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Rua/Logradouro</Label>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Rua</Label>
           <Input 
             value={street} 
             onChange={(e) => setStreet(e.target.value)}
-            className="h-12 bg-slate-800 border-none text-[12px] font-bold focus-visible:ring-emerald-500 rounded-2xl"
+            className="h-9 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500"
             placeholder="Nome da Rua"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Lado</Label>
+        <div className="space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Lado</Label>
           <Input 
             value={side} 
             onChange={(e) => setSide(e.target.value)}
-            className="h-12 bg-slate-800 border-none text-[12px] font-black focus-visible:ring-emerald-500 text-center rounded-2xl"
+            className="h-9 bg-slate-800 border-none text-[11px] font-black focus-visible:ring-emerald-500 text-center"
             placeholder="Lado"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
-        <div className="col-span-2 space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Número</Label>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="col-span-1 space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Nº</Label>
           <Input 
-            ref={numberInputRef}
             value={number} 
             onChange={(e) => setNumber(e.target.value)}
-            className="h-14 bg-slate-800 border-none text-2xl font-black focus-visible:ring-emerald-500 text-center rounded-2xl"
+            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center"
             placeholder="0"
             inputMode="numeric"
           />
         </div>
-        <div className="col-span-2 space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Comp.</Label>
+        <div className="col-span-1 space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Comp.</Label>
           <Input 
             value={complement} 
             onChange={(e) => setComplement(e.target.value)}
-            className="h-14 bg-slate-800 border-none text-lg font-bold focus-visible:ring-emerald-500 text-center rounded-2xl uppercase"
+            className="h-10 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500"
             placeholder="A, B..."
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Tipo Imóvel</Label>
+        <div className="col-span-1 space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Tipo</Label>
           <Select value={type} onValueChange={(v: PropertyType) => setType(v)}>
-            <SelectTrigger className="h-14 bg-slate-800 border-none text-xs font-black focus:ring-emerald-500 rounded-2xl uppercase">
+            <SelectTrigger className="h-10 bg-slate-800 border-none text-[11px] font-black focus:ring-emerald-500">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-slate-900 border-slate-800 text-white font-bold rounded-2xl">
-              <SelectItem value="residence">Residencial</SelectItem>
-              <SelectItem value="commerce">Comercial</SelectItem>
-              <SelectItem value="vacant_lot">Terreno Baldio</SelectItem>
-              <SelectItem value="strategic_point">Ponto Estratégico</SelectItem>
-              <SelectItem value="others">Outros</SelectItem>
+            <SelectContent className="bg-slate-900 border-slate-800 text-white font-bold">
+              <SelectItem value="residence">R</SelectItem>
+              <SelectItem value="commerce">C</SelectItem>
+              <SelectItem value="vacant_lot">TB</SelectItem>
+              <SelectItem value="strategic_point">PE</SelectItem>
+              <SelectItem value="others">O</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500 ml-1">Habitantes</Label>
+        <div className="col-span-1 space-y-1">
+          <Label className="text-[8px] font-black uppercase text-slate-400">Hab.</Label>
           <Input 
             type="number"
             value={inhabitants} 
             onChange={(e) => setInhabitants(parseInt(e.target.value) || 0)}
-            className="h-14 bg-slate-800 border-none text-2xl font-black focus-visible:ring-emerald-500 text-center rounded-2xl"
+            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center"
             placeholder="0"
-            inputMode="numeric"
           />
         </div>
       </div>
@@ -166,12 +144,12 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
         type="submit"
         disabled={!number}
         className={cn(
-          "w-full h-16 rounded-2xl font-black uppercase tracking-widest text-xs gap-2 transition-all mt-2",
-          number ? "bg-emerald-500 hover:bg-emerald-400 text-slate-900 shadow-xl shadow-emerald-500/20" : "bg-slate-800 text-slate-600"
+          "w-full h-12 rounded-lg font-black uppercase tracking-widest text-[11px] gap-2 transition-all",
+          number ? "bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20" : "bg-slate-800 text-slate-500"
         )}
       >
-        <Plus className="h-6 w-6" />
-        Salvar Imóvel
+        <Plus className="h-5 w-5" />
+        Adicionar Imóvel
       </Button>
     </form>
   );
