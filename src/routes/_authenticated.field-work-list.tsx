@@ -46,23 +46,12 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   component: FieldWorkListPage,
 });
 
-
 function FieldWorkListPage() {
-  return (
-    <ErrorBoundary>
-      <FieldWorkListContent />
-    </ErrorBoundary>
-  );
-}
-
-function FieldWorkListContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -170,22 +159,20 @@ function FieldWorkListContent() {
           .order("number", { ascending: true });
         
         if (props) {
-          const normalizedProps = (props || []).map(p => {
-            const visitsArray = Array.isArray(p.visits) ? p.visits : [];
-            const latestVisit = visitsArray.length > 0 
-              ? [...visitsArray].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
+          const normalizedProps = props.map(p => {
+            const latestVisit = p.visits && p.visits.length > 0 
+              ? p.visits.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
             
             return {
               ...p,
               status: latestVisit?.status || "not_visited",
-              has_focus: latestVisit?.has_focus || (Array.isArray(latestVisit?.visit_deposits) && latestVisit.visit_deposits.some((d: any) => d.is_positive)) || false,
-              treatment_applied: latestVisit?.treatment_applied || (Array.isArray(latestVisit?.visit_deposits) && latestVisit.visit_deposits.some((d: any) => d.is_treated)) || false,
+              has_focus: latestVisit?.has_focus || latestVisit?.visit_deposits?.some((d: any) => d.is_positive) || false,
+              treatment_applied: latestVisit?.treatment_applied || latestVisit?.visit_deposits?.some((d: any) => d.is_treated) || false,
               is_pending: latestVisit?.activity_type === 'pending' || latestVisit?.status === 'closed' || latestVisit?.status === 'refused',
               latest_visit: latestVisit
             };
           });
-
           setProperties(normalizedProps);
         }
       }
@@ -196,16 +183,15 @@ function FieldWorkListContent() {
     }
   };
 
-  const filteredProperties = (properties || []).filter(p => {
-    const matchesSearch = (p?.number || "").includes(searchQuery) || (p?.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  const filteredProperties = properties.filter(p => {
+    const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     if (filter === "all") return matchesSearch;
-    if (filter === "completed") return matchesSearch && (p?.status === "visited" || p?.status === "closed" || p?.status === "refused" || p?.status === "abandoned");
-    if (filter === "pending") return matchesSearch && (p?.status === "not_visited" || p?.status === "closed" || p?.status === "refused");
-    if (filter === "focus") return matchesSearch && p?.has_focus;
-    if (filter === "survey") return matchesSearch && p?.latest_visit?.activity_type === 'infestation_survey';
+    if (filter === "completed") return matchesSearch && (p.status === "visited" || p.status === "closed" || p.status === "refused" || p.status === "abandoned");
+    if (filter === "pending") return matchesSearch && (p.status === "not_visited" || p.status === "closed" || p.status === "refused");
+    if (filter === "focus") return matchesSearch && p.has_focus;
+    if (filter === "survey") return matchesSearch && p.latest_visit?.activity_type === 'infestation_survey';
     return matchesSearch;
   });
-
 
   const generatePDF = () => {
     const doc = new jsPDF();
@@ -243,7 +229,7 @@ function FieldWorkListContent() {
     doc.setFontSize(16);
     doc.text("Boletim Diário de Visitas", 14, 95);
 
-    const tableData = (properties || []).map(p => {
+    const tableData = properties.map(p => {
       const treatmentInfo = p.latest_visit?.treatment_applied 
         ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
         : "Não";
@@ -280,17 +266,15 @@ function FieldWorkListContent() {
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 
-  const workedCount = (properties || []).filter(p => p?.status !== "not_visited" && p?.status).length;
-  const closedCount = (properties || []).filter(p => p?.status === "closed").length;
-  const refusedCount = (properties || []).filter(p => p?.status === "refused").length;
-  const focusCount = (properties || []).filter(p => p?.has_focus).length;
-  const treatedCount = (properties || []).filter(p => p?.treatment_applied).length;
-  const treatedDepositsCount = (properties || []).reduce((acc, p) => acc + (p?.latest_visit?.treated_deposits || 0), 0);
-  const larvicideUsed = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.treatment_amount) || 0), 0);
-  const eliminationCount = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.elimination_amount) || 0), 0);
-  const progressPercent = (properties || []).length > 0 ? Math.round((workedCount / (properties || []).length) * 100) : 0;
-
-
+  const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
+  const closedCount = properties.filter(p => p.status === "closed").length;
+  const refusedCount = properties.filter(p => p.status === "refused").length;
+  const focusCount = properties.filter(p => p.has_focus).length;
+  const treatedCount = properties.filter(p => p.treatment_applied).length;
+  const treatedDepositsCount = properties.reduce((acc, p) => acc + (p.latest_visit?.treated_deposits || 0), 0);
+  const larvicideUsed = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.treatment_amount) || 0), 0);
+  const eliminationCount = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.elimination_amount) || 0), 0);
+  const progressPercent = properties.length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
 
   return (
     <LandscapeBulletinLayout
@@ -601,11 +585,7 @@ function FieldWorkListContent() {
                       return;
                     }
                     setIsModalOpen(false);
-                    if (selectedProperty?.id) {
-                      navigate({ to: '/property/$propertyId', params: { propertyId: selectedProperty.id } });
-                    } else {
-                      toast.error("Erro: Identificador do imóvel não encontrado.");
-                    }
+                    navigate({ to: `/property/${selectedProperty?.id}` });
                   }}
                   disabled={isLocked}
                 >

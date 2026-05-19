@@ -30,8 +30,6 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -44,42 +42,8 @@ const DEPOSIT_TYPES = [
 ];
 
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
-  component: () => (
-    <ErrorBoundary>
-      <PropertyVisitPage />
-    </ErrorBoundary>
-  ),
-  errorComponent: ({ error, reset }) => {
-    console.error("Route error:", error);
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center gap-6">
-        <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
-          <AlertCircle className="h-10 w-10 text-red-500" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-black tracking-tighter text-slate-800">Erro na Tela de Visita</h3>
-          <p className="text-sm text-slate-500 font-medium max-w-xs mx-auto">
-            Ocorreu um erro ao carregar esta página. Tente recarregar ou voltar à lista.
-          </p>
-          {process.env.NODE_ENV === 'development' && (
-            <pre className="mt-4 p-4 bg-slate-50 rounded-xl text-left text-[10px] text-red-600 overflow-auto max-w-full">
-              {error.message}
-            </pre>
-          )}
-        </div>
-        <div className="flex gap-3 w-full max-w-xs">
-          <Button variant="outline" onClick={() => window.location.href = "/field-work-list"} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
-            Voltar
-          </Button>
-          <Button onClick={() => reset()} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
-            Recarregar
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  component: PropertyVisitPage,
 });
-
 
 function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
   return (
@@ -108,8 +72,7 @@ function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (
 }
 
 function PropertyVisitPage() {
-  const params = useParams({ strict: false }) as any;
-  const propertyId = params.propertyId;
+  const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
   const [status, setStatus] = useState<string>("visited");
   const [activity, setActivity] = useState<string>("routine");
@@ -148,14 +111,9 @@ function PropertyVisitPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error: agentError } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
-      if (agentError) {
-        console.error("Error fetching agent data:", agentError);
-        return;
-      }
+      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (data) setAgent(data);
     } catch (e) { console.error(e); }
-
   }
 
   async function fetchDailyStats() {
@@ -509,8 +467,8 @@ function PropertyVisitPage() {
     }
   }, [activity, deposits.length]);
 
-  const updateDeposit = (id: string | number, field: string, value: any) => {
-    setDeposits(prev => (prev || []).map(d => {
+  const updateDeposit = (id: number, field: string, value: any) => {
+    setDeposits(deposits.map(d => {
       if (d.id === id) {
         const updated = { ...d, [field]: value };
         // Auto-select if quantity > 0 or any action is checked
@@ -522,8 +480,8 @@ function PropertyVisitPage() {
     }));
   };
 
-  const surveySummary = (deposits || []).reduce((acc, d) => {
-    if (!d || !d.selected) return acc;
+  const surveySummary = deposits.reduce((acc, d) => {
+    if (!d.selected) return acc;
     return {
       found: acc.found + (Number(d.quantity) || 0),
       positive: acc.positive + (d.positive ? 1 : 0),
@@ -541,51 +499,51 @@ function PropertyVisitPage() {
     );
   }
 
-  if (error || !property) {
-    if (isLandscape) {
-      return (
-        <LandscapeBulletinLayout
-          isLandscape={true}
-          title={`Quarteirão ${activeSession?.block_number || "--"}`}
-          subtitle={activeSession?.street_name || "--"}
-          agentInfo={{
-            name: agent?.name || "Agente",
-            municipality: agent?.municipality || "Município",
-            registrationId: agent?.registration_id || "0000",
-            cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
-            week: activeSession?.week_id?.substring(0, 2) || "--",
-            block: activeSession?.block_number || "--",
-            street: activeSession?.street_name || "--"
-          }}
-          stats={{
-            worked: dailyStats.worked,
-            total: activeSession?.property_count || 45,
-            closed: 0,
-            refused: 0,
-            focus: 0,
-            treated: 0,
-            treatedDeposits: routineData.treatedDeposits,
-            larvicideUsed: routineData.treatmentAmount,
-            eliminated: routineData.eliminationAmount,
-            progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
-          }}
-        >
-          <DigitalBulletinTable 
-            properties={blockProperties} 
-            onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
-            onStatusUpdate={() => {}}
-          />
-        </LandscapeBulletinLayout>
-      );
-    }
-
+  if (error) {
+  if (isLandscape) {
     return (
+      <LandscapeBulletinLayout
+        isLandscape={true}
+        title={`Quarteirão ${activeSession?.block_number || "--"}`}
+        subtitle={activeSession?.street_name || "--"}
+        agentInfo={{
+          name: agent?.name || "Agente",
+          municipality: agent?.municipality || "Município",
+          registrationId: agent?.registration_id || "0000",
+          cycle: activeSession?.cycle_id?.substring(0, 4) || "--",
+          week: activeSession?.week_id?.substring(0, 2) || "--",
+          block: activeSession?.block_number || "--",
+          street: activeSession?.street_name || "--"
+        }}
+        stats={{
+          worked: dailyStats.worked,
+          total: activeSession?.property_count || 45,
+          closed: 0,
+          refused: 0,
+          focus: 0,
+          treated: 0,
+          treatedDeposits: routineData.treatedDeposits,
+          larvicideUsed: routineData.treatmentAmount,
+          eliminated: routineData.eliminationAmount,
+          progress: Math.round((dailyStats.worked / (activeSession?.property_count || 45)) * 100)
+        }}
+      >
+        <DigitalBulletinTable 
+          properties={blockProperties} 
+          onPropertyClick={(p) => navigate({ to: `/property/${p.id}` })}
+          onStatusUpdate={() => {}}
+        />
+      </LandscapeBulletinLayout>
+    );
+  }
+
+  return (
       <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-6">
         <div className="h-20 w-20 bg-red-50 rounded-[2rem] flex items-center justify-center">
           <AlertCircle className="h-10 w-10 text-red-500" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error || "Imóvel não encontrado"}</h3>
+          <h3 className="text-xl font-black tracking-tighter text-slate-800">{error}</h3>
           <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações.</p>
         </div>
         <div className="flex gap-3 w-full max-w-xs">
@@ -600,7 +558,6 @@ function PropertyVisitPage() {
     );
   }
 
-
   const [nextProperty, setNextProperty] = useState<any>(null);
 
   useEffect(() => {
@@ -610,7 +567,6 @@ function PropertyVisitPage() {
   }, [property, activeSession]);
 
   async function fetchNextProperty() {
-    if (!property?.block_id || !property?.number) return;
     try {
       const { data: nextProp } = await supabase
         .from("properties")
@@ -624,7 +580,6 @@ function PropertyVisitPage() {
       setNextProperty(nextProp);
     } catch (e) { console.error(e); }
   }
-
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
