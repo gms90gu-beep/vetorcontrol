@@ -89,59 +89,46 @@ function DashboardPage() {
         // 5. Get Cycle Stats
         const { data: visits } = await supabase
           .from("visits")
-          .select("id, status")
+          .select("id, status, visit_date")
           .eq("cycle_id", cycle.id);
         
         if (visits) {
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+
+          const workedToday = visits.filter(v => new Date(v.visit_date) >= startOfToday).length;
+
           setStats({
             worked: visits.length,
             closed: visits.filter(v => v.status === 'closed').length,
             refused: visits.filter(v => v.status === 'refused').length,
           });
-        }
-      }
 
-      // 6. Get Active Session
-      const { data: session } = await supabase
-        .from("field_work_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (session) {
-        const { data: blockProps } = await supabase
-          .from("properties")
-          .select("id")
-          .eq("block_number", session.block_number);
-        
-        const workedCount = 0; // Fallback
-        let sessionProgress = 0;
+          if (session) {
+            const { data: blockProps } = await supabase
+              .from("properties")
+              .select("id")
+              .eq("block_number", session.block_number);
+            
+            let sessionProgress = 0;
+            if (blockProps && blockProps.length > 0) {
+              const sessionVisits = visits.filter(v => 
+                blockProps.some(p => p.id === (v as any).property_id)
+              );
+              sessionProgress = Math.round((sessionVisits.length / blockProps.length) * 100);
+              setBlockProgress(sessionProgress);
+            }
 
-        if (blockProps && blockProps.length > 0 && session.cycle_id) {
-          const { data: sessionVisits } = await supabase
-            .from("visits")
-            .select("id")
-            .eq("cycle_id", session.cycle_id)
-            .in("property_id", blockProps.map(p => p.id));
-          
-          if (sessionVisits) {
-            const count = sessionVisits.length;
-            sessionProgress = Math.round((count / blockProps.length) * 100);
-            setBlockProgress(sessionProgress);
+            setActiveSession({
+              ...session,
+              progress: sessionProgress,
+              worked_count: workedToday,
+              total_properties: blockProps?.length || 45,
+              daily_goal: 35,
+              start_time: new Date(session.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+            });
           }
         }
-
-        setActiveSession({
-          ...session,
-          progress: sessionProgress,
-          worked_count: stats.worked, // Simplified for UI
-          total_properties: coverageData?.total_properties || 120,
-          daily_goal: 35,
-          start_time: new Date(session.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        });
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
