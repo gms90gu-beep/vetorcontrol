@@ -192,7 +192,8 @@ function DashboardPage() {
           blockProgress={blockProgress}
           onContinue={() => {
             console.log('Navegando para trabalho atual...');
-            navigate({ to: "/field-work" as any });
+            navigate({ to: "/field-work-list" as any });
+
           }}
           onRegister={() => {
             console.log('Navegando para registrar nova visita...');
