@@ -622,6 +622,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicles: {
+        Row: {
+          brand: string | null
+          color: string | null
+          created_at: string
+          id: string
+          license_plate: string
+          model: string | null
+          observations: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          color?: string | null
+          created_at?: string
+          id?: string
+          license_plate: string
+          model?: string | null
+          observations?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          color?: string | null
+          created_at?: string
+          id?: string
+          license_plate?: string
+          model?: string | null
+          observations?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       visit_deposits: {
         Row: {
           description: string | null
