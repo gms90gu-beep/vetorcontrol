@@ -145,9 +145,9 @@ function RGPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
-  async function fetchProperties() {
+  const fetchProperties = async () => {
     const { data, error } = await supabase
       .from("properties")
       .select("*")
