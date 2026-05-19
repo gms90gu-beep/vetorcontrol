@@ -46,10 +46,17 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
-  component: FieldWorkListPage,
+  component: () => (
+    <ErrorBoundary>
+      <FieldWorkListPage />
+    </ErrorBoundary>
+  ),
 });
+
 
 function FieldWorkListPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -231,7 +238,7 @@ function FieldWorkListPage() {
     doc.setFontSize(16);
     doc.text("Boletim Diário de Visitas", 14, 95);
 
-    const tableData = properties.map(p => {
+    const tableData = (properties || []).map(p => {
       const treatmentInfo = p.latest_visit?.treatment_applied 
         ? `${p.latest_visit.treatment_amount}${p.latest_visit.larvicide_unit === 'gramas' ? 'g' : p.latest_visit.larvicide_unit === 'ml' ? 'ml' : ' un'}`
         : "Não";
@@ -276,7 +283,8 @@ function FieldWorkListPage() {
   const treatedDepositsCount = (properties || []).reduce((acc, p) => acc + (p?.latest_visit?.treated_deposits || 0), 0);
   const larvicideUsed = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.treatment_amount) || 0), 0);
   const eliminationCount = (properties || []).reduce((acc, p) => acc + (Number(p?.latest_visit?.elimination_amount) || 0), 0);
-  const progressPercent = (properties || []).length > 0 ? Math.round((workedCount / properties.length) * 100) : 0;
+  const progressPercent = (properties || []).length > 0 ? Math.round((workedCount / (properties || []).length) * 100) : 0;
+
 
 
   return (

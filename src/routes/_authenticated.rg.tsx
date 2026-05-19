@@ -388,7 +388,7 @@ function RGPage() {
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl border-none shadow-2xl">
                   <SelectItem value="all" className="font-bold">Todos</SelectItem>
-                  {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
+                  {(properties || []).map(p => p.block_number).filter(Boolean).reduce((acc: string[], curr) => acc.includes(curr!) ? acc : [...acc, curr!], []).map(block => (
                     <SelectItem key={block} value={block!} className="font-bold">Qtr {block}</SelectItem>
                   ))}
                 </SelectContent>

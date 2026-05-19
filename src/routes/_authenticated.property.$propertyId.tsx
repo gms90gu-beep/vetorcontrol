@@ -30,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -42,8 +44,13 @@ const DEPOSIT_TYPES = [
 ];
 
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
-  component: PropertyVisitPage,
+  component: () => (
+    <ErrorBoundary>
+      <PropertyVisitPage />
+    </ErrorBoundary>
+  ),
 });
+
 
 function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (v: boolean) => void, label: string }) {
   return (
@@ -111,9 +118,14 @@ function PropertyVisitPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      const { data, error: agentError } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
+      if (agentError) {
+        console.error("Error fetching agent data:", agentError);
+        return;
+      }
       if (data) setAgent(data);
     } catch (e) { console.error(e); }
+
   }
 
   async function fetchDailyStats() {
@@ -568,6 +580,7 @@ function PropertyVisitPage() {
   }, [property, activeSession]);
 
   async function fetchNextProperty() {
+    if (!property?.block_id || !property?.number) return;
     try {
       const { data: nextProp } = await supabase
         .from("properties")
@@ -581,6 +594,7 @@ function PropertyVisitPage() {
       setNextProperty(nextProp);
     } catch (e) { console.error(e); }
   }
+
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
