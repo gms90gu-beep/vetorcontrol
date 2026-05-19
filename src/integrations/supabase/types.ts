@@ -357,6 +357,7 @@ export type Database = {
           created_at: string
           had_previous_focus: boolean | null
           id: string
+          inhabitants: number | null
           is_abandoned: boolean | null
           is_frequently_closed: boolean | null
           latitude: number | null
@@ -365,6 +366,8 @@ export type Database = {
           number: string
           observations: string | null
           reference: string | null
+          sequence: number | null
+          side: string | null
           status: Database["public"]["Enums"]["property_status"] | null
           street_id: string | null
           street_name: string | null
@@ -379,6 +382,7 @@ export type Database = {
           created_at?: string
           had_previous_focus?: boolean | null
           id?: string
+          inhabitants?: number | null
           is_abandoned?: boolean | null
           is_frequently_closed?: boolean | null
           latitude?: number | null
@@ -387,6 +391,8 @@ export type Database = {
           number: string
           observations?: string | null
           reference?: string | null
+          sequence?: number | null
+          side?: string | null
           status?: Database["public"]["Enums"]["property_status"] | null
           street_id?: string | null
           street_name?: string | null
@@ -401,6 +407,7 @@ export type Database = {
           created_at?: string
           had_previous_focus?: boolean | null
           id?: string
+          inhabitants?: number | null
           is_abandoned?: boolean | null
           is_frequently_closed?: boolean | null
           latitude?: number | null
@@ -409,6 +416,8 @@ export type Database = {
           number?: string
           observations?: string | null
           reference?: string | null
+          sequence?: number | null
+          side?: string | null
           status?: Database["public"]["Enums"]["property_status"] | null
           street_id?: string | null
           street_name?: string | null
