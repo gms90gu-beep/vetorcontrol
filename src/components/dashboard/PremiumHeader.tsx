@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   MapPin, 
   User as UserIcon, 
-  Sync, 
   Clock, 
   CheckCircle2, 
   TrendingUp,
