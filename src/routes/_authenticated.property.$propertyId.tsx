@@ -98,6 +98,7 @@ function PropertyVisitPage() {
   const [error, setError] = useState<string | null>(null);
   const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
   const [blockProperties, setBlockProperties] = useState<any[]>([]);
+  const [nextProperty, setNextProperty] = useState<any>(null);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
 
@@ -106,6 +107,12 @@ function PropertyVisitPage() {
     fetchDailyStats();
     fetchAgentData();
   }, [propertyId]);
+
+  useEffect(() => {
+    if (property && activeSession) {
+      fetchNextProperty();
+    }
+  }, [property, activeSession]);
 
   async function fetchAgentData() {
     try {
@@ -558,13 +565,6 @@ function PropertyVisitPage() {
     );
   }
 
-  const [nextProperty, setNextProperty] = useState<any>(null);
-
-  useEffect(() => {
-    if (property && activeSession) {
-      fetchNextProperty();
-    }
-  }, [property, activeSession]);
 
   async function fetchNextProperty() {
     try {
