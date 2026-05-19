@@ -90,7 +90,7 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
             </TableRow>
           </TableHeader>
           <TableBody>
-            {properties.map((prop) => (
+            {(properties || []).map((prop) => (
               <TableRow 
                 key={prop.id} 
                 className="group hover:bg-blue-50/30 cursor-pointer border-slate-50 transition-colors"
