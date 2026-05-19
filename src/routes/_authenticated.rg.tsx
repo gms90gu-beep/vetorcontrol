@@ -43,7 +43,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { RGBulletinHeader } from "@/components/rg/RGBulletinHeader";
-import { RGBulletinTable } from "@/components/rg/RGBulletinTable";
+import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable";
 import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
@@ -52,28 +52,6 @@ export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
 });
 
-type Property = {
-  id: string;
-  number: string;
-  complement: string | null;
-  type: "residence" | "commerce" | "vacant_lot" | "strategic_point" | "others";
-  street_name: string | null;
-  neighborhood: string | null;
-  block_number: string | null;
-  reference: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  container_count: number | null;
-  observations: string | null;
-  is_abandoned: boolean | null;
-  is_frequently_closed: boolean | null;
-  had_previous_focus: boolean | null;
-  status: "active" | "pending" | "deactivated" | null;
-  user_id: string | null;
-  side: string | null;
-  sequence: number | null;
-  inhabitants: number | null;
-};
 
 function RGPage() {
   const [searchTerm, setSearchTerm] = useState("");
