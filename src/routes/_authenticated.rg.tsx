@@ -89,7 +89,7 @@ function RGPage() {
     fetchInitialData();
   }, []);
 
-  async function fetchInitialData() {
+  const fetchInitialData = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -145,9 +145,9 @@ function RGPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
-  async function fetchProperties() {
+  const fetchProperties = async () => {
     const { data, error } = await supabase
       .from("properties")
       .select("*")
@@ -157,7 +157,7 @@ function RGPage() {
 
     if (error) throw error;
     setProperties(data as Property[]);
-  }
+  };
 
   const handleBlockSelect = (block: Block) => {
     setSelectedBlock(block);
