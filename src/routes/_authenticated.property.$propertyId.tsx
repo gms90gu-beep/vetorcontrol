@@ -509,8 +509,8 @@ function PropertyVisitPage() {
     }
   }, [activity, deposits.length]);
 
-  const updateDeposit = (id: number, field: string, value: any) => {
-    setDeposits(deposits.map(d => {
+  const updateDeposit = (id: string | number, field: string, value: any) => {
+    setDeposits(prev => (prev || []).map(d => {
       if (d.id === id) {
         const updated = { ...d, [field]: value };
         // Auto-select if quantity > 0 or any action is checked
