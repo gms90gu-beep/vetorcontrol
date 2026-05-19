@@ -15,8 +15,7 @@ import {
   Save,
   Trash2,
   LayoutDashboard,
-  ClipboardList,
-  ArrowLeft
+  ClipboardList
 } from "lucide-react";
 import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
@@ -48,20 +47,17 @@ import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable"
 import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
-import { RGPropertyForm } from "@/components/rg/RGPropertyForm";
-import { RGBlockList, type Block } from "@/components/rg/RGBlockList";
 
 export const Route = createFileRoute("/_authenticated/rg")({
   component: RGPage,
 });
+
 
 function RGPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [blockFilter, setBlockFilter] = useState("all");
   const [properties, setProperties] = useState<Property[]>([]);
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
@@ -89,7 +85,7 @@ function RGPage() {
     fetchInitialData();
   }, []);
 
-  const fetchInitialData = async () => {
+  async function fetchInitialData() {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -105,20 +101,6 @@ function RGPage() {
         }));
       }
 
-      const { data: blocksData } = await supabase
-        .from("blocks")
-        .select(`
-          *,
-          subareas (
-            name
-          )
-        `)
-        .order("number", { ascending: true });
-      
-      if (blocksData) {
-        setBlocks(blocksData as Block[]);
-      }
-
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -130,6 +112,11 @@ function RGPage() {
       
       if (session) {
         setActiveSession(session);
+        setBlockFilter(session.block_number || "all");
+        setBulletinHeader(prev => ({
+          ...prev,
+          quarteirao: session.block_number || ""
+        }));
       }
 
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
@@ -139,47 +126,21 @@ function RGPage() {
         if (week) setActiveWeek(week);
       }
 
-      await fetchProperties();
+      const { data, error } = await supabase
+        .from("properties")
+        .select("*")
+        .order("sequence", { ascending: true })
+        .order("street_name", { ascending: true })
+        .order("number", { ascending: true });
+
+      if (error) throw error;
+      setProperties(data as Property[]);
     } catch (error: any) {
       toast.error("Erro ao carregar dados: " + error.message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fetchProperties = async () => {
-    const { data, error } = await supabase
-      .from("properties")
-      .select("*")
-      .order("sequence", { ascending: true })
-      .order("street_name", { ascending: true })
-      .order("number", { ascending: true });
-
-    if (error) throw error;
-    setProperties(data as Property[]);
-  };
-
-  const handleBlockSelect = (block: Block) => {
-    setSelectedBlock(block);
-    setBlockFilter(block.number);
-    setBulletinHeader(prev => ({
-      ...prev,
-      quarteirao: block.number,
-      localidade: block.subareas?.name || prev.localidade
-    }));
-    setCurrentStep(1);
-  };
-
-  const handleNewBlock = () => {
-    setSelectedBlock({ id: 'new', number: '' } as Block);
-    setBulletinHeader(prev => ({
-      ...prev,
-      quarteirao: '',
-      localidade: ''
-    }));
-    setBlockFilter('all');
-    setCurrentStep(1);
-  };
+  }
 
   const filteredProperties = useMemo(() => {
     return properties.filter(p => {
@@ -321,64 +282,28 @@ function RGPage() {
     setEditingProperty(null);
   };
 
-  if (!selectedBlock) {
-    return (
-      <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8">
-        <div className="px-4 lg:px-6 py-8 space-y-8 max-w-7xl mx-auto w-full">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <div className="h-14 w-14 rounded-[1.5rem] bg-slate-900 flex items-center justify-center shadow-xl">
-                 <LayoutDashboard className="h-7 w-7 text-emerald-400" />
-               </div>
-               <div>
-                 <h1 className="text-3xl font-black tracking-tighter text-slate-900 uppercase leading-none mb-1">Meus Quarteirões</h1>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Selecione um quarteirão para o RG</p>
-               </div>
-            </div>
-          </div>
-          <RGBlockList 
-            blocks={blocks} 
-            onSelect={handleBlockSelect} 
-            onNewBlock={handleNewBlock} 
-            isLoading={isLoading} 
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8 animate-in fade-in duration-500">
-      {/* Mobile Header with Back Button */}
+    <div className="flex flex-col min-h-screen bg-slate-50 pb-24 lg:pb-8">
+      {/* Mobile Step Progress Indicator */}
       <div className="lg:hidden sticky top-0 z-50 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-10 w-10 rounded-full bg-slate-50 text-slate-900"
-            onClick={() => setSelectedBlock(null)}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-              currentStep >= 1 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-            )}>1</div>
-            <div className="h-0.5 w-4 bg-slate-100" />
-            <div className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-              currentStep >= 2 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-            )}>2</div>
-            <div className="h-0.5 w-4 bg-slate-100" />
-            <div className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
-              currentStep >= 3 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
-            )}>3</div>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+            currentStep >= 1 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+          )}>1</div>
+          <div className="h-0.5 w-4 bg-slate-100" />
+          <div className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+            currentStep >= 2 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+          )}>2</div>
+          <div className="h-0.5 w-4 bg-slate-100" />
+          <div className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-black transition-all",
+            currentStep >= 3 ? "bg-slate-900 text-emerald-400" : "bg-slate-100 text-slate-400"
+          )}>3</div>
         </div>
         <div className="text-right">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">QTR {bulletinHeader.quarteirao}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Etapa {currentStep}</p>
           <p className="text-xs font-black text-slate-900 uppercase">
             {currentStep === 1 && "Cabeçalho"}
             {currentStep === 2 && "Imóveis"}
@@ -389,23 +314,13 @@ function RGPage() {
 
       {/* Header Buttons - Desktop only */}
       <div className="hidden lg:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-6 pt-6 mb-4">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-12 w-12 rounded-2xl bg-white border border-slate-100 shadow-sm text-slate-900 hover:bg-slate-50 transition-all"
-            onClick={() => setSelectedBlock(null)}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
-              <ClipboardList className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">RG: QTR {bulletinHeader.quarteirao}</h1>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{bulletinHeader.localidade || "Boletim de Reconhecimento Geográfico"}</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-xl">
+            <ClipboardList className="h-6 w-6 text-emerald-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">RG Digital</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Boletim de Reconhecimento Geográfico</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -418,6 +333,14 @@ function RGPage() {
             PDF Oficial
           </Button>
           <RGImportByPhoto onImportComplete={fetchInitialData} />
+          <Button 
+            variant="outline" 
+            className="h-11 px-6 rounded-xl bg-white border-2 border-slate-100 shadow-sm font-black text-[11px] uppercase tracking-widest gap-2 hover:bg-slate-50 transition-all"
+            onClick={() => navigate({ to: '/field-work-list' })}
+          >
+            <HistoryIcon className="h-4 w-4 text-slate-400" />
+            Histórico
+          </Button>
         </div>
       </div>
 
@@ -651,7 +574,7 @@ function RGPage() {
           </div>
           
           <ScrollArea className="max-h-[60vh] p-6">
-            <RGPropertyForm 
+            <PropertyForm 
               initialData={editingProperty} 
               onSave={handleSaveProperty} 
               onCancel={() => setIsFormOpen(false)}
@@ -660,5 +583,157 @@ function RGPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void }) {
+  const [formData, setFormData] = useState<Partial<Property>>(initialData || {
+    number: "",
+    complement: "",
+    type: "residence",
+    street_name: "",
+    side: "01",
+    sequence: 1,
+    inhabitants: 0,
+    status: "active"
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.number) {
+      toast.error("Número obrigatório");
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      const propertyToSave = {
+        number: formData.number || "",
+        complement: formData.complement || null,
+        type: formData.type || "residence",
+        street_name: formData.street_name || null,
+        side: formData.side || null,
+        sequence: formData.sequence || null,
+        inhabitants: formData.inhabitants || 0,
+        status: formData.status || "active",
+        user_id: user.id,
+        id: initialData?.id || undefined
+      };
+
+      const { data, error } = await supabase
+        .from("properties")
+        .upsert(propertyToSave)
+        .select()
+        .single();
+
+
+      if (error) throw error;
+      
+      onSave(data as Property);
+      toast.success(initialData ? "Atualizado!" : "Cadastrado!");
+    } catch (error: any) {
+      toast.error("Erro: " + error.message);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rua</Label>
+          <Input 
+            value={formData.street_name || ""} 
+            onChange={(e) => setFormData({...formData, street_name: e.target.value})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Lado</Label>
+          <Input 
+            value={formData.side || ""} 
+            onChange={(e) => setFormData({...formData, side: e.target.value})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Número</Label>
+          <Input 
+            value={formData.number} 
+            onChange={(e) => setFormData({...formData, number: e.target.value})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sequência</Label>
+          <Input 
+            type="number"
+            value={formData.sequence || ""} 
+            onChange={(e) => setFormData({...formData, sequence: parseInt(e.target.value)})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Complemento</Label>
+          <Input 
+            value={formData.complement || ""} 
+            onChange={(e) => setFormData({...formData, complement: e.target.value})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Habitantes</Label>
+          <Input 
+            type="number"
+            value={formData.inhabitants || 0} 
+            onChange={(e) => setFormData({...formData, inhabitants: parseInt(e.target.value)})}
+            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo de Imóvel</Label>
+        <Select 
+          value={formData.type} 
+          onValueChange={(val: any) => setFormData({...formData, type: val})}
+        >
+          <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50 font-bold">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-2xl border-none shadow-2xl">
+            <SelectItem value="residence" className="rounded-xl font-bold">Residencial</SelectItem>
+            <SelectItem value="commerce" className="rounded-xl font-bold">Comércio</SelectItem>
+            <SelectItem value="vacant_lot" className="rounded-xl font-bold">Terreno Baldio</SelectItem>
+            <SelectItem value="strategic_point" className="rounded-xl font-bold">Ponto Estratégico</SelectItem>
+            <SelectItem value="others" className="rounded-xl font-bold">Outros</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-3">
+        <Button 
+          type="button" 
+          variant="outline" 
+          className="flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest"
+          onClick={onCancel}
+        >
+          Cancelar
+        </Button>
+        <Button 
+          type="submit" 
+          className="flex-[2] h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
+        >
+          <Save className="h-4 w-4" /> Salvar
+        </Button>
+      </div>
+    </form>
   );
 }
