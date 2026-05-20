@@ -311,26 +311,26 @@ function RGPage() {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reconhecimento Geográfico</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <Button 
-            variant="outline" 
-            className="flex-1 sm:flex-none h-10 rounded-lg bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-            onClick={handleExportPDF}
-          >
-            <Printer className="h-4 w-4 text-emerald-600" />
-            PDF
-          </Button>
-          <div className="flex-1 sm:flex-none">
-            <RGImportByPhoto onImportComplete={fetchInitialData} />
+        <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[280px]">
+          <div className="flex items-center gap-2 w-full">
+            <Button 
+              variant="outline" 
+              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
+              onClick={handleExportPDF}
+            >
+              <Printer className="h-4 w-4 text-emerald-600" />
+              PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
+              onClick={() => navigate({ to: '/field-work-list' })}
+            >
+              <HistoryIcon className="h-4 w-4 text-slate-400" />
+              Histórico
+            </Button>
           </div>
-          <Button 
-            variant="outline" 
-            className="flex-1 sm:flex-none h-10 rounded-lg bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-            onClick={() => navigate({ to: '/field-work-list' })}
-          >
-            <HistoryIcon className="h-4 w-4 text-slate-400" />
-            Histórico
-          </Button>
+          <RGImportByPhoto onImportComplete={fetchInitialData} />
         </div>
       </div>
 
