@@ -33,20 +33,33 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function ActionCard({ title, description, icon: Icon, color, to, onClick, className }: any) {
+  // Extract border color and text color from the passed bg class
+  const colorMap: Record<string, { border: string, text: string, iconBg: string }> = {
+    "bg-emerald-500": { border: "border-emerald-500/20", text: "text-emerald-600", iconBg: "bg-emerald-500/10" },
+    "bg-blue-500": { border: "border-blue-500/20", text: "text-blue-600", iconBg: "bg-blue-500/10" },
+    "bg-indigo-600": { border: "border-indigo-600/20", text: "text-indigo-600", iconBg: "bg-indigo-600/10" },
+    "bg-red-500": { border: "border-red-500/20", text: "text-red-600", iconBg: "bg-red-500/10" },
+    "bg-slate-800": { border: "border-slate-800/20", text: "text-slate-800", iconBg: "bg-slate-800/10" },
+  };
+
+  const colors = colorMap[color] || { border: "border-border", text: "text-foreground", iconBg: "bg-accent/50" };
+
   const content = (
     <div className={cn(
-      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-xl hover:shadow-2xl border-none text-white relative overflow-hidden group",
-      color,
+      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 bg-white dark:bg-slate-950 group",
+      colors.border,
       className
     )}>
-      <div className="absolute -right-4 -top-4 bg-white/10 h-24 w-24 rounded-full blur-2xl group-hover:bg-white/20 transition-all duration-500" />
-      
-      <div className="bg-white/20 backdrop-blur-md p-3.5 rounded-2xl w-fit mb-5 group-hover:scale-110 transition-transform duration-500">
+      <div className={cn(
+        "p-3.5 rounded-2xl w-fit mb-5 group-hover:scale-110 transition-transform duration-500",
+        colors.iconBg,
+        colors.text
+      )}>
         <Icon className="h-6 w-6" />
       </div>
       <div className="relative z-10">
-        <h3 className="text-xl font-black leading-tight mb-1 tracking-tight">{title}</h3>
-        <p className="text-[10px] text-white/90 font-bold uppercase tracking-wider leading-relaxed">{description}</p>
+        <h3 className={cn("text-xl font-black leading-tight mb-1 tracking-tight", colors.text)}>{title}</h3>
+        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider leading-relaxed">{description}</p>
       </div>
     </div>
   );
