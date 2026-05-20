@@ -4,7 +4,7 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, Filter } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, Filter, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
@@ -76,14 +76,10 @@ export function ReportsDashboard() {
       setKpiData({ worked, coverage, focus, treated, productivity });
 
       // Process Production Chart (by status)
-      const productionByWeek = [
-        { name: 'Semana 1', trabalhados: 45, fechados: 5 },
-        { name: 'Semana 2', trabalhados: 52, fechados: 8 },
-        { name: 'Semana 3', trabalhados: 48, fechados: 4 },
-        { name: 'Semana 4', trabalhados: 61, fechados: 12 },
-      ];
+      // Real implementation would group visits by week
+      const productionByWeek: any[] = [];
 
-      // Process Deposits (mocking distribution)
+      // Process Deposits
       const depositCounts: Record<string, number> = {};
       visits.forEach(v => {
         v.visit_deposits?.forEach((d: any) => {
@@ -92,27 +88,28 @@ export function ReportsDashboard() {
       });
 
       const deposits = Object.entries(depositCounts).map(([name, value]) => ({ name, value }));
-      if (deposits.length === 0) {
-        deposits.push(
-          { name: 'A1', value: 35 },
-          { name: 'B', value: 25 },
-          { name: 'C', value: 15 },
-          { name: 'D1', value: 20 },
-          { name: 'E', value: 5 }
-        );
-      }
 
-      // Process Coverage (Mock)
+      // Process Coverage
       const coverageMock = [
         { name: 'Visitados', value: coverage },
-        { name: 'Pendente', value: 100 - coverage }
+        { name: 'Pendente', value: Math.max(0, 100 - coverage) }
       ];
 
-      // Process Evolution (Mock)
-      const evolution = Array.from({ length: 14 }).map((_, i) => ({
-        date: format(subDays(new Date(), 13 - i), 'dd/MM'),
-        visitas: Math.floor(Math.random() * 40) + 10
-      }));
+      // Process Evolution
+      const evolution: any[] = [];
+      // If we have visits, we could group them by day
+      if (visits.length > 0) {
+        const visitsByDate: Record<string, number> = {};
+        visits.forEach(v => {
+          const date = format(new Date(v.visit_date), 'dd/MM');
+          visitsByDate[date] = (visitsByDate[date] || 0) + 1;
+        });
+        
+        Object.entries(visitsByDate).forEach(([date, count]) => {
+          evolution.push({ date, visitas: count });
+        });
+        evolution.sort((a, b) => a.date.localeCompare(b.date));
+      }
 
       setChartData({
         production: productionByWeek,
@@ -191,25 +188,27 @@ export function ReportsDashboard() {
           <Button variant="ghost" className="text-blue-600 font-bold text-xs">Ver todos</Button>
         </div>
         <div className="space-y-4">
-          {[
-            { name: "Carlos Silva", visits: 245, coverage: 98 },
-            { name: "Maria Oliveira", visits: 232, coverage: 95 },
-            { name: "João Santos", visits: 210, coverage: 89 }
-          ].map((agent, i) => (
+          {chartData.production.length > 0 ? chartData.production.slice(0, 3).map((agent: any, i) => (
             <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
                 <div>
-                  <h4 className="font-bold text-slate-800 text-sm">{agent.name}</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.visits} visitas</p>
+                  <h4 className="font-bold text-slate-800 text-sm">{agent.name || "Agente"}</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.visits || 0} visitas</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-black text-emerald-600">{agent.coverage}%</p>
+                <p className="text-sm font-black text-emerald-600">{agent.coverage || 0}%</p>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cobertura</p>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <BarChart3 className="h-10 w-10 mb-3 opacity-20" />
+              <p className="text-xs font-black uppercase tracking-widest">Nenhum dado de produtividade disponível</p>
+              <p className="text-[10px] font-bold opacity-60 mt-1 uppercase">Os dados aparecerão assim que as visitas forem registradas</p>
+            </div>
+          )}
         </div>
       </div>
 
