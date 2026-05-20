@@ -676,7 +676,9 @@ function RGPage() {
   );
 }
 
-function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void }) {
+type PropertyFormProps = { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void };
+
+function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
   const [formData, setFormData] = useState<Partial<Property>>(initialData || {
     number: "",
     complement: "",
