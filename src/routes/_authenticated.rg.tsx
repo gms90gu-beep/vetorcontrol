@@ -390,6 +390,26 @@ function RGPage() {
     }
   };
 
+  const handleBack = () => {
+    if (isDirty) {
+      if (confirm("Deseja sair sem salvar as alterações do boletim?")) {
+        navigate({ to: "/dashboard" });
+      }
+    } else {
+      window.history.back();
+    }
+  };
+
+  const handleClose = () => {
+    if (isDirty) {
+      if (confirm("Deseja sair sem salvar as alterações do boletim?")) {
+        navigate({ to: "/dashboard" });
+      }
+    } else {
+      navigate({ to: "/dashboard" });
+    }
+  };
+
   const handlePropertyClick = (property: Property) => {
     setEditingProperty(property);
     setIsFormOpen(true);
