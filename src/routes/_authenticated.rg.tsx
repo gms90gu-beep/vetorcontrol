@@ -80,6 +80,7 @@ function RGPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [agent, setAgent] = useState<any>(null);
@@ -265,12 +266,9 @@ function RGPage() {
   const handleDeleteBlock = async () => {
     if (blockFilter === "all") return;
     
-    if (!window.confirm(`Atenção: Você está prestes a excluir o Quarteirão ${blockFilter} e todos os seus ${filteredProperties.length} imóveis. Esta ação não pode ser desfeita. Deseja continuar?`)) {
-      return;
-    }
-
     try {
       setIsLoading(true);
+      setIsDeleteDialogOpen(false);
       
       // Delete properties for this block
       const { error: propError } = await supabase
@@ -514,7 +512,7 @@ function RGPage() {
                       variant="ghost"
                       size="icon"
                       className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100"
-                      onClick={handleDeleteBlock}
+                      onClick={() => setIsDeleteDialogOpen(true)}
                       title="Excluir este quarteirão"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -546,6 +544,39 @@ function RGPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <AlertCircle className="h-6 w-6 text-red-500" />
+              Confirmar Exclusão
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <p className="text-slate-600 font-bold leading-relaxed">
+              Tem certeza que deseja excluir o <span className="text-red-600">Quarteirão {blockFilter}</span>? 
+              Esta ação não pode ser desfeita e todos os {filteredProperties.length} imóveis vinculados serão removidos.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button 
+                variant="outline" 
+                className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest border-slate-200"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest gap-2"
+                onClick={handleDeleteBlock}
+              >
+                <Trash2 className="h-4 w-4" />
+                Sim, Excluir e Salvar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
