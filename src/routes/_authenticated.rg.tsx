@@ -85,6 +85,7 @@ function RGPage() {
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
+  const [resetKey, setResetKey] = useState(0);
   const [bulletinHeader, setBulletinHeader] = useState({
     uf: "CE",
     municipio: "",
@@ -203,6 +204,24 @@ function RGPage() {
       setBlockFilter(value);
     }
   };
+
+  const handleResetForm = () => {
+    setBulletinHeader({
+      uf: "CE",
+      municipio: agent?.municipality || "",
+      localidade: "",
+      sublocal: "",
+      distrito: "",
+      categoria: "URBANA",
+      quarteirao: activeSession?.block_number || "",
+      sequencia: "01",
+      lado: "01",
+      agente: agent?.name || ""
+    });
+    setSearchTerm("");
+    setBlockFilter("all");
+    setResetKey(prev => prev + 1);
+    toast.info("Campos do formulário limpos");
 
   const handleQuickAdd = async (data: any) => {
     try {
@@ -330,7 +349,17 @@ function RGPage() {
               Histórico
             </Button>
           </div>
-          <RGImportByPhoto onImportComplete={fetchInitialData} />
+          <div className="flex flex-col gap-2">
+            <RGImportByPhoto onImportComplete={fetchInitialData} />
+            <Button 
+              variant="ghost" 
+              className="w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 bg-white/50"
+              onClick={handleResetForm}
+            >
+              <Trash2 className="h-4 w-4" />
+              Limpar Campos
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -360,6 +389,7 @@ function RGPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
           <div className="lg:col-span-1">
             <RGQuickAddForm 
+              key={resetKey}
               onAdd={handleQuickAdd}
               lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0}
               defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""}
