@@ -1002,9 +1002,11 @@ function PropertyVisitPage() {
       </div>
 
       {/* Fixed Footer: Next Property */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] mb-[env(safe-area-inset-bottom)]">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximo Imóvel</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            {nextProperty ? "Próximo Imóvel" : "Fim do Quarteirão"}
+          </span>
           <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
         </div>
         <div className="flex gap-2">
