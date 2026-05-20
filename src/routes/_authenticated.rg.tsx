@@ -16,7 +16,9 @@ import {
   Trash2,
   LayoutDashboard,
   ClipboardList,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
+  X
 } from "lucide-react";
 import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
