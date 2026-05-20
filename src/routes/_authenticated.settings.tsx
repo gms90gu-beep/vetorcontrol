@@ -66,7 +66,7 @@ function SettingsPage() {
     if (data) setAgent(data);
   }
 
-  const handleUpdateAgent = async (field: string, value: string) => {
+  const handleUpdateAgent = async (field: keyof any, value: string) => {
     try {
       setAgent((prev: any) => ({ ...prev, [field]: value }));
       
@@ -75,7 +75,7 @@ function SettingsPage() {
 
       const { error } = await supabase
         .from("agents")
-        .update({ [field]: value })
+        .update({ [field]: value } as any)
         .eq("profile_id", user.id);
 
       if (error) throw error;
@@ -145,7 +145,7 @@ function SettingsPage() {
               icon={MapPin} 
               label="Município" 
               value={agent?.municipality || ""} 
-              onChange={(val) => handleUpdateAgent("municipality", val)}
+              onChange={(val: string) => handleUpdateAgent("municipality", val)}
               placeholder="Digite o município"
             />
             <Separator className="bg-slate-50 mx-4" />
@@ -153,7 +153,7 @@ function SettingsPage() {
               icon={Phone} 
               label="Telefone" 
               value={agent?.phone || ""} 
-              onChange={(val) => handleUpdateAgent("phone", val)}
+              onChange={(val: string) => handleUpdateAgent("phone", val)}
               placeholder="Digite o telefone"
             />
             <Separator className="bg-slate-50 mx-4" />
@@ -161,7 +161,7 @@ function SettingsPage() {
               icon={Hash} 
               label="Número do ACE" 
               value={agent?.registration_id || ""} 
-              onChange={(val) => handleUpdateAgent("registration_id", val)}
+              onChange={(val: string) => handleUpdateAgent("registration_id", val)}
               placeholder="Digite o número do ACE"
             />
             <Separator className="bg-slate-50 mx-4" />
