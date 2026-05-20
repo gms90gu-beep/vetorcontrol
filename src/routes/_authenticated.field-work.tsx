@@ -336,18 +336,25 @@ function FieldWorkPage() {
         )}
 
         {/* Start Button */}
-        <Button 
-          className={cn(
-            "w-full h-20 rounded-[2.5rem] text-xl font-black shadow-2xl transition-all gap-3 active:scale-95 mt-4",
-            selectedBlockId && selectedCycleId && selectedWeekId
-              ? "bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200" 
-              : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+        <div className="pt-4 pb-8">
+          <Button 
+            className={cn(
+              "w-full h-24 rounded-[3rem] text-2xl font-black shadow-2xl transition-all gap-4 active:scale-95 border-4",
+              selectedBlockId && selectedCycleId && selectedWeekId
+                ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 border-emerald-400 text-white" 
+                : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-slate-300"
+            )}
+            onClick={handleStartWork}
+          >
+            INICIAR JORNADA
+            <ArrowRight className="h-8 w-8" />
+          </Button>
+          {(!selectedBlockId || !selectedCycleId || !selectedWeekId) && (
+            <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4 animate-pulse">
+              Selecione ciclo, semana e quarteirão para liberar
+            </p>
           )}
-          onClick={handleStartWork}
-        >
-          Iniciar Trabalho
-          <ArrowRight className="h-6 w-6" />
-        </Button>
+        </div>
       </div>
     </div>
   );
