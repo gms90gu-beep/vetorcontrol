@@ -41,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsPage() {
   const [agent, setAgent] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { allowWeekend, toggleWeekendOperation, userRole } = useOperationalDate();
   const [stats, setStats] = useState({
     worked: 1240,
@@ -66,22 +67,27 @@ function SettingsPage() {
     if (data) setAgent(data);
   }
 
-  const handleUpdateAgent = async (field: keyof any, value: string) => {
+  const handleUpdateAgent = async () => {
+    setIsLoading(true);
     try {
-      setAgent((prev: any) => ({ ...prev, [field]: value }));
-      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase
         .from("agents")
-        .update({ [field]: value } as any)
+        .update({
+          municipality: agent.municipality,
+          phone: agent.phone,
+          registration_id: agent.registration_id
+        } as any)
         .eq("profile_id", user.id);
 
       if (error) throw error;
-      toast.success("Informação atualizada");
+      toast.success("Perfil atualizado com sucesso!");
     } catch (error: any) {
       toast.error("Erro ao atualizar: " + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -145,7 +151,7 @@ function SettingsPage() {
               icon={MapPin} 
               label="Município" 
               value={agent?.municipality || ""} 
-              onChange={(val: string) => handleUpdateAgent("municipality", val)}
+              onChange={(val: string) => setAgent((prev: any) => ({ ...prev, municipality: val }))}
               placeholder="Digite o município"
             />
             <Separator className="bg-slate-50 mx-4" />
@@ -153,7 +159,7 @@ function SettingsPage() {
               icon={Phone} 
               label="Telefone" 
               value={agent?.phone || ""} 
-              onChange={(val: string) => handleUpdateAgent("phone", val)}
+              onChange={(val: string) => setAgent((prev: any) => ({ ...prev, phone: val }))}
               placeholder="Digite o telefone"
             />
             <Separator className="bg-slate-50 mx-4" />
@@ -161,9 +167,18 @@ function SettingsPage() {
               icon={Hash} 
               label="Número do ACE" 
               value={agent?.registration_id || ""} 
-              onChange={(val: string) => handleUpdateAgent("registration_id", val)}
+              onChange={(val: string) => setAgent((prev: any) => ({ ...prev, registration_id: val }))}
               placeholder="Digite o número do ACE"
             />
+            <div className="p-4">
+              <Button 
+                onClick={handleUpdateAgent} 
+                disabled={isLoading}
+                className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-[10px] gap-2 shadow-lg"
+              >
+                {isLoading ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </div>
             <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={History} label="Histórico Operacional" description="Ver registro de atividades passadas" isAction />
           </CardContent>
