@@ -633,9 +633,22 @@ function PropertyVisitPage() {
               IMÓVEL {property?.number || "..."}
             </h2>
           </div>
-          <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 bg-emerald-50 font-bold uppercase tracking-tight py-1">
-            ATIVO
-          </Badge>
+          <div className="flex items-center gap-1">
+            {nextProperty && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate({ to: `/property/${nextProperty.id}` })} 
+                className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
+                title="Próximo imóvel"
+              >
+                <ArrowRight className="h-5 w-5 text-blue-500" />
+              </Button>
+            )}
+            <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 bg-emerald-50 font-bold uppercase tracking-tight py-1">
+              {propertyIndex ? `${propertyIndex.current}/${propertyIndex.total}` : "ATIVO"}
+            </Badge>
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-1 text-center py-2 border-y border-slate-50">
