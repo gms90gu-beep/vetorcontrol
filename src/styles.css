@@ -94,4 +94,14 @@
     color: var(--color-foreground);
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Hide scrollbar globally but maintain functionality */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
