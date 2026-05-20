@@ -335,7 +335,7 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0")}>
+      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
         {!isLandscape && (
           <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -415,7 +415,7 @@ function FieldWorkListPage() {
           </>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="relative flex-1 group">
               <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
