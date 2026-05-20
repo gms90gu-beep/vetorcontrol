@@ -426,9 +426,42 @@ function RGPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 bg-slate-100 min-h-screen pb-24 lg:pb-8">
-      {/* Header Buttons */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 pt-4">
+    <div className="flex flex-col bg-slate-100 dark:bg-slate-950 min-h-screen pb-24 lg:pb-8">
+      {/* Sticky Navigation Header */}
+      <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm pt-[env(safe-area-inset-top)]">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all rounded-xl h-9"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Voltar</span>
+          </Button>
+          
+          <div className="flex flex-col items-center">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
+              Boletim Digital
+            </h2>
+            <div className="h-1 w-6 bg-emerald-500 rounded-full mt-1" />
+          </div>
+
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-red-500 transition-all rounded-xl h-9"
+            onClick={handleClose}
+          >
+            <span className="hidden sm:inline">Fechar</span>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      <div className="flex flex-col gap-4">
+        {/* Existing Content */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 pt-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
             <ClipboardList className="h-5 w-5 text-emerald-400" />
