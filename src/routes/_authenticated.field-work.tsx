@@ -78,7 +78,6 @@ function FieldWorkPage() {
             name
           )
         `)
-        .gt("total_properties", 0)
         .order("number", { ascending: true });
       
       if (blocksData) setBlocks(blocksData);
