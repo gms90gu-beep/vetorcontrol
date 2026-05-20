@@ -76,14 +76,10 @@ export function ReportsDashboard() {
       setKpiData({ worked, coverage, focus, treated, productivity });
 
       // Process Production Chart (by status)
-      const productionByWeek = [
-        { name: 'Semana 1', trabalhados: 45, fechados: 5 },
-        { name: 'Semana 2', trabalhados: 52, fechados: 8 },
-        { name: 'Semana 3', trabalhados: 48, fechados: 4 },
-        { name: 'Semana 4', trabalhados: 61, fechados: 12 },
-      ];
+      // Real implementation would group visits by week
+      const productionByWeek: any[] = [];
 
-      // Process Deposits (mocking distribution)
+      // Process Deposits
       const depositCounts: Record<string, number> = {};
       visits.forEach(v => {
         v.visit_deposits?.forEach((d: any) => {
@@ -92,27 +88,28 @@ export function ReportsDashboard() {
       });
 
       const deposits = Object.entries(depositCounts).map(([name, value]) => ({ name, value }));
-      if (deposits.length === 0) {
-        deposits.push(
-          { name: 'A1', value: 35 },
-          { name: 'B', value: 25 },
-          { name: 'C', value: 15 },
-          { name: 'D1', value: 20 },
-          { name: 'E', value: 5 }
-        );
-      }
 
-      // Process Coverage (Mock)
+      // Process Coverage
       const coverageMock = [
         { name: 'Visitados', value: coverage },
-        { name: 'Pendente', value: 100 - coverage }
+        { name: 'Pendente', value: Math.max(0, 100 - coverage) }
       ];
 
-      // Process Evolution (Mock)
-      const evolution = Array.from({ length: 14 }).map((_, i) => ({
-        date: format(subDays(new Date(), 13 - i), 'dd/MM'),
-        visitas: Math.floor(Math.random() * 40) + 10
-      }));
+      // Process Evolution
+      const evolution: any[] = [];
+      // If we have visits, we could group them by day
+      if (visits.length > 0) {
+        const visitsByDate: Record<string, number> = {};
+        visits.forEach(v => {
+          const date = format(new Date(v.visit_date), 'dd/MM');
+          visitsByDate[date] = (visitsByDate[date] || 0) + 1;
+        });
+        
+        Object.entries(visitsByDate).forEach(([date, count]) => {
+          evolution.push({ date, visitas: count });
+        });
+        evolution.sort((a, b) => a.date.localeCompare(b.date));
+      }
 
       setChartData({
         production: productionByWeek,
