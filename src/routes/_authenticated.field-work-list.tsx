@@ -188,7 +188,7 @@ function FieldWorkListPage() {
   const filteredProperties = properties.filter(p => {
     const matchesSearch = (p.number || "").includes(searchQuery) || (p.street_name?.toLowerCase() || "").includes(searchQuery.toLowerCase());
     if (filter === "all") return matchesSearch;
-    if (filter === "completed") return matchesSearch && (p.status === "visited" || p.status === "closed" || p.status === "refused" || p.status === "abandoned");
+    if (filter === "completed") return matchesSearch && ["visited", "closed", "refused", "abandoned"].includes(p.status);
     if (filter === "pending") return matchesSearch && (p.status === "not_visited" || p.status === "closed" || p.status === "refused");
     if (filter === "focus") return matchesSearch && p.has_focus;
     if (filter === "survey") return matchesSearch && p.latest_visit?.activity_type === 'infestation_survey';
@@ -217,8 +217,9 @@ function FieldWorkListPage() {
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42);
     doc.text(`Imóveis Trabalhados: ${workedCount}`, 20, 55);
-    doc.text(`Imóveis Fechados: ${closedCount}`, 20, 62);
-    doc.text(`Imóveis Recusados: ${refusedCount}`, 20, 69);
+    doc.text(`Imóveis Visitados: ${properties.filter(p => p.status === "visited").length}`, 20, 60);
+    doc.text(`Imóveis Fechados: ${closedCount}`, 20, 65);
+    doc.text(`Imóveis Recusados: ${refusedCount}`, 20, 70);
     
     doc.text(`Depósitos Tratados: ${treatedDepositsCount}`, 85, 55);
     doc.text(`Depósitos Eliminados: ${eliminationCount}`, 85, 62);
@@ -268,7 +269,7 @@ function FieldWorkListPage() {
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 
-  const workedCount = properties.filter(p => p.status !== "not_visited" && p.status).length;
+  const workedCount = properties.filter(p => ["visited", "closed", "refused", "abandoned"].includes(p.status)).length;
   const closedCount = properties.filter(p => p.status === "closed").length;
   const refusedCount = properties.filter(p => p.status === "refused").length;
   const focusCount = properties.filter(p => p.has_focus).length;
