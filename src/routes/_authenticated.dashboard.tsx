@@ -88,6 +88,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
