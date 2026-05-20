@@ -286,6 +286,14 @@ function RGPage() {
         .delete()
         .eq("number", blockFilter);
       
+      // If this was the active session block, we should update the session or just clear it locally
+      if (activeSession && activeSession.block_number === blockFilter) {
+        await supabase
+          .from("field_work_sessions")
+          .update({ block_number: null })
+          .eq("id", activeSession.id);
+      }
+      
       toast.success(`Quarteirão ${blockFilter} e seus imóveis foram excluídos.`);
       
       // Update local state
