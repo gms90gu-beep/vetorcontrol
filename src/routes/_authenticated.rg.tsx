@@ -671,6 +671,7 @@ function RGPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
