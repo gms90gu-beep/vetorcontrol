@@ -217,6 +217,8 @@ function DashboardPage() {
       }
     } catch (error) {
       console.error("Error fetching status:", error);
+    } finally {
+      setIsLoading(false);
     }
   }
 
