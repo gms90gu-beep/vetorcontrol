@@ -188,29 +188,27 @@ export function ReportsDashboard() {
           <Button variant="ghost" className="text-blue-600 font-bold text-xs">Ver todos</Button>
         </div>
         <div className="space-y-4">
-          {[].length > 0 ? [].map((agent: any, i) => (
-...
-          )) : (
-            <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-              <BarChart3 className="h-8 w-8 mb-2 opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-widest">Aguardando registros reais</p>
-            </div>
-          )}
-        </div>
+          {chartData.production.length > 0 ? chartData.production.slice(0, 3).map((agent: any, i) => (
             <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
                 <div>
-                  <h4 className="font-bold text-slate-800 text-sm">{agent.name}</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.visits} visitas</p>
+                  <h4 className="font-bold text-slate-800 text-sm">{agent.name || "Agente"}</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.visits || 0} visitas</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-black text-emerald-600">{agent.coverage}%</p>
+                <p className="text-sm font-black text-emerald-600">{agent.coverage || 0}%</p>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cobertura</p>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <BarChart3 className="h-10 w-10 mb-3 opacity-20" />
+              <p className="text-xs font-black uppercase tracking-widest">Nenhum dado de produtividade disponível</p>
+              <p className="text-[10px] font-bold opacity-60 mt-1 uppercase">Os dados aparecerão assim que as visitas forem registradas</p>
+            </div>
+          )}
         </div>
       </div>
 
