@@ -263,7 +263,7 @@ function RGPage() {
   };
 
   const handleDeleteBlock = async () => {
-    if (blockFilter === \"all\") return;
+    if (blockFilter === "all") return;
     
     if (!window.confirm(`Atenção: Você está prestes a excluir o Quarteirão ${blockFilter} e todos os seus ${filteredProperties.length} imóveis. Esta ação não pode ser desfeita. Deseja continuar?`)) {
       return;
@@ -274,32 +274,33 @@ function RGPage() {
       
       // Delete properties for this block
       const { error: propError } = await supabase
-        .from(\"properties\")
+        .from("properties")
         .delete()
-        .eq(\"block_number\", blockFilter);
+        .eq("block_number", blockFilter);
 
       if (propError) throw propError;
 
       // Try to delete from blocks table too if there's a record
       await supabase
-        .from(\"blocks\")
+        .from("blocks")
         .delete()
-        .eq(\"number\", blockFilter);
+        .eq("number", blockFilter);
       
       toast.success(`Quarteirão ${blockFilter} e seus imóveis foram excluídos.`);
       
       // Update local state
       setProperties(prev => prev.filter(p => p.block_number !== blockFilter));
-      setBlockFilter(\"all\");
+      setBlockFilter("all");
       if (bulletinHeader.quarteirao === blockFilter) {
-        setBulletinHeader(prev => ({ ...prev, quarteirao: \"\" }));
+        setBulletinHeader(prev => ({ ...prev, quarteirao: "" }));
       }
     } catch (error: any) {
-      toast.error(\"Erro ao excluir quarteirão: \" + error.message);
+      toast.error("Erro ao excluir quarteirão: " + error.message);
     } finally {
       setIsLoading(false);
     }
   };
+
 
 
   const handleExportPDF = async () => {
