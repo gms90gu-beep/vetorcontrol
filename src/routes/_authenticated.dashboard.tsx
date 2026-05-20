@@ -116,6 +116,7 @@ function DashboardPage() {
 
   async function fetchCurrentStatus() {
     try {
+      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
