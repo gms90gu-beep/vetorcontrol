@@ -620,7 +620,7 @@ function FieldWorkListPage() {
           </div>
         </div>
       </div>
-      </>
+      
       
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
