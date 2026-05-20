@@ -90,6 +90,7 @@ function RGPage() {
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
   const [resetKey, setResetKey] = useState(0);
+  const [isDirty, setIsDirty] = useState(false);
   const [bulletinHeader, setBulletinHeader] = useState({
     uf: "CE",
     municipio: "",
