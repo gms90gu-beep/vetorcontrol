@@ -718,6 +718,7 @@ export type Database = {
           treated_deposits: number | null
           treatment_amount: number | null
           treatment_applied: boolean | null
+          tubitos_coletados: number | null
           visit_date: string
           week_id: string | null
           week_number: number | null
@@ -741,6 +742,7 @@ export type Database = {
           treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
+          tubitos_coletados?: number | null
           visit_date?: string
           week_id?: string | null
           week_number?: number | null
@@ -764,6 +766,7 @@ export type Database = {
           treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
+          tubitos_coletados?: number | null
           visit_date?: string
           week_id?: string | null
           week_number?: number | null
