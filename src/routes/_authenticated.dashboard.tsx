@@ -88,6 +88,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
@@ -115,6 +116,7 @@ function DashboardPage() {
 
   async function fetchCurrentStatus() {
     try {
+      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -215,6 +217,8 @@ function DashboardPage() {
       }
     } catch (error) {
       console.error("Error fetching status:", error);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -268,9 +272,9 @@ function DashboardPage() {
         </CardContent>
       </Card>
       
-      {!activeSession && (
+      {!isLoading && !activeSession && (
         <Button 
-          className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg tracking-tight shadow-lg shadow-emerald-500/20 gap-3 animate-in fade-in zoom-in duration-500"
+          className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg tracking-tight shadow-lg shadow-emerald-500/20 gap-3 animate-in fade-in zoom-in duration-500 shrink-0"
           onClick={() => navigate({ to: '/field-work' })}
         >
           <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
@@ -278,6 +282,10 @@ function DashboardPage() {
           </span>
           ▶ INICIAR JORNADA DIÁRIA
         </Button>
+      )}
+
+      {isLoading && !activeSession && (
+        <div className="w-full h-16 rounded-2xl bg-slate-100 animate-pulse shrink-0" />
       )}
 
       {/* Active Session Progress */}
