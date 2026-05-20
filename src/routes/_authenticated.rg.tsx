@@ -222,6 +222,7 @@ function RGPage() {
     setBlockFilter("all");
     setResetKey(prev => prev + 1);
     toast.info("Campos do formulário limpos");
+  };
 
   const handleQuickAdd = async (data: any) => {
     try {
