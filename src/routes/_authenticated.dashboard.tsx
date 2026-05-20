@@ -60,7 +60,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
       </div>
       <div className="relative z-10">
         <h3 className={cn(
-          "text-2xl font-black leading-tight mb-1 tracking-tight", 
+          "text-xl sm:text-2xl font-black leading-tight mb-1 tracking-tight break-words", 
           isCritical ? "text-white" : colors.text
         )}>{title}</h3>
         <p className={cn(
