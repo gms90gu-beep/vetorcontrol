@@ -337,7 +337,7 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
+      <div className={cn("space-y-6 pb-[160px] animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
         {!isLandscape && (
           <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -484,35 +484,37 @@ function FieldWorkListPage() {
                 }}
                 onStatusUpdate={() => {}} 
               />
-              <div className="pt-8 pb-12 lg:hidden">
-                <DailyWorkCloser 
-                  stats={{
-                    worked: workedCount,
-                    closed: closedCount,
-                    refused: refusedCount,
-                    eliminated: eliminationCount,
-                    treated: treatedCount,
-                    focus: focusCount,
-                    pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
-                    treatedDeposits: treatedDepositsCount,
-                    larvicideUsed: larvicideUsed,
-                    progress: progressPercent
-                  }}
-                  onGeneratePDF={generatePDF}
-                  isLocked={isLocked}
-                  userRole={userRole}
-                  onReopen={async () => {
-                    try {
-                      const { data: { user } } = await supabase.auth.getUser();
-                      if (!user) return;
-                      await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
-                      setIsLocked(false);
-                      toast.success("Boletim reaberto com sucesso!");
-                    } catch (e) {
-                      toast.error("Erro ao reabrir boletim.");
-                    }
-                  }}
-                />
+              <div className="fixed bottom-[100px] left-0 right-0 p-4 bg-gradient-to-t from-slate-50/90 via-slate-50/50 to-transparent z-40 lg:hidden pointer-events-none mb-[env(safe-area-inset-bottom)]">
+                <div className="pointer-events-auto max-w-md mx-auto">
+                  <DailyWorkCloser 
+                    stats={{
+                      worked: workedCount,
+                      closed: closedCount,
+                      refused: refusedCount,
+                      eliminated: eliminationCount,
+                      treated: treatedCount,
+                      focus: focusCount,
+                      pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
+                      treatedDeposits: treatedDepositsCount,
+                      larvicideUsed: larvicideUsed,
+                      progress: progressPercent
+                    }}
+                    onGeneratePDF={generatePDF}
+                    isLocked={isLocked}
+                    userRole={userRole}
+                    onReopen={async () => {
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) return;
+                        await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                        setIsLocked(false);
+                        toast.success("Boletim reaberto com sucesso!");
+                      } catch (e) {
+                        toast.error("Erro ao reabrir boletim.");
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </div>
           ) : (
