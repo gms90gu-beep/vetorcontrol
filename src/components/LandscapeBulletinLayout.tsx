@@ -62,20 +62,20 @@ export function LandscapeBulletinLayout({
   }
 
   return (
-    <div className="flex h-[calc(100vh-80px)] gap-6 animate-in fade-in duration-700">
+    <div className="flex flex-col lg:flex-row h-full lg:h-[calc(100vh-120px)] gap-6 animate-in fade-in duration-700 overflow-y-auto lg:overflow-hidden p-1">
       {/* LADO ESQUERDO: Lista e Tabela */}
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-4 min-h-0">
         <div className="flex flex-col gap-0.5 mb-2">
-          <h2 className="text-2xl font-black tracking-tight text-slate-900">{title}</h2>
+          <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">{title}</h2>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{subtitle}</p>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0">
           {children}
         </div>
       </div>
 
-      {/* LADO DIREITO: Painel Lateral Fixo */}
-      <div className="w-[320px] shrink-0 flex flex-col gap-4 overflow-y-auto no-scrollbar pb-6">
+      {/* LADO DIREITO: Painel Lateral */}
+      <div className="w-full lg:w-[280px] shrink-0 flex flex-col gap-4 pb-6 lg:pb-0 lg:overflow-y-auto no-scrollbar">
         {sidebarHeader}
         
         {/* Agent & Location Card */}
@@ -132,7 +132,7 @@ export function LandscapeBulletinLayout({
         </Card>
 
         {/* Operational Summary Cards */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-2 gap-3">
           <div className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
             <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />

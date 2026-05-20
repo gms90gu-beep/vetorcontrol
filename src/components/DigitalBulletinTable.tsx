@@ -68,8 +68,8 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
   };
 
   return (
-    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden h-full flex flex-col">
-      <ScrollArea className="flex-1">
+    <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-xl overflow-hidden h-full flex flex-col min-h-[400px] lg:min-h-0">
+      <ScrollArea className="flex-1 w-full">
         <Table>
           <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
             <TableRow className="hover:bg-transparent border-slate-100">

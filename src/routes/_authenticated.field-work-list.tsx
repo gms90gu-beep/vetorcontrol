@@ -335,20 +335,20 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col")}>
+      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0")}>
         {!isLandscape && (
           <>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/field-work' })} className="rounded-full active:scale-95 bg-white shadow-sm">
-                  <ArrowLeft className="h-6 w-6" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 md:gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/field-work' })} className="rounded-full active:scale-95 bg-white shadow-sm shrink-0">
+                  <ArrowLeft className="h-5 w-5 md:h-6 md:w-6" />
                 </Button>
                 <div className="flex flex-col gap-0.5">
-                  <h2 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-                    <ClipboardList className="h-6 w-6 text-blue-500" />
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 md:h-6 md:w-6 text-blue-500" />
                     Boletim Digital
                   </h2>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 truncate max-w-[200px] md:max-w-none">
                     Quarteirão {activeSession?.block_number} • {activeSession?.street_name}
                   </p>
                 </div>
@@ -356,14 +356,14 @@ function FieldWorkListPage() {
               <Button 
                 variant="outline" 
                 onClick={generatePDF}
-                className="rounded-2xl border-none bg-white shadow-md hover:shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2 h-12"
+                className="w-full sm:w-auto rounded-xl md:rounded-2xl border-none bg-white shadow-md hover:shadow-lg transition-all font-black text-[10px] uppercase tracking-widest gap-2 h-10 md:h-12"
               >
                 <FileText className="h-4 w-4 text-red-500" />
                 Gerar PDF
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
               <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                   <Target className="h-16 w-16" />
