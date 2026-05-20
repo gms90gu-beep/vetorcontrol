@@ -303,6 +303,31 @@ function RGPage() {
 
 
 
+  const handleSaveHeader = async () => {
+    try {
+      setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      // We update the agent information since these fields usually map to the agent's context
+      const { error } = await supabase
+        .from("agents")
+        .update({
+          municipality: bulletinHeader.municipio,
+          name: bulletinHeader.agente
+        })
+        .eq("profile_id", user.id);
+
+      if (error) throw error;
+      
+      toast.success("Cabeçalho salvo com sucesso!");
+    } catch (error: any) {
+      toast.error("Erro ao salvar cabeçalho: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleExportPDF = async () => {
     try {
       toast.loading("Gerando boletim oficial...");
@@ -381,6 +406,14 @@ function RGPage() {
             >
               <Printer className="h-4 w-4 text-emerald-600" />
               PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
+              onClick={handleSaveHeader}
+            >
+              <Save className="h-4 w-4 text-blue-600" />
+              Salvar
             </Button>
             <Button 
               variant="outline" 
