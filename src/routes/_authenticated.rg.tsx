@@ -271,7 +271,9 @@ function RGPage() {
       setIsLoading(true);
       setIsDeleteDialogOpen(false);
       
-      // Delete properties for this block
+      // Find the specific block record to delete it explicitly if possible
+      const blockToDelete = properties.find(p => p.block_number === blockFilter);
+      
       const { error: propError } = await supabase
         .from("properties")
         .delete()
@@ -279,11 +281,18 @@ function RGPage() {
 
       if (propError) throw propError;
 
-      // Try to delete from blocks table too if there's a record
-      await supabase
-        .from("blocks")
-        .delete()
-        .eq("number", blockFilter);
+      // Try to delete from blocks table by number (or ID if we found it)
+      if (blockToDelete?.block_id) {
+        await supabase
+          .from("blocks")
+          .delete()
+          .eq("id", blockToDelete.block_id);
+      } else {
+        await supabase
+          .from("blocks")
+          .delete()
+          .eq("number", blockFilter);
+      }
       
       // If this was the active session block, we should update the session or just clear it locally
       if (activeSession && activeSession.block_number === blockFilter) {
