@@ -46,7 +46,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
   const content = (
     <div className={cn(
-      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 group relative overflow-hidden",
+      "flex flex-col h-full p-8 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 group relative overflow-hidden",
       isCritical 
         ? "bg-red-500 border-red-600 text-white" 
         : "bg-white dark:bg-slate-950 " + colors.border,
@@ -60,7 +60,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
       </div>
       <div className="relative z-10">
         <h3 className={cn(
-          "text-xl font-black leading-tight mb-1 tracking-tight", 
+          "text-2xl font-black leading-tight mb-1 tracking-tight", 
           isCritical ? "text-white" : colors.text
         )}>{title}</h3>
         <p className={cn(
@@ -273,12 +273,12 @@ function DashboardPage() {
           <div className="absolute top-0 right-0 p-6 opacity-20">
             <Target className="h-20 w-20" />
           </div>
-          <CardHeader className="pb-2">
+          <CardHeader className="p-8 pb-4">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Trabalho em Andamento</p>
-            <CardTitle className="text-xl font-black">Quarteirão {activeSession.block_number}</CardTitle>
+            <CardTitle className="text-2xl font-black">Quarteirão {activeSession.block_number}</CardTitle>
           </CardHeader>
-          <CardContent>
-             <div className="flex items-center justify-between mb-2">
+          <CardContent className="p-8 pt-0">
+             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-bold opacity-90">{blockProgress}% do quarteirão</span>
               <span className="text-xs font-bold opacity-70 underline underline-offset-4 decoration-white/30">{activeSession.street_name}</span>
             </div>
