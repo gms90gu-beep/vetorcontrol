@@ -340,6 +340,7 @@ function RGPage() {
 
       if (error) throw error;
       
+      setIsDirty(false);
       toast.success("Cabeçalho salvo com sucesso!");
     } catch (error: any) {
       toast.error("Erro ao salvar cabeçalho: " + error.message);
