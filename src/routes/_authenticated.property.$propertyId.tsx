@@ -91,13 +91,13 @@ function PropertyVisitPage() {
     guidance: false, 
     notes: "" 
   });
-  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false });
+  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0 });
   const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
+  const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0, tubitos: 0 });
   const [blockProperties, setBlockProperties] = useState<any[]>([]);
   const [nextProperty, setNextProperty] = useState<any>(null);
   const [prevProperty, setPrevProperty] = useState<any>(null);
@@ -168,7 +168,7 @@ function PropertyVisitPage() {
 
       const { data: visits } = await supabase
         .from("visits")
-        .select("status, treatment_amount, treated_deposits")
+        .select("status, treatment_amount, treated_deposits, tubitos_coletados")
         .eq("agent_id", user.id)
         .gte("visit_date", today.toISOString());
 
@@ -176,8 +176,9 @@ function PropertyVisitPage() {
         const stats = visits.reduce((acc, v) => ({
           worked: acc.worked + 1,
           treated: acc.treated + (v.treated_deposits || 0),
-          larvicide: acc.larvicide + (Number(v.treatment_amount) || 0)
-        }), { worked: 0, treated: 0, larvicide: 0 });
+          larvicide: acc.larvicide + (Number(v.treatment_amount) || 0),
+          tubitos: acc.tubitos + (Number(v.tubitos_coletados) || 0)
+        }), { worked: 0, treated: 0, larvicide: 0, tubitos: 0 });
         setDailyStats(stats);
       }
     } catch (e) { console.error(e); }
@@ -232,7 +233,7 @@ function PropertyVisitPage() {
           // Check for existing visit for this property in the current cycle
           const { data: existingVisit } = await supabase
             .from("visits")
-            .select("id, status, activity_type, has_focus, sample_collected, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
+            .select("id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
             .eq("property_id", propertyId as string)
             .eq("agent_id", user.id)
             .eq("cycle_id", session.cycle_id as string)
@@ -264,7 +265,8 @@ function PropertyVisitPage() {
             
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
-              sampleCollected: existingVisit.sample_collected || false
+              sampleCollected: existingVisit.sample_collected || false,
+              tubitosColetados: existingVisit.tubitos_coletados || 0
             });
             
             setPendingData({
@@ -423,6 +425,7 @@ function PropertyVisitPage() {
             visit_date: new Date().toISOString(),
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+            tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
             treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
             larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
@@ -446,6 +449,7 @@ function PropertyVisitPage() {
             activity_type: (activityMap[activity] || "routine") as any,
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+            tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
             treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
             treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
             larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
@@ -680,11 +684,11 @@ function PropertyVisitPage() {
           <p className="text-xl font-black text-slate-900">{dailyStats.treated}</p>
         </div>
         <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-1 group active:scale-95 transition-all">
-          <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
-            <Bug className="h-5 w-5" />
+          <div className="h-10 w-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+            <Activity className="h-5 w-5" />
           </div>
-          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Larvicida</p>
-          <p className="text-xl font-black text-slate-900">{dailyStats.larvicide}</p>
+          <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Tubitos</p>
+          <p className="text-xl font-black text-slate-900">{dailyStats.tubitos}</p>
         </div>
       </div>
 
@@ -963,8 +967,33 @@ function PropertyVisitPage() {
                     <BooleanButton 
                       label="Coleta realizada?" 
                       value={surveyData.sampleCollected} 
-                      onChange={(v) => setSurveyData({...surveyData, sampleCollected: v})} 
+                      onChange={(v) => {
+                        setSurveyData({...surveyData, sampleCollected: v});
+                        if (v && surveyData.tubitosColetados === 0) {
+                          setSurveyData(prev => ({...prev, sampleCollected: v, tubitosColetados: 1}));
+                        }
+                      }} 
                     />
+
+                    {surveyData.sampleCollected && (
+                      <div className="space-y-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in zoom-in duration-300">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-amber-600 ml-1">
+                          Quantidade de tubitos coletados
+                        </Label>
+                        <Input 
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          autoFocus
+                          value={surveyData.tubitosColetados}
+                          onChange={(e) => setSurveyData({...surveyData, tubitosColetados: Math.max(0, Number(e.target.value))})}
+                          className="h-14 rounded-xl border-amber-200 bg-white text-xl font-black text-center focus:ring-amber-500"
+                        />
+                        <p className="text-[9px] font-bold text-amber-500 text-center uppercase tracking-tighter">
+                          Total acumulado hoje: {dailyStats.tubitos + (surveyData.tubitosColetados || 0)} tubitos
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </section>
