@@ -74,20 +74,20 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Rua</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Rua</Label>
           <Input 
             value={street} 
             onChange={(e) => setStreet(e.target.value)}
-            className="h-9 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500"
+            className="h-9 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500 placeholder:text-slate-400"
             placeholder="Nome da Rua"
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Lado</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Lado</Label>
           <Input 
             value={side} 
             onChange={(e) => setSide(e.target.value)}
-            className="h-9 bg-slate-800 border-none text-[11px] font-black focus-visible:ring-emerald-500 text-center"
+            className="h-9 bg-slate-800 border-none text-[11px] font-black focus-visible:ring-emerald-500 text-center placeholder:text-slate-400"
             placeholder="Lado"
           />
         </div>
@@ -95,28 +95,28 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="col-span-1 space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Nº</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Nº</Label>
           <Input 
             value={number} 
             onChange={(e) => setNumber(e.target.value)}
-            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center"
+            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center placeholder:text-slate-400"
             placeholder="0"
             inputMode="numeric"
           />
         </div>
         <div className="col-span-1 space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Comp.</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Comp.</Label>
           <Input 
             value={complement} 
             onChange={(e) => setComplement(e.target.value)}
-            className="h-10 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500"
+            className="h-10 bg-slate-800 border-none text-[11px] font-bold focus-visible:ring-emerald-500 placeholder:text-slate-400"
             placeholder="A, B..."
           />
         </div>
         <div className="col-span-1 space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Tipo</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Tipo</Label>
           <Select value={type} onValueChange={(v: PropertyType) => setType(v)}>
-            <SelectTrigger className="h-10 bg-slate-800 border-none text-[11px] font-black focus:ring-emerald-500">
+            <SelectTrigger className="h-10 bg-slate-800 border-none text-[11px] font-black focus:ring-emerald-500 text-slate-200">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-slate-900 border-slate-800 text-white font-bold">
@@ -129,12 +129,12 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
           </Select>
         </div>
         <div className="col-span-1 space-y-1">
-          <Label className="text-[8px] font-black uppercase text-slate-400">Hab.</Label>
+          <Label className="text-[8px] font-black uppercase text-slate-200">Hab.</Label>
           <Input 
             type="number"
             value={inhabitants} 
             onChange={(e) => setInhabitants(parseInt(e.target.value) || 0)}
-            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center"
+            className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center placeholder:text-slate-400"
             placeholder="0"
           />
         </div>
