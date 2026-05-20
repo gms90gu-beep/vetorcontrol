@@ -117,6 +117,13 @@ function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { count } = await supabase
+        .from("visits")
+        .select("*", { count: 'exact', head: true })
+        .eq("status", "pending");
+      
+      setPendingCount(count || 0);
+
       const currentYearVal = new Date().getFullYear();
       setCurrentYear(currentYearVal);
 
