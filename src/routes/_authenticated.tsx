@@ -77,7 +77,7 @@ function AuthenticatedLayout() {
           )}>
             <Outlet />
           </div>
-          {!isLandscape && <BottomNav />}
+          {!isLandscape && !location.pathname.startsWith('/property/') && <BottomNav />}
         </main>
       </div>
     </SidebarProvider>

@@ -14,7 +14,8 @@ import {
   Bug,
   ShieldCheck,
   FileText,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,6 +100,8 @@ function PropertyVisitPage() {
   const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
   const [blockProperties, setBlockProperties] = useState<any[]>([]);
   const [nextProperty, setNextProperty] = useState<any>(null);
+  const [prevProperty, setPrevProperty] = useState<any>(null);
+  const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
 
@@ -108,25 +111,43 @@ function PropertyVisitPage() {
     fetchAgentData();
   }, [propertyId]);
 
-  const fetchNextProperty = async () => {
+  const fetchAdjacentProperties = async () => {
+    if (!property || !property.block_number) return;
     try {
-      const { data: nextProp } = await supabase
+      // Fetch all properties in the same block to determine order and count
+      const { data: allProps } = await supabase
         .from("properties")
         .select("id, number")
-        .eq("block_id", property.block_id)
-        .gt("number", property.number)
-        .order("number", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      setNextProperty(nextProp);
+        .eq("block_number", property.block_number)
+        .order("number", { ascending: true });
+
+      if (allProps && allProps.length > 0) {
+        const currentIndex = allProps.findIndex(p => p.id === propertyId);
+        setPropertyIndex({
+          current: currentIndex + 1,
+          total: allProps.length
+        });
+
+        if (currentIndex > 0) {
+          setPrevProperty(allProps[currentIndex - 1]);
+        } else {
+          setPrevProperty(null);
+        }
+
+        if (currentIndex < allProps.length - 1) {
+          setNextProperty(allProps[currentIndex + 1]);
+        } else {
+          setNextProperty(null);
+        }
+      }
     } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
-    if (property && activeSession) {
-      fetchNextProperty();
+    if (property) {
+      fetchAdjacentProperties();
     }
-  }, [property, activeSession]);
+  }, [property]);
 
   async function fetchAgentData() {
     try {
@@ -463,7 +484,12 @@ function PropertyVisitPage() {
       }
 
       toast.success("Visita finalizada com sucesso!");
-      navigate({ to: "/field-work-list" });
+      
+      if (nextProperty) {
+        navigate({ to: `/property/${nextProperty.id}` });
+      } else {
+        navigate({ to: "/field-work-list" });
+      }
     } catch (error: any) {
       toast.error("Erro ao salvar visita: " + error.message);
     } finally {
@@ -586,18 +612,44 @@ function PropertyVisitPage() {
       {/* Header Operational */}
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
-            <ChevronLeft className="h-6 w-6 text-slate-600" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+              <ChevronLeft className="h-6 w-6 text-slate-600" />
+            </Button>
+            {prevProperty && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate({ to: `/property/${prevProperty.id}` })} 
+                className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
+                title="Imóvel anterior"
+              >
+                <ArrowLeft className="h-5 w-5 text-blue-500" />
+              </Button>
+            )}
+          </div>
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Identificação do Imóvel</span>
             <h2 className="text-3xl font-black tracking-tighter text-slate-900">
               IMÓVEL {property?.number || "..."}
             </h2>
           </div>
-          <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 bg-emerald-50 font-bold uppercase tracking-tight py-1">
-            ATIVO
-          </Badge>
+          <div className="flex items-center gap-1">
+            {nextProperty && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate({ to: `/property/${nextProperty.id}` })} 
+                className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
+                title="Próximo imóvel"
+              >
+                <ArrowRight className="h-5 w-5 text-blue-500" />
+              </Button>
+            )}
+            <Badge variant="outline" className="border-emerald-500/20 text-emerald-600 bg-emerald-50 font-bold uppercase tracking-tight py-1">
+              {propertyIndex ? `${propertyIndex.current}/${propertyIndex.total}` : "ATIVO"}
+            </Badge>
+          </div>
         </div>
 
         <div className="flex flex-col items-center gap-1 text-center py-2 border-y border-slate-50">
@@ -951,10 +1003,27 @@ function PropertyVisitPage() {
       </div>
 
       {/* Fixed Footer: Next Property */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximo Imóvel</span>
-          <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] mb-[env(safe-area-inset-bottom)]">
+        <div className="flex gap-4">
+          {prevProperty && (
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Anterior</span>
+              <Button 
+                variant="outline"
+                size="icon"
+                onClick={() => navigate({ to: `/property/${prevProperty.id}` })}
+                className="h-10 w-10 rounded-xl border-slate-100 bg-slate-50 text-slate-400"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {nextProperty ? "Próximo" : "Fim"}
+            </span>
+            <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+          </div>
         </div>
         <div className="flex gap-2">
            <Button 
