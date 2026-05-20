@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -87,6 +87,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 }
 
 function DashboardPage() {
+  const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
@@ -266,6 +267,18 @@ function DashboardPage() {
           <Progress value={coverageData?.coverage_percentage || 0} className="h-2 bg-white/10" />
         </CardContent>
       </Card>
+      
+      {!activeSession && (
+        <Button 
+          className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg tracking-tight shadow-lg shadow-emerald-500/20 gap-3 animate-in fade-in zoom-in duration-500"
+          onClick={() => navigate({ to: '/field-work' })}
+        >
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
+            <CalendarCheck className="h-5 w-5" />
+          </span>
+          ▶ INICIAR JORNADA DIÁRIA
+        </Button>
+      )}
 
       {/* Active Session Progress */}
       {activeSession && (
