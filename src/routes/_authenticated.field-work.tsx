@@ -68,7 +68,7 @@ function FieldWorkPage() {
         }
       }
 
-      // Fetch blocks
+      // Fetch blocks that have properties and are available
       const { data: blocksData } = await supabase
         .from("blocks")
         .select(`
@@ -77,6 +77,7 @@ function FieldWorkPage() {
             name
           )
         `)
+        .gt("total_properties", 0)
         .order("number", { ascending: true });
       
       if (blocksData) setBlocks(blocksData);
