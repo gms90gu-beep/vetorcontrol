@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function ActionCard({ title, description, icon: Icon, color, to, onClick, className }: any) {
+function ActionCard({ title, description, icon: Icon, color, to, onClick, className, isCritical }: any) {
   // Extract border color and text color from the passed bg class
   const colorMap: Record<string, { border: string, text: string, iconBg: string }> = {
     "bg-emerald-500": { border: "border-emerald-500/20", text: "text-emerald-600", iconBg: "bg-emerald-500/10" },
@@ -46,20 +46,27 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
   const content = (
     <div className={cn(
-      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 bg-white dark:bg-slate-950 group",
-      colors.border,
+      "flex flex-col h-full p-6 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 group relative overflow-hidden",
+      isCritical 
+        ? "bg-red-500 border-red-600 text-white" 
+        : "bg-white dark:bg-slate-950 " + colors.border,
       className
     )}>
       <div className={cn(
         "p-3.5 rounded-2xl w-fit mb-5 group-hover:scale-110 transition-transform duration-500",
-        colors.iconBg,
-        colors.text
+        isCritical ? "bg-white/20 text-white" : colors.iconBg + " " + colors.text
       )}>
         <Icon className="h-6 w-6" />
       </div>
       <div className="relative z-10">
-        <h3 className={cn("text-xl font-black leading-tight mb-1 tracking-tight", colors.text)}>{title}</h3>
-        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider leading-relaxed">{description}</p>
+        <h3 className={cn(
+          "text-xl font-black leading-tight mb-1 tracking-tight", 
+          isCritical ? "text-white" : colors.text
+        )}>{title}</h3>
+        <p className={cn(
+          "text-[10px] font-bold uppercase tracking-wider leading-relaxed",
+          isCritical ? "text-white/90" : "text-muted-foreground"
+        )}>{description}</p>
       </div>
     </div>
   );
