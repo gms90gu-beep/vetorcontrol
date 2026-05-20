@@ -205,6 +205,7 @@ function RGPage() {
 
   const handleHeaderChange = (field: string, value: string) => {
     setBulletinHeader(prev => ({ ...prev, [field]: value }));
+    setIsDirty(true);
     if (field === 'quarteirao' && value) {
       setBlockFilter(value);
     }
