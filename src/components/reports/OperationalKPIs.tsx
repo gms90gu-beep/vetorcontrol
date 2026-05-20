@@ -41,7 +41,7 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         icon={Home} 
         color="text-blue-600" 
         bgColor="bg-blue-50" 
-        trend="+12%" 
+        trend="0%" 
       />
       <KPICard 
         label="Cobertura %" 
@@ -49,7 +49,7 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         icon={Target} 
         color="text-emerald-600" 
         bgColor="bg-emerald-50" 
-        trend="+5%"
+        trend="0%"
       />
       <KPICard 
         label="Focos (+)" 
@@ -57,7 +57,7 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         icon={AlertTriangle} 
         color="text-red-600" 
         bgColor="bg-red-50" 
-        trend="-2%"
+        trend="0%"
         isCritical
       />
       <KPICard 
@@ -66,7 +66,7 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         icon={CheckCircle2} 
         color="text-cyan-600" 
         bgColor="bg-cyan-50" 
-        trend="+18%"
+        trend="0%"
       />
       <KPICard 
         label="Produtividade" 
@@ -74,7 +74,7 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         icon={TrendingUp} 
         color="text-purple-600" 
         bgColor="bg-purple-50" 
-        trend="+8%"
+        trend="0%"
       />
     </div>
   );
