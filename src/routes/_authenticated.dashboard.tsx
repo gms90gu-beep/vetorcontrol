@@ -266,6 +266,18 @@ function DashboardPage() {
           <Progress value={coverageData?.coverage_percentage || 0} className="h-2 bg-white/10" />
         </CardContent>
       </Card>
+      
+      {!activeSession && (
+        <Button 
+          className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg tracking-tight shadow-lg shadow-emerald-500/20 gap-3 animate-in fade-in zoom-in duration-500"
+          onClick={() => navigate({ to: '/field-work' })}
+        >
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
+            <CalendarCheck className="h-5 w-5" />
+          </span>
+          ▶ INICIAR JORNADA DIÁRIA
+        </Button>
+      )}
 
       {/* Active Session Progress */}
       {activeSession && (
