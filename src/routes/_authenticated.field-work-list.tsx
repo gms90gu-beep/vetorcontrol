@@ -618,6 +618,7 @@ function FieldWorkListPage() {
                 }
               }}
             />
+          </div>
         </div>
       </div>
       </>
