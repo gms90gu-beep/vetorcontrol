@@ -624,7 +624,7 @@ function PropertyVisitPage() {
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
                 title="Imóvel anterior"
               >
-                <ChevronLeft className="h-5 w-5 text-blue-500" />
+                <ArrowLeft className="h-5 w-5 text-blue-500" />
               </Button>
             )}
           </div>
