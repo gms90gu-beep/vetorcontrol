@@ -193,15 +193,15 @@ export function OperationalHeader() {
             <div className="flex flex-col gap-1">
               <div className="flex justify-between items-end">
                 <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Território Atual</span>
-                  <span className="text-xs font-black text-blue-400 uppercase tracking-tight">
+                  <span className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Território Atual</span>
+                  <span className="text-xs font-black text-blue-300 uppercase tracking-tight">
                     Quarteirão {activeSession.block_number} • {activeSession.street_name}
                   </span>
                 </div>
-                <span className="text-[10px] font-black text-slate-400">{todayStats.progress}%</span>
+                <span className="text-[10px] font-black text-slate-100">{todayStats.progress}%</span>
               </div>
               <Progress value={todayStats.progress} className="h-1.5 bg-slate-900" indicatorClassName="bg-blue-500" />
-              <p className="text-[9px] font-bold text-slate-500">
+              <p className="text-[9px] font-bold text-slate-200">
                 {Math.round((todayStats.progress / 100) * (activeSession.property_count || 45))} de {activeSession.property_count || 45} imóveis trabalhados
               </p>
             </div>
@@ -216,15 +216,15 @@ export function OperationalHeader() {
       {/* Mini Resumo Operacional */}
       <div className="bg-slate-900/30 flex divide-x divide-white/5">
          <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Trabalhados</span>
+            <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Trabalhados</span>
             <span className="text-sm font-black text-emerald-500">{todayStats.worked}</span>
          </div>
          <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Fechados</span>
+            <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Fechados</span>
             <span className="text-sm font-black text-amber-500">{todayStats.pending}</span>
          </div>
          <div className="flex-1 px-4 py-2 flex flex-col items-center justify-center">
-            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Focos (+)</span>
+            <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Focos (+)</span>
             <span className="text-sm font-black text-red-500">0</span>
          </div>
       </div>
