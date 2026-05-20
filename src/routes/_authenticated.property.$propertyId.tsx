@@ -483,7 +483,12 @@ function PropertyVisitPage() {
       }
 
       toast.success("Visita finalizada com sucesso!");
-      navigate({ to: "/field-work-list" });
+      
+      if (nextProperty) {
+        navigate({ to: `/property/${nextProperty.id}` });
+      } else {
+        navigate({ to: "/field-work-list" });
+      }
     } catch (error: any) {
       toast.error("Erro ao salvar visita: " + error.message);
     } finally {
