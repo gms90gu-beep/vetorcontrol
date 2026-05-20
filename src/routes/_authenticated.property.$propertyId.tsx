@@ -99,6 +99,8 @@ function PropertyVisitPage() {
   const [dailyStats, setDailyStats] = useState({ worked: 0, treated: 0, larvicide: 0 });
   const [blockProperties, setBlockProperties] = useState<any[]>([]);
   const [nextProperty, setNextProperty] = useState<any>(null);
+  const [prevProperty, setPrevProperty] = useState<any>(null);
+  const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
 
