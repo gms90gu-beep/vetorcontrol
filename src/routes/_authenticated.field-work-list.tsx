@@ -461,14 +461,14 @@ function FieldWorkListPage() {
           </Tabs>
         </div>
 
-        <div className={cn("space-y-4", isLandscape && "flex-1 overflow-hidden")}>
+        <div className={cn("space-y-4", "flex-1 min-h-0 lg:overflow-hidden")}>
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Boletim...</p>
             </div>
           ) : filteredProperties.length > 0 ? (
-            <div className={cn(isLandscape && "h-full overflow-hidden")}>
+            <div className={cn("h-full lg:min-h-0 lg:overflow-hidden flex flex-col")}>
               <DigitalBulletinTable 
                 properties={filteredProperties} 
                 indexSurvey={indexSurvey}
@@ -482,7 +482,7 @@ function FieldWorkListPage() {
                 }}
                 onStatusUpdate={() => {}} 
               />
-              <div className="pt-8 pb-12">
+              <div className="pt-8 pb-12 lg:hidden">
                 <DailyWorkCloser 
                   stats={{
                     worked: workedCount,
@@ -522,6 +522,100 @@ function FieldWorkListPage() {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Verifique os filtros ou busque outro número</p>
             </div>
           )}
+        </div>
+        </div>
+        
+        {/* Desktop Sidebar Summary */}
+        <div className="hidden lg:flex flex-col gap-6 overflow-y-auto no-scrollbar pb-6 pr-2">
+          <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-blue-500 flex items-center justify-center font-black">
+                  {agent?.name?.substring(0, 1) || "A"}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{agent?.municipality || "Município"}</p>
+                  <h4 className="font-black tracking-tight text-sm">{agent?.name || "Agente"}</h4>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
+                <div>
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Matrícula</p>
+                  <p className="text-[10px] font-bold">{agent?.registration_id || "MAT-0000"}</p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Data</p>
+                  <p className="text-[10px] font-bold">{new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-6 opacity-10">
+              <Target className="h-16 w-16" />
+            </div>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-end mb-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200 mb-1">Quarteirão {activeSession?.block_number}</p>
+                  <h3 className="text-2xl font-black tracking-tighter">{progressPercent}%</h3>
+                </div>
+                <p className="text-[10px] font-bold text-blue-200">{workedCount}/{properties.length}</p>
+              </div>
+              <Progress value={progressPercent} className="h-1.5 bg-white/10" />
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Trabalhados", val: workedCount, color: "emerald", icon: CheckCircle2 },
+              { label: "Fechados", val: closedCount, color: "yellow", icon: XCircle },
+              { label: "Recusados", val: refusedCount, color: "red", icon: AlertCircle },
+              { label: "Focos (+)", val: focusCount, color: "red", icon: BarChart3, highlight: true },
+              { label: "Dep. Tratados", val: treatedDepositsCount, color: "blue", icon: Layers },
+              { label: "Larvicida (g/ml)", val: larvicideUsed, color: "cyan", icon: Droplets }
+            ].map((s, i) => (
+              <div key={i} className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
+                <div className={cn("h-8 w-8 rounded-xl flex items-center justify-center mb-2", s.color === "emerald" ? "bg-emerald-100" : s.color === "yellow" ? "bg-yellow-100" : s.color === "red" ? "bg-red-100" : s.color === "blue" ? "bg-blue-100" : "bg-cyan-100")}>
+                  <s.icon className={cn("h-4 w-4", s.highlight ? "text-white bg-red-500 p-0.5 rounded" : s.color === "emerald" ? "text-emerald-600" : s.color === "yellow" ? "text-yellow-600" : s.color === "red" ? "text-red-600" : s.color === "blue" ? "text-blue-600" : "text-cyan-600")} />
+                </div>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                <p className={cn("text-lg font-black text-slate-900", s.highlight && "text-red-600")}>{s.val}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-auto pt-4">
+            <DailyWorkCloser 
+              stats={{
+                worked: workedCount,
+                closed: closedCount,
+                refused: refusedCount,
+                eliminated: eliminationCount,
+                treated: treatedCount,
+                focus: focusCount,
+                pending: properties.filter(p => p.status === 'closed' || p.status === 'refused').length,
+                treatedDeposits: treatedDepositsCount,
+                larvicideUsed: larvicideUsed,
+                progress: progressPercent
+              }}
+              onGeneratePDF={generatePDF}
+              isLocked={isLocked}
+              userRole={userRole}
+              onReopen={async () => {
+                try {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (!user) return;
+                  await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                  setIsLocked(false);
+                  toast.success("Boletim reaberto com sucesso!");
+                } catch (e) {
+                  toast.error("Erro ao reabrir boletim.");
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
 
