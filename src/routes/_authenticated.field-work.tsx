@@ -12,7 +12,8 @@ import {
   ArrowRight,
   Info,
   Layers,
-  CalendarDays
+  CalendarDays,
+  Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,6 @@ function FieldWorkPage() {
             name
           )
         `)
-        .gt("total_properties", 0)
         .order("number", { ascending: true });
       
       if (blocksData) setBlocks(blocksData);
@@ -254,6 +254,23 @@ function FieldWorkPage() {
                <div className="flex flex-col items-center justify-center py-10 gap-3">
                 <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
+              </div>
+            ) : filteredBlocks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-white rounded-3xl shadow-md gap-4 border-2 border-dashed border-slate-200">
+                <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
+                  <MapPin className="h-8 w-8 text-slate-300" />
+                </div>
+                <div>
+                  <p className="text-lg font-black text-slate-800 tracking-tight">Nenhum quarteirão disponível</p>
+                  <p className="text-sm font-medium text-slate-500 mt-1">Não encontramos quarteirões ativos para o seu território.</p>
+                </div>
+                <Button 
+                  onClick={() => navigate({ to: '/rg' })}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 h-12 rounded-2xl gap-2 shadow-lg shadow-blue-200"
+                >
+                  <Plus className="h-5 w-5" />
+                  NOVO QUARTEIRÃO
+                </Button>
               </div>
             ) : filteredBlocks.map((block) => (
               <Card 
