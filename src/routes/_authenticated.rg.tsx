@@ -290,7 +290,7 @@ function RGPage() {
       if (activeSession && activeSession.block_number === blockFilter) {
         await supabase
           .from("field_work_sessions")
-          .update({ block_number: null })
+          .update({ block_number: "" })
           .eq("id", activeSession.id);
       }
       
