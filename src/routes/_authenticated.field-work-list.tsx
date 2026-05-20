@@ -484,7 +484,7 @@ function FieldWorkListPage() {
                 }}
                 onStatusUpdate={() => {}} 
               />
-              <div className="fixed bottom-[100px] left-0 right-0 p-4 bg-gradient-to-t from-slate-50/90 via-slate-50/50 to-transparent z-40 lg:hidden pointer-events-none mb-[env(safe-area-inset-bottom)]">
+              <div className="fixed bottom-[110px] left-0 right-0 p-4 bg-gradient-to-t from-slate-50/90 via-slate-50/50 to-transparent z-40 lg:hidden pointer-events-none mb-[env(safe-area-inset-bottom)]">
                 <div className="pointer-events-auto max-w-md mx-auto">
                   <DailyWorkCloser 
                     stats={{
