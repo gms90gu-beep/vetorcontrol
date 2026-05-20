@@ -170,6 +170,7 @@ function PropertyVisitPage() {
         .from("visits")
         .select("status, treatment_amount, treated_deposits, tubitos_coletados")
         .eq("agent_id", user.id)
+        .in("status", ["visited", "closed", "refused", "abandoned"])
         .gte("visit_date", today.toISOString());
 
       if (visits) {
@@ -434,7 +435,7 @@ function PropertyVisitPage() {
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
             is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
-            notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
+            notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
           })
           .select()
           .single();
@@ -443,10 +444,12 @@ function PropertyVisitPage() {
         visitId = visit.id;
       } else {
         // Update activity type in case it changed
-        await supabase
+        const { error: updateError } = await supabase
           .from("visits")
           .update({ 
+            status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
+            visit_date: new Date().toISOString(),
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
@@ -458,9 +461,11 @@ function PropertyVisitPage() {
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
             is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
-            notes: status === 'visited' ? (activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : "") : ""
+            notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
           })
           .eq("id", visitId);
+          
+        if (updateError) throw updateError;
       }
 
       // Sync deposits
