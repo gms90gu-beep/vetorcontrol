@@ -18,7 +18,8 @@ import {
   Trophy,
   History,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Hash
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +65,25 @@ function SettingsPage() {
     
     if (data) setAgent(data);
   }
+
+  const handleUpdateAgent = async (field: string, value: string) => {
+    try {
+      setAgent((prev: any) => ({ ...prev, [field]: value }));
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("agents")
+        .update({ [field]: value })
+        .eq("profile_id", user.id);
+
+      if (error) throw error;
+      toast.success("Informação atualizada");
+    } catch (error: any) {
+      toast.error("Erro ao atualizar: " + error.message);
+    }
+  };
 
   const handleUpdatePhoto = () => {
     toast.info("Acessando câmera...");
@@ -120,9 +141,29 @@ function SettingsPage() {
         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Detalhes Operacionais</h3>
         <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
           <CardContent className="p-2">
-            <SettingsItem icon={MapPin} label="Município" description={agent?.municipality || "São Paulo"} />
+            <SettingsInputItem 
+              icon={MapPin} 
+              label="Município" 
+              value={agent?.municipality || ""} 
+              onChange={(val) => handleUpdateAgent("municipality", val)}
+              placeholder="Digite o município"
+            />
             <Separator className="bg-slate-50 mx-4" />
-            <SettingsItem icon={Phone} label="Telefone" description={agent?.phone || "(11) 99999-9999"} />
+            <SettingsInputItem 
+              icon={Phone} 
+              label="Telefone" 
+              value={agent?.phone || ""} 
+              onChange={(val) => handleUpdateAgent("phone", val)}
+              placeholder="Digite o telefone"
+            />
+            <Separator className="bg-slate-50 mx-4" />
+            <SettingsInputItem 
+              icon={Hash} 
+              label="Número do ACE" 
+              value={agent?.registration_id || ""} 
+              onChange={(val) => handleUpdateAgent("registration_id", val)}
+              placeholder="Digite o número do ACE"
+            />
             <Separator className="bg-slate-50 mx-4" />
             <SettingsItem icon={History} label="Histórico Operacional" description="Ver registro de atividades passadas" isAction />
           </CardContent>
@@ -210,6 +251,27 @@ function SettingsItem({ icon: Icon, label, description, hasSwitch, defaultChecke
       ) : isAction ? (
         <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-slate-500 transition-colors" />
       ) : null}
+    </div>
+  );
+}
+
+function SettingsInputItem({ icon: Icon, label, value, onChange, placeholder }: any) {
+  return (
+    <div className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors rounded-2xl group">
+      <div className="flex items-center gap-4 flex-1">
+        <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="flex flex-col flex-1 max-w-[200px] sm:max-w-none">
+          <span className="font-bold text-sm tracking-tight text-slate-900">{label}</span>
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="h-8 border-slate-200 focus:border-primary focus:ring-primary text-xs font-medium p-0 bg-transparent border-none shadow-none focus-visible:ring-0"
+          />
+        </div>
+      </div>
     </div>
   );
 }
