@@ -236,11 +236,11 @@ function DashboardPage() {
         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
           <TrendingUp className="h-32 w-32" />
         </div>
-        <CardHeader className="pb-2">
+        <CardHeader className="p-8 pb-4">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Cobertura do Ciclo</p>
-              <CardTitle className="text-3xl font-black tracking-tighter">
+              <CardTitle className="text-4xl font-black tracking-tighter">
                 {coverageData ? `${coverageData.coverage_percentage}%` : "0%"}
               </CardTitle>
             </div>
@@ -256,7 +256,7 @@ function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8 pt-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Progresso Geral</span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
