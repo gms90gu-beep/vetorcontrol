@@ -611,9 +611,22 @@ function PropertyVisitPage() {
       {/* Header Operational */}
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
-            <ChevronLeft className="h-6 w-6 text-slate-600" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+              <ChevronLeft className="h-6 w-6 text-slate-600" />
+            </Button>
+            {prevProperty && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => navigate({ to: `/property/${prevProperty.id}` })} 
+                className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
+                title="Imóvel anterior"
+              >
+                <ChevronLeft className="h-5 w-5 text-blue-500" />
+              </Button>
+            )}
+          </div>
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Identificação do Imóvel</span>
             <h2 className="text-3xl font-black tracking-tighter text-slate-900">
