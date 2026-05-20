@@ -1059,25 +1059,33 @@ function PropertyVisitPage() {
             <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-           <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-            className="h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-8 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2"
-          >
-            {isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}
-            {!isSaving && <CheckCircle2 className="h-5 w-5" />}
-          </Button>
-          {nextProperty && (
-            <Button 
-              variant="outline"
-              onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
-              className="h-14 w-14 rounded-2xl border-slate-200 active:scale-95 transition-all p-0"
-              title="Ir para o próximo"
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex gap-2">
+             <Button 
+              onClick={handleSave} 
+              disabled={isSaving}
+              className="h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-8 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2"
             >
-              <ArrowRight className="h-6 w-6 text-slate-600" />
+              {isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}
+              {!isSaving && <CheckCircle2 className="h-5 w-5" />}
             </Button>
-          )}
+            {nextProperty && (
+              <Button 
+                variant="outline"
+                onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
+                className="h-14 w-14 rounded-2xl border-slate-200 active:scale-95 transition-all p-0"
+                title="Ir para o próximo"
+              >
+                <ArrowRight className="h-6 w-6 text-slate-600" />
+              </Button>
+            )}
+          </div>
+          <button 
+            onClick={() => navigate({ to: "/dashboard" })}
+            className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
+          >
+            Tela Inicial
+          </button>
         </div>
       </div>
     </div>
