@@ -137,7 +137,7 @@ export function OperationalHeader() {
                   "h-2 w-2 rounded-full",
                   workStatus === 'in_work' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse" : "bg-slate-500"
                 )} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-200">
                   {workStatus === 'in_work' ? "🟢 Em Trabalho" : "⚫ Expediente Encerrado"}
                 </span>
               </div>
@@ -145,16 +145,16 @@ export function OperationalHeader() {
                 {agent?.name || "Agente"}
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">{agent?.registration_id || "MATRÍCULA"}</span>
-                <span className="h-1 w-1 rounded-full bg-slate-700" />
-                <span className="text-[9px] font-bold text-blue-400 uppercase tracking-tight">{agent?.municipality || "Município"}</span>
+                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tight">{agent?.registration_id || "MATRÍCULA"}</span>
+                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span className="text-[9px] font-bold text-blue-200 uppercase tracking-tight">{agent?.municipality || "Município"}</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
              <div className="hidden sm:flex flex-col items-end">
-               <span className="text-[9px] font-black text-slate-500 uppercase">Ciclo {activeCycle?.number || "-"} • Semana {activeWeek?.number || "-"}</span>
+               <span className="text-[9px] font-black text-slate-300 uppercase">Ciclo {activeCycle?.number || "-"} • Semana {activeWeek?.number || "-"}</span>
                <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
              </div>
              
