@@ -1004,11 +1004,26 @@ function PropertyVisitPage() {
 
       {/* Fixed Footer: Next Property */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] mb-[env(safe-area-inset-bottom)]">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            {nextProperty ? "Próximo Imóvel" : "Fim do Quarteirão"}
-          </span>
-          <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+        <div className="flex gap-4">
+          {prevProperty && (
+            <div className="flex flex-col items-center">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Anterior</span>
+              <Button 
+                variant="outline"
+                size="icon"
+                onClick={() => navigate({ to: `/property/${prevProperty.id}` })}
+                className="h-10 w-10 rounded-xl border-slate-100 bg-slate-50 text-slate-400"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {nextProperty ? "Próximo" : "Fim"}
+            </span>
+            <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
+          </div>
         </div>
         <div className="flex gap-2">
            <Button 
