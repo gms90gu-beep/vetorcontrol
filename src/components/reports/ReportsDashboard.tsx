@@ -188,7 +188,15 @@ export function ReportsDashboard() {
           <Button variant="ghost" className="text-blue-600 font-bold text-xs">Ver todos</Button>
         </div>
         <div className="space-y-4">
-          {[].map((agent: any, i) => (
+          {[].length > 0 ? [].map((agent: any, i) => (
+...
+          )) : (
+            <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+              <BarChart3 className="h-8 w-8 mb-2 opacity-20" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Aguardando registros reais</p>
+            </div>
+          )}
+        </div>
             <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
