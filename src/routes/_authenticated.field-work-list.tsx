@@ -617,8 +617,13 @@ function FieldWorkListPage() {
                 }
               }}
             />
+          </div>
         </div>
-      </div>
+
+
+      
+
+      
       
       
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
