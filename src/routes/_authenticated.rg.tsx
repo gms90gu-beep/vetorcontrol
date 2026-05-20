@@ -262,6 +262,47 @@ function RGPage() {
     }
   };
 
+  const handleDeleteBlock = async () => {
+    if (blockFilter === "all") return;
+    
+    if (!window.confirm(`Atenção: Você está prestes a excluir o Quarteirão ${blockFilter} e todos os seus ${filteredProperties.length} imóveis. Esta ação não pode ser desfeita. Deseja continuar?`)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Delete properties for this block
+      const { error: propError } = await supabase
+        .from("properties")
+        .delete()
+        .eq("block_number", blockFilter);
+
+      if (propError) throw propError;
+
+      // Try to delete from blocks table too if there's a record
+      await supabase
+        .from("blocks")
+        .delete()
+        .eq("number", blockFilter);
+      
+      toast.success(`Quarteirão ${blockFilter} e seus imóveis foram excluídos.`);
+      
+      // Update local state
+      setProperties(prev => prev.filter(p => p.block_number !== blockFilter));
+      setBlockFilter("all");
+      if (bulletinHeader.quarteirao === blockFilter) {
+        setBulletinHeader(prev => ({ ...prev, quarteirao: "" }));
+      }
+    } catch (error: any) {
+      toast.error("Erro ao excluir quarteirão: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
   const handleExportPDF = async () => {
     try {
       toast.loading("Gerando boletim oficial...");
@@ -414,17 +455,32 @@ function RGPage() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <Select value={blockFilter} onValueChange={setBlockFilter}>
-                  <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
-                    <SelectValue placeholder="Quarteirão" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-none shadow-2xl">
-                    <SelectItem value="all">Todos Qtrs</SelectItem>
-                    {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
-                      <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <Select value={blockFilter} onValueChange={setBlockFilter}>
+                    <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
+                      <SelectValue placeholder="Quarteirão" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                      <SelectItem value="all">Todos Qtrs</SelectItem>
+                      {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
+                        <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {blockFilter !== "all" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100"
+                      onClick={handleDeleteBlock}
+                      title="Excluir este quarteirão"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
               </div>
             </Card>
 
