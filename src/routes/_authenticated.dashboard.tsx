@@ -278,28 +278,28 @@ function DashboardPage() {
           title="Diário" 
           description="Iniciar jornada" 
           icon={CalendarCheck} 
-          color="bg-emerald-500 shadow-emerald-200"
+          color="bg-emerald-500"
           to="/field-work"
         />
         <ActionCard 
           title="RG" 
           description="Cadastro de imóveis" 
           icon={MapPin} 
-          color="bg-blue-500 shadow-blue-200"
+          color="bg-blue-500"
           to="/rg"
         />
         <ActionCard 
           title="Boletim" 
           description="Resumo operacional" 
           icon={BarChart3} 
-          color="bg-indigo-600 shadow-indigo-200"
+          color="bg-indigo-600"
           to="/reports"
         />
         <ActionCard 
           title="Pendências" 
           description="Recuperar visitas" 
           icon={AlertCircle} 
-          color="bg-red-500 shadow-red-200"
+          color="bg-red-500"
           to="/pending"
         />
         <div className="col-span-2">
@@ -307,7 +307,7 @@ function DashboardPage() {
             title="Sincronizar" 
             description={isSyncing ? "Enviando dados..." : `Sync: ${lastSync}`}
             icon={RefreshCw} 
-            color="bg-slate-800 shadow-slate-200"
+            color="bg-slate-800"
             onClick={handleSync}
             className={isSyncing ? "animate-spin duration-[3s]" : ""}
           />
