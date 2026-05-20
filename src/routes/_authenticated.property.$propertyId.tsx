@@ -110,25 +110,43 @@ function PropertyVisitPage() {
     fetchAgentData();
   }, [propertyId]);
 
-  const fetchNextProperty = async () => {
+  const fetchAdjacentProperties = async () => {
+    if (!property || !property.block_number) return;
     try {
-      const { data: nextProp } = await supabase
+      // Fetch all properties in the same block to determine order and count
+      const { data: allProps } = await supabase
         .from("properties")
         .select("id, number")
-        .eq("block_id", property.block_id)
-        .gt("number", property.number)
-        .order("number", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      setNextProperty(nextProp);
+        .eq("block_number", property.block_number)
+        .order("number", { ascending: true });
+
+      if (allProps && allProps.length > 0) {
+        const currentIndex = allProps.findIndex(p => p.id === propertyId);
+        setPropertyIndex({
+          current: currentIndex + 1,
+          total: allProps.length
+        });
+
+        if (currentIndex > 0) {
+          setPrevProperty(allProps[currentIndex - 1]);
+        } else {
+          setPrevProperty(null);
+        }
+
+        if (currentIndex < allProps.length - 1) {
+          setNextProperty(allProps[currentIndex + 1]);
+        } else {
+          setNextProperty(null);
+        }
+      }
     } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
-    if (property && activeSession) {
-      fetchNextProperty();
+    if (property) {
+      fetchAdjacentProperties();
     }
-  }, [property, activeSession]);
+  }, [property]);
 
   async function fetchAgentData() {
     try {
