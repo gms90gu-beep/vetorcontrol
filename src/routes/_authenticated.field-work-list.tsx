@@ -337,7 +337,7 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
+      <div className={cn("space-y-6 pb-[160px] animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
         {!isLandscape && (
           <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
