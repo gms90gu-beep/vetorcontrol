@@ -692,6 +692,7 @@ function FieldWorkListPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      </>
     </LandscapeBulletinLayout>
   );
 }
