@@ -525,7 +525,6 @@ function FieldWorkListPage() {
             </div>
           )}
         </div>
-        </div>
         
         {/* Desktop Sidebar Summary */}
         <div className="hidden lg:flex flex-col gap-6 overflow-y-auto no-scrollbar pb-6 pr-2">
@@ -619,6 +618,8 @@ function FieldWorkListPage() {
             />
           </div>
         </div>
+
+      </div>
 
 
       
