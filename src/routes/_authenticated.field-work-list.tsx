@@ -335,7 +335,7 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col")}>
+      <div className={cn("space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0")}>
         {!isLandscape && (
           <>
             <div className="flex items-center justify-between">
