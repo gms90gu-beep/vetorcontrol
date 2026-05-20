@@ -120,7 +120,7 @@ function DashboardPage() {
       const { count } = await supabase
         .from("visits")
         .select("*", { count: 'exact', head: true })
-        .eq("status", "pending");
+        .eq("status", "abandoned");
       
       setPendingCount(count || 0);
 
