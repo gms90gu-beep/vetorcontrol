@@ -188,11 +188,7 @@ export function ReportsDashboard() {
           <Button variant="ghost" className="text-blue-600 font-bold text-xs">Ver todos</Button>
         </div>
         <div className="space-y-4">
-          {[
-            { name: "Carlos Silva", visits: 245, coverage: 98 },
-            { name: "Maria Oliveira", visits: 232, coverage: 95 },
-            { name: "João Santos", visits: 210, coverage: 89 }
-          ].map((agent, i) => (
+          {[].map((agent: any, i) => (
             <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100/50">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">#{i+1}</div>
