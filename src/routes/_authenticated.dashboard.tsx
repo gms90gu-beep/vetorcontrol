@@ -312,10 +312,11 @@ function DashboardPage() {
         />
         <ActionCard 
           title="Pendências" 
-          description="Recuperar visitas" 
+          description={pendingCount > 0 ? `${pendingCount} visitas pendentes` : "Recuperar visitas"} 
           icon={AlertCircle} 
           color="bg-red-500"
           to="/pending"
+          isCritical={pendingCount > 10} // Just an example of what could be 'critical'
         />
         <div className="col-span-2">
           <ActionCard 
