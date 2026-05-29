@@ -10,31 +10,44 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
     if (!session) {
       console.log("Admin-Master: Sem sessão, redirecionando para login");
       throw redirect({ to: "/login" });
     }
 
-    // Permitir acesso direto para o email específico gms90gu@gmail.com
-    if (session.user.email === 'gms90gu@gmail.com') {
+    // Acesso direto pelo e-mail do criador do sistema
+    if (session.user.email === "gms90gu@gmail.com") {
       console.log("Admin-Master: Acesso permitido via e-mail direto");
       return;
     }
 
-    const { data: profile } = await supabase
+    // ✅ CORREÇÃO: busca o perfil com tratamento de erro explícito
+    const { data: profile, error } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", session.user.id)
       .maybeSingle();
-    
-    console.log("Admin-Master Check: User ID:", session.user.id, "Role:", profile?.role);
-    
-    if (!profile || profile.role !== 'admin_master') {
-      console.log("Admin-Master: Role inválido (" + profile?.role + "), redirecionando para dashboard");
+
+    console.log("Admin-Master Check — User ID:", session.user.id);
+    console.log("Admin-Master Check — Role:", profile?.role);
+    console.log("Admin-Master Check — Erro:", error);
+
+    // ✅ CORREÇÃO: se perfil não existe, redireciona para login (não dashboard)
+    if (!profile) {
+      console.log("Admin-Master: Perfil não encontrado no banco — redirecionando para login");
+      throw redirect({ to: "/login" });
+    }
+
+    if (profile.role !== "admin_master") {
+      console.log("Admin-Master: Role inválido (" + profile.role + ") — redirecionando para dashboard");
       throw redirect({ to: "/dashboard" });
     }
-    console.log("Admin-Master: Acesso permitido");
+
+    console.log("Admin-Master: Acesso permitido ✅");
   },
   component: AdminMasterPage,
 });
@@ -100,18 +113,11 @@ function AdminMasterPage() {
     <div className="w-full min-h-screen bg-slate-950 p-6">
       <div className="max-w-6xl mx-auto flex justify-end gap-3 mb-4">
         <Link to="/dashboard">
-          <Button 
-            variant="outline" 
-            className="border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
-          >
+          <Button variant="outline" className="border-white/10 text-slate-400 hover:text-white hover:bg-white/10">
             <LayoutDashboard className="mr-2 h-4 w-4" /> Ir para Dashboard
           </Button>
         </Link>
-        <Button 
-          variant="ghost" 
-          onClick={handleLogout}
-          className="text-slate-400 hover:text-white hover:bg-white/10"
-        >
+        <Button variant="ghost" onClick={handleLogout} className="text-slate-400 hover:text-white hover:bg-white/10">
           <LogOut className="mr-2 h-4 w-4" /> Sair
         </Button>
       </div>
