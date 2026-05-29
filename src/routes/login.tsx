@@ -12,6 +12,26 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+async function getSessionAfterLogin() {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    console.debug(`[Login] Tentativa ${attempt} de restaurar sessão pós-login:`, {
+      hasSession: Boolean(session),
+      userId: session?.user.id,
+      error,
+    });
+
+    if (session?.user) return session;
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+  }
+
+  return null;
+}
+
 function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,24 +50,37 @@ function LoginPage() {
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
+      console.debug("[Login] Login autenticado para:", data.user.email ?? data.user.id);
+
+      const session = await getSessionAfterLogin();
+      const authenticatedUser = session?.user ?? data.user;
+
+      if (!session?.user) {
+        console.warn("[Login] Sessão ainda indisponível após login; usando usuário retornado pelo signIn como fallback.");
+      }
+
       // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
-      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: data.user.id });
+      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: authenticatedUser.id });
 
       const role = roleData as string | null;
 
-      console.log("Role encontrado via RPC:", role);
-      console.log("Erro RPC:", roleError);
+      console.debug("[Login] Role encontrado via RPC:", role);
+      console.debug("[Login] Erro RPC:", roleError);
+
+      if (roleError) {
+        console.error("[Login] Falha ao buscar role; usando /dashboard como fallback seguro:", roleError);
+      }
 
       toast.success("Login realizado com sucesso!");
 
       if (role === "admin_master") {
-        console.log("Redirecionando para /admin-master");
+        console.debug("[Login] Redirecionando admin_master para /admin-master");
         window.location.href = "/admin-master";
       } else if (role === "supervisor" || role === "coordenador") {
-        console.log("Redirecionando para /supervision");
+        console.debug("[Login] Redirecionando supervisor/coordenador para /supervision");
         window.location.href = "/supervision";
       } else {
-        console.log("Redirecionando para /dashboard, role:", role);
+        console.debug("[Login] Redirecionando para /dashboard, role:", role);
         window.location.href = "/dashboard";
       }
     } catch (error: any) {
