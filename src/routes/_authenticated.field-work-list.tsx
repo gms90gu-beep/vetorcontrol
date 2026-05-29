@@ -338,7 +338,7 @@ function FieldWorkListPage() {
         </div>
       }
     >
-      <div className={cn("space-y-6 pb-[160px] animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
+      <div className={cn("space-y-6 pb-[200px] animate-in fade-in slide-in-from-bottom-4 duration-700", isLandscape && "pb-0 h-full flex flex-col min-h-0", "lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:pb-0 lg:h-[calc(100vh-140px)]")}>
         {!isLandscape && (
           <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -366,20 +366,31 @@ function FieldWorkListPage() {
               </Button>
             </div>
 
+            <div className="relative group mb-2">
+              <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+              <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors z-10" />
+              <Input 
+                placeholder="Buscar imóvel por número ou rua..." 
+                className="pl-12 h-14 rounded-2xl border-none bg-white shadow-xl text-base font-bold focus-visible:ring-blue-500/20 relative z-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-              <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2rem] overflow-hidden relative">
+              <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                   <Target className="h-16 w-16" />
                 </div>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-end mb-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Quarteirão</p>
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-100 mb-1">Quarteirão</p>
                       <h3 className="text-2xl font-black tracking-tighter">{progressPercent}%</h3>
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400">{workedCount}/{properties.length}</p>
+                    <p className="text-[10px] font-bold text-emerald-100">{workedCount} de {properties.length} imóveis</p>
                   </div>
-                  <Progress value={progressPercent} className="h-1.5 bg-white/10" />
+                  <Progress value={progressPercent} className="h-2.5 bg-white/20" />
                 </CardContent>
               </Card>
 
@@ -390,28 +401,28 @@ function FieldWorkListPage() {
                 <CardContent className="p-6">
                   <div className="flex justify-between items-end mb-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200 mb-1">Rua/Logradouro</p>
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-100 mb-1">Rua/Logradouro</p>
                       <h3 className="text-2xl font-black tracking-tighter">64%</h3>
                     </div>
-                    <p className="text-[10px] font-bold text-blue-200">18/28</p>
+                    <p className="text-[10px] font-bold text-blue-100">18 de 28 imóveis</p>
                   </div>
-                  <Progress value={64} className="h-1.5 bg-white/10" />
+                  <Progress value={64} className="h-2.5 bg-white/20" />
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-xl bg-indigo-600 text-white rounded-[2rem] overflow-hidden relative">
+              <Card className="border-none shadow-xl bg-purple-600 text-white rounded-[2rem] overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                   <LayoutDashboard className="h-16 w-16" />
                 </div>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-end mb-3">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-1">Ciclo Atual</p>
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-purple-100 mb-1">Ciclo Atual</p>
                       <h3 className="text-2xl font-black tracking-tighter">42%</h3>
                     </div>
-                    <p className="text-[10px] font-bold text-indigo-200">842/2000</p>
+                    <p className="text-[10px] font-bold text-purple-100">842 de 2000 imóveis</p>
                   </div>
-                  <Progress value={42} className="h-1.5 bg-white/10" />
+                  <Progress value={42} className="h-2.5 bg-white/20" />
                 </CardContent>
               </Card>
             </div>
@@ -420,15 +431,7 @@ function FieldWorkListPage() {
 
         <div className="flex flex-col gap-4 lg:min-h-0 lg:overflow-hidden">
           <div className="flex items-center gap-3">
-            <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-              <Input 
-                placeholder="Buscar imóvel..." 
-                className="pl-12 h-14 rounded-2xl border-none bg-white shadow-lg text-base font-bold focus-visible:ring-blue-500/20"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+            <div className="flex-1"></div>
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
@@ -485,7 +488,7 @@ function FieldWorkListPage() {
                 }}
                 onStatusUpdate={() => {}} 
               />
-              <div className="fixed bottom-[85px] left-0 right-0 p-4 bg-gradient-to-t from-slate-50/90 via-slate-50/50 to-transparent z-40 lg:hidden pointer-events-none mb-[env(safe-area-inset-bottom)]">
+              <div className="fixed bottom-[100px] left-0 right-0 p-4 bg-gradient-to-t from-slate-50/95 via-slate-50/50 to-transparent z-40 lg:hidden pointer-events-none pb-[calc(env(safe-area-inset-bottom)+1rem)]">
                 <div className="pointer-events-auto max-w-md mx-auto">
                   <DailyWorkCloser 
                     stats={{

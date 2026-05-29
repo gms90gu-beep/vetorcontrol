@@ -114,7 +114,7 @@ export function LandscapeBulletinLayout({
         </Card>
 
         {/* Progress Card */}
-        <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
+        <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
           <div className="absolute top-0 right-0 p-6 opacity-10">
             <Target className="h-16 w-16" />
           </div>
