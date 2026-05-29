@@ -725,6 +725,7 @@ function PropertyVisitPage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-lg font-bold">Quarteirão {activeSession?.block_number || property?.block_number || "--"}</Badge>
+
             <Badge variant="outline" className="border-slate-200 text-slate-500 rounded-lg font-bold uppercase text-[9px]">
               {translate(property?.type)}
             </Badge>
