@@ -1,11 +1,11 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldAlert, KeyRound, ArrowRight, LogOut } from "lucide-react";
+import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-master")({
@@ -85,7 +85,15 @@ function AdminMasterPage() {
 
   return (
     <div className="w-full min-h-screen bg-slate-950 p-6">
-      <div className="max-w-6xl mx-auto flex justify-end mb-4">
+      <div className="max-w-6xl mx-auto flex justify-end gap-3 mb-4">
+        <Link to="/dashboard">
+          <Button 
+            variant="outline" 
+            className="border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+          >
+            <LayoutDashboard className="mr-2 h-4 w-4" /> Ir para Dashboard
+          </Button>
+        </Link>
         <Button 
           variant="ghost" 
           onClick={handleLogout}
