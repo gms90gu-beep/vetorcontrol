@@ -44,9 +44,12 @@ interface DigitalBulletinTableProps {
 
 export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpdate, indexSurvey }: DigitalBulletinTableProps) {
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "residence": return <Home className="w-4 h-4 text-blue-500" />;
-      case "commerce": return <Store className="w-4 h-4 text-purple-500" />;
+    const lowerType = type?.toLowerCase();
+    switch (lowerType) {
+      case "residence":
+      case "residential": return <Home className="w-4 h-4 text-blue-500" />;
+      case "commerce":
+      case "commercial": return <Store className="w-4 h-4 text-purple-500" />;
       case "vacant_lot": return <MapPin className="w-4 h-4 text-amber-600" />;
       case "strategic_point": return <Warehouse className="w-4 h-4 text-emerald-600" />;
       default: return <Home className="w-4 h-4" />;
