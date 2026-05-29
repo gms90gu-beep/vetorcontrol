@@ -34,15 +34,31 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    if (typeof window === "undefined") {
+      console.debug("[Protected Guard] SSR detectado; validação será feita no cliente.");
+      return;
+    }
+
+    console.debug("[Protected Guard] Verificando sessão protegida...");
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) console.error("[Protected Guard] Erro ao restaurar sessão:", sessionError);
     
     if (!session) {
+      console.warn("[Protected Guard] Sem sessão, redirecionando para login.");
       throw redirect({
         to: "/login",
       });
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      console.warn("[Protected Guard] Sessão inválida ou expirada:", userError);
+      throw redirect({ to: "/login" });
     }
     
     return { session };
@@ -53,26 +69,33 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const router = useRouter();
   const location = useLocation();
-  const [user, setUser] = useState<any>(null);
+  const { user, isReady, signOut } = useAuth();
   const isLandscape = useOrientation();
   const { isOperational, isLoading: isOperationalLoading, userRole } = useOperationalDate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setUser(session.user);
-      }
-    });
-  }, []);
+    if (!isReady) return;
+    if (!user) {
+      console.warn("[Protected Layout] Auth pronto sem usuário; redirecionando para login.");
+      router.navigate({ to: "/login", replace: true });
+    }
+  }, [isReady, router, user]);
 
 
-  if (!user || isOperationalLoading) return null;
+  if (!isReady || !user || isOperationalLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" />
+        <span className="text-sm font-medium">Carregando sessão...</span>
+      </div>
+    );
+  }
 
   // System is now always operational
   // Removed weekend block validation
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     window.location.href = "/login";
   };
 
