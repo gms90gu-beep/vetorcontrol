@@ -10,6 +10,7 @@ import { format, subDays } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Badge } from "@/components/ui/badge";
+import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -137,6 +138,32 @@ export function ReportsDashboard() {
     }
   };
 
+  const handleWeeklyReport = async () => {
+    const { data: { user } } = await supabase.auth.getSession();
+    if (!user) return;
+
+    toast.info("Gerando Boletim Semanal...");
+    const result = await generateWeeklyReportPDF(user.id);
+    
+    if (result) {
+      toast.success("Boletim Semanal gerado!");
+      // Save PDF
+      result.pdf.save(result.fileName);
+    }
+  };
+
+  const handleShareWhatsApp = async () => {
+    const { data: { user } } = await supabase.auth.getSession();
+    if (!user) return;
+
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+    
+    const result = await generateWeeklyReportPDF(user.id);
+    if (result) {
+      openWhatsAppShare(result.fileName, profile?.full_name || "Agente");
+    }
+  };
+
   const isSupervisor = userRole === "supervisor" || userRole === "admin";
 
   return (
@@ -236,9 +263,20 @@ export function ReportsDashboard() {
               <Badge className="bg-white/20 backdrop-blur-md mb-6 font-black uppercase tracking-widest text-[9px]">Geração de Documentos</Badge>
               <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 leading-none">Boletins Oficiais<br/>Automáticos</h3>
               <p className="text-blue-100 text-sm mb-8 max-w-xs font-medium leading-relaxed">Gere boletins semanais e consolidados de ciclo seguindo as normas oficiais do Ministério da Saúde com um clique.</p>
-              <Button className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-[1.25rem] h-14 px-10 font-black uppercase tracking-widest text-xs group-hover:translate-x-2 transition-transform">
-                Gerar Boletim Semanal <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button 
+                  onClick={handleWeeklyReport}
+                  className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-[1.25rem] h-14 px-8 font-black uppercase tracking-widest text-xs transition-all active:scale-95"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Baixar PDF
+                </Button>
+                <Button 
+                  onClick={handleShareWhatsApp}
+                  className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 backdrop-blur-sm border border-emerald-500/20 rounded-[1.25rem] h-14 px-8 font-black uppercase tracking-widest text-xs transition-all active:scale-95"
+                >
+                  <Share2 className="mr-2 h-4 w-4" /> WhatsApp
+                </Button>
+              </div>
             </div>
           </div>
         </div>
