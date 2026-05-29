@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   component: FieldWorkListPage,
@@ -240,7 +241,7 @@ function FieldWorkListPage() {
       return [
         p.number,
         p.type || "Res.",
-        p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
+        p.status === "visited" ? translate("VISITED") : p.status === "closed" ? translate("CLOSED") : p.status === "refused" ? translate("REFUSED") : translate("PENDING"),
         treatmentInfo,
         p.has_focus ? "Sim" : "Não",
         p.is_pending ? "Sim" : "Não",
@@ -689,11 +690,11 @@ function FieldWorkListPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tipo de Imóvel</p>
-                  <p className="font-bold text-slate-800 uppercase text-xs">{selectedProperty?.type || "Residência"}</p>
+                  <p className="font-bold text-slate-800 uppercase text-xs">{translate(selectedProperty?.type)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Atual</p>
-                  <p className="font-bold text-slate-800 uppercase text-xs">{selectedProperty?.status || "Pendente"}</p>
+                  <p className="font-bold text-slate-800 uppercase text-xs">{translate(selectedProperty?.status)}</p>
                 </div>
               </div>
 
