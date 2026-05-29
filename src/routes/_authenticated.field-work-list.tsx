@@ -292,7 +292,7 @@ function FieldWorkListPage() {
         cycle: activeCycle?.number || "01/26",
         week: activeWeek?.number?.toString() || "1",
         block: activeSession?.block_number || "--",
-        street: activeSession?.street_name || "--"
+        street: ""
       }}
       stats={{
         worked: workedCount,
