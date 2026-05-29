@@ -32,15 +32,18 @@ function LoginPage() {
       if (!data.user) throw new Error("Usuário não encontrado");
 
       // Check for first user logic or existing profile
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .maybeSingle();
 
-      let userRole = 'agente';
+      console.log("Role encontrado para o usuário " + data.user.id + ":", profile?.role);
+
+      let userRole = profile?.role;
 
       if (!profile) {
+        console.log("Nenhum perfil encontrado. Verificando se é o primeiro usuário...");
         // If no profile exists, check if any admin_master exists in the system
         const { count } = await supabase
           .from("profiles")
@@ -49,6 +52,7 @@ function LoginPage() {
 
         // If no admin_master exists, this first user becomes the master
         const assignedRole = (count === 0) ? 'admin_master' : 'agente';
+        console.log("Atribuindo papel:", assignedRole);
         
         await supabase.from("profiles").insert({
           id: data.user.id,
@@ -57,12 +61,11 @@ function LoginPage() {
         });
         
         userRole = assignedRole;
-      } else {
-        userRole = profile.role;
       }
 
       toast.success("Login realizado com sucesso!");
       
+      console.log("Redirecionando baseado no role:", userRole);
       if (userRole === 'admin_master') {
         navigate({ to: "/admin-master" as any });
       } else {
