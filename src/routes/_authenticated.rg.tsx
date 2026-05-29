@@ -185,11 +185,11 @@ function RGPage() {
   }, [properties, searchTerm, blockFilter]);
 
   const stats = useMemo(() => {
-    const residence = filteredProperties.filter(p => p.type === 'residence').length;
-    const commerce = filteredProperties.filter(p => p.type === 'commerce').length;
-    const vacant_lot = filteredProperties.filter(p => p.type === 'vacant_lot').length;
-    const strategic_point = filteredProperties.filter(p => p.type === 'strategic_point').length;
-    const others = filteredProperties.filter(p => p.type === 'others').length;
+    const residence = filteredProperties.filter(p => p.type?.toLowerCase() === 'residence' || p.type?.toLowerCase() === 'residential').length;
+    const commerce = filteredProperties.filter(p => p.type?.toLowerCase() === 'commerce' || p.type?.toLowerCase() === 'commercial').length;
+    const vacant_lot = filteredProperties.filter(p => p.type?.toLowerCase() === 'vacant_lot').length;
+    const strategic_point = filteredProperties.filter(p => p.type?.toLowerCase() === 'strategic_point').length;
+    const others = filteredProperties.filter(p => p.type?.toLowerCase() === 'others').length;
     const total = filteredProperties.length;
     const inhabitants = filteredProperties.reduce((sum, p) => sum + (p.inhabitants || 0), 0);
     
