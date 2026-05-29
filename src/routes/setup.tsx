@@ -10,16 +10,7 @@ import { ShieldAlert, UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
-    // Check if there are any admin_master users in the profiles table
-    const { count, error } = await supabase
-      .from("profiles")
-      .select("*", { count: 'exact', head: true })
-      .eq("role", "admin_master");
-    
-    // If there is already an admin master, redirect to login
-    if (!error && count && count > 0) {
-      throw redirect({ to: "/login" });
-    }
+    throw redirect({ to: "/login" });
   },
   component: SetupPage,
 });

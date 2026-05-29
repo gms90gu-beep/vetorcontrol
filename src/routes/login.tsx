@@ -38,54 +38,49 @@ function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // 1. Try normal login
+      const loginEmail = email.includes('@') ? email : `${email}@vetor.com`;
       const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: email.includes('@') ? email : `${email}@vetor.com`, 
+        email: loginEmail, 
         password 
       });
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // Check if it's the admin email from env vars
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-      const userEmail = data.user?.email;
-
-      let userRole = 'agente';
-
-      // Ensure profile exists and check role
-      const { data: profile, error: profileError } = await supabase
+      // Check for first user logic or existing profile
+      const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .maybeSingle();
 
-      if (profile) {
-        userRole = profile.role;
-      }
+      let userRole = 'agente';
 
-      // If it's the admin email, force admin_master role if not set
-      if (adminEmail && userEmail === adminEmail && userRole !== 'admin_master') {
-        const { error: updateError } = await supabase
+      if (!profile) {
+        // If no profile exists, check if any admin_master exists in the system
+        const { count } = await supabase
           .from("profiles")
-          .update({ role: 'admin_master' })
-          .eq("id", data.user.id);
+          .select("*", { count: 'exact', head: true })
+          .eq("role", "admin_master");
+
+        // If no admin_master exists, this first user becomes the master
+        const assignedRole = (count === 0) ? 'admin_master' : 'agente';
         
-        if (!updateError) {
-          userRole = 'admin_master';
-        }
+        await supabase.from("profiles").insert({
+          id: data.user.id,
+          role: assignedRole,
+          full_name: data.user.user_metadata?.full_name || email.split('@')[0]
+        });
+        
+        userRole = assignedRole;
+      } else {
+        userRole = profile.role;
       }
 
       toast.success("Login realizado com sucesso!");
       
-      // Redirect based on role
       if (userRole === 'admin_master') {
         navigate({ to: "/admin-master" as any });
-      } else if (userRole === 'supervisor' || userRole === 'coordenador') {
-        navigate({ to: "/supervision" as any });
       } else {
         navigate({ to: "/dashboard" as any });
       }
