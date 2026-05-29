@@ -10,13 +10,13 @@ import { ShieldAlert, UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
-    // Check if there are any users in the profiles table
-    // (We use profiles as a proxy since we can't count auth.users from client without RPC or service role)
+    // Check if there are any admin_master users in the profiles table
     const { count, error } = await supabase
       .from("profiles")
-      .select("*", { count: 'exact', head: true });
+      .select("*", { count: 'exact', head: true })
+      .eq("role", "admin_master");
     
-    // If there are already users, don't allow access to setup
+    // If there is already an admin master, redirect to login
     if (!error && count && count > 0) {
       throw redirect({ to: "/login" });
     }
@@ -36,7 +36,7 @@ function SetupPage() {
     setIsLoading(true);
 
     try {
-      // 1. Sign up the user
+      // 1. Try to sign up the user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -47,8 +47,10 @@ function SetupPage() {
         }
       });
 
+      let user = authData.user;
+
       if (signUpError) {
-        // If user already exists, try to log in automatically
+        // If user already exists, try to log in
         if (signUpError.message.toLowerCase().includes("user already registered")) {
           const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
             email,
@@ -56,58 +58,47 @@ function SetupPage() {
           });
 
           if (signInError) {
-            toast.error(
-              <div className="flex flex-col gap-2">
-                <span>Usuário já existe. Acesse pelo login.</span>
-                <Button variant="outline" size="sm" onClick={() => navigate({ to: "/login" })}>
-                  Ir para Login
-                </Button>
-              </div>,
-              { duration: 5000 }
-            );
+            toast.error("Usuário já existe com senha diferente. Acesse pelo login.");
+            navigate({ to: "/login" });
             return;
           }
-
-          if (signInData.user) {
-            // Check if admin_master role is set
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("role")
-              .eq("id", signInData.user.id)
-              .maybeSingle();
-
-            if (!profile || profile.role !== 'admin_master') {
-              await supabase
-                .from("profiles")
-                .update({ role: "admin_master" })
-                .eq("id", signInData.user.id);
-            }
-
-            toast.success("Login automático realizado como Admin Master");
-            navigate({ to: "/admin-master" as any });
-            return;
-          }
+          user = signInData.user;
+        } else {
+          throw signUpError;
         }
-        throw signUpError;
       }
 
-      if (!authData.user) throw new Error("Erro ao criar usuário");
+      if (!user) throw new Error("Erro ao acessar conta");
 
-      // 2. Set as admin_master
-      // Wait a bit for triggers to finish.
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 2. Ensure profile exists and has admin_master role
+      // Wait a bit for auth triggers to complete profile creation if it was a new signup
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const { error: roleError } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
-        .update({ role: "admin_master" })
-        .eq("id", authData.user.id);
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (roleError) {
-        console.error("Role error:", roleError);
+      if (!profile) {
+        // Insert profile if missing
+        await supabase
+          .from("profiles")
+          .insert({ 
+            id: user.id, 
+            role: "admin_master",
+            full_name: name 
+          });
+      } else if (profile.role !== "admin_master") {
+        // Update role if exists but not admin
+        await supabase
+          .from("profiles")
+          .update({ role: "admin_master" })
+          .eq("id", user.id);
       }
 
-      toast.success("Administrador Master criado com sucesso!");
-      navigate({ to: "/admin-master" as any });
+      toast.success("Administrador Master configurado!");
+      navigate({ to: "/dashboard" as any });
     } catch (error: any) {
       toast.error(error.message || "Erro ao configurar sistema");
     } finally {
