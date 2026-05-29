@@ -36,7 +36,7 @@ serve(async (req) => {
 
       // Validate role permissions
       const targetRole = action === 'create' ? 'agente' : role
-      if (action === 'create_manager' && !['supervisor', 'coordenador'].includes(targetRole)) {
+      if (action === 'create_manager' && !['supervisor', 'coordenador', 'agente'].includes(targetRole)) {
         throw new Error('Invalid manager role')
       }
 
