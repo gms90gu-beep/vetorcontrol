@@ -11,7 +11,10 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
+    if (!session) {
+      console.log("Admin-Master: Sem sessão, redirecionando para login");
+      throw redirect({ to: "/login" });
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -19,9 +22,13 @@ export const Route = createFileRoute("/admin-master")({
       .eq("id", session.user.id)
       .maybeSingle();
     
+    console.log("Admin-Master Check: User ID:", session.user.id, "Role:", profile?.role);
+    
     if (!profile || profile.role !== 'admin_master') {
+      console.log("Admin-Master: Role inválido (" + profile?.role + "), redirecionando para dashboard");
       throw redirect({ to: "/dashboard" });
     }
+    console.log("Admin-Master: Acesso permitido");
   },
   component: AdminMasterPage,
 });
