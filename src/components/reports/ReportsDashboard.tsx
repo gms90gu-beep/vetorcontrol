@@ -139,11 +139,11 @@ export function ReportsDashboard() {
   };
 
   const handleWeeklyReport = async () => {
-    const { data: { user } } = await supabase.auth.getSession();
-    if (!user) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
 
     toast.info("Gerando Boletim Semanal...");
-    const result = await generateWeeklyReportPDF(user.id);
+    const result = await generateWeeklyReportPDF(session.user.id);
     
     if (result) {
       toast.success("Boletim Semanal gerado!");
@@ -153,12 +153,12 @@ export function ReportsDashboard() {
   };
 
   const handleShareWhatsApp = async () => {
-    const { data: { user } } = await supabase.auth.getSession();
-    if (!user) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
 
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
     
-    const result = await generateWeeklyReportPDF(user.id);
+    const result = await generateWeeklyReportPDF(session.user.id);
     if (result) {
       openWhatsAppShare(result.fileName, profile?.full_name || "Agente");
     }
