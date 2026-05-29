@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,16 +30,21 @@ function LoginPage() {
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // ✅ Lê o role direto dos metadados do JWT (sem query no banco)
-      const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
+      // Busca o role diretamente da tabela profiles (RLS desativado)
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
 
-      console.log("Role encontrado nos metadados:", role);
-      console.log("User metadata completo:", data.user.user_metadata);
+      const role = profile?.role;
+
+      console.log("Role encontrado:", role);
+      console.log("Erro de perfil:", profileError);
 
       toast.success("Login realizado com sucesso!");
 
-      // ✅ CORREÇÃO: usar window.location.href para evitar race condition
-      // com o beforeLoad do TanStack Router
+      // Usa window.location.href para evitar race condition com o beforeLoad do TanStack Router
       if (role === "admin_master") {
         console.log("Redirecionando para /admin-master");
         window.location.href = "/admin-master";
