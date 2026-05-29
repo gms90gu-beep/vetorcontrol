@@ -351,7 +351,35 @@ function PropertyVisitPage() {
     }
   }
 
+  const handleEndBlock = async () => {
+    if (!property?.block_id) {
+      toast.error("Quarteirão não definido.");
+      return;
+    }
+    
+    try {
+      // Mark current property as end
+      await supabase
+        .from("properties")
+        .update({ is_block_end: true })
+        .eq("id", propertyId);
+      
+      // Update block status
+      await supabase
+        .from("blocks")
+        .update({ status: 'completed' })
+        .eq("id", property.block_id);
+        
+      toast.success("Quarteirão encerrado com sucesso!");
+      navigate({ to: "/rg" });
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao encerrar quarteirão.");
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
+
     if (!activeSession || isUpdatingStatus || !propertyId) {
       if (!activeSession) toast.error("Inicie uma jornada de trabalho primeiro.");
       return;
