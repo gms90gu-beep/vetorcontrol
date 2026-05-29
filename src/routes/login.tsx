@@ -31,8 +31,8 @@ function LoginPage() {
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // Check for first user logic or existing profile
-      console.log("Iniciando busca de role para o usuário:", data.user.id);
+      // 1. Após login bem sucedido, buscar o role do usuário
+      console.log("Usuário logado ID:", data.user.id);
       
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -40,46 +40,49 @@ function LoginPage() {
         .eq("id", data.user.id)
         .single();
 
-      console.log("Resultado da query profiles.single():", profile, profileError);
-      
-      let userRole = profile?.role;
+      // 3. Mostrar no console o resultado da query de profiles para debug
+      console.log("Resultado da consulta de perfil:", { profile, profileError });
 
+      if (profileError) {
+        console.error("Erro ao buscar perfil:", profileError);
+      }
 
-      if (!profile) {
-        console.log("Perfil não encontrado, verificando se é o primeiro usuário do sistema...");
-        // If no profile exists, check if any admin_master exists in the system
+      const userRole = profile?.role;
+      console.log("Papel detectado:", userRole);
+
+      if (!profile && !profileError) {
+        console.log("Perfil não existe, verificando primeiro usuário...");
         const { count } = await supabase
           .from("profiles")
           .select("*", { count: 'exact', head: true })
           .eq("role", "admin_master");
 
-        // If no admin_master exists, this first user becomes the master
         const assignedRole = (count === 0) ? 'admin_master' : 'agente';
-        console.log("Atribuindo novo papel:", assignedRole);
         
-        const { error: insertError } = await supabase.from("profiles").insert({
+        await supabase.from("profiles").insert({
           id: data.user.id,
           role: assignedRole,
           full_name: data.user.user_metadata?.full_name || email.split('@')[0]
         });
-
-        if (insertError) {
-          console.error("Erro ao criar perfil:", insertError);
-          throw insertError;
-        }
         
-        userRole = assignedRole;
+        console.log("Novo perfil criado com role:", assignedRole);
+        
+        if (assignedRole === 'admin_master') {
+          navigate({ to: "/admin-master" as any });
+        } else {
+          navigate({ to: "/dashboard" as any });
+        }
+        return;
       }
 
       toast.success("Login realizado com sucesso!");
       
-      console.log("Resultado final do role:", userRole);
-      
+      // 2. Se role === 'admin_master' → navigate('/admin-master')
       if (userRole === 'admin_master') {
-        console.log("Redirecionando para /admin-master");
+        console.log("Redirecionando para ADMIN MASTER");
         navigate({ to: "/admin-master" as any });
       } else {
-        console.log("Redirecionando para /dashboard");
+        console.log("Redirecionando para DASHBOARD");
         navigate({ to: "/dashboard" as any });
       }
     } catch (error: any) {
