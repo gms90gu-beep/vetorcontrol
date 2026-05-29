@@ -365,8 +365,9 @@ function FieldWorkPage() {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bairro/Subárea</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.subareas?.name || "--"}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resumo do Quarteirão</p>
+                  <p className="text-xl font-black text-slate-800">Nº {selectedBlock.number}</p>
+
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>
