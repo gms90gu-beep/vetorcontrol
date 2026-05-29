@@ -85,12 +85,15 @@ function RGPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [archivedPDFs, setArchivedPDFs] = useState<any[]>([]);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
   const [resetKey, setResetKey] = useState(0);
+
   const [isDirty, setIsDirty] = useState(false);
   const [bulletinHeader, setBulletinHeader] = useState({
     uf: "CE",
