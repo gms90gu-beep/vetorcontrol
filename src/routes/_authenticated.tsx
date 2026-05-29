@@ -15,6 +15,7 @@ import {
   Home,
   CheckSquare,
   Car,
+  ShieldCheck
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -133,8 +134,12 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     { label: "Relatórios", icon: FileText, to: "/reports" },
   ];
 
-  if (userRole === "supervisor" || userRole === "admin") {
+  if (userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador") {
     navItems.push({ label: "Supervisão", icon: LayoutDashboard, to: "/supervision" as any });
+  }
+
+  if (userRole === "admin_master") {
+    navItems.push({ label: "Admin Master", icon: ShieldCheck, to: "/admin-master" as any });
   }
 
   navItems.push({ label: "Configurações", icon: Settings, to: "/settings" });

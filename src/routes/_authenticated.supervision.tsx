@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/supervision")({
       .eq("user_id", session.user.id)
       .maybeSingle();
 
-    if (!roleData || (roleData.role !== 'supervisor' && roleData.role !== 'admin')) {
+    if (!roleData || !['supervisor', 'coordenador', 'admin_master'].includes(roleData.role)) {
       throw redirect({ to: "/dashboard" });
     }
   },
