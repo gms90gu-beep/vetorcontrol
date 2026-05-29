@@ -284,7 +284,7 @@ function FieldWorkListPage() {
     <LandscapeBulletinLayout
       isLandscape={isLandscape}
       title="Boletim Digital"
-      subtitle={`Quarteirão ${activeSession?.block_number || "--"} • ${activeSession?.street_name || "--"}`}
+      subtitle={`Quarteirão ${activeSession?.block_number || "--"}`}
       agentInfo={{
         municipality: agent?.municipality || "Município",
         name: agent?.name || "Agente",
