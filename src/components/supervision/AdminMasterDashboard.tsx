@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 
 export function AdminMasterDashboard() {
-  const { userRole } = useOperationalDate();
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,7 +30,7 @@ export function AdminMasterDashboard() {
     full_name: "",
     email: "",
     password: "",
-    role: "supervisor" as "supervisor" | "coordenador"
+    role: "supervisor" as "supervisor" | "coordenador" | "agente"
   });
 
   useEffect(() => {
@@ -47,10 +46,8 @@ export function AdminMasterDashboard() {
 
       if (error) throw error;
       
-      // Filter for non-agents (supervisors, coordinators, admin_masters)
-      const managers = data.filter((p: any) => 
-        p.role !== 'agente'
-      );
+      // Show all users for admin master
+      const managers = data;
       
       setUsers(managers);
     } catch (error) {
@@ -115,14 +112,29 @@ export function AdminMasterDashboard() {
             </Badge>
           </div>
           <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic">Central de Comando</h1>
-          <p className="text-slate-400 font-medium">Gestão de alta cúpula: Supervisores e Coordenadores.</p>
+          <p className="text-slate-400 font-medium">Gestão global: Supervisores, Agentes e Coordenadores.</p>
         </div>
 
         <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
           <DialogTrigger asChild>
-            <Button className="rounded-2xl h-14 px-8 font-black bg-white text-slate-950 hover:bg-slate-200 transition-all active:scale-95 shadow-2xl shadow-white/10 uppercase tracking-widest text-xs">
-              <UserPlus className="mr-2 h-5 w-5" /> Adicionar Gestor
-            </Button>
+            <div className="flex flex-wrap gap-4">
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={() => setNewUser(prev => ({ ...prev, role: 'supervisor' }))}
+                  className="rounded-2xl h-14 px-8 font-black bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-95 shadow-2xl shadow-blue-500/10 uppercase tracking-widest text-xs"
+                >
+                  <UserPlus className="mr-2 h-5 w-5" /> Novo Supervisor
+                </Button>
+              </DialogTrigger>
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={() => setNewUser(prev => ({ ...prev, role: 'agente' }))}
+                  className="rounded-2xl h-14 px-8 font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-all active:scale-95 shadow-2xl shadow-emerald-500/10 uppercase tracking-widest text-xs"
+                >
+                  <UserPlus className="mr-2 h-5 w-5" /> Novo Agente
+                </Button>
+              </DialogTrigger>
+            </div>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white rounded-[2.5rem]">
             <DialogHeader>
@@ -166,6 +178,7 @@ export function AdminMasterDashboard() {
                   className="w-full bg-slate-800 border-none rounded-xl h-10 px-3 text-sm font-bold text-white outline-none"
                 >
                   <option value="supervisor">SUPERVISOR</option>
+                  <option value="agente">AGENTE</option>
                   <option value="coordenador">COORDENADOR (BETA)</option>
                 </select>
               </div>
@@ -213,6 +226,7 @@ export function AdminMasterDashboard() {
                     "px-3 py-1 font-black text-[9px] uppercase tracking-[0.2em] border-none rounded-md",
                     user.role === 'admin_master' ? "bg-amber-500 text-slate-950" : 
                     user.role === 'coordenador' ? "bg-blue-500 text-white" : 
+                    user.role === 'agente' ? "bg-emerald-500 text-white" : 
                     "bg-slate-800 text-slate-400"
                   )}>
                     {user.role?.replace('_', ' ')}
