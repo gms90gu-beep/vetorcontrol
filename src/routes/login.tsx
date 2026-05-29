@@ -30,28 +30,24 @@ function LoginPage() {
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // Buscar o role do usuário após login bem sucedido
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
+      // ✅ Lê o role direto dos metadados do JWT (sem query no banco)
+      const role = data.user.user_metadata?.role;
 
-      console.log("Perfil encontrado:", profile);
-      console.log("Erro de perfil:", profileError);
+      console.log("Role encontrado nos metadados:", role);
+      console.log("User metadata completo:", data.user.user_metadata);
 
       toast.success("Login realizado com sucesso!");
 
       // ✅ CORREÇÃO: usar window.location.href para evitar race condition
       // com o beforeLoad do TanStack Router
-      if (profile?.role === "admin_master") {
+      if (role === "admin_master") {
         console.log("Redirecionando para /admin-master");
         window.location.href = "/admin-master";
-      } else if (profile?.role === "supervisor" || profile?.role === "coordenador") {
+      } else if (role === "supervisor" || role === "coordenador") {
         console.log("Redirecionando para /supervision");
         window.location.href = "/supervision";
       } else {
-        console.log("Redirecionando para /dashboard, role:", profile?.role);
+        console.log("Redirecionando para /dashboard, role:", role);
         window.location.href = "/dashboard";
       }
     } catch (error: any) {
