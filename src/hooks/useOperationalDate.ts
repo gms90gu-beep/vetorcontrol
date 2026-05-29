@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Hook to manage operational availability.
@@ -7,32 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export function useOperationalDate() {
   const [isOperational] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchUserRole() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        // Get user role
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        
-        setUserRole(profileData?.role || null);
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchUserRole();
-  }, []);
+  const { role: userRole, isLoading } = useAuth();
 
   // For backward compatibility while we remove references
   const toggleWeekendOperation = async () => true;

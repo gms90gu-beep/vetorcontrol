@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -92,6 +93,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 function DashboardPage() {
   const navigate = useNavigate();
   const { userRole, isLoading: isRoleLoading } = useOperationalDate();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -242,7 +244,7 @@ function DashboardPage() {
   return (
     <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Admin Master Access Button */}
-      {(userRole === 'admin_master' || (typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token')?.includes('gms90gu@gmail.com'))) && (
+      {(userRole === 'admin_master' || user?.email === 'gms90gu@gmail.com') && (
         <Card className="border-2 border-amber-500/50 bg-amber-500/10 p-4 rounded-[2rem] flex items-center justify-between group hover:bg-amber-500/20 transition-all cursor-pointer shadow-lg shadow-amber-500/10" onClick={() => navigate({ to: '/admin-master' as any })}>
           <div className="flex items-center gap-4">
             <div className="h-12 w-12 rounded-2xl bg-amber-500 flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">

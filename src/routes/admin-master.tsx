@@ -1,55 +1,94 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link, useRouter } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard } from "lucide-react";
+import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
+    if (typeof window === "undefined") {
+      console.debug("[Admin-Master Guard] SSR detectado; validação será feita no cliente.");
+      return;
+    }
+
+    console.debug("[Admin-Master Guard] Iniciando verificação de acesso...");
     const {
       data: { session },
+      error: sessionError,
     } = await supabase.auth.getSession();
 
+    if (sessionError) {
+      console.error("[Admin-Master Guard] Erro ao restaurar sessão:", sessionError);
+    }
+
     if (!session) {
-      console.log("Admin-Master: Sem sessão, redirecionando para login");
+      console.warn("[Admin-Master Guard] Sem sessão persistida, redirecionando para login");
       throw redirect({ to: "/login" });
     }
 
+    const { data: verifiedUser, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !verifiedUser.user) {
+      console.warn("[Admin-Master Guard] Sessão existe, mas usuário não foi validado:", userError);
+      throw redirect({ to: "/login" });
+    }
+
+    const user = verifiedUser.user;
+
     // Acesso direto pelo e-mail do criador do sistema — sem query no banco
-    if (session.user.email === "gms90gu@gmail.com") {
-      console.log("Admin-Master: Acesso permitido via e-mail direto");
+    if (user.email === "gms90gu@gmail.com") {
+      console.debug("[Admin-Master Guard] Acesso permitido via e-mail direto");
       return;
     }
 
     // Para outros usuários, verifica o role via RPC (SECURITY DEFINER — ignora RLS)
-    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: session.user.id });
+    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: user.id });
 
-    console.log("Admin-Master Check — User ID:", session.user.id);
-    console.log("Admin-Master Check — Role via RPC:", role);
-    console.log("Admin-Master Check — Erro:", error);
+    console.debug("[Admin-Master Guard] User ID:", user.id);
+    console.debug("[Admin-Master Guard] Role via RPC:", role);
+    console.debug("[Admin-Master Guard] Erro RPC:", error);
 
-    if (!role) {
-      console.log("Admin-Master: Role não encontrado — redirecionando para login");
-      throw redirect({ to: "/login" });
-    }
-
-    if (role !== "admin_master") {
-      console.log("Admin-Master: Role inválido (" + role + ") — redirecionando para dashboard");
+    if (error) {
+      console.error("[Admin-Master Guard] Erro ao validar role — redirecionando para dashboard:", error);
       throw redirect({ to: "/dashboard" });
     }
 
-    console.log("Admin-Master: Acesso permitido ✅");
+    if (role !== "admin_master") {
+      console.warn("[Admin-Master Guard] Role inválido (" + role + ") — redirecionando para dashboard");
+      throw redirect({ to: "/dashboard" });
+    }
+
+    console.debug("[Admin-Master Guard] Acesso permitido ✅");
   },
   component: AdminMasterPage,
 });
 
 function AdminMasterPage() {
+  const router = useRouter();
+  const { user, role, isReady, isRoleLoading, signOut } = useAuth();
   const [password, setPassword] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const hasAdminAccess = user?.email === "gms90gu@gmail.com" || role === "admin_master";
+
+  useEffect(() => {
+    if (!isReady || isRoleLoading) return;
+
+    if (!user) {
+      console.warn("[Admin-Master Page] Sem usuário após hidratação; redirecionando para login.");
+      router.navigate({ to: "/login", replace: true });
+      return;
+    }
+
+    if (!hasAdminAccess) {
+      console.warn("[Admin-Master Page] Usuário sem admin_master; redirecionando para dashboard. Role:", role);
+      router.navigate({ to: "/dashboard", replace: true });
+    }
+  }, [hasAdminAccess, isReady, isRoleLoading, role, router, user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,9 +101,18 @@ function AdminMasterPage() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     window.location.href = "/login";
   };
+
+  if (!isReady || isRoleLoading || !user || !hasAdminAccess) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
+        <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
+        <span className="text-sm font-medium">Validando acesso master...</span>
+      </div>
+    );
+  }
 
   if (!isAuthorized) {
     return (
