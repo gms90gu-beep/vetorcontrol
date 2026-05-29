@@ -20,7 +20,7 @@ import {
   ArrowLeft,
   X
 } from "lucide-react";
-import { generateRGPDF } from "@/lib/pdf-generator";
+import { generateRGPDF, uploadBlockPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
