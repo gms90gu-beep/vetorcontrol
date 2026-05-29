@@ -31,7 +31,7 @@ function LoginPage() {
       if (!data.user) throw new Error("Usuário não encontrado");
 
       // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
-      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { user_id: data.user.id });
+      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: data.user.id });
 
       const role = roleData as string | null;
 
