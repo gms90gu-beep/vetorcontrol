@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import QRCode from "qrcode";
 import { format } from "date-fns";
+import { translate } from "./translations";
 
 interface Property {
   number: string;
@@ -91,8 +92,8 @@ export const generateRGPDF = async (
     p.number || "",
     p.sequence || index + 1,
     p.complement || "",
-    p.type === 'residence' ? 'R' : 
-    p.type === 'commerce' ? 'C' : 
+    (p.type === 'residence' || p.type === 'residential') ? 'R' : 
+    (p.type === 'commerce' || p.type === 'commercial') ? 'C' : 
     p.type === 'vacant_lot' ? 'TB' : 
     p.type === 'strategic_point' ? 'PE' : 'O',
     p.inhabitants || 0

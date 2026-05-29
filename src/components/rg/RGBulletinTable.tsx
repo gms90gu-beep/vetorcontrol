@@ -31,9 +31,12 @@ interface RGBulletinTableProps {
 
 export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTableProps) {
   const getTypeCode = (type: string) => {
-    switch (type) {
-      case "residence": return "R";
-      case "commerce": return "C";
+    const lowerType = type?.toLowerCase();
+    switch (lowerType) {
+      case "residence":
+      case "residential": return "R";
+      case "commerce":
+      case "commercial": return "C";
       case "vacant_lot": return "TB";
       case "strategic_point": return "PE";
       default: return "O";
