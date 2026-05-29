@@ -321,7 +321,8 @@ function FieldWorkPage() {
                           {block.number}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-black text-sm uppercase tracking-tight">{block.subareas?.name || "Sem Nome"}</span>
+                          <span className="font-black text-sm uppercase tracking-tight">Quarteirão {block.number}</span>
+
                           <span className={cn(
                             "text-[10px] font-bold uppercase tracking-widest",
                             selectedBlockId === block.id ? "text-white/60" : "text-slate-500"
