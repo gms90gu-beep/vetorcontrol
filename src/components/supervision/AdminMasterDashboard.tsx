@@ -31,7 +31,7 @@ export function AdminMasterDashboard() {
     full_name: "",
     email: "",
     password: "",
-    role: "supervisor" as "supervisor" | "coordenador"
+    role: "supervisor" as "supervisor" | "coordenador" | "agente"
   });
 
   useEffect(() => {
@@ -120,9 +120,24 @@ export function AdminMasterDashboard() {
 
         <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
           <DialogTrigger asChild>
-            <Button className="rounded-2xl h-14 px-8 font-black bg-white text-slate-950 hover:bg-slate-200 transition-all active:scale-95 shadow-2xl shadow-white/10 uppercase tracking-widest text-xs">
-              <UserPlus className="mr-2 h-5 w-5" /> Adicionar Gestor
-            </Button>
+            <div className="flex flex-wrap gap-4">
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={() => setNewUser(prev => ({ ...prev, role: 'supervisor' }))}
+                  className="rounded-2xl h-14 px-8 font-black bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-95 shadow-2xl shadow-blue-500/10 uppercase tracking-widest text-xs"
+                >
+                  <UserPlus className="mr-2 h-5 w-5" /> Novo Supervisor
+                </Button>
+              </DialogTrigger>
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={() => setNewUser(prev => ({ ...prev, role: 'agente' }))}
+                  className="rounded-2xl h-14 px-8 font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-all active:scale-95 shadow-2xl shadow-emerald-500/10 uppercase tracking-widest text-xs"
+                >
+                  <UserPlus className="mr-2 h-5 w-5" /> Novo Agente
+                </Button>
+              </DialogTrigger>
+            </div>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white rounded-[2.5rem]">
             <DialogHeader>
@@ -166,6 +181,7 @@ export function AdminMasterDashboard() {
                   className="w-full bg-slate-800 border-none rounded-xl h-10 px-3 text-sm font-bold text-white outline-none"
                 >
                   <option value="supervisor">SUPERVISOR</option>
+                  <option value="agente">AGENTE</option>
                   <option value="coordenador">COORDENADOR (BETA)</option>
                 </select>
               </div>

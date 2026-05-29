@@ -10,9 +10,25 @@ import { ShieldAlert, UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
-    throw redirect({ to: "/login" });
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Se o usuário já estiver logado, redirecionar para o dashboard
+    if (session) {
+      throw redirect({ to: "/dashboard" });
+    }
+
+    // Verificar se existe algum admin_master no sistema
+    const { count } = await supabase
+      .from("profiles")
+      .select("*", { count: 'exact', head: true })
+      .eq("role", "admin_master");
+
+    // Se já existir um admin master, redirecionar para o login
+    if (count && count > 0) {
+      throw redirect({ to: "/login" });
+    }
   },
-  component: () => null,
+  component: SetupPage,
 });
 
 function SetupPage() {

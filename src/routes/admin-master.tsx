@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldAlert, KeyRound, ArrowRight } from "lucide-react";
+import { ShieldAlert, KeyRound, ArrowRight, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-master")({
@@ -32,14 +32,17 @@ function AdminMasterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real scenario, this would check against a secure hash or edge function
-    // For now, using a standard master password as requested for the gate
     if (password === "VETOR_ADMIN_2026") {
       setIsAuthorized(true);
       toast.success("Acesso Master Autorizado");
     } else {
       toast.error("Senha Master Incorreta");
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
   };
 
   if (!isAuthorized) {
@@ -82,6 +85,15 @@ function AdminMasterPage() {
 
   return (
     <div className="w-full min-h-screen bg-slate-950 p-6">
+      <div className="max-w-6xl mx-auto flex justify-end mb-4">
+        <Button 
+          variant="ghost" 
+          onClick={handleLogout}
+          className="text-slate-400 hover:text-white hover:bg-white/10"
+        >
+          <LogOut className="mr-2 h-4 w-4" /> Sair
+        </Button>
+      </div>
       <AdminMasterDashboard />
     </div>
   );
