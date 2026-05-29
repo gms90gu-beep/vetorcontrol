@@ -1,12 +1,13 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link, useRouter } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard } from "lucide-react";
+import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
@@ -68,8 +69,26 @@ export const Route = createFileRoute("/admin-master")({
 });
 
 function AdminMasterPage() {
+  const router = useRouter();
+  const { user, role, isReady, isRoleLoading, signOut } = useAuth();
   const [password, setPassword] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const hasAdminAccess = user?.email === "gms90gu@gmail.com" || role === "admin_master";
+
+  useEffect(() => {
+    if (!isReady || isRoleLoading) return;
+
+    if (!user) {
+      console.warn("[Admin-Master Page] Sem usuário após hidratação; redirecionando para login.");
+      router.navigate({ to: "/login", replace: true });
+      return;
+    }
+
+    if (!hasAdminAccess) {
+      console.warn("[Admin-Master Page] Usuário sem admin_master; redirecionando para dashboard. Role:", role);
+      router.navigate({ to: "/dashboard", replace: true });
+    }
+  }, [hasAdminAccess, isReady, isRoleLoading, role, router, user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,9 +101,18 @@ function AdminMasterPage() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     window.location.href = "/login";
   };
+
+  if (!isReady || isRoleLoading || !user || !hasAdminAccess) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
+        <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
+        <span className="text-sm font-medium">Validando acesso master...</span>
+      </div>
+    );
+  }
 
   if (!isAuthorized) {
     return (
