@@ -77,12 +77,8 @@ function FieldWorkPage() {
       // Fetch blocks that have properties and are available
       const { data: blocksData } = await supabase
         .from("blocks")
-        .select(`
-          *,
-          subareas (
-            name
-          )
-        `)
+        .select(`*`)
+
         .order("number", { ascending: true });
       
       if (blocksData) setBlocks(blocksData);
