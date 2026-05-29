@@ -103,10 +103,10 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                   <div className="flex items-center gap-2">
                     {getTypeIcon(prop.type)}
                     <span className="text-[10px] font-bold text-slate-500 uppercase truncate max-w-[80px]">
-                      {prop.type === 'residence' || prop.type === 'RESIDENTIAL' ? 'Residencial' : 
-                       prop.type === 'commerce' || prop.type === 'COMMERCIAL' ? 'Comercial' : 
-                       prop.type === 'vacant_lot' || prop.type === 'VACANT_LOT' ? 'Terreno Baldio' : 
-                       prop.type === 'strategic_point' ? 'Ponto Estratégico' : prop.type}
+                      {(prop.type as string) === 'residence' || (prop.type as string) === 'RESIDENTIAL' ? 'Residencial' : 
+                       (prop.type as string) === 'commerce' || (prop.type as string) === 'COMMERCIAL' ? 'Comercial' : 
+                       (prop.type as string) === 'vacant_lot' || (prop.type as string) === 'VACANT_LOT' ? 'Terreno Baldio' : 
+                       (prop.type as string) === 'strategic_point' ? 'Ponto Estratégico' : prop.type}
                     </span>
                   </div>
                 </TableCell>
