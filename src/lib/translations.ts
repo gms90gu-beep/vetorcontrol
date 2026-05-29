@@ -6,6 +6,7 @@ export const TRANSLATIONS: Record<string, string> = {
   "VACANT_LOT": "Terreno Baldio",
   "vacant_lot": "Terreno Baldio",
   "COMMERCIAL": "Comercial",
+  "commercial": "Comercial",
   "commerce": "Comercial",
   "STRATEGIC_POINT": "Ponto Estratégico",
   "strategic_point": "Ponto Estratégico",
@@ -47,5 +48,6 @@ export const TRANSLATIONS: Record<string, string> = {
 export function translate(key: string | null | undefined): string {
   if (!key) return "";
   const trimmedKey = key.trim();
+  // Try exact match then lowercase match
   return TRANSLATIONS[trimmedKey] || TRANSLATIONS[trimmedKey.toLowerCase()] || trimmedKey;
 }
