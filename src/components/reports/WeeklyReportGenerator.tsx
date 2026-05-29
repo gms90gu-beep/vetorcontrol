@@ -33,7 +33,7 @@ export async function generateWeeklyReportPDF(agentId: string) {
     if (!visits) throw new Error("Erro ao buscar visitas");
 
     const worked = visits.length;
-    const closed = visits.filter(v => v.status === 'CLOSED').length;
+    const closed = visits.filter(v => v.status === 'closed').length;
     const focus = visits.filter(v => v.has_focus).length;
     
     // Coverage per block (unique block IDs)
