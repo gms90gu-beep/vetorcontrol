@@ -551,6 +551,15 @@ function RGPage() {
               <HistoryIcon className="h-4 w-4 text-slate-400" />
               Histórico
             </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
+              onClick={() => setIsArchiveOpen(true)}
+            >
+              <FileText className="h-4 w-4 text-orange-500" />
+              Arquivos
+            </Button>
+
           </div>
           <div className="flex flex-col gap-2">
             <RGImportByPhoto onImportComplete={fetchInitialData} />
