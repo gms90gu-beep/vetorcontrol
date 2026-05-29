@@ -113,7 +113,7 @@ export function LandscapeBulletinLayout({
           </CardContent>
         </Card>
 
-        {/* Progress Card */}
+        {/* Progress Cards */}
         <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
           <div className="absolute top-0 right-0 p-6 opacity-10">
             <Target className="h-16 w-16" />
@@ -129,6 +129,8 @@ export function LandscapeBulletinLayout({
             <Progress value={stats.progress} className="h-2.5 bg-white/10" />
             <p className="text-[8px] font-bold text-blue-200 mt-2 uppercase tracking-widest truncate">{agentInfo.street}</p>
           </CardContent>
+        </Card>
+
         <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
           <div className="absolute top-0 right-0 p-6 opacity-10">
             <Layers className="h-16 w-16" />
