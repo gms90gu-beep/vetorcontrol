@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { Button } from "@/components/ui/button";
 
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
@@ -152,36 +153,48 @@ export function OperationalHeader() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-             <div className="hidden sm:flex flex-col items-end">
+          <div className="flex items-center gap-2 sm:gap-3">
+             <div className="hidden sm:flex flex-col items-end mr-2">
                <span className="text-[9px] font-black text-slate-300 uppercase">Ciclo {activeCycle?.number || "-"} • Semana {activeWeek?.number || "-"}</span>
                <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
              </div>
              
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="relative outline-none group active:scale-95 transition-transform">
-                  <Avatar className="h-10 w-10 border-2 border-white/10 relative shadow-xl">
-                    <AvatarImage src={agent?.photo_url} alt={agent?.name} className="object-cover" />
-                    <AvatarFallback className="bg-slate-800 text-slate-400 font-black text-sm">
-                      {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 mt-2 bg-slate-900 border-white/10 text-white p-2 rounded-2xl shadow-2xl">
-                <DropdownMenuLabel className="px-3 pt-3 pb-2 font-black text-sm uppercase tracking-tight">Menu Operacional</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-white/5 mx-2" />
-                <DropdownMenuItem className="rounded-xl focus:bg-white/5 focus:text-white py-3 cursor-pointer" onClick={() => navigate({ to: "/settings" })}>
-                  <Settings className="mr-3 h-4 w-4 text-blue-400" />
-                  <span className="font-bold text-xs uppercase tracking-widest">Configurações</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="rounded-xl focus:bg-red-500/10 focus:text-red-400 text-red-400 py-3 cursor-pointer" onClick={handleSignOut}>
-                  <LogOut className="mr-3 h-4 w-4" />
-                  <span className="font-bold text-xs uppercase tracking-widest">Sair da Conta</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+             <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-full border border-white/5">
+               <Button 
+                 variant="ghost" 
+                 size="icon" 
+                 className="h-10 w-10 rounded-full text-red-400 hover:bg-red-500/10 hover:text-red-300" 
+                 onClick={handleSignOut}
+                 title="Sair do Sistema"
+               >
+                 <LogOut className="h-5 w-5" />
+               </Button>
+
+               <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative outline-none group active:scale-95 transition-transform">
+                    <Avatar className="h-10 w-10 border-2 border-white/10 relative shadow-xl">
+                      <AvatarImage src={agent?.photo_url} alt={agent?.name} className="object-cover" />
+                      <AvatarFallback className="bg-slate-700 text-slate-400 font-black text-sm">
+                        {agent?.name?.substring(0, 2).toUpperCase() || "AG"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 mt-2 bg-slate-900 border-white/10 text-white p-2 rounded-2xl shadow-2xl">
+                  <DropdownMenuLabel className="px-3 pt-3 pb-2 font-black text-sm uppercase tracking-tight">Menu Operacional</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/5 mx-2" />
+                  <DropdownMenuItem className="rounded-xl focus:bg-white/5 focus:text-white py-3 cursor-pointer" onClick={() => navigate({ to: "/settings" })}>
+                    <Settings className="mr-3 h-4 w-4 text-blue-400" />
+                    <span className="font-bold text-xs uppercase tracking-widest">Configurações</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-xl focus:bg-red-500/10 focus:text-red-400 text-red-400 py-3 cursor-pointer" onClick={handleSignOut}>
+                    <LogOut className="mr-3 h-4 w-4" />
+                    <span className="font-bold text-xs uppercase tracking-widest">Sair da Conta</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+             </div>
           </div>
         </div>
       </div>

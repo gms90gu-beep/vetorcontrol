@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useRouter, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useRouter, useLocation, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -36,6 +36,18 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
+  beforeLoad: async ({ location }) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({
+        to: "/login",
+        search: {
+          redirect: location.href,
+        },
+      });
+    }
+    return { session };
+  },
   component: AuthenticatedLayout,
 });
 
@@ -48,13 +60,12 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "/login";
-      } else {
+      if (session) {
         setUser(session.user);
       }
     });
   }, []);
+
 
   if (!user || isOperationalLoading) return null;
 
@@ -95,8 +106,8 @@ function BottomNav() {
       <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
-      { (userRole === "supervisor" || userRole === "admin") ? (
-        <NavItem to="/supervision" icon={LayoutDashboard} label="Sup." />
+      { (userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador") ? (
+        <NavItem to="/supervision" icon={LayoutDashboard} label="Superv." />
       ) : (
         <NavItem to="/map" icon={MapIcon} label="Mapa" />
       )}

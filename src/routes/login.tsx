@@ -60,13 +60,13 @@ function LoginPage() {
         <form onSubmit={handleLogin}>
           <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1">E-mail</Label>
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1">E-mail ou Matrícula</Label>
               <div className="relative">
                 <Mail className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="seu@email.com"
+                  placeholder="exemplo@vetor.com ou 12345"
                   className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
