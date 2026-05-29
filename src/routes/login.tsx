@@ -32,57 +32,21 @@ function LoginPage() {
       if (!data.user) throw new Error("Usuário não encontrado");
 
       // 1. Após login bem sucedido, buscar o role do usuário
-      console.log("Usuário logado ID:", data.user.id);
-      
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
         .single();
 
-      // 3. Mostrar no console o resultado da query de profiles para debug
-      console.log("Resultado da consulta de perfil:", { profile, profileError });
-
-      if (profileError) {
-        console.error("Erro ao buscar perfil:", profileError);
-      }
-
-      const userRole = profile?.role;
-      console.log("Papel detectado:", userRole);
-
-      if (!profile && !profileError) {
-        console.log("Perfil não existe, verificando primeiro usuário...");
-        const { count } = await supabase
-          .from("profiles")
-          .select("*", { count: 'exact', head: true })
-          .eq("role", "admin_master");
-
-        const assignedRole = (count === 0) ? 'admin_master' : 'agente';
-        
-        await supabase.from("profiles").insert({
-          id: data.user.id,
-          role: assignedRole,
-          full_name: data.user.user_metadata?.full_name || email.split('@')[0]
-        });
-        
-        console.log("Novo perfil criado com role:", assignedRole);
-        
-        if (assignedRole === 'admin_master') {
-          navigate({ to: "/admin-master" as any });
-        } else {
-          navigate({ to: "/dashboard" as any });
-        }
-        return;
-      }
+      console.log("Perfil encontrado:", profile);
 
       toast.success("Login realizado com sucesso!");
       
-      // 2. Se role === 'admin_master' → navigate('/admin-master')
-      if (userRole === 'admin_master') {
-        console.log("Redirecionando para ADMIN MASTER");
+      if (profile?.role === 'admin_master') {
+        console.log("Redirecionando para /admin-master");
         navigate({ to: "/admin-master" as any });
       } else {
-        console.log("Redirecionando para DASHBOARD");
+        console.log("Redirecionando para /dashboard");
         navigate({ to: "/dashboard" as any });
       }
     } catch (error: any) {
