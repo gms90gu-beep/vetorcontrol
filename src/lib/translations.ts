@@ -32,6 +32,7 @@ export const TRANSLATIONS: Record<string, string> = {
   "pending": "Pendente",
   "ACTIVE": "Ativo",
   "active": "Ativo",
+  "not_visited": "Não Visitado",
   
   // Activity Types
   "routine": "Rotina",
