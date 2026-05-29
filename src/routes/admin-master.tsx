@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
