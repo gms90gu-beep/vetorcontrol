@@ -262,7 +262,7 @@ function FieldWorkPage() {
                       "text-base font-black tracking-tight",
                       selectedBlockId ? "text-slate-800" : "text-slate-400"
                     )}>
-                      {selectedBlockId ? selectedBlock?.subareas?.name || "Sem Rua" : "Selecione o quarteirão..."}
+                      {selectedBlockId ? `Quarteirão ${selectedBlock?.number}` : "Selecione o quarteirão..."}
                     </span>
                     {selectedBlockId && (
                       <div className="flex items-center gap-2">
