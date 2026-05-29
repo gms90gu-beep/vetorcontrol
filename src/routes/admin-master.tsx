@@ -10,39 +10,54 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
+    console.debug("[Admin-Master Guard] Iniciando verificação de acesso...");
     const {
       data: { session },
+      error: sessionError,
     } = await supabase.auth.getSession();
 
+    if (sessionError) {
+      console.error("[Admin-Master Guard] Erro ao restaurar sessão:", sessionError);
+    }
+
     if (!session) {
-      console.log("Admin-Master: Sem sessão, redirecionando para login");
+      console.warn("[Admin-Master Guard] Sem sessão persistida, redirecionando para login");
       throw redirect({ to: "/login" });
     }
 
+    const { data: verifiedUser, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !verifiedUser.user) {
+      console.warn("[Admin-Master Guard] Sessão existe, mas usuário não foi validado:", userError);
+      throw redirect({ to: "/login" });
+    }
+
+    const user = verifiedUser.user;
+
     // Acesso direto pelo e-mail do criador do sistema — sem query no banco
-    if (session.user.email === "gms90gu@gmail.com") {
-      console.log("Admin-Master: Acesso permitido via e-mail direto");
+    if (user.email === "gms90gu@gmail.com") {
+      console.debug("[Admin-Master Guard] Acesso permitido via e-mail direto");
       return;
     }
 
     // Para outros usuários, verifica o role via RPC (SECURITY DEFINER — ignora RLS)
-    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: session.user.id });
+    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: user.id });
 
-    console.log("Admin-Master Check — User ID:", session.user.id);
-    console.log("Admin-Master Check — Role via RPC:", role);
-    console.log("Admin-Master Check — Erro:", error);
+    console.debug("[Admin-Master Guard] User ID:", user.id);
+    console.debug("[Admin-Master Guard] Role via RPC:", role);
+    console.debug("[Admin-Master Guard] Erro RPC:", error);
 
-    if (!role) {
-      console.log("Admin-Master: Role não encontrado — redirecionando para login");
-      throw redirect({ to: "/login" });
-    }
-
-    if (role !== "admin_master") {
-      console.log("Admin-Master: Role inválido (" + role + ") — redirecionando para dashboard");
+    if (error) {
+      console.error("[Admin-Master Guard] Erro ao validar role — redirecionando para dashboard:", error);
       throw redirect({ to: "/dashboard" });
     }
 
-    console.log("Admin-Master: Acesso permitido ✅");
+    if (role !== "admin_master") {
+      console.warn("[Admin-Master Guard] Role inválido (" + role + ") — redirecionando para dashboard");
+      throw redirect({ to: "/dashboard" });
+    }
+
+    console.debug("[Admin-Master Guard] Acesso permitido ✅");
   },
   component: AdminMasterPage,
 });
