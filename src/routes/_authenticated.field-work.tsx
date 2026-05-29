@@ -77,12 +77,8 @@ function FieldWorkPage() {
       // Fetch blocks that have properties and are available
       const { data: blocksData } = await supabase
         .from("blocks")
-        .select(`
-          *,
-          subareas (
-            name
-          )
-        `)
+        .select(`*`)
+
         .order("number", { ascending: true });
       
       if (blocksData) setBlocks(blocksData);
@@ -142,7 +138,8 @@ function FieldWorkPage() {
         cycle_id: selectedCycleId,
         week_id: selectedWeekId,
         block_number: selectedBlock?.number || "",
-        street_name: selectedBlock?.subareas?.name || "Rua",
+        street_name: "Logradouro",
+
         property_count: selectedBlock?.total_properties || 0,
         session_date: date.toISOString().split('T')[0],
         status: "in_progress"
@@ -265,7 +262,7 @@ function FieldWorkPage() {
                       "text-base font-black tracking-tight",
                       selectedBlockId ? "text-slate-800" : "text-slate-400"
                     )}>
-                      {selectedBlockId ? selectedBlock?.subareas?.name || "Sem Rua" : "Selecione o quarteirão..."}
+                      {selectedBlockId ? `Quarteirão ${selectedBlock?.number}` : "Selecione o quarteirão..."}
                     </span>
                     {selectedBlockId && (
                       <div className="flex items-center gap-2">
@@ -324,7 +321,8 @@ function FieldWorkPage() {
                           {block.number}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-black text-sm uppercase tracking-tight">{block.subareas?.name || "Sem Nome"}</span>
+                          <span className="font-black text-sm uppercase tracking-tight">Quarteirão {block.number}</span>
+
                           <span className={cn(
                             "text-[10px] font-bold uppercase tracking-widest",
                             selectedBlockId === block.id ? "text-white/60" : "text-slate-500"
@@ -367,8 +365,9 @@ function FieldWorkPage() {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bairro/Subárea</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.subareas?.name || "--"}</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resumo do Quarteirão</p>
+                  <p className="text-xl font-black text-slate-800">Nº {selectedBlock.number}</p>
+
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>

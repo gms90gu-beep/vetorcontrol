@@ -284,7 +284,7 @@ function FieldWorkListPage() {
     <LandscapeBulletinLayout
       isLandscape={isLandscape}
       title="Boletim Digital"
-      subtitle={`Quarteirão ${activeSession?.block_number || "--"} • ${activeSession?.street_name || "--"}`}
+      subtitle={`Quarteirão ${activeSession?.block_number || "--"}`}
       agentInfo={{
         municipality: agent?.municipality || "Município",
         name: agent?.name || "Agente",
@@ -292,7 +292,7 @@ function FieldWorkListPage() {
         cycle: activeCycle?.number || "01/26",
         week: activeWeek?.number?.toString() || "1",
         block: activeSession?.block_number || "--",
-        street: activeSession?.street_name || "--"
+        street: ""
       }}
       stats={{
         worked: workedCount,
@@ -353,7 +353,7 @@ function FieldWorkListPage() {
                     Boletim Digital
                   </h2>
                   <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 truncate max-w-[200px] md:max-w-none">
-                    Quarteirão {activeSession?.block_number} • {activeSession?.street_name}
+                    Quarteirão {activeSession?.block_number}
                   </p>
                 </div>
               </div>

@@ -99,9 +99,9 @@ function RGPage() {
     uf: "CE",
     municipio: "",
     localidade: "",
-    sublocal: "",
     distrito: "",
     categoria: "URBANA",
+
     quarteirao: "",
     sequencia: "01",
     lado: "01",
@@ -235,8 +235,8 @@ function RGPage() {
       uf: "CE",
       municipio: agent?.municipality || "",
       localidade: "",
-      sublocal: "",
       distrito: "",
+
       categoria: "URBANA",
       quarteirao: activeSession?.block_number || "",
       sequencia: "01",

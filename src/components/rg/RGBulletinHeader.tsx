@@ -6,7 +6,6 @@ interface RGBulletinHeaderProps {
     uf: string;
     municipio: string;
     localidade: string;
-    sublocal: string;
     distrito: string;
     categoria: string;
     quarteirao: string;
@@ -41,14 +40,6 @@ export function RGBulletinHeader({ data, onChange }: RGBulletinHeaderProps) {
         <Input 
           value={data.localidade} 
           onChange={(e) => onChange("localidade", e.target.value)}
-          className="h-8 text-[11px] font-black border-slate-300 focus-visible:ring-slate-400 rounded-sm"
-        />
-      </div>
-      <div className="space-y-1 col-span-2 sm:col-span-1">
-        <Label className="text-[9px] text-slate-500">Sublocal</Label>
-        <Input 
-          value={data.sublocal} 
-          onChange={(e) => onChange("sublocal", e.target.value)}
           className="h-8 text-[11px] font-black border-slate-300 focus-visible:ring-slate-400 rounded-sm"
         />
       </div>
