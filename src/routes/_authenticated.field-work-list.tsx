@@ -570,6 +570,10 @@ function FieldWorkListPage() {
                 </div>
                 <p className="text-[10px] font-bold text-emerald-100">{workedCount} de {properties.length} imóveis</p>
               </div>
+              <Progress value={progressPercent} className="h-2.5 bg-white/20" />
+            </CardContent>
+          </Card>
+
           <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
             <div className="absolute top-0 right-0 p-6 opacity-10">
               <Layers className="h-16 w-16" />
@@ -599,8 +603,6 @@ function FieldWorkListPage() {
                 <p className="text-[10px] font-bold text-purple-100">842 de 2000 imóveis</p>
               </div>
               <Progress value={42} className="h-2.5 bg-white/20" />
-            </CardContent>
-          </Card>
             </CardContent>
           </Card>
 
