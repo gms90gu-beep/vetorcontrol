@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 
 type AppRole = "admin_master" | "coordenador" | "supervisor" | "agente" | string;
@@ -58,6 +60,8 @@ async function getRoleForUser(userId: string) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
@@ -119,13 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setIsRoleLoading(false);
       }
+
+      router.invalidate();
+      queryClient.invalidateQueries();
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient, router]);
 
   useEffect(() => {
     if (!isReady) return;
