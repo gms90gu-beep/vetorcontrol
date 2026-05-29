@@ -16,42 +16,46 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const loginEmail = email.includes('@') ? email : `${email}@vetor.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: loginEmail, 
-        password 
+      const loginEmail = email.includes("@") ? email : `${email}@vetor.com`;
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
       });
 
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // 1. Após login bem sucedido, buscar o role do usuário
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
+      // Buscar o role do usuário após login bem sucedido
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
         .single();
 
       console.log("Perfil encontrado:", profile);
+      console.log("Erro de perfil:", profileError);
 
       toast.success("Login realizado com sucesso!");
-      
-      if (profile?.role === 'admin_master') {
+
+      // ✅ CORREÇÃO: usar window.location.href para evitar race condition
+      // com o beforeLoad do TanStack Router
+      if (profile?.role === "admin_master") {
         console.log("Redirecionando para /admin-master");
-        navigate({ to: "/admin-master" as any });
+        window.location.href = "/admin-master";
+      } else if (profile?.role === "supervisor" || profile?.role === "coordenador") {
+        console.log("Redirecionando para /supervision");
+        window.location.href = "/supervision";
       } else {
-        console.log("Redirecionando para /dashboard");
-        navigate({ to: "/dashboard" as any });
+        console.log("Redirecionando para /dashboard, role:", profile?.role);
+        window.location.href = "/dashboard";
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -73,7 +77,9 @@ function LoginPage() {
         <form onSubmit={handleLogin}>
           <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">E-mail ou Matrícula</Label>
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">
+                E-mail ou Matrícula
+              </Label>
               <div className="relative">
                 <Mail className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
                 <Input
@@ -88,7 +94,12 @@ function LoginPage() {
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">Senha</Label>
+                <Label
+                  htmlFor="password"
+                  className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400"
+                >
+                  Senha
+                </Label>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
@@ -103,8 +114,8 @@ function LoginPage() {
                 />
               </div>
             </div>
-            <Button 
-              className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2" 
+            <Button
+              className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -112,13 +123,18 @@ function LoginPage() {
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Entrando...
                 </>
-              ) : "Entrar"}
+              ) : (
+                "Entrar"
+              )}
             </Button>
           </CardContent>
         </form>
         <CardFooter className="flex justify-center pb-10">
           <p className="text-sm text-slate-500 font-medium">
-            Não tem uma conta? <Link to="/signup" className="text-primary font-bold hover:underline">Solicitar acesso</Link>
+            Não tem uma conta?{" "}
+            <Link to="/signup" className="text-primary font-bold hover:underline">
+              Solicitar acesso
+            </Link>
           </p>
         </CardFooter>
       </Card>
