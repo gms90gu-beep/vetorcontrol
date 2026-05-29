@@ -138,7 +138,8 @@ function FieldWorkPage() {
         cycle_id: selectedCycleId,
         week_id: selectedWeekId,
         block_number: selectedBlock?.number || "",
-        street_name: selectedBlock?.subareas?.name || "Rua",
+        street_name: "Logradouro",
+
         property_count: selectedBlock?.total_properties || 0,
         session_date: date.toISOString().split('T')[0],
         status: "in_progress"
