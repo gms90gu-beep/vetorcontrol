@@ -16,6 +16,12 @@ export const Route = createFileRoute("/admin-master")({
       throw redirect({ to: "/login" });
     }
 
+    // Permitir acesso direto para o email específico gms90gu@gmail.com
+    if (session.user.email === 'gms90gu@gmail.com') {
+      console.log("Admin-Master: Acesso permitido via e-mail direto");
+      return;
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
