@@ -47,15 +47,54 @@ function SetupPage() {
         }
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        // If user already exists, try to log in automatically
+        if (signUpError.message.toLowerCase().includes("user already registered")) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+
+          if (signInError) {
+            toast.error(
+              <div className="flex flex-col gap-2">
+                <span>Usuário já existe. Acesse pelo login.</span>
+                <Button variant="outline" size="sm" onClick={() => navigate({ to: "/login" })}>
+                  Ir para Login
+                </Button>
+              </div>,
+              { duration: 5000 }
+            );
+            return;
+          }
+
+          if (signInData.user) {
+            // Check if admin_master role is set
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("role")
+              .eq("id", signInData.user.id)
+              .maybeSingle();
+
+            if (!profile || profile.role !== 'admin_master') {
+              await supabase
+                .from("profiles")
+                .update({ role: "admin_master" })
+                .eq("id", signInData.user.id);
+            }
+
+            toast.success("Login automático realizado como Admin Master");
+            navigate({ to: "/admin-master" as any });
+            return;
+          }
+        }
+        throw signUpError;
+      }
+
       if (!authData.user) throw new Error("Erro ao criar usuário");
 
-      // 2. Set as admin_master (the profile and role should be created by triggers, 
-      // but we ensure it here if possible or just rely on the fact that the first user 
-      // is designated as admin_master in this flow)
-      
-      // Note: Usually a trigger handles profile creation. 
-      // We'll wait a bit for triggers to finish.
+      // 2. Set as admin_master
+      // Wait a bit for triggers to finish.
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       const { error: roleError } = await supabase
@@ -63,14 +102,12 @@ function SetupPage() {
         .update({ role: "admin_master" })
         .eq("id", authData.user.id);
 
-      // If user_roles doesn't exist yet, it might be because the trigger hasn't fired or failed
-      // We don't block on this, but toast a warning
       if (roleError) {
         console.error("Role error:", roleError);
       }
 
       toast.success("Administrador Master criado com sucesso!");
-      navigate({ to: "/login" });
+      navigate({ to: "/admin-master" as any });
     } catch (error: any) {
       toast.error(error.message || "Erro ao configurar sistema");
     } finally {
