@@ -359,6 +359,7 @@ export type Database = {
           id: string
           inhabitants: number | null
           is_abandoned: boolean | null
+          is_block_end: boolean | null
           is_frequently_closed: boolean | null
           latitude: number | null
           longitude: number | null
@@ -384,6 +385,7 @@ export type Database = {
           id?: string
           inhabitants?: number | null
           is_abandoned?: boolean | null
+          is_block_end?: boolean | null
           is_frequently_closed?: boolean | null
           latitude?: number | null
           longitude?: number | null
@@ -409,6 +411,7 @@ export type Database = {
           id?: string
           inhabitants?: number | null
           is_abandoned?: boolean | null
+          is_block_end?: boolean | null
           is_frequently_closed?: boolean | null
           latitude?: number | null
           longitude?: number | null
