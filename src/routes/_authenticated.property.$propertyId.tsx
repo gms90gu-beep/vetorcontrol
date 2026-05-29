@@ -351,12 +351,41 @@ function PropertyVisitPage() {
     }
   }
 
+  const handleEndBlock = async () => {
+    if (!property?.block_id) {
+      toast.error("Quarteirão não definido.");
+      return;
+    }
+    
+    try {
+      // Mark current property as end
+      await supabase
+        .from("properties")
+        .update({ is_block_end: true })
+        .eq("id", propertyId);
+      
+      // Update block status
+      await supabase
+        .from("blocks")
+        .update({ status: 'completed' })
+        .eq("id", property.block_id);
+        
+      toast.success("Quarteirão encerrado com sucesso!");
+      navigate({ to: "/rg" });
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao encerrar quarteirão.");
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
+
     if (!activeSession || isUpdatingStatus || !propertyId) {
       if (!activeSession) toast.error("Inicie uma jornada de trabalho primeiro.");
       return;
     }
     
+
     const previousStatus = status;
     setStatus(newStatus);
     setIsUpdatingStatus(true);
@@ -1118,12 +1147,22 @@ function PropertyVisitPage() {
               </Button>
             )}
           </div>
-          <button 
-            onClick={() => navigate({ to: "/dashboard" })}
-            className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
-          >
-            Tela Inicial
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={handleEndBlock}
+              className="text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center gap-1"
+            >
+              <AlertCircle className="h-3 w-3" />
+              Encerrar Quarteirão
+            </button>
+            <button 
+              onClick={() => navigate({ to: "/dashboard" })}
+              className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
+            >
+              Tela Inicial
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
