@@ -31,7 +31,7 @@ function LoginPage() {
       if (!data.user) throw new Error("Usuário não encontrado");
 
       // ✅ Lê o role direto dos metadados do JWT (sem query no banco)
-      const role = data.user.user_metadata?.role;
+      const role = data.user.app_metadata?.role;
 
       console.log("Role encontrado nos metadados:", role);
       console.log("User metadata completo:", data.user.user_metadata);
