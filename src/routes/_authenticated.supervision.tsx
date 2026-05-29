@@ -7,13 +7,13 @@ export const Route = createFileRoute("/_authenticated/supervision")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
 
-    const { data: roleData } = await supabase
-      .from("user_roles")
+    const { data: profile } = await supabase
+      .from("profiles")
       .select("role")
-      .eq("user_id", session.user.id)
+      .eq("id", session.user.id)
       .maybeSingle();
 
-    if (!roleData || !['supervisor', 'coordenador', 'admin_master'].includes(roleData.role)) {
+    if (!profile || !['supervisor', 'coordenador', 'admin_master'].includes(profile.role)) {
       throw redirect({ to: "/dashboard" });
     }
   },

@@ -43,16 +43,13 @@ export function AdminMasterDashboard() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select(`
-          *,
-          user_roles(role)
-        `);
+        .select("*");
 
       if (error) throw error;
       
       // Filter for non-agents (supervisors, coordinators, admin_masters)
       const managers = data.filter((p: any) => 
-        p.user_roles?.some((r: any) => r.role !== 'agente' && r.role !== 'agent')
+        p.role !== 'agente'
       );
       
       setUsers(managers);
@@ -214,14 +211,14 @@ export function AdminMasterDashboard() {
                 <div className="flex items-center gap-4">
                   <Badge className={cn(
                     "px-3 py-1 font-black text-[9px] uppercase tracking-[0.2em] border-none rounded-md",
-                    user.user_roles?.[0]?.role === 'admin_master' ? "bg-amber-500 text-slate-950" : 
-                    user.user_roles?.[0]?.role === 'coordenador' ? "bg-blue-500 text-white" : 
+                    user.role === 'admin_master' ? "bg-amber-500 text-slate-950" : 
+                    user.role === 'coordenador' ? "bg-blue-500 text-white" : 
                     "bg-slate-800 text-slate-400"
                   )}>
-                    {user.user_roles?.[0]?.role?.replace('_', ' ')}
+                    {user.role?.replace('_', ' ')}
                   </Badge>
 
-                  {user.user_roles?.[0]?.role !== 'admin_master' && (
+                  {user.role !== 'admin_master' && (
                     <Button variant="ghost" size="icon" className="text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all">
                       <Trash2 className="h-5 w-5" />
                     </Button>
