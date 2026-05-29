@@ -86,6 +86,7 @@ function AuthenticatedLayout() {
 
 function BottomNav() {
   const isMobile = useIsMobile();
+  const { userRole } = useOperationalDate();
   if (!isMobile) return null;
 
   return (
@@ -93,8 +94,12 @@ function BottomNav() {
       <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
-      <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Relatórios" />
+      { (userRole === "supervisor" || userRole === "admin") ? (
+        <NavItem to="/supervision" icon={LayoutDashboard} label="Sup." />
+      ) : (
+        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+      )}
+      <NavItem to="/reports" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
@@ -115,6 +120,7 @@ function NavItem({ to, icon: Icon, label }: any) {
 
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const isMobile = useIsMobile();
+  const { userRole } = useOperationalDate();
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
@@ -125,8 +131,13 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     { label: "Pendências", icon: AlertTriangle, to: "/pending" },
     { label: "Mapa", icon: MapIcon, to: "/map" },
     { label: "Relatórios", icon: FileText, to: "/reports" },
-    { label: "Configurações", icon: Settings, to: "/settings" },
   ];
+
+  if (userRole === "supervisor" || userRole === "admin") {
+    navItems.push({ label: "Supervisão", icon: LayoutDashboard, to: "/supervision" as any });
+  }
+
+  navItems.push({ label: "Configurações", icon: Settings, to: "/settings" });
 
   return (
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
