@@ -609,11 +609,11 @@ function FieldWorkListPage() {
 
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Trabalhados", val: workedCount, color: "emerald", icon: CheckCircle2 },
-              { label: "Fechados", val: closedCount, color: "yellow", icon: XCircle },
-              { label: "Recusados", val: refusedCount, color: "red", icon: AlertCircle },
+              { label: translate("worked"), val: workedCount, color: "emerald", icon: CheckCircle2 },
+              { label: translate("CLOSED"), val: closedCount, color: "yellow", icon: XCircle },
+              { label: translate("REFUSED"), val: refusedCount, color: "red", icon: AlertCircle },
               { label: "Focos (+)", val: focusCount, color: "red", icon: BarChart3, highlight: true },
-              { label: "Dep. Tratados", val: treatedDepositsCount, color: "blue", icon: Layers },
+              { label: translate("TREATED"), val: treatedDepositsCount, color: "blue", icon: Layers },
               { label: "Larvicida (g/ml)", val: larvicideUsed, color: "cyan", icon: Droplets }
             ].map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
