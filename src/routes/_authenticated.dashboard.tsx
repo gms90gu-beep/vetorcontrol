@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Search,
   Plus,
-  Target
+  Target,
+  ShieldAlert
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
