@@ -12,7 +12,7 @@ export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
     throw redirect({ to: "/login" });
   },
-  component: SetupPage,
+  component: () => null,
 });
 
 function SetupPage() {
