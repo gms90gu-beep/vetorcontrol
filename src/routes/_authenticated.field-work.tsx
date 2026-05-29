@@ -47,6 +47,7 @@ function FieldWorkPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
