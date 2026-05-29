@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 
 export function AdminMasterDashboard() {
+  const { userRole } = useOperationalDate();
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -256,3 +257,4 @@ export function AdminMasterDashboard() {
 }
 
 import { cn } from "@/lib/utils";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
