@@ -30,21 +30,16 @@ function LoginPage() {
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
 
-      // Busca o role diretamente da tabela profiles (RLS desativado)
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
+      // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
+      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { user_id: data.user.id });
 
-      const role = profile?.role;
+      const role = roleData as string | null;
 
-      console.log("Role encontrado:", role);
-      console.log("Erro de perfil:", profileError);
+      console.log("Role encontrado via RPC:", role);
+      console.log("Erro RPC:", roleError);
 
       toast.success("Login realizado com sucesso!");
 
-      // Usa window.location.href para evitar race condition com o beforeLoad do TanStack Router
       if (role === "admin_master") {
         console.log("Redirecionando para /admin-master");
         window.location.href = "/admin-master";
