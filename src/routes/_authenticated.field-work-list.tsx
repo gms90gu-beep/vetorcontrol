@@ -240,8 +240,8 @@ function FieldWorkListPage() {
       
       return [
         p.number,
-        p.type || "Res.",
-        p.status === "visited" ? translate("VISITED") : p.status === "closed" ? translate("CLOSED") : p.status === "refused" ? translate("REFUSED") : translate("PENDING"),
+        translate(p.type) || "Res.",
+        translate(p.status) || translate("not_visited"),
         treatmentInfo,
         p.has_focus ? "Sim" : "Não",
         p.is_pending ? "Sim" : "Não",
