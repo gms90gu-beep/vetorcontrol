@@ -1,15 +1,29 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ShieldCheck, Mail, Lock } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
+  beforeLoad: async () => {
+    // Check if system needs setup (no users)
+    const { count, error } = await supabase
+      .from("profiles")
+      .select("*", { count: 'exact', head: true });
+    
+    if (!error && count === 0) {
+      throw redirect({ to: "/setup" });
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: LoginPage,
 });
 
@@ -23,8 +37,27 @@ function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      // 1. Try normal login
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.includes('@') ? email : `${email}@vetor.com`, 
+        password 
+      });
+
+      if (error) {
+        // 2. Check for default admin login if env vars are present
+        const defaultEmail = import.meta.env.VITE_ADMIN_EMAIL;
+        const defaultPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
+        if (defaultEmail && defaultPassword && email === defaultEmail && password === defaultPassword) {
+          // If the user matches default credentials but sign-in failed, 
+          // it might be because the user doesn't exist in Auth but we want to allow it?
+          // No, usually we want to ensure they exist.
+          // For now, just show the actual error.
+          throw error;
+        }
+        throw error;
+      }
+
       toast.success("Login realizado com sucesso!");
       navigate({ to: "/dashboard" });
     } catch (error: any) {
@@ -34,18 +67,9 @@ function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/dashboard",
-    });
-    if (result.error) {
-      toast.error(result.error.message || "Erro ao fazer login com Google");
-    }
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md border-none shadow-2xl bg-background/80 backdrop-blur-xl rounded-[2.5rem] overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+      <Card className="w-full max-w-md border-white/10 shadow-2xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden">
         <CardHeader className="space-y-1 text-center pt-10 pb-6">
           <div className="flex justify-center mb-6">
             <div className="h-20 w-20 rounded-[2rem] bg-primary flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 rotate-12 transition-transform hover:rotate-0">
@@ -53,21 +77,20 @@ function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-4xl font-black tracking-tighter text-primary">VetorControl</CardTitle>
-          <CardDescription className="text-base font-medium">
+          <CardDescription className="text-base font-medium text-slate-400">
             Sistema de Controle Vetorial Urbano
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1">E-mail ou Matrícula</Label>
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">E-mail ou Matrícula</Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
+                <Mail className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
                 <Input
                   id="email"
-                  type="email"
                   placeholder="exemplo@vetor.com ou 12345"
-                  className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -76,14 +99,15 @@ function LoginPage() {
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest ml-1">Senha</Label>
+                <Label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">Senha</Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-4 h-5 w-5 text-muted-foreground" />
+                <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
                 <Input
                   id="password"
                   type="password"
-                  className="pl-12 h-14 rounded-2xl border-none bg-accent/50 focus-visible:ring-primary/30 text-base"
+                  placeholder="••••••••"
+                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -94,48 +118,17 @@ function LoginPage() {
               className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2" 
               disabled={isLoading}
             >
-              {isLoading ? "Entrando..." : "Entrar"}
-            </Button>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-widest">
-                <span className="bg-background px-4 text-muted-foreground">Ou continue com</span>
-              </div>
-            </div>
-
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full h-14 rounded-2xl font-bold active:scale-[0.98] transition-all border-none bg-accent/30 hover:bg-accent/50"
-              onClick={handleGoogleLogin}
-            >
-              <svg className="mr-3 h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
-              Google
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Entrando...
+                </>
+              ) : "Entrar"}
             </Button>
           </CardContent>
         </form>
         <CardFooter className="flex justify-center pb-10">
-          <p className="text-sm text-muted-foreground font-medium">
+          <p className="text-sm text-slate-500 font-medium">
             Não tem uma conta? <Link to="/signup" className="text-primary font-bold hover:underline">Solicitar acesso</Link>
           </p>
         </CardFooter>

@@ -38,7 +38,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    
+    // Public paths that should not be redirected
+    const publicPaths = ['/login', '/setup', '/signup'];
+    const isPublicPath = publicPaths.some(path => location.pathname.startsWith(path));
+
+    if (!session && !isPublicPath) {
       throw redirect({
         to: "/login",
         search: {
@@ -46,6 +51,7 @@ export const Route = createFileRoute("/_authenticated")({
         },
       });
     }
+    
     return { session };
   },
   component: AuthenticatedLayout,
