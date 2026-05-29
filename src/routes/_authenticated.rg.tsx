@@ -672,7 +672,64 @@ function RGPage() {
                 <p className="text-2xl font-black text-emerald-600">{stats.strategic_point}</p>
               </div>
             </div>
-          </div>
+      <Dialog open={isArchiveOpen} onOpenChange={setIsArchiveOpen}>
+        <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+              <FileText className="h-6 w-6 text-orange-500" />
+              Arquivo de Quarteirões
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[50vh] pr-4">
+            <div className="space-y-3 py-4">
+              {archivedPDFs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+                  <FileText className="h-8 w-8 mb-2 opacity-20" />
+                  <p className="font-bold uppercase text-[10px]">Nenhum PDF arquivado.</p>
+                </div>
+              ) : (
+                archivedPDFs.map((pdf, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-slate-900 truncate max-w-[200px] sm:max-w-xs">{pdf.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {format(new Date(pdf.created_at), "dd/MM/yyyy HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-50"
+                        onClick={() => handleShareOnWhatsApp(pdf.name)}
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-50"
+                        onClick={async () => {
+                          const { data } = await supabase.storage.from('block-reports').createSignedUrl(pdf.name, 60);
+                          if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+                        }}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
         </div>
       </div>
 
