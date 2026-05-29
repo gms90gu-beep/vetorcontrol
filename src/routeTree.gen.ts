@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
+import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenticated.supervision'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
@@ -49,6 +50,12 @@ const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSupervisionRoute =
+  AuthenticatedSupervisionRouteImport.update({
+    id: '/supervision',
+    path: '/supervision',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/supervision': typeof AuthenticatedSupervisionRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -130,6 +138,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/supervision': typeof AuthenticatedSupervisionRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/': typeof AuthenticatedIndexRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -148,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/rg': typeof AuthenticatedRgRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/supervision': typeof AuthenticatedSupervisionRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/rg'
     | '/settings'
+    | '/supervision'
     | '/vehicles'
     | '/property/$propertyId'
   fileRoutesByTo: FileRoutesByTo
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/rg'
     | '/settings'
+    | '/supervision'
     | '/vehicles'
     | '/'
     | '/property/$propertyId'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/reports'
     | '/_authenticated/rg'
     | '/_authenticated/settings'
+    | '/_authenticated/supervision'
     | '/_authenticated/vehicles'
     | '/_authenticated/'
     | '/_authenticated/property/$propertyId'
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       path: '/vehicles'
       fullPath: '/vehicles'
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/supervision': {
+      id: '/_authenticated/supervision'
+      path: '/supervision'
+      fullPath: '/supervision'
+      preLoaderRoute: typeof AuthenticatedSupervisionRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/settings': {
@@ -330,6 +350,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRgRoute: typeof AuthenticatedRgRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSupervisionRoute: typeof AuthenticatedSupervisionRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
@@ -345,6 +366,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRgRoute: AuthenticatedRgRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSupervisionRoute: AuthenticatedSupervisionRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
@@ -362,3 +384,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
