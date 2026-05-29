@@ -50,6 +50,7 @@ import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable"
 import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
 import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
+import { translate } from "@/lib/translations";
 
 class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode, fallback: ReactNode }) {
@@ -801,11 +802,11 @@ function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="rounded-2xl border-none shadow-2xl">
-            <SelectItem value="residence" className="rounded-xl font-bold">Residencial</SelectItem>
-            <SelectItem value="commerce" className="rounded-xl font-bold">Comércio</SelectItem>
-            <SelectItem value="vacant_lot" className="rounded-xl font-bold">Terreno Baldio</SelectItem>
-            <SelectItem value="strategic_point" className="rounded-xl font-bold">Ponto Estratégico</SelectItem>
-            <SelectItem value="others" className="rounded-xl font-bold">Outros</SelectItem>
+            <SelectItem value="residence" className="rounded-xl font-bold">{translate("residence")}</SelectItem>
+            <SelectItem value="commerce" className="rounded-xl font-bold">{translate("commerce")}</SelectItem>
+            <SelectItem value="vacant_lot" className="rounded-xl font-bold">{translate("vacant_lot")}</SelectItem>
+            <SelectItem value="strategic_point" className="rounded-xl font-bold">{translate("strategic_point")}</SelectItem>
+            <SelectItem value="others" className="rounded-xl font-bold">{translate("others")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
