@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function SupervisionDashboard() {
+  const { userRole } = useOperationalDate();
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -102,7 +103,7 @@ export function SupervisionDashboard() {
       const { data, error } = await supabase.functions.invoke('manage-agents', {
         body: { 
           action: 'create',
-          agentData: newAgent
+          agentData: { ...newAgent, role: 'agente' }
         }
       });
 
@@ -348,3 +349,4 @@ function StatsCard({ title, value, icon: Icon, color }: any) {
 }
 
 import { cn } from "@/lib/utils";
+import { useOperationalDate } from "@/hooks/useOperationalDate";

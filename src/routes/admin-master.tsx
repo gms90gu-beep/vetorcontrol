@@ -1,9 +1,11 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { SupervisionDashboard } from "@/components/supervision/SupervisionDashboard";
+import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/_authenticated/supervision")({
+export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
+    // Note: User can choose to add a secondary password check in the component
+    // but here we check the profile role first.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
 
@@ -13,17 +15,17 @@ export const Route = createFileRoute("/_authenticated/supervision")({
       .eq("user_id", session.user.id)
       .maybeSingle();
 
-    if (!roleData || !['supervisor', 'coordenador', 'admin_master'].includes(roleData.role)) {
+    if (!roleData || roleData.role !== 'admin_master') {
       throw redirect({ to: "/dashboard" });
     }
   },
-  component: SupervisionPage,
+  component: AdminMasterPage,
 });
 
-function SupervisionPage() {
+function AdminMasterPage() {
   return (
-    <div className="w-full h-full pb-20">
-      <SupervisionDashboard />
+    <div className="w-full min-h-screen bg-slate-950 p-6">
+      <AdminMasterDashboard />
     </div>
   );
 }

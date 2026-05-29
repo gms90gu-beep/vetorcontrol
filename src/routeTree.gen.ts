@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AdminMasterRouteImport } from './routes/admin-master'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
@@ -34,6 +35,11 @@ const SignupRoute = SignupRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMasterRoute = AdminMasterRouteImport.update({
+  id: '/admin-master',
+  path: '/admin-master',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -111,6 +117,7 @@ const AuthenticatedPropertyPropertyIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
+  '/admin-master': typeof AdminMasterRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/cycles': typeof AuthenticatedCyclesRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
 export interface FileRoutesByTo {
+  '/admin-master': typeof AdminMasterRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/cycles': typeof AuthenticatedCyclesRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/admin-master': typeof AdminMasterRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin-master'
     | '/login'
     | '/signup'
     | '/cycles'
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/property/$propertyId'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/admin-master'
     | '/login'
     | '/signup'
     | '/cycles'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/admin-master'
     | '/login'
     | '/signup'
     | '/_authenticated/cycles'
@@ -219,6 +231,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AdminMasterRoute: typeof AdminMasterRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
 }
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-master': {
+      id: '/admin-master'
+      path: '/admin-master'
+      fullPath: '/admin-master'
+      preLoaderRoute: typeof AdminMasterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -378,6 +398,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AdminMasterRoute: AdminMasterRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
 }

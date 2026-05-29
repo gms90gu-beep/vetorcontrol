@@ -1021,6 +1021,7 @@ export type Database = {
         Returns: undefined
       }
       get_epi_week: { Args: { d: string }; Returns: number }
+      get_user_role: { Args: { u_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1031,7 +1032,13 @@ export type Database = {
     }
     Enums: {
       activity_type: "routine" | "infestation_survey" | "pending"
-      app_role: "admin" | "supervisor" | "agent"
+      app_role:
+        | "admin"
+        | "supervisor"
+        | "agent"
+        | "admin_master"
+        | "coordenador"
+        | "agente"
       block_status: "not_started" | "in_progress" | "completed"
       cycle_status: "not_started" | "in_progress" | "finished"
       property_status: "active" | "pending" | "deactivated"
@@ -1170,7 +1177,14 @@ export const Constants = {
   public: {
     Enums: {
       activity_type: ["routine", "infestation_survey", "pending"],
-      app_role: ["admin", "supervisor", "agent"],
+      app_role: [
+        "admin",
+        "supervisor",
+        "agent",
+        "admin_master",
+        "coordenador",
+        "agente",
+      ],
       block_status: ["not_started", "in_progress", "completed"],
       cycle_status: ["not_started", "in_progress", "finished"],
       property_status: ["active", "pending", "deactivated"],
