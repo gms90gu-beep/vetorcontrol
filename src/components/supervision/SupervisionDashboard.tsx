@@ -52,21 +52,40 @@ export function SupervisionDashboard() {
   async function fetchAgents() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch agents
+      const { data: profiles, error: profileError } = await supabase
         .from("profiles")
         .select(`
           *,
           user_roles(role)
         `);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
       
-      // Filter for agents only
-      const filteredAgents = data.filter((p: any) => 
+      const filteredAgents = profiles.filter((p: any) => 
         p.user_roles?.some((r: any) => r.role === 'agent')
       );
+
+      // Fetch stats for each agent
+      const { data: visits, error: visitError } = await supabase
+        .from("visits")
+        .select("agent_id, status, has_focus");
+
+      if (visitError) throw visitError;
+
+      const agentsWithStats = filteredAgents.map(agent => {
+        const agentVisits = visits.filter(v => v.agent_id === agent.id);
+        return {
+          ...agent,
+          stats: {
+            worked: agentVisits.length,
+            closed: agentVisits.filter(v => v.status === 'closed').length,
+            focus: agentVisits.filter(v => v.has_focus).length
+          }
+        };
+      });
       
-      setAgents(filteredAgents);
+      setAgents(agentsWithStats);
     } catch (error) {
       console.error("Error fetching agents:", error);
       toast.error("Erro ao carregar lista de agentes");
@@ -253,6 +272,21 @@ export function SupervisionDashboard() {
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Matrícula: {agent.registration_number}</span>
                       <span className="text-slate-300">•</span>
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.city}</span>
+                    </div>
+                    {/* Production stats */}
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Trabalhados</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{agent.stats?.worked || 0}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Fechados</span>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{agent.stats?.closed || 0}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Focos</span>
+                        <span className="text-xs font-bold text-rose-500">{agent.stats?.focus || 0}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
