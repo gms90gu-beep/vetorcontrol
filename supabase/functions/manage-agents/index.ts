@@ -28,20 +28,17 @@ serve(async (req) => {
 
     if (authError || !user) throw new Error('Unauthorized')
 
-    const { data: roleData } = await supabaseClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const { action, agentData, userData } = await req.json()
 
-    if (!roleData || (roleData.role !== 'supervisor' && roleData.role !== 'admin')) {
-      throw new Error('Forbidden: Only supervisors can manage agents')
-    }
+    if (action === 'create' || action === 'create_manager') {
+      const data = action === 'create' ? agentData : userData
+      const { email, password, full_name, registration_number, city, role = 'agente' } = data
 
-    const { action, agentData } = await req.json()
-
-    if (action === 'create') {
-      const { email, password, full_name, registration_number, city } = agentData
+      // Validate role permissions
+      const targetRole = action === 'create' ? 'agente' : role
+      if (action === 'create_manager' && !['supervisor', 'coordenador'].includes(targetRole)) {
+        throw new Error('Invalid manager role')
+      }
 
       // 1. Create user in Auth
       const { data: authUser, error: createError } = await supabaseClient.auth.admin.createUser({
@@ -66,12 +63,12 @@ serve(async (req) => {
 
       if (profileError) throw profileError
 
-      // 3. Set role as agent
+      // 3. Set role
       const { error: roleError } = await supabaseClient
         .from('user_roles')
         .insert({
           user_id: authUser.user.id,
-          role: 'agent'
+          role: targetRole
         })
 
       if (roleError) throw roleError
