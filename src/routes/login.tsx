@@ -44,21 +44,12 @@ function LoginPage() {
       });
 
       if (error) {
-        // 2. Check for default admin login if env vars are present
-        const defaultEmail = import.meta.env.VITE_ADMIN_EMAIL;
-        const defaultPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-
-        if (defaultEmail && defaultPassword && email === defaultEmail && password === defaultPassword) {
-          // If the user matches default credentials but sign-in failed, 
-          // it might be because the user doesn't exist in Auth but we want to allow it?
-          // No, usually we want to ensure they exist.
-          // For now, just show the actual error.
-          throw error;
-        }
         throw error;
       }
 
-      // Check if it's the admin master from env vars
+      if (!data.user) throw new Error("Usuário não encontrado");
+
+      // Check if it's the admin email from env vars
       const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
       const userEmail = data.user?.email;
 
