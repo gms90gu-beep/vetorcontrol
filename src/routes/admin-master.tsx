@@ -10,6 +10,11 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
+    if (typeof window === "undefined") {
+      console.debug("[Admin-Master Guard] SSR detectado; validação será feita no cliente.");
+      return;
+    }
+
     console.debug("[Admin-Master Guard] Iniciando verificação de acesso...");
     const {
       data: { session },
