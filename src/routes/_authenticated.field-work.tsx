@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
@@ -335,7 +336,7 @@ function FieldWorkPage() {
                     "text-xl font-black uppercase tracking-tighter",
                     selectedBlock.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
                   )}>
-                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : 'Não Iniciado'}
+                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : translate(selectedBlock.status)}
                   </p>
                 </div>
                 <div className="space-y-1">

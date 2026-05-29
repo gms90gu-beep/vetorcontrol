@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 interface DailyWorkCloserProps {
   stats?: {
@@ -277,11 +278,11 @@ export function DailyWorkCloser({
           
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <SummaryItem icon={Target} label="Trabalhados" value={stats.worked} color="text-slate-800" />
-              <SummaryItem icon={XCircle} label="Fechados" value={stats.closed} color="text-blue-600" />
-              <SummaryItem icon={XCircle} label="Recusados" value={stats.refused} color="text-red-500" />
+              <SummaryItem icon={Target} label={translate("worked")} value={stats.worked} color="text-slate-800" />
+              <SummaryItem icon={XCircle} label={translate("CLOSED")} value={stats.closed} color="text-blue-600" />
+              <SummaryItem icon={XCircle} label={translate("REFUSED")} value={stats.refused} color="text-red-500" />
               <SummaryItem icon={BarChart3} label="Eliminados" value={stats.eliminated} color="text-emerald-500" />
-              <SummaryItem icon={Layers} label="Tratados" value={stats.treatedDeposits || stats.treated} color="text-indigo-600" />
+              <SummaryItem icon={Layers} label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} color="text-indigo-600" />
               <SummaryItem icon={CheckCircle2} label="Focos Pos." value={stats.focus} color="text-orange-500" />
               <div className="col-span-2 md:col-span-1">
                  <SummaryItem icon={Droplets} label="Larvicida" value={`${stats.larvicideUsed || 0}g`} color="text-cyan-600" />
@@ -355,10 +356,10 @@ export function DailyWorkCloser({
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
             <div className="grid grid-cols-2 gap-3">
               <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
-              <SummaryItemSmall label="Fechados" value={stats.closed} icon={XCircle} />
-              <SummaryItemSmall label="Recusados" value={stats.refused} icon={XCircle} />
+              <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
+              <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
               <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
-              <SummaryItemSmall label="Tratados" value={stats.treatedDeposits || stats.treated} icon={Layers} />
+              <SummaryItemSmall label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} icon={Layers} />
               <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
             </div>
           </div>

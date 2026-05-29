@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 type Property = {
   id: string;
@@ -51,9 +52,12 @@ interface RGDigitalBulletinTableProps {
 
 export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigitalBulletinTableProps) {
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "residence": return <Home className="w-4 h-4 text-blue-500" />;
-      case "commerce": return <Store className="w-4 h-4 text-purple-500" />;
+    const lowerType = type?.toLowerCase();
+    switch (lowerType) {
+      case "residence":
+      case "residential": return <Home className="w-4 h-4 text-blue-500" />;
+      case "commerce":
+      case "commercial": return <Store className="w-4 h-4 text-purple-500" />;
       case "vacant_lot": return <MapPin className="w-4 h-4 text-amber-600" />;
       case "strategic_point": return <Warehouse className="w-4 h-4 text-emerald-600" />;
       default: return <HelpCircle className="w-4 h-4 text-slate-400" />;
@@ -63,9 +67,9 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
   const getStatusBadge = (status?: string | null) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Ativo</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> {translate("OPEN")}</Badge>;
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> Pendente</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       default:
         return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">Novo</Badge>;
     }
@@ -105,10 +109,7 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
                   <div className="flex items-center gap-2">
                     {getTypeIcon(prop.type)}
                     <span className="text-[10px] font-bold text-slate-500 uppercase truncate max-w-[80px]">
-                      {(prop.type as string) === 'residence' || (prop.type as string) === 'RESIDENTIAL' ? 'Residencial' : 
-                       (prop.type as string) === 'commerce' || (prop.type as string) === 'COMMERCIAL' ? 'Comercial' : 
-                       (prop.type as string) === 'vacant_lot' || (prop.type as string) === 'VACANT_LOT' ? 'Terreno Baldio' : 
-                       (prop.type as string) === 'strategic_point' ? 'Ponto Estratégico' : prop.type}
+                      {translate(prop.type)}
                     </span>
                   </div>
                 </TableCell>

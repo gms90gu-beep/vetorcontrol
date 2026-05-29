@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
+import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -364,11 +365,11 @@ function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Trabalhados</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{translate("worked")}</p>
             <p className="text-3xl font-black text-slate-800">{stats.worked}</p>
           </div>
           <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Fechados</p>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{translate("CLOSED")}</p>
             <p className="text-3xl font-black text-blue-600">{stats.closed}</p>
           </div>
         </div>

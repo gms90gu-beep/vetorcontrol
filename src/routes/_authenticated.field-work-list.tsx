@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   component: FieldWorkListPage,
@@ -239,8 +240,8 @@ function FieldWorkListPage() {
       
       return [
         p.number,
-        p.type || "Res.",
-        p.status === "visited" ? "Visitado" : p.status === "closed" ? "Fechado" : p.status === "refused" ? "Recusado" : "Pendente",
+        translate(p.type) || "Res.",
+        translate(p.status) || translate("not_visited"),
         treatmentInfo,
         p.has_focus ? "Sim" : "Não",
         p.is_pending ? "Sim" : "Não",
@@ -608,11 +609,11 @@ function FieldWorkListPage() {
 
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: "Trabalhados", val: workedCount, color: "emerald", icon: CheckCircle2 },
-              { label: "Fechados", val: closedCount, color: "yellow", icon: XCircle },
-              { label: "Recusados", val: refusedCount, color: "red", icon: AlertCircle },
+              { label: translate("worked"), val: workedCount, color: "emerald", icon: CheckCircle2 },
+              { label: translate("CLOSED"), val: closedCount, color: "yellow", icon: XCircle },
+              { label: translate("REFUSED"), val: refusedCount, color: "red", icon: AlertCircle },
               { label: "Focos (+)", val: focusCount, color: "red", icon: BarChart3, highlight: true },
-              { label: "Dep. Tratados", val: treatedDepositsCount, color: "blue", icon: Layers },
+              { label: translate("TREATED"), val: treatedDepositsCount, color: "blue", icon: Layers },
               { label: "Larvicida (g/ml)", val: larvicideUsed, color: "cyan", icon: Droplets }
             ].map((s, i) => (
               <div key={i} className="bg-white p-4 rounded-3xl shadow-md border border-slate-100">
@@ -689,11 +690,11 @@ function FieldWorkListPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tipo de Imóvel</p>
-                  <p className="font-bold text-slate-800 uppercase text-xs">{selectedProperty?.type || "Residência"}</p>
+                  <p className="font-bold text-slate-800 uppercase text-xs">{translate(selectedProperty?.type)}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Status Atual</p>
-                  <p className="font-bold text-slate-800 uppercase text-xs">{selectedProperty?.status || "Pendente"}</p>
+                  <p className="font-bold text-slate-800 uppercase text-xs">{translate(selectedProperty?.status)}</p>
                 </div>
               </div>
 

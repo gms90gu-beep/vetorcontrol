@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 interface OperationalKPIsProps {
   data: {
@@ -36,9 +37,9 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
       <KPICard 
-        label="Trabalhados" 
+        label={translate("worked")} 
         value={data.worked} 
-        icon={Home} 
+        icon={Home}
         color="text-blue-600" 
         bgColor="bg-blue-50" 
         trend="0%" 
@@ -61,9 +62,9 @@ export function OperationalKPIs({ data, isLoading }: OperationalKPIsProps) {
         isCritical
       />
       <KPICard 
-        label="Dep. Tratados" 
+        label={translate("TREATED")} 
         value={data.treated} 
-        icon={CheckCircle2} 
+        icon={CheckCircle2}
         color="text-cyan-600" 
         bgColor="bg-cyan-50" 
         trend="0%"

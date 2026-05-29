@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { translate } from "@/lib/translations";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -400,7 +401,7 @@ function PropertyVisitPage() {
       }
       
       toast.success("Status atualizado", {
-        description: `Imóvel marcado como ${newStatus === 'visited' ? 'Visitado' : newStatus === 'closed' ? 'Fechado' : newStatus === 'refused' ? 'Recusado' : 'Abandonado'}`,
+        description: `Imóvel marcado como ${translate(newStatus)}`,
       });
     } catch (error: any) {
       console.error("Error updating status:", error);
@@ -696,13 +697,13 @@ function PropertyVisitPage() {
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-lg font-bold">Quarteirão {activeSession?.block_number || property?.block_number || "--"}</Badge>
             <Badge variant="outline" className="border-slate-200 text-slate-500 rounded-lg font-bold uppercase text-[9px]">
-              {PROPERTY_TYPE_MAP[property?.type] || property?.type || "Tipo N/A"}
+              {translate(property?.type)}
             </Badge>
             <Badge variant="outline" className={cn(
               "rounded-lg font-bold uppercase text-[9px]",
               (property?.status === "active" || property?.status === "OPEN") ? "border-emerald-200 text-emerald-600 bg-emerald-50" : "border-slate-200 text-slate-500"
             )}>
-              {PROPERTY_STATUS_MAP[property?.status] || property?.status || "Status N/A"}
+              {translate(property?.status)}
             </Badge>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block w-full">Última visita: {property?.last_visit ? new Date(property.last_visit).toLocaleDateString() : 'Nunca'}</span>
           </div>

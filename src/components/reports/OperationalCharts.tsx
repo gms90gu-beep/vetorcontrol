@@ -6,6 +6,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientOnly } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
+import { translate } from "@/lib/translations";
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 const STATUS_COLORS = {
@@ -65,7 +66,7 @@ export function OperationalCharts({
               <div key={i} className="flex items-center justify-between group">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: COLORS[i]}} />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{item.name}</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">{translate(item.name)}</span>
                 </div>
                 <span className="text-xs font-black text-slate-900">{item.value}%</span>
               </div>

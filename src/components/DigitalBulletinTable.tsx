@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { translate } from "@/lib/translations";
 
 interface Property {
   id: string;
@@ -43,9 +44,12 @@ interface DigitalBulletinTableProps {
 
 export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpdate, indexSurvey }: DigitalBulletinTableProps) {
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "residence": return <Home className="w-4 h-4 text-blue-500" />;
-      case "commerce": return <Store className="w-4 h-4 text-purple-500" />;
+    const lowerType = type?.toLowerCase();
+    switch (lowerType) {
+      case "residence":
+      case "residential": return <Home className="w-4 h-4 text-blue-500" />;
+      case "commerce":
+      case "commercial": return <Store className="w-4 h-4 text-purple-500" />;
       case "vacant_lot": return <MapPin className="w-4 h-4 text-amber-600" />;
       case "strategic_point": return <Warehouse className="w-4 h-4 text-emerald-600" />;
       default: return <Home className="w-4 h-4" />;
@@ -55,15 +59,15 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "visited":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Visitado</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       case "closed":
-        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> Fechado</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><Clock className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       case "refused":
-        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><XCircle className="w-2.5 h-2.5 mr-1" /> Recusado</Badge>;
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><XCircle className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       case "abandoned":
-        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><AlertCircle className="w-2.5 h-2.5 mr-1" /> Abandonado</Badge>;
+        return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><AlertCircle className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       default:
-        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">Não Visitado</Badge>;
+        return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">{translate("NOT_VISITED")}</Badge>;
     }
   };
 
@@ -103,10 +107,7 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                   <div className="flex items-center gap-2">
                     {getTypeIcon(prop.type)}
                     <span className="text-[10px] font-bold text-slate-500 uppercase truncate max-w-[80px]">
-                      {(prop.type as string) === 'residence' || (prop.type as string) === 'RESIDENTIAL' ? 'Residencial' : 
-                       (prop.type as string) === 'commerce' || (prop.type as string) === 'COMMERCIAL' ? 'Comercial' : 
-                       (prop.type as string) === 'vacant_lot' || (prop.type as string) === 'VACANT_LOT' ? 'Terreno Baldio' : 
-                       (prop.type as string) === 'strategic_point' ? 'Ponto Estratégico' : prop.type}
+                      {translate(prop.type)}
                     </span>
                   </div>
                 </TableCell>
