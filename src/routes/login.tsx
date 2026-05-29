@@ -9,12 +9,6 @@ import { toast } from "sonner";
 import { ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
-  beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      throw redirect({ to: "/dashboard" });
-    }
-  },
   component: LoginPage,
 });
 

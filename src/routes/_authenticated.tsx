@@ -36,19 +36,12 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Public paths that should not be redirected
-    const publicPaths = ['/login', '/setup', '/signup'];
-    const isPublicPath = publicPaths.some(path => location.pathname.startsWith(path));
-
-    if (!session && !isPublicPath) {
+    if (!session) {
       throw redirect({
         to: "/login",
-        search: {
-          redirect: location.href,
-        },
       });
     }
     
