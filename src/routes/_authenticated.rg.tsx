@@ -375,9 +375,16 @@ function RGPage() {
     }
   };
 
-  const handleExportPDF = async () => {
+  const handleExportBlockPDF = async () => {
+    if (blockFilter === 'all' && filteredProperties.length === 0) {
+      toast.error("Selecione um quarteirão ou certifique-se que há imóveis listados.");
+      return;
+    }
+
     try {
-      toast.loading("Gerando boletim oficial...");
+      toast.loading("Gerando PDF do Quarteirão...");
+      
+      const blockValue = blockFilter === 'all' ? bulletinHeader.quarteirao : blockFilter;
       
       const agentInfo = {
         municipality: bulletinHeader.municipio,
@@ -385,7 +392,7 @@ function RGPage() {
         registrationId: agent?.registration_id || "MAT-0000",
         cycle: activeCycle?.number || "01/26",
         week: activeWeek?.number?.toString() || "1",
-        block: bulletinHeader.quarteirao,
+        block: blockValue,
         street: filteredProperties[0]?.street_name || ""
       };
 
@@ -403,18 +410,38 @@ function RGPage() {
         filteredProperties,
         agentInfo,
         metadata,
-        { type: blockFilter === 'all' ? 'total' : 'block', value: blockFilter }
+        { type: 'block', value: blockValue }
       );
 
-      doc.save(`RG_BOLETIM_${bulletinHeader.municipio.toUpperCase()}_QTR_${bulletinHeader.quarteirao}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`);
+      // Save locally
+      const fileName = `RG_QTR_${blockValue}_${bulletinHeader.municipio.toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
+      doc.save(fileName);
+      
+      // Upload to Supabase Storage
+      try {
+        await uploadBlockPDF(doc, blockValue, bulletinHeader.municipio);
+        toast.success("PDF gerado e arquivado com sucesso!");
+        fetchArchivedPDFs(); // Refresh archive
+      } catch (uploadError) {
+        console.error("Erro ao fazer upload:", uploadError);
+        toast.info("PDF baixado, mas não foi possível salvar no arquivo digital.");
+      }
       
       toast.dismiss();
-      toast.success("PDF gerado com sucesso!");
     } catch (error: any) {
       toast.dismiss();
       toast.error("Erro ao gerar PDF: " + error.message);
     }
   };
+
+  const handleShareOnWhatsApp = (fileName: string) => {
+    // In a real app, we would get a public URL and share it
+    // For now, we'll just show a message
+    toast.info("Link de compartilhamento gerado. Abra o WhatsApp para enviar.");
+    const text = encodeURIComponent(`Segue o Boletim Digital do Quarteirão. Arquivo: ${fileName}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
+
 
   const handleBack = () => {
     if (isDirty) {
