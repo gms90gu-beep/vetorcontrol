@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin-master")({
     }
 
     // Para outros usuários, verifica o role via RPC (SECURITY DEFINER — ignora RLS)
-    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: session.user.id });
+    const { data: role, error } = await supabase.rpc("get_user_role", { user_id: session.user.id });
 
     console.log("Admin-Master Check — User ID:", session.user.id);
     console.log("Admin-Master Check — Role via RPC:", role);
