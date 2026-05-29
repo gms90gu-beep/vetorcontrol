@@ -19,31 +19,26 @@ export const Route = createFileRoute("/admin-master")({
       throw redirect({ to: "/login" });
     }
 
-    // Acesso direto pelo e-mail do criador do sistema
+    // Acesso direto pelo e-mail do criador do sistema — sem query no banco
     if (session.user.email === "gms90gu@gmail.com") {
       console.log("Admin-Master: Acesso permitido via e-mail direto");
       return;
     }
 
-    // ✅ CORREÇÃO: busca o perfil com tratamento de erro explícito
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .maybeSingle();
+    // Para outros usuários, verifica o role via RPC (SECURITY DEFINER — ignora RLS)
+    const { data: role, error } = await supabase.rpc("get_user_role", { user_id: session.user.id });
 
     console.log("Admin-Master Check — User ID:", session.user.id);
-    console.log("Admin-Master Check — Role:", profile?.role);
+    console.log("Admin-Master Check — Role via RPC:", role);
     console.log("Admin-Master Check — Erro:", error);
 
-    // ✅ CORREÇÃO: se perfil não existe, redireciona para login (não dashboard)
-    if (!profile) {
-      console.log("Admin-Master: Perfil não encontrado no banco — redirecionando para login");
+    if (!role) {
+      console.log("Admin-Master: Role não encontrado — redirecionando para login");
       throw redirect({ to: "/login" });
     }
 
-    if (profile.role !== "admin_master") {
-      console.log("Admin-Master: Role inválido (" + profile.role + ") — redirecionando para dashboard");
+    if (role !== "admin_master") {
+      console.log("Admin-Master: Role inválido (" + role + ") — redirecionando para dashboard");
       throw redirect({ to: "/dashboard" });
     }
 
