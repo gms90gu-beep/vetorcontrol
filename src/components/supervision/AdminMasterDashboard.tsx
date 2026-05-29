@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 
 export function AdminMasterDashboard() {
-  const { userRole } = useOperationalDate();
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,10 +46,8 @@ export function AdminMasterDashboard() {
 
       if (error) throw error;
       
-      // Filter for non-agents (supervisors, coordinators, admin_masters)
-      const managers = data.filter((p: any) => 
-        p.role !== 'agente'
-      );
+      // Show all users for admin master
+      const managers = data;
       
       setUsers(managers);
     } catch (error) {
@@ -115,7 +112,7 @@ export function AdminMasterDashboard() {
             </Badge>
           </div>
           <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic">Central de Comando</h1>
-          <p className="text-slate-400 font-medium">Gestão de alta cúpula: Supervisores e Coordenadores.</p>
+          <p className="text-slate-400 font-medium">Gestão global: Supervisores, Agentes e Coordenadores.</p>
         </div>
 
         <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
@@ -229,6 +226,7 @@ export function AdminMasterDashboard() {
                     "px-3 py-1 font-black text-[9px] uppercase tracking-[0.2em] border-none rounded-md",
                     user.role === 'admin_master' ? "bg-amber-500 text-slate-950" : 
                     user.role === 'coordenador' ? "bg-blue-500 text-white" : 
+                    user.role === 'agente' ? "bg-emerald-500 text-white" : 
                     "bg-slate-800 text-slate-400"
                   )}>
                     {user.role?.replace('_', ' ')}
