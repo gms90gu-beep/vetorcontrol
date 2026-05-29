@@ -18,7 +18,8 @@ import {
   ClipboardList,
   AlertCircle,
   ArrowLeft,
-  X
+  X,
+  Edit2
 } from "lucide-react";
 import { generateRGPDF, uploadBlockPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,6 @@ function RGPage() {
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
   const [resetKey, setResetKey] = useState(0);
-
   const [isDirty, setIsDirty] = useState(false);
   const [bulletinHeader, setBulletinHeader] = useState({
     uf: "CE",
@@ -127,15 +127,11 @@ function RGPage() {
         });
 
       if (error) throw error;
-      
-      // Need to fetch files from each block folder if they are organized that way
-      // For now, let's assume flat structure or just list all if flat
       setArchivedPDFs(data || []);
     } catch (error: any) {
       console.error("Erro ao buscar arquivos:", error.message);
     }
   }
-
 
   async function fetchInitialData() {
     setIsLoading(true);
@@ -143,7 +139,6 @@ function RGPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Agent
       const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (agentData) {
         setAgent(agentData);
@@ -154,7 +149,6 @@ function RGPage() {
         }));
       }
 
-      // Session
       const { data: session } = await supabase
         .from("field_work_sessions")
         .select("*")
@@ -173,7 +167,6 @@ function RGPage() {
         }));
       }
 
-      // Cycle/Week
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
       if (cycle) {
         setActiveCycle(cycle);
@@ -301,7 +294,6 @@ function RGPage() {
       setIsLoading(true);
       setIsDeleteDialogOpen(false);
       
-      // Find the specific block record to delete it explicitly if possible
       const blockToDelete = properties.find(p => p.block_number === blockFilter);
       
       const { error: propError } = await supabase
@@ -311,30 +303,17 @@ function RGPage() {
 
       if (propError) throw propError;
 
-      // Try to delete from blocks table by number (or ID if we found it)
       if (blockToDelete?.block_id) {
-        await supabase
-          .from("blocks")
-          .delete()
-          .eq("id", blockToDelete.block_id);
+        await supabase.from("blocks").delete().eq("id", blockToDelete.block_id);
       } else {
-        await supabase
-          .from("blocks")
-          .delete()
-          .eq("number", blockFilter);
+        await supabase.from("blocks").delete().eq("number", blockFilter);
       }
       
-      // If this was the active session block, we should update the session or just clear it locally
       if (activeSession && activeSession.block_number === blockFilter) {
-        await supabase
-          .from("field_work_sessions")
-          .update({ block_number: "" })
-          .eq("id", activeSession.id);
+        await supabase.from("field_work_sessions").update({ block_number: "" }).eq("id", activeSession.id);
       }
       
       toast.success(`Quarteirão ${blockFilter} e seus imóveis foram excluídos.`);
-      
-      // Update local state
       setProperties(prev => prev.filter(p => p.block_number !== blockFilter));
       setBlockFilter("all");
       if (bulletinHeader.quarteirao === blockFilter) {
@@ -347,15 +326,12 @@ function RGPage() {
     }
   };
 
-
-
   const handleSaveHeader = async () => {
     try {
       setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
 
-      // We update the agent information since these fields usually map to the agent's context
       const { error } = await supabase
         .from("agents")
         .update({
@@ -365,7 +341,6 @@ function RGPage() {
         .eq("profile_id", user.id);
 
       if (error) throw error;
-      
       setIsDirty(false);
       toast.success("Cabeçalho salvo com sucesso!");
     } catch (error: any) {
@@ -383,7 +358,6 @@ function RGPage() {
 
     try {
       toast.loading("Gerando PDF do Quarteirão...");
-      
       const blockValue = blockFilter === 'all' ? bulletinHeader.quarteirao : blockFilter;
       
       const agentInfo = {
@@ -406,22 +380,14 @@ function RGPage() {
         inhabitants: stats.inhabitants
       };
 
-      const doc = await generateRGPDF(
-        filteredProperties,
-        agentInfo,
-        metadata,
-        { type: 'block', value: blockValue }
-      );
-
-      // Save locally
+      const doc = await generateRGPDF(filteredProperties, agentInfo, metadata, { type: 'block', value: blockValue });
       const fileName = `RG_QTR_${blockValue}_${bulletinHeader.municipio.toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
       doc.save(fileName);
       
-      // Upload to Supabase Storage
       try {
         await uploadBlockPDF(doc, blockValue, bulletinHeader.municipio);
         toast.success("PDF gerado e arquivado com sucesso!");
-        fetchArchivedPDFs(); // Refresh archive
+        fetchArchivedPDFs();
       } catch (uploadError) {
         console.error("Erro ao fazer upload:", uploadError);
         toast.info("PDF baixado, mas não foi possível salvar no arquivo digital.");
@@ -435,13 +401,10 @@ function RGPage() {
   };
 
   const handleShareOnWhatsApp = (fileName: string) => {
-    // In a real app, we would get a public URL and share it
-    // For now, we'll just show a message
     toast.info("Link de compartilhamento gerado. Abra o WhatsApp para enviar.");
     const text = encodeURIComponent(`Segue o Boletim Digital do Quarteirão. Arquivo: ${fileName}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
-
 
   const handleBack = () => {
     if (isDirty) {
@@ -480,32 +443,17 @@ function RGPage() {
 
   return (
     <div className="flex flex-col bg-slate-100 dark:bg-slate-950 min-h-screen pb-24 lg:pb-8">
-      {/* Sticky Navigation Header */}
       <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm pt-[env(safe-area-inset-top)]">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all rounded-xl h-9"
-            onClick={handleBack}
-          >
+          <Button variant="ghost" size="sm" className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all rounded-xl h-9" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Voltar</span>
           </Button>
-          
           <div className="flex flex-col items-center">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">
-              Boletim Digital
-            </h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">Boletim Digital</h2>
             <div className="h-1 w-6 bg-emerald-500 rounded-full mt-1" />
           </div>
-
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-red-500 transition-all rounded-xl h-9"
-            onClick={handleClose}
-          >
+          <Button variant="ghost" size="sm" className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-red-500 transition-all rounded-xl h-9" onClick={handleClose}>
             <span className="hidden sm:inline">Fechar</span>
             <X className="h-4 w-4" />
           </Button>
@@ -513,292 +461,202 @@ function RGPage() {
       </header>
 
       <div className="flex flex-col gap-4">
-        {/* Existing Content */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 pt-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
-            <ClipboardList className="h-5 w-5 text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">RG Digital</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reconhecimento Geográfico</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[280px]">
-          <div className="flex items-center gap-2 w-full">
-            <Button 
-              variant="outline" 
-              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={handleExportBlockPDF}
-            >
-              <Printer className="h-4 w-4 text-emerald-600" />
-              PDF Quarteirão
-            </Button>
-
-            <Button 
-              variant="outline" 
-              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={handleSaveHeader}
-            >
-              <Save className="h-4 w-4 text-blue-600" />
-              Salvar
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={() => navigate({ to: '/field-work-list' })}
-            >
-              <HistoryIcon className="h-4 w-4 text-slate-400" />
-              Histórico
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={() => setIsArchiveOpen(true)}
-            >
-              <FileText className="h-4 w-4 text-orange-500" />
-              Arquivos
-            </Button>
-
-          </div>
-          <div className="flex flex-col gap-2">
-            <RGImportByPhoto onImportComplete={fetchInitialData} />
-            <Button 
-              variant="ghost" 
-              className="w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 bg-white/50"
-              onClick={handleResetForm}
-            >
-              <Trash2 className="h-4 w-4" />
-              Limpar Campos
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Official Form Style Container */}
-      <div className="px-4 space-y-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-          </div>
-        ) : (
-          <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
-            <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
-            
-            <div className="p-0 overflow-x-auto">
-              <RGBulletinTable 
-                properties={filteredProperties} 
-                onEdit={handlePropertyClick}
-                onDelete={handleDeleteProperty}
-              />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
+              <ClipboardList className="h-5 w-5 text-emerald-400" />
             </div>
-            
-            <RGBulletinFooter stats={stats} />
-          </Card>
-        )}
-
-        {/* Quick Add Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-          <div className="lg:col-span-1">
-            <RGQuickAddForm 
-              key={resetKey}
-              onAdd={handleQuickAdd}
-              lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0}
-              defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""}
-              defaultSide={bulletinHeader.lado}
-            />
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">RG Digital</h1>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reconhecimento Geográfico</p>
+            </div>
           </div>
-          
-          <div className="lg:col-span-2 flex flex-col gap-4">
-            <Card className="border-none shadow-xl bg-white rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Filtrar Território</h3>
-                <Filter className="h-4 w-4 text-slate-400" />
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex-1 min-w-[200px] relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input 
-                    placeholder="Buscar por rua ou número..." 
-                    className="pl-10 h-10 rounded-xl border-slate-100 bg-slate-50 font-bold"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={blockFilter} onValueChange={setBlockFilter}>
-                    <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
-                      <SelectValue placeholder="Quarteirão" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-none shadow-2xl">
-                      <SelectItem value="all">Todos Qtrs</SelectItem>
-                      {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
-                        <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[280px]">
+            <div className="flex items-center gap-2 w-full">
+              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={handleExportBlockPDF}>
+                <Printer className="h-4 w-4 text-emerald-600" />
+                PDF Quarteirão
+              </Button>
+              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={handleSaveHeader}>
+                <Save className="h-4 w-4 text-blue-600" />
+                Salvar
+              </Button>
+              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={() => navigate({ to: '/field-work-list' })}>
+                <HistoryIcon className="h-4 w-4 text-slate-400" />
+                Histórico
+              </Button>
+              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={() => setIsArchiveOpen(true)}>
+                <FileText className="h-4 w-4 text-orange-500" />
+                Arquivos
+              </Button>
+            </div>
+          </div>
+        </div>
 
-                  {blockFilter !== "all" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100"
-                      onClick={() => setIsDeleteDialogOpen(true)}
-                      title="Excluir este quarteirão"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-
+        <div className="px-4 space-y-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+            </div>
+          ) : (
+            <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
+              <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
+              <div className="p-0 overflow-x-auto">
+                <RGBulletinTable properties={filteredProperties} onEdit={handlePropertyClick} onDelete={handleDeleteProperty} />
               </div>
+              <RGBulletinFooter stats={stats} />
             </Card>
+          )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Residencial</p>
-                <p className="text-2xl font-black text-blue-600">{stats.residence}</p>
-              </div>
-              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comercial</p>
-                <p className="text-2xl font-black text-purple-600">{stats.commerce}</p>
-              </div>
-              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">T. Baldio</p>
-                <p className="text-2xl font-black text-amber-600">{stats.vacant_lot}</p>
-              </div>
-              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">P. Estratégico</p>
-                <p className="text-2xl font-black text-emerald-600">{stats.strategic_point}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            <div className="lg:col-span-1">
+              <RGQuickAddForm key={resetKey} onAdd={handleQuickAdd} lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0} defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""} defaultSide={bulletinHeader.lado} />
+            </div>
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              <Card className="border-none shadow-xl bg-white rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Filtrar Território</h3>
+                  <Filter className="h-4 w-4 text-slate-400" />
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-[200px] relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input placeholder="Buscar por rua ou número..." className="pl-10 h-10 rounded-xl border-slate-100 bg-slate-50 font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select value={blockFilter} onValueChange={setBlockFilter}>
+                      <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
+                        <SelectValue placeholder="Quarteirão" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-2xl">
+                        <SelectItem value="all">Todos Qtrs</SelectItem>
+                        {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
+                          <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {blockFilter !== "all" && (
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100" onClick={() => setIsDeleteDialogOpen(true)} title="Excluir este quarteirão">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Residencial</p>
+                  <p className="text-2xl font-black text-blue-600">{stats.residence}</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comercial</p>
+                  <p className="text-2xl font-black text-purple-600">{stats.commerce}</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">T. Baldio</p>
+                  <p className="text-2xl font-black text-amber-600">{stats.vacant_lot}</p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">P. Estratégico</p>
+                  <p className="text-2xl font-black text-emerald-600">{stats.strategic_point}</p>
+                </div>
               </div>
             </div>
-      <Dialog open={isArchiveOpen} onOpenChange={setIsArchiveOpen}>
-        <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-              <FileText className="h-6 w-6 text-orange-500" />
-              Arquivo de Quarteirões
-            </DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="h-[50vh] pr-4">
-            <div className="space-y-3 py-4">
-              {archivedPDFs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-32 text-slate-400">
-                  <FileText className="h-8 w-8 mb-2 opacity-20" />
-                  <p className="font-bold uppercase text-[10px]">Nenhum PDF arquivado.</p>
-                </div>
-              ) : (
-                archivedPDFs.map((pdf, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-orange-600" />
+          </div>
+        </div>
+
+        <Dialog open={isArchiveOpen} onOpenChange={setIsArchiveOpen}>
+          <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                <FileText className="h-6 w-6 text-orange-500" />
+                Arquivo de Quarteirões
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[50vh] pr-4">
+              <div className="space-y-3 py-4">
+                {archivedPDFs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-32 text-slate-400">
+                    <FileText className="h-8 w-8 mb-2 opacity-20" />
+                    <p className="font-bold uppercase text-[10px]">Nenhum PDF arquivado.</p>
+                  </div>
+                ) : (
+                  archivedPDFs.map((pdf, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                          <FileText className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 truncate max-w-[200px] sm:max-w-xs">{pdf.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {format(new Date(pdf.created_at), "dd/MM/yyyy HH:mm")}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-black text-slate-900 truncate max-w-[200px] sm:max-w-xs">{pdf.name}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          {format(new Date(pdf.created_at), "dd/MM/yyyy HH:mm")}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-50"
-                        onClick={() => handleShareOnWhatsApp(pdf.name)}
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-50"
-                        onClick={async () => {
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-50" onClick={() => handleShareOnWhatsApp(pdf.name)}>
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-50" onClick={async () => {
                           const { data } = await supabase.storage.from('block-reports').createSignedUrl(pdf.name, 60);
                           if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-                        }}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                        }}>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
 
-        </div>
-      </div>
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-              <AlertCircle className="h-6 w-6 text-red-500" />
-              Confirmar Exclusão
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-slate-600 font-bold leading-relaxed">
-              Tem certeza que deseja excluir o <span className="text-red-600">Quarteirão {blockFilter}</span>? 
-              Esta ação não pode ser desfeita e todos os {filteredProperties.length} imóveis vinculados serão removidos.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest border-slate-200"
-                onClick={() => setIsDeleteDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest gap-2"
-                onClick={handleDeleteBlock}
-              >
-                <Trash2 className="h-4 w-4" />
-                Sim, Excluir e Salvar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
-          <div className="bg-slate-900 p-8 text-white relative">
-            <div className="absolute top-0 right-0 p-8 opacity-10">
-              <HistoryIcon className="h-24 w-24" />
-            </div>
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black tracking-tighter">
-                {editingProperty ? `Imóvel ${editingProperty.number}` : "Novo Imóvel"}
+              <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+                Confirmar Exclusão
               </DialogTitle>
-              <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">
-                {editingProperty ? "Atualizar Cadastro" : "Cadastro de Território"}
-              </p>
             </DialogHeader>
-          </div>
-          
-          <ScrollArea className="max-h-[60vh] p-6">
-            <PropertyForm 
-              initialData={editingProperty} 
-              onSave={handleSaveProperty} 
-              onCancel={() => setIsFormOpen(false)}
-            />
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+            <div className="py-4 space-y-4">
+              <p className="text-slate-600 font-bold leading-relaxed">
+                Tem certeza que deseja excluir o <span className="text-red-600">Quarteirão {blockFilter}</span>? 
+                Esta ação não pode ser desfeita e todos os {filteredProperties.length} imóveis vinculados serão removidos.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button variant="outline" className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest border-slate-200" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
+                <Button className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest gap-2" onClick={handleDeleteBlock}>
+                  <Trash2 className="h-4 w-4" /> Sim, Excluir e Salvar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
+            <div className="bg-slate-900 p-8 text-white relative">
+              <div className="absolute top-0 right-0 p-8 opacity-10"><HistoryIcon className="h-24 w-24" /></div>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black tracking-tighter">{editingProperty ? `Imóvel ${editingProperty.number}` : "Novo Imóvel"}</DialogTitle>
+                <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">{editingProperty ? "Atualizar Cadastro" : "Cadastro de Território"}</p>
+              </DialogHeader>
+            </div>
+            <ScrollArea className="max-h-[60vh] p-6">
+              <PropertyForm initialData={editingProperty} onSave={handleSaveProperty} onCancel={() => setIsFormOpen(false)} />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
 }
 
-type PropertyFormProps = { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void };
-
-function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
+function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void }) {
   const [formData, setFormData] = useState<Partial<Property>>(initialData || {
     number: "",
     complement: "",
@@ -834,15 +692,8 @@ function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
         id: initialData?.id || undefined
       };
 
-      const { data, error } = await supabase
-        .from("properties")
-        .upsert(propertyToSave)
-        .select()
-        .single();
-
-
+      const { data, error } = await supabase.from("properties").upsert(propertyToSave).select().single();
       if (error) throw error;
-      
       onSave(data as Property);
       toast.success(initialData ? "Atualizado!" : "Cadastrado!");
     } catch (error: any) {
@@ -855,71 +706,37 @@ function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rua</Label>
-          <Input 
-            value={formData.street_name || ""} 
-            onChange={(e) => setFormData({...formData, street_name: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input value={formData.street_name || ""} onChange={(e) => setFormData({...formData, street_name: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Lado</Label>
-          <Input 
-            value={formData.side || ""} 
-            onChange={(e) => setFormData({...formData, side: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input value={formData.side || ""} onChange={(e) => setFormData({...formData, side: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
       </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Número</Label>
-          <Input 
-            value={formData.number} 
-            onChange={(e) => setFormData({...formData, number: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input value={formData.number} onChange={(e) => setFormData({...formData, number: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sequência</Label>
-          <Input 
-            type="number"
-            value={formData.sequence || ""} 
-            onChange={(e) => setFormData({...formData, sequence: parseInt(e.target.value)})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input type="number" value={formData.sequence || ""} onChange={(e) => setFormData({...formData, sequence: parseInt(e.target.value)})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
       </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Complemento</Label>
-          <Input 
-            value={formData.complement || ""} 
-            onChange={(e) => setFormData({...formData, complement: e.target.value})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input value={formData.complement || ""} onChange={(e) => setFormData({...formData, complement: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
         <div className="space-y-2">
           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Habitantes</Label>
-          <Input 
-            type="number"
-            value={formData.inhabitants || 0} 
-            onChange={(e) => setFormData({...formData, inhabitants: parseInt(e.target.value)})}
-            className="rounded-xl border-slate-100 bg-slate-50 font-bold"
-          />
+          <Input type="number" value={formData.inhabitants || 0} onChange={(e) => setFormData({...formData, inhabitants: parseInt(e.target.value)})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
         </div>
       </div>
-
       <div className="space-y-2">
         <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo de Imóvel</Label>
-        <Select 
-          value={formData.type} 
-          onValueChange={(val: any) => setFormData({...formData, type: val})}
-        >
-          <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50 font-bold">
-            <SelectValue />
-          </SelectTrigger>
+        <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
+          <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50 font-bold"><SelectValue /></SelectTrigger>
           <SelectContent className="rounded-2xl border-none shadow-2xl">
             <SelectItem value="residence" className="rounded-xl font-bold">{translate("residence")}</SelectItem>
             <SelectItem value="commerce" className="rounded-xl font-bold">{translate("commerce")}</SelectItem>
@@ -929,20 +746,9 @@ function PropertyForm({ initialData, onSave, onCancel }: PropertyFormProps) {
           </SelectContent>
         </Select>
       </div>
-
       <div className="flex gap-3">
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest"
-          onClick={onCancel}
-        >
-          Cancelar
-        </Button>
-        <Button 
-          type="submit" 
-          className="flex-[2] h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2"
-        >
+        <Button type="button" variant="outline" className="flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" className="flex-[2] h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2">
           <Save className="h-4 w-4" /> Salvar
         </Button>
       </div>
