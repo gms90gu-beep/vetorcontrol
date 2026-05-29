@@ -558,19 +558,19 @@ function FieldWorkListPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
+          <Card className="border-none shadow-xl bg-emerald-600 text-white rounded-[2rem] overflow-hidden relative">
             <div className="absolute top-0 right-0 p-6 opacity-10">
               <Target className="h-16 w-16" />
             </div>
             <CardContent className="p-6">
               <div className="flex justify-between items-end mb-3">
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200 mb-1">Quarteirão {activeSession?.block_number}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-100 mb-1">Quarteirão {activeSession?.block_number}</p>
                   <h3 className="text-2xl font-black tracking-tighter">{progressPercent}%</h3>
                 </div>
-                <p className="text-[10px] font-bold text-blue-200">{workedCount}/{properties.length}</p>
+                <p className="text-[10px] font-bold text-emerald-100">{workedCount} de {properties.length} imóveis</p>
               </div>
-              <Progress value={progressPercent} className="h-1.5 bg-white/10" />
+              <Progress value={progressPercent} className="h-2.5 bg-white/20" />
             </CardContent>
           </Card>
 
