@@ -235,8 +235,8 @@ function RGPage() {
       uf: "CE",
       municipio: agent?.municipality || "",
       localidade: "",
-      sublocal: "",
       distrito: "",
+
       categoria: "URBANA",
       quarteirao: activeSession?.block_number || "",
       sequencia: "01",
