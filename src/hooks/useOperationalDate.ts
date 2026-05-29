@@ -17,13 +17,13 @@ export function useOperationalDate() {
         if (!session) return;
 
         // Get user role
-        const { data: roleData } = await supabase
-          .from("user_roles")
+        const { data: profileData } = await supabase
+          .from("profiles")
           .select("role")
-          .eq("user_id", session.user.id)
+          .eq("id", session.user.id)
           .maybeSingle();
         
-        setUserRole(roleData?.role || null);
+        setUserRole(profileData?.role || null);
       } catch (error) {
         console.error("Error fetching user role:", error);
       } finally {

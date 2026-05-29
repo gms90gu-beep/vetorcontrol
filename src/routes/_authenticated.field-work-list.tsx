@@ -91,12 +91,12 @@ function FieldWorkListPage() {
         setIsLocked(agentData.work_status === 'work_completed');
       }
 
-      const { data: roleData } = await supabase
-        .from("user_roles")
+      const { data: profile } = await supabase
+        .from("profiles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .maybeSingle();
-      if (roleData) setUserRole(roleData.role);
+      if (profile) setUserRole(profile.role);
 
       const { data: cycle } = await supabase
         .from("cycles")

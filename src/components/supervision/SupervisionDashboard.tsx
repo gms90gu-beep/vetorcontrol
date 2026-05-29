@@ -56,15 +56,12 @@ export function SupervisionDashboard() {
       // Fetch agents
       const { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select(`
-          *,
-          user_roles(role)
-        `);
+        .select("*");
 
       if (profileError) throw profileError;
       
       const filteredAgents = profiles.filter((p: any) => 
-        p.user_roles?.some((r: any) => r.role === 'agent')
+        p.role === 'agente' || p.role === 'agent'
       );
 
       // Fetch stats for each agent

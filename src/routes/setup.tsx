@@ -59,9 +59,9 @@ function SetupPage() {
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       const { error: roleError } = await supabase
-        .from("user_roles")
+        .from("profiles")
         .update({ role: "admin_master" })
-        .eq("user_id", authData.user.id);
+        .eq("id", authData.user.id);
 
       // If user_roles doesn't exist yet, it might be because the trigger hasn't fired or failed
       // We don't block on this, but toast a warning

@@ -58,8 +58,45 @@ function LoginPage() {
         throw error;
       }
 
+      // Check if it's the admin master from env vars
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+      const userEmail = data.user?.email;
+
+      let userRole = 'agente';
+
+      // Ensure profile exists and check role
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      if (profile) {
+        userRole = profile.role;
+      }
+
+      // If it's the admin email, force admin_master role if not set
+      if (adminEmail && userEmail === adminEmail && userRole !== 'admin_master') {
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ role: 'admin_master' })
+          .eq("id", data.user.id);
+        
+        if (!updateError) {
+          userRole = 'admin_master';
+        }
+      }
+
       toast.success("Login realizado com sucesso!");
-      navigate({ to: "/dashboard" });
+      
+      // Redirect based on role
+      if (userRole === 'admin_master') {
+        navigate({ to: "/admin-master" as any });
+      } else if (userRole === 'supervisor' || userRole === 'coordenador') {
+        navigate({ to: "/supervision" as any });
+      } else {
+        navigate({ to: "/dashboard" as any });
+      }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
     } finally {

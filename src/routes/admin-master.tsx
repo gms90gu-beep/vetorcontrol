@@ -13,13 +13,13 @@ export const Route = createFileRoute("/admin-master")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
 
-    const { data: roleData } = await supabase
-      .from("user_roles")
+    const { data: profile } = await supabase
+      .from("profiles")
       .select("role")
-      .eq("user_id", session.user.id)
+      .eq("id", session.user.id)
       .maybeSingle();
-
-    if (!roleData || (roleData.role !== 'admin_master' && roleData.role !== 'admin')) {
+    
+    if (!profile || profile.role !== 'admin_master') {
       throw redirect({ to: "/dashboard" });
     }
   },

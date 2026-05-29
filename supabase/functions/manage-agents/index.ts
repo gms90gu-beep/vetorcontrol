@@ -50,28 +50,19 @@ serve(async (req) => {
 
       if (createError) throw createError
 
-      // 2. Create profile
+      // 2. Create profile with role
       const { error: profileError } = await supabaseClient
         .from('profiles')
-        .update({
+        .upsert({
+          id: authUser.user.id,
           full_name,
           registration_number,
           city,
-          is_active: true
-        })
-        .eq('id', authUser.user.id)
-
-      if (profileError) throw profileError
-
-      // 3. Set role
-      const { error: roleError } = await supabaseClient
-        .from('user_roles')
-        .insert({
-          user_id: authUser.user.id,
+          is_active: true,
           role: targetRole
         })
 
-      if (roleError) throw roleError
+      if (profileError) throw profileError;
 
       return new Response(JSON.stringify({ success: true, user: authUser.user }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -333,6 +333,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           registration_number: string | null
+          role: Database["public"]["Enums"]["user_role_type"]
           updated_at: string
         }
         Insert: {
@@ -343,6 +344,7 @@ export type Database = {
           id: string
           is_active?: boolean | null
           registration_number?: string | null
+          role?: Database["public"]["Enums"]["user_role_type"]
           updated_at?: string
         }
         Update: {
@@ -353,6 +355,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           registration_number?: string | null
+          role?: Database["public"]["Enums"]["user_role_type"]
           updated_at?: string
         }
         Relationships: []
@@ -1048,6 +1051,7 @@ export type Database = {
         | "vacant_lot"
         | "strategic_point"
         | "others"
+      user_role_type: "admin_master" | "coordenador" | "supervisor" | "agente"
       visit_status: "visited" | "closed" | "refused" | "abandoned"
     }
     CompositeTypes: {
@@ -1195,6 +1199,7 @@ export const Constants = {
         "strategic_point",
         "others",
       ],
+      user_role_type: ["admin_master", "coordenador", "supervisor", "agente"],
       visit_status: ["visited", "closed", "refused", "abandoned"],
     },
   },
