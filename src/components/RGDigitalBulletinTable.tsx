@@ -104,8 +104,11 @@ export function RGDigitalBulletinTable({ properties, onPropertyClick }: RGDigita
                 <TableCell>
                   <div className="flex items-center gap-2">
                     {getTypeIcon(prop.type)}
-                    <span className="text-[10px] font-bold text-slate-500 uppercase truncate max-w-[60px]">
-                      {prop.type === 'residence' ? 'Res' : prop.type === 'commerce' ? 'Com' : prop.type === 'vacant_lot' ? 'Ter' : prop.type === 'strategic_point' ? 'PE' : 'Out'}
+                    <span className="text-[10px] font-bold text-slate-500 uppercase truncate max-w-[80px]">
+                      {(prop.type as string) === 'residence' || (prop.type as string) === 'RESIDENTIAL' ? 'Residencial' : 
+                       (prop.type as string) === 'commerce' || (prop.type as string) === 'COMMERCIAL' ? 'Comercial' : 
+                       (prop.type as string) === 'vacant_lot' || (prop.type as string) === 'VACANT_LOT' ? 'Terreno Baldio' : 
+                       (prop.type as string) === 'strategic_point' ? 'Ponto Estratégico' : prop.type}
                     </span>
                   </div>
                 </TableCell>
