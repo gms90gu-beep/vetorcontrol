@@ -27,11 +27,17 @@ export const TRANSLATIONS: Record<string, string> = {
   "abandoned": "Abandonado",
   "TREATED": "Tratado",
   "treated": "Tratado",
+  "PENDING": "Pendente",
+  "pending": "Pendente",
+  "ACTIVE": "Ativo",
+  "active": "Ativo",
   
   // Activity Types
   "routine": "Rotina",
   "infestation_survey": "L. Índice",
-  "pending": "Pendência"
+  
+  // KPI Labels
+  "worked": "Trabalhados"
 };
 
 /**
@@ -40,5 +46,6 @@ export const TRANSLATIONS: Record<string, string> = {
  */
 export function translate(key: string | null | undefined): string {
   if (!key) return "";
-  return TRANSLATIONS[key] || TRANSLATIONS[key.toLowerCase()] || key;
+  const trimmedKey = key.trim();
+  return TRANSLATIONS[trimmedKey] || TRANSLATIONS[trimmedKey.toLowerCase()] || trimmedKey;
 }
