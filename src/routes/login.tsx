@@ -10,16 +10,6 @@ import { ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
-    // Check if system needs setup (no admin master)
-    const { count, error } = await supabase
-      .from("profiles")
-      .select("*", { count: 'exact', head: true })
-      .eq("role", "admin_master");
-    
-    if (!error && count === 0) {
-      throw redirect({ to: "/setup" });
-    }
-
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       throw redirect({ to: "/dashboard" });
