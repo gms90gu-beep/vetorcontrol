@@ -121,13 +121,43 @@ export function LandscapeBulletinLayout({
           <CardContent className="p-6">
             <div className="flex justify-between items-end mb-3">
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200 mb-1">Quarteirão {agentInfo.block}</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-100 mb-1">Quarteirão {agentInfo.block}</p>
                 <h3 className="text-2xl font-black tracking-tighter">{stats.progress}%</h3>
               </div>
-              <p className="text-[10px] font-bold text-blue-200">{stats.worked}/{stats.total}</p>
+              <p className="text-[10px] font-bold text-emerald-100">{stats.worked} de {stats.total} imóveis</p>
             </div>
-            <Progress value={stats.progress} className="h-1.5 bg-white/10" />
+            <Progress value={stats.progress} className="h-2.5 bg-white/10" />
             <p className="text-[8px] font-bold text-blue-200 mt-2 uppercase tracking-widest truncate">{agentInfo.street}</p>
+          </CardContent>
+        <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-6 opacity-10">
+            <Layers className="h-16 w-16" />
+          </div>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-end mb-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-200 mb-1">Rua/Logradouro</p>
+                <h3 className="text-2xl font-black tracking-tighter">64%</h3>
+              </div>
+              <p className="text-[10px] font-bold text-blue-200">18 de 28 imóveis</p>
+            </div>
+            <Progress value={64} className="h-2.5 bg-white/10" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-xl bg-purple-600 text-white rounded-[2rem] overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-6 opacity-10">
+            <LayoutDashboard className="h-16 w-16" />
+          </div>
+          <CardContent className="p-6">
+            <div className="flex justify-between items-end mb-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-purple-200 mb-1">Ciclo Atual</p>
+                <h3 className="text-2xl font-black tracking-tighter">42%</h3>
+              </div>
+              <p className="text-[10px] font-bold text-purple-200">842 de 2000 imóveis</p>
+            </div>
+            <Progress value={42} className="h-2.5 bg-white/10" />
           </CardContent>
         </Card>
 
