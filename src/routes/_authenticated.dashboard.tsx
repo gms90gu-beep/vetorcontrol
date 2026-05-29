@@ -91,6 +91,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const { userRole, isLoading: isRoleLoading } = useOperationalDate();
   const [isLoading, setIsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -101,6 +102,7 @@ function DashboardPage() {
   const [blockProgress, setBlockProgress] = useState(0);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [activeWeek, setActiveWeek] = useState<any>(null);
+
 
   const [stats, setStats] = useState({
     worked: 0,
