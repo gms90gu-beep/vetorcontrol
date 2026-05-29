@@ -1145,12 +1145,22 @@ function PropertyVisitPage() {
               </Button>
             )}
           </div>
-          <button 
-            onClick={() => navigate({ to: "/dashboard" })}
-            className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
-          >
-            Tela Inicial
-          </button>
+          <div className="flex gap-4">
+            <button 
+              onClick={handleEndBlock}
+              className="text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center gap-1"
+            >
+              <AlertCircle className="h-3 w-3" />
+              Encerrar Quarteirão
+            </button>
+            <button 
+              onClick={() => navigate({ to: "/dashboard" })}
+              className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
+            >
+              Tela Inicial
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
