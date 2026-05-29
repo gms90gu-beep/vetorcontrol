@@ -38,15 +38,12 @@ function LoginPage() {
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
-        .maybeSingle();
+        .single();
 
-      if (profileError) {
-        console.error("Erro ao buscar profile:", profileError);
-      }
-
-      console.log("Role encontrado no profiles:", profile?.role);
-
+      console.log("Resultado da query profiles.single():", profile, profileError);
+      
       let userRole = profile?.role;
+
 
       if (!profile) {
         console.log("Perfil não encontrado, verificando se é o primeiro usuário do sistema...");
