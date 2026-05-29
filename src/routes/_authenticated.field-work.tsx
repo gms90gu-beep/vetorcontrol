@@ -13,7 +13,8 @@ import {
   Info,
   Layers,
   CalendarDays,
-  Plus
+  Plus,
+  ChevronDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
@@ -44,6 +47,7 @@ function FieldWorkPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
@@ -231,88 +235,111 @@ function FieldWorkPage() {
           </Popover>
         </div>
 
-        {/* Block Selection */}
         <div className="space-y-4">
           <div className="flex items-center justify-between ml-1">
             <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Seleção do Quarteirão</label>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 font-bold rounded-lg border-none">
-              {filteredBlocks.length} disponíveis
-            </Badge>
           </div>
 
-          <div className="relative group">
-            <Search className="absolute left-4 top-4 h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-            <Input 
-              placeholder="Buscar quarteirão pelo número..." 
-              className="pl-12 h-14 rounded-2xl border-none bg-white shadow-md text-base font-bold focus-visible:ring-blue-500/20"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {isLoading ? (
-               <div className="flex flex-col items-center justify-center py-10 gap-3">
-                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando...</p>
-              </div>
-            ) : filteredBlocks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-white rounded-3xl shadow-md gap-4 border-2 border-dashed border-slate-200">
-                <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center">
-                  <MapPin className="h-8 w-8 text-slate-300" />
-                </div>
-                <div>
-                  <p className="text-lg font-black text-slate-800 tracking-tight">Nenhum quarteirão disponível</p>
-                  <p className="text-sm font-medium text-slate-500 mt-1">Não encontramos quarteirões ativos para o seu território.</p>
-                </div>
-                <Button 
-                  onClick={() => navigate({ to: '/rg' })}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 h-12 rounded-2xl gap-2 shadow-lg shadow-blue-200"
-                >
-                  <Plus className="h-5 w-5" />
-                  NOVO QUARTEIRÃO
-                </Button>
-              </div>
-            ) : filteredBlocks.map((block) => (
-              <Card 
-                key={block.id}
+          <Dialog open={isBlockModalOpen} onOpenChange={setIsBlockModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
                 className={cn(
-                  "border-2 transition-all duration-300 rounded-3xl cursor-pointer active:scale-95",
-                  selectedBlockId === block.id 
-                    ? "border-blue-500 bg-blue-50 shadow-blue-100" 
-                    : "border-transparent bg-white shadow-md hover:shadow-lg"
+                  "w-full h-20 rounded-[2rem] border-none bg-white shadow-lg flex items-center justify-between px-6 active:scale-95 transition-all group",
+                  selectedBlockId ? "ring-2 ring-blue-500/20" : ""
                 )}
-                onClick={() => setSelectedBlockId(block.id)}
               >
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "h-14 w-14 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
-                        selectedBlockId === block.id ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"
-                      )}>
-                        <span className="text-xl font-black">{block.number}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-lg font-black tracking-tight text-slate-800">
-                          {block.subareas?.name || "Sem Rua"}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-3 w-3 text-slate-400" />
-                          <span className="text-xs font-bold text-slate-500">{block.total_properties || 0} imóveis</span>
-                        </div>
-                      </div>
-                    </div>
-                    {selectedBlockId === block.id && (
-                      <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
-                        <CheckCircle2 className="h-4 w-4 text-white" />
+                <div className="flex items-center gap-4 text-left">
+                  <div className={cn(
+                    "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
+                    selectedBlockId ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-400"
+                  )}>
+                    {selectedBlockId ? (
+                      <span className="text-xl font-black">{selectedBlock?.number}</span>
+                    ) : (
+                      <MapPin className="h-6 w-6" />
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={cn(
+                      "text-base font-black tracking-tight",
+                      selectedBlockId ? "text-slate-800" : "text-slate-400"
+                    )}>
+                      {selectedBlockId ? selectedBlock?.subareas?.name || "Sem Rua" : "Selecione o quarteirão..."}
+                    </span>
+                    {selectedBlockId && (
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3 w-3 text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedBlock?.total_properties || 0} imóveis</span>
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+                <ChevronDown className="h-5 w-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-[2.5rem] bg-slate-950 border-none shadow-2xl p-0 overflow-hidden">
+              <DialogHeader className="p-8 pb-4">
+                <DialogTitle className="text-xl font-black text-white uppercase tracking-tight">Quarteirões Disponíveis</DialogTitle>
+                <div className="relative mt-4 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
+                  <Input 
+                    placeholder="Buscar quarteirão..." 
+                    className="pl-12 h-14 rounded-2xl border-none bg-white/5 text-white placeholder:text-slate-600 font-bold focus-visible:ring-blue-500/20"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </DialogHeader>
+              <ScrollArea className="max-h-[60vh] px-4 pb-8">
+                <div className="grid grid-cols-1 gap-2 p-4">
+                  {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-10 gap-3">
+                      <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Carregando...</p>
+                    </div>
+                  ) : filteredBlocks.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-6 text-center gap-4">
+                      <p className="text-slate-500 font-bold">Nenhum quarteirão encontrado</p>
+                    </div>
+                  ) : filteredBlocks.map((block) => (
+                    <button
+                      key={block.id}
+                      className={cn(
+                        "w-full p-4 rounded-2xl flex items-center justify-between transition-all active:scale-[0.98] text-left",
+                        selectedBlockId === block.id 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                          : "bg-white/5 text-slate-300 hover:bg-white/10"
+                      )}
+                      onClick={() => {
+                        setSelectedBlockId(block.id);
+                        setIsBlockModalOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "h-12 w-12 rounded-xl flex items-center justify-center font-black text-lg shadow-inner",
+                          selectedBlockId === block.id ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
+                        )}>
+                          {block.number}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-black text-sm uppercase tracking-tight">{block.subareas?.name || "Sem Nome"}</span>
+                          <span className={cn(
+                            "text-[10px] font-bold uppercase tracking-widest",
+                            selectedBlockId === block.id ? "text-white/60" : "text-slate-500"
+                          )}>
+                            {block.total_properties || 0} imóveis
+                          </span>
+                        </div>
+                      </div>
+                      {selectedBlockId === block.id && <CheckCircle2 className="h-5 w-5 text-white" />}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Summary (Conditional) */}
