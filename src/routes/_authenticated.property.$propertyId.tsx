@@ -42,6 +42,25 @@ const DEPOSIT_TYPES = [
   { code: "E", name: "Depósitos naturais" }
 ];
 
+const PROPERTY_TYPE_MAP: Record<string, string> = {
+  "residence": "Residencial",
+  "commerce": "Comercial",
+  "vacant_lot": "Terreno Baldio",
+  "strategic_point": "Ponto Estratégico",
+  "others": "Outros",
+  "RESIDENTIAL": "Residencial",
+  "COMMERCIAL": "Comercial",
+  "VACANT_LOT": "Terreno Baldio"
+};
+
+const PROPERTY_STATUS_MAP: Record<string, string> = {
+  "active": "Aberto",
+  "pending": "Pendente",
+  "deactivated": "Fechado",
+  "OPEN": "Aberto",
+  "CLOSED": "Fechado"
+};
+
 export const Route = createFileRoute("/_authenticated/property/$propertyId")({
   component: PropertyVisitPage,
 });
@@ -112,42 +131,51 @@ function PropertyVisitPage() {
   }, [propertyId]);
 
   const fetchAdjacentProperties = async () => {
-    if (!property || !property.block_number) return;
+    if (!property) return;
+    
     try {
-      // Fetch all properties in the same block to determine order and count
-      const { data: allProps } = await supabase
+      // Use block_id if available, fallback to block_number
+      let query = supabase
         .from("properties")
-        .select("id, number")
-        .eq("block_number", property.block_number)
+        .select("id, number");
+      
+      if (property.block_id) {
+        query = query.eq("block_id", property.block_id);
+      } else if (property.block_number) {
+        query = query.eq("block_number", property.block_number);
+      } else {
+        return;
+      }
+
+      // Consistent ordering with RG page
+      const { data: allProps } = await query
+        .order("sequence", { ascending: true })
+        .order("street_name", { ascending: true })
         .order("number", { ascending: true });
 
       if (allProps && allProps.length > 0) {
         const currentIndex = allProps.findIndex(p => p.id === propertyId);
-        setPropertyIndex({
-          current: currentIndex + 1,
-          total: allProps.length
-        });
+        
+        if (currentIndex !== -1) {
+          setPropertyIndex({
+            current: currentIndex + 1,
+            total: allProps.length
+          });
 
-        if (currentIndex > 0) {
-          setPrevProperty(allProps[currentIndex - 1]);
-        } else {
-          setPrevProperty(null);
-        }
-
-        if (currentIndex < allProps.length - 1) {
-          setNextProperty(allProps[currentIndex + 1]);
-        } else {
-          setNextProperty(null);
+          setPrevProperty(currentIndex > 0 ? allProps[currentIndex - 1] : null);
+          setNextProperty(currentIndex < allProps.length - 1 ? allProps[currentIndex + 1] : null);
         }
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error("Error fetching adjacent properties:", e); 
+    }
   };
 
   useEffect(() => {
     if (property) {
       fetchAdjacentProperties();
     }
-  }, [property]);
+  }, [property, propertyId]);
 
   async function fetchAgentData() {
     try {
@@ -665,9 +693,18 @@ function PropertyVisitPage() {
           <p className="text-lg font-black text-slate-800 tracking-tight">
             {property?.street_name || "..."}
           </p>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-lg font-bold">Quarteirão {activeSession?.block_number || "--"}</Badge>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última visita: {property?.last_visit ? new Date(property.last_visit).toLocaleDateString() : 'Nunca'}</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Badge variant="secondary" className="bg-slate-100 text-slate-600 rounded-lg font-bold">Quarteirão {activeSession?.block_number || property?.block_number || "--"}</Badge>
+            <Badge variant="outline" className="border-slate-200 text-slate-500 rounded-lg font-bold uppercase text-[9px]">
+              {PROPERTY_TYPE_MAP[property?.type] || property?.type || "Tipo N/A"}
+            </Badge>
+            <Badge variant="outline" className={cn(
+              "rounded-lg font-bold uppercase text-[9px]",
+              (property?.status === "active" || property?.status === "OPEN") ? "border-emerald-200 text-emerald-600 bg-emerald-50" : "border-slate-200 text-slate-500"
+            )}>
+              {PROPERTY_STATUS_MAP[property?.status] || property?.status || "Status N/A"}
+            </Badge>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block w-full">Última visita: {property?.last_visit ? new Date(property.last_visit).toLocaleDateString() : 'Nunca'}</span>
           </div>
         </div>
       </div>
