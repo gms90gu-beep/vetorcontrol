@@ -529,11 +529,12 @@ function RGPage() {
             <Button 
               variant="outline" 
               className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
-              onClick={handleExportPDF}
+              onClick={handleExportBlockPDF}
             >
               <Printer className="h-4 w-4 text-emerald-600" />
-              PDF
+              PDF Quarteirão
             </Button>
+
             <Button 
               variant="outline" 
               className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2"
