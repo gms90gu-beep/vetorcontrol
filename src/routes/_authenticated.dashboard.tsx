@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Search,
   Plus,
-  Target
+  Target,
+  ShieldAlert
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
@@ -89,6 +91,7 @@ function ActionCard({ title, description, icon: Icon, color, to, onClick, classN
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const { userRole, isLoading: isRoleLoading } = useOperationalDate();
   const [isLoading, setIsLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -99,6 +102,7 @@ function DashboardPage() {
   const [blockProgress, setBlockProgress] = useState(0);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [activeWeek, setActiveWeek] = useState<any>(null);
+
 
   const [stats, setStats] = useState({
     worked: 0,
@@ -237,6 +241,24 @@ function DashboardPage() {
 
   return (
     <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Admin Master Access Button */}
+      {(userRole === 'admin_master' || (typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token')?.includes('gms90gu@gmail.com'))) && (
+        <Card className="border-2 border-amber-500/50 bg-amber-500/10 p-4 rounded-[2rem] flex items-center justify-between group hover:bg-amber-500/20 transition-all cursor-pointer shadow-lg shadow-amber-500/10" onClick={() => navigate({ to: '/admin-master' as any })}>
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-amber-500 flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-amber-500 uppercase italic tracking-tighter">Painel de Controle Master</h3>
+              <p className="text-[10px] font-bold text-amber-500/70 uppercase tracking-widest">Acesso restrito à gestão global do sistema</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="text-amber-500 hover:bg-amber-500/20 rounded-xl">
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+        </Card>
+      )}
+
       {/* Cycle Coverage Card */}
       <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden relative group">
         <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
