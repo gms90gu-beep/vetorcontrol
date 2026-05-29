@@ -113,7 +113,29 @@ function RGPage() {
 
   useEffect(() => {
     fetchInitialData();
+    fetchArchivedPDFs();
   }, []);
+
+  async function fetchArchivedPDFs() {
+    try {
+      const { data, error } = await supabase.storage
+        .from('block-reports')
+        .list('', {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: 'created_at', order: 'desc' }
+        });
+
+      if (error) throw error;
+      
+      // Need to fetch files from each block folder if they are organized that way
+      // For now, let's assume flat structure or just list all if flat
+      setArchivedPDFs(data || []);
+    } catch (error: any) {
+      console.error("Erro ao buscar arquivos:", error.message);
+    }
+  }
+
 
   async function fetchInitialData() {
     setIsLoading(true);
