@@ -570,7 +570,37 @@ function FieldWorkListPage() {
                 </div>
                 <p className="text-[10px] font-bold text-emerald-100">{workedCount} de {properties.length} imóveis</p>
               </div>
-              <Progress value={progressPercent} className="h-2.5 bg-white/20" />
+          <Card className="border-none shadow-xl bg-blue-600 text-white rounded-[2rem] overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-6 opacity-10">
+              <Layers className="h-16 w-16" />
+            </div>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-end mb-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-100 mb-1">Rua/Logradouro</p>
+                  <h3 className="text-2xl font-black tracking-tighter">64%</h3>
+                </div>
+                <p className="text-[10px] font-bold text-blue-100">18 de 28 imóveis</p>
+              </div>
+              <Progress value={64} className="h-2.5 bg-white/20" />
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-xl bg-purple-600 text-white rounded-[2rem] overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-6 opacity-10">
+              <LayoutDashboard className="h-16 w-16" />
+            </div>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-end mb-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-purple-100 mb-1">Ciclo Atual</p>
+                  <h3 className="text-2xl font-black tracking-tighter">42%</h3>
+                </div>
+                <p className="text-[10px] font-bold text-purple-100">842 de 2000 imóveis</p>
+              </div>
+              <Progress value={42} className="h-2.5 bg-white/20" />
+            </CardContent>
+          </Card>
             </CardContent>
           </Card>
 
