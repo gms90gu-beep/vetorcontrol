@@ -299,7 +299,13 @@ export function SupervisionDashboard() {
                   </Badge>
                   
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setViewingAgent(agent)}
+                      title="Ver detalhes do agente"
+                      className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90"
+                    >
                       <Eye className="h-4 w-4 text-slate-400" />
                     </Button>
                     
