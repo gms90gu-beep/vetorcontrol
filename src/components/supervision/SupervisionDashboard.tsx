@@ -410,8 +410,7 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
     </div>
   );
 }
-  );
-}
+
 
 function StatsCard({ title, value, icon: Icon, color }: any) {
   return (
