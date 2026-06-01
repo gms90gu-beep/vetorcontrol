@@ -38,6 +38,7 @@ export function SupervisionDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [viewingAgent, setViewingAgent] = useState<any | null>(null);
   const [newAgent, setNewAgent] = useState({
     full_name: "",
     email: "",
