@@ -38,6 +38,7 @@ export function SupervisionDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
+  const [viewingAgent, setViewingAgent] = useState<any | null>(null);
   const [newAgent, setNewAgent] = useState({
     full_name: "",
     email: "",
@@ -298,7 +299,13 @@ export function SupervisionDashboard() {
                   </Badge>
                   
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setViewingAgent(agent)}
+                      title="Ver detalhes do agente"
+                      className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90"
+                    >
                       <Eye className="h-4 w-4 text-slate-400" />
                     </Button>
                     
@@ -325,9 +332,85 @@ export function SupervisionDashboard() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!viewingAgent} onOpenChange={(open) => !open && setViewingAgent(null)}>
+        <DialogContent className="sm:max-w-[480px] rounded-[2rem] border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">
+              {viewingAgent?.full_name}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingAgent && (
+            <div className="space-y-5 mt-2">
+              <div className="flex items-center gap-3">
+                <Badge className={cn(
+                  "rounded-lg px-2 py-1 font-black text-[9px] uppercase tracking-widest border-none",
+                  viewingAgent.is_active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                )}>
+                  {viewingAgent.is_active ? "ATIVO" : "INATIVO"}
+                </Badge>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {viewingAgent.role}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Matrícula" value={viewingAgent.registration_number || "—"} />
+                <Field label="Município" value={viewingAgent.city || "—"} />
+                <Field label="E-mail" value={viewingAgent.email || "—"} />
+                <Field label="Telefone" value={viewingAgent.phone || "—"} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 pt-2">
+                <StatBox label="Trabalhados" value={viewingAgent.stats?.worked || 0} color="text-slate-800" />
+                <StatBox label="Fechados" value={viewingAgent.stats?.closed || 0} color="text-slate-800" />
+                <StatBox label="Focos" value={viewingAgent.stats?.focus || 0} color="text-rose-500" />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    handleToggleStatus(viewingAgent.id, viewingAgent.is_active);
+                    setViewingAgent(null);
+                  }}
+                  variant="outline"
+                  className="flex-1 h-11 rounded-xl font-bold"
+                >
+                  {viewingAgent.is_active ? "Desativar" : "Ativar"}
+                </Button>
+                <Button
+                  onClick={() => setViewingAgent(null)}
+                  className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-bold"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 break-words">{value}</p>
+    </div>
+  );
+}
+
+function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3 text-center">
+      <p className={cn("text-2xl font-black tracking-tighter", color)}>{value}</p>
+      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">{label}</p>
+    </div>
+  );
+}
+
 
 function StatsCard({ title, value, icon: Icon, color }: any) {
   return (
