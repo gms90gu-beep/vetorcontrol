@@ -220,6 +220,53 @@ function LoginPage() {
           </p>
         </CardFooter>
       </Card>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-primary">Recuperar Senha</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Informe o e-mail cadastrado e enviaremos um link para você redefinir sua senha.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword} className="grid gap-4 mt-2">
+            <div className="grid gap-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">E-mail cadastrado</Label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 h-5 w-5 text-slate-500" />
+                <Input
+                  type="email"
+                  placeholder="exemplo@vetor.com"
+                  className="pl-12 h-12 rounded-xl border-white/5 bg-slate-800 text-base"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setForgotOpen(false)}
+                className="text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={forgotLoading} className="rounded-xl font-bold">
+                {forgotLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar Link de Recuperação"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
