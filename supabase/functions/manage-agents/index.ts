@@ -40,6 +40,30 @@ async function getOrCreateAuthUser(supabaseAdmin: any, userData: { email: string
   return existingUser;
 }
 
+async function ensureAuthUserExists(supabaseAdmin: any, userId: string): Promise<boolean> {
+  // Retry a few times to absorb any propagation delay right after createUser
+  for (let i = 0; i < 4; i++) {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (!error && data?.user?.id === userId) return true;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
+}
+
+async function safeUpsertUserRole(supabaseAdmin: any, userId: string, role: string) {
+  const exists = await ensureAuthUserExists(supabaseAdmin, userId);
+  if (!exists) {
+    throw new Error(
+      `Não foi possível sincronizar o perfil: usuário ${userId} não existe em auth.users. Recrie o usuário ou remova o registro órfão.`,
+    );
+  }
+  // Clear existing roles for this user then insert the new one (single role per user)
+  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+  if (delErr) throw delErr;
+  const { error: insErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
+  if (insErr) throw insErr;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -87,11 +111,7 @@ serve(async (req) => {
       });
       if (profileError) throw profileError;
 
-      const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
-        user_id: authUser.id,
-        role: "agente",
-      }, { onConflict: "user_id,role" });
-      if (roleError) throw roleError;
+      await safeUpsertUserRole(supabaseAdmin, authUser.id, "agente");
 
       const { error: agentError } = await supabaseAdmin.from("agents").upsert({
         profile_id: authUser.id,
@@ -127,11 +147,7 @@ serve(async (req) => {
       });
       if (profileError) throw profileError;
 
-      const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
-        user_id: authUser.id,
-        role,
-      }, { onConflict: "user_id,role" });
-      if (roleError) throw roleError;
+      await safeUpsertUserRole(supabaseAdmin, authUser.id, role);
 
       return jsonResponse({ success: true, user: authUser });
     }
@@ -184,14 +200,7 @@ serve(async (req) => {
 
       // Sync user_roles when role is provided (admin master only)
       if (role && isAdminMaster) {
-        if (!authUserExists) {
-          throw new Error(
-            "Não é possível alterar o perfil: este usuário não possui conta de autenticação ativa. Recrie o usuário ou remova o registro órfão.",
-          );
-        }
-        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
-        const { error: rErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
-        if (rErr) throw rErr;
+        await safeUpsertUserRole(supabaseAdmin, userId, role);
       }
 
       // Sync agents table (name + phone) if record exists
