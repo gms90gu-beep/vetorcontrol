@@ -200,14 +200,7 @@ serve(async (req) => {
 
       // Sync user_roles when role is provided (admin master only)
       if (role && isAdminMaster) {
-        if (!authUserExists) {
-          throw new Error(
-            "Não é possível alterar o perfil: este usuário não possui conta de autenticação ativa. Recrie o usuário ou remova o registro órfão.",
-          );
-        }
-        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
-        const { error: rErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
-        if (rErr) throw rErr;
+        await safeUpsertUserRole(supabaseAdmin, userId, role);
       }
 
       // Sync agents table (name + phone) if record exists
