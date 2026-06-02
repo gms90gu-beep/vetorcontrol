@@ -37,6 +37,29 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    const target = email.trim();
+    if (!target) {
+      toast.error("Digite seu e-mail para receber o link de redefinição.");
+      return;
+    }
+    const loginEmail = target.includes("@") ? target : `${target}@vetor.com`;
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("E-mail de redefinição enviado com sucesso. Verifique sua caixa de entrada.");
+    } catch (err: any) {
+      console.error("[Login] Erro ao enviar reset:", err);
+      toast.error(err.message || "Erro ao enviar e-mail de redefinição.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,41 +79,34 @@ function LoginPage() {
       const session = await getSessionAfterLogin();
       const authenticatedUser = session?.user ?? data.user;
 
-      if (!session?.user) {
-        console.warn("[Login] Sessão ainda indisponível após login; usando usuário retornado pelo signIn como fallback.");
+      // Se o admin marcou senha temporária, força troca antes de continuar
+      const mustChange = (authenticatedUser.user_metadata as any)?.must_change_password === true;
+      if (mustChange) {
+        toast.message("Você deve alterar sua senha antes de continuar.");
+        await navigate({ to: "/reset-password", replace: true });
+        return;
       }
 
-      // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
       const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: authenticatedUser.id });
-
       const role = roleData as string | null;
 
-      console.debug("[Login] Role encontrado via RPC:", role);
-      console.debug("[Login] Erro RPC:", roleError);
-
-      if (roleError) {
-        console.error("[Login] Falha ao buscar role; usando /dashboard como fallback seguro:", roleError);
-      }
+      console.debug("[Login] Role encontrado via RPC:", role, "erro:", roleError);
 
       toast.success("Login realizado com sucesso!");
 
       if (role === "admin_master") {
-        console.debug("[Login] Redirecionando admin_master para /admin-master");
         await navigate({ to: "/admin-master", replace: true });
       } else if (role === "coordenador") {
-        console.debug("[Login] Redirecionando coordenador para /coordenador");
         await navigate({ to: "/coordenador" as any, replace: true });
       } else if (role === "supervisor") {
-        console.debug("[Login] Redirecionando supervisor para /supervisor");
         await navigate({ to: "/supervisor" as any, replace: true });
       } else if (role === "agente") {
-        console.debug("[Login] Redirecionando agente para /agente");
         await navigate({ to: "/agente" as any, replace: true });
       } else {
-        console.debug("[Login] Redirecionando para /dashboard, role:", role);
         await navigate({ to: "/dashboard", replace: true });
       }
     } catch (error: any) {
+      console.error("[Login] Erro:", error);
       toast.error(error.message || "Erro ao fazer login");
       setIsLoading(false);
     }
