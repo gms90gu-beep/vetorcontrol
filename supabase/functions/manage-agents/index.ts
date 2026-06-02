@@ -149,6 +149,67 @@ serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // ── UPDATE USER (admin master edits profile/role) ───────────────────────
+    if (action === "update_user") {
+      const { userId, full_name, email, phone, role, is_active } = body.userData ?? {};
+      if (!userId) throw new Error("userId is required");
+
+      const isAdminMaster = callerRole === "admin_master";
+
+      const profileUpdate: Record<string, unknown> = {};
+      if (typeof full_name === "string") profileUpdate.full_name = full_name;
+      if (typeof email === "string") profileUpdate.email = email;
+      if (typeof is_active === "boolean") profileUpdate.is_active = is_active;
+      if (role && isAdminMaster) {
+        if (!["agente", "supervisor", "coordenador", "admin_master"].includes(role)) {
+          throw new Error("Invalid role: " + role);
+        }
+        profileUpdate.role = role;
+      }
+
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: pErr } = await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", userId);
+        if (pErr) throw pErr;
+      }
+
+      // Update auth email if changed
+      if (typeof email === "string") {
+        const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { email });
+        if (aErr) console.warn("[manage-agents] auth email update warning:", aErr.message);
+      }
+
+      // Sync user_roles when role is provided (admin master only)
+      if (role && isAdminMaster) {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+        const { error: rErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
+        if (rErr) throw rErr;
+      }
+
+      // Sync agents table (name + phone) if record exists
+      const agentUpdate: Record<string, unknown> = {};
+      if (typeof full_name === "string") agentUpdate.name = full_name;
+      if (typeof phone === "string") agentUpdate.phone = phone;
+      if (typeof is_active === "boolean") agentUpdate.status = is_active ? "active" : "inactive";
+      if (Object.keys(agentUpdate).length > 0) {
+        await supabaseAdmin.from("agents").update(agentUpdate).eq("profile_id", userId);
+      }
+
+      return jsonResponse({ success: true });
+    }
+
+    // ── RESET PASSWORD ───────────────────────────────────────────────────────
+    if (action === "reset_password") {
+      const { userId, newPassword } = body;
+      if (!userId) throw new Error("userId is required");
+
+      // Generate temp password if not provided
+      const tempPassword = newPassword || (Math.random().toString(36).slice(-10) + "A1!");
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: tempPassword });
+      if (pwErr) throw pwErr;
+
+      return jsonResponse({ success: true, tempPassword });
+    }
+
     // ── DELETE USER ──────────────────────────────────────────────────────────
     if (action === "delete_user") {
       const { userId } = body;
