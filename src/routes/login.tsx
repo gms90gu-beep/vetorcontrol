@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ async function getSessionAfterLogin() {
 }
 
 function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -75,13 +76,19 @@ function LoginPage() {
 
       if (role === "admin_master") {
         console.debug("[Login] Redirecionando admin_master para /admin-master");
-        window.location.href = "/admin-master";
-      } else if (role === "supervisor" || role === "coordenador") {
-        console.debug("[Login] Redirecionando supervisor/coordenador para /supervision");
-        window.location.href = "/supervision";
+        await navigate({ to: "/admin-master", replace: true });
+      } else if (role === "coordenador") {
+        console.debug("[Login] Redirecionando coordenador para /coordenador");
+        await navigate({ to: "/coordenador" as any, replace: true });
+      } else if (role === "supervisor") {
+        console.debug("[Login] Redirecionando supervisor para /supervisor");
+        await navigate({ to: "/supervisor" as any, replace: true });
+      } else if (role === "agente") {
+        console.debug("[Login] Redirecionando agente para /agente");
+        await navigate({ to: "/agente" as any, replace: true });
       } else {
         console.debug("[Login] Redirecionando para /dashboard, role:", role);
-        window.location.href = "/dashboard";
+        await navigate({ to: "/dashboard", replace: true });
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
