@@ -175,12 +175,22 @@ export function SupervisionDashboard() {
   const totalFocus = agents.reduce((s, a) => s + (a.stats?.focus || 0), 0);
   const alertsNoActivity = agents.filter((a) => a.is_active && !a.hasAnyToday).length;
   const progressPct = totalWorked > 0 ? Math.round((totalClosed / Math.max(totalWorked, 1)) * 100) : 0;
+  const roleLabel =
+    role === "admin_master"
+      ? "ADMIN MASTER"
+      : role === "coordenador"
+        ? "COORDENADOR"
+        : role === "supervisor"
+          ? "SUPERVISOR"
+          : "AGENTE";
   const panelTitle =
     role === "admin_master"
       ? "Painel Administrativo"
       : role === "coordenador"
-        ? "Painel do Coordenador"
-        : "Painel do Supervisor";
+        ? "Painel de Coordenação"
+        : "Painel de Supervisão";
+  const displayName =
+    profile?.full_name || user?.email?.split("@")[0] || "Usuário";
 
   return (
     <div className="min-h-screen bg-[#f4f5f7]">
@@ -193,13 +203,16 @@ export function SupervisionDashboard() {
               <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> Em trabalho
             </span>
             <p className="mt-2 text-base font-bold text-white truncate leading-tight">
-              {profile?.full_name || "Supervisor"}
+              {displayName}
             </p>
             <p className="text-[9px] font-bold uppercase tracking-widest text-[#3b9ede]">
+              {roleLabel}
+            </p>
+            <p className="text-[10px] font-semibold text-white/80 truncate">
               {panelTitle}
             </p>
             <p className="text-[9px] text-[#2e4a60] truncate">
-              ACE · {profile?.city || "—"}
+              {profile?.city || "—"}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
