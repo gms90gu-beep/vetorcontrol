@@ -90,11 +90,9 @@ function AdminMasterPage() {
   };
 
   const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-
+    // Evita window.history.back() — no preview iframe da Lovable isso pode
+    // sair do app e gerar "Lovable proxy error (404)". Navega sempre para
+    // uma rota interna segura.
     navigate({ to: "/dashboard", replace: true });
   };
 
