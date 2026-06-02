@@ -240,6 +240,24 @@ export function SupervisionDashboard() {
                   />
                 </div>
               </div>
+              {canChooseSupervisor && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Supervisor Responsável
+                  </label>
+                  <select
+                    value={newAgent.supervisor_id}
+                    onChange={(e) => setNewAgent({ ...newAgent, supervisor_id: e.target.value })}
+                    className="w-full h-10 rounded-xl bg-slate-50 border border-slate-100 px-3 text-sm"
+                  >
+                    <option value="">— Sem supervisor —</option>
+                    {supervisors.map((s) => (
+                      <option key={s.id} value={s.id}>{s.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold mt-2">
                 Salvar Cadastro
               </Button>
