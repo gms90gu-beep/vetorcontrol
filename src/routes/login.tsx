@@ -212,9 +212,9 @@ function LoginPage() {
           </CardContent>
         </form>
         <CardFooter className="flex justify-center pb-10">
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-auth-muted font-medium">
             Não tem uma conta?{" "}
-            <Link to="/signup" className="text-primary font-bold hover:underline">
+            <Link to="/signup" className="text-auth-link font-bold hover:text-auth-link-hover hover:underline">
               Solicitar acesso
             </Link>
           </p>
@@ -222,22 +222,22 @@ function LoginPage() {
       </Card>
 
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
-        <DialogContent className="bg-slate-900 border-white/10 text-white rounded-3xl">
+        <DialogContent className="bg-auth-card border-auth-field-border text-auth-foreground rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black text-primary">Recuperar Senha</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-auth-muted">
               Informe o e-mail cadastrado e enviaremos um link para você redefinir sua senha.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="grid gap-4 mt-2">
             <div className="grid gap-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">E-mail cadastrado</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-auth-muted">E-mail cadastrado</Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-3.5 h-5 w-5 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   type="email"
                   placeholder="exemplo@vetor.com"
-                  className="pl-12 h-12 rounded-xl border-white/5 bg-slate-800 text-base"
+                  className="pl-12 h-12 rounded-xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   required
