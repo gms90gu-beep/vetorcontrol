@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
