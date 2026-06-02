@@ -215,6 +215,12 @@ serve(async (req) => {
         }
         profileUpdate.role = role;
       }
+      // Allow admin_master/coordenador to (re)assign supervisor; supervisor caller forces self
+      if (supervisor_id !== undefined) {
+        profileUpdate.supervisor_id =
+          callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
+      }
+
 
       if (Object.keys(profileUpdate).length > 0) {
         const { error: pErr } = await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", userId);
