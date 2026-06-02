@@ -30,6 +30,7 @@ import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
 import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
+import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenticated.coordenacao'
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
@@ -141,6 +142,12 @@ const AuthenticatedCoordenadorRoute =
     path: '/coordenador',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedCoordenacaoRoute =
+  AuthenticatedCoordenacaoRouteImport.update({
+    id: '/coordenacao',
+    path: '/coordenacao',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCampoRoute = AuthenticatedCampoRouteImport.update({
   id: '/campo',
   path: '/campo',
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
   '/campo': typeof AuthenticatedCampoRoute
+  '/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -192,6 +200,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
   '/campo': typeof AuthenticatedCampoRoute
+  '/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -219,6 +228,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/agente': typeof AuthenticatedAgenteRoute
   '/_authenticated/campo': typeof AuthenticatedCampoRoute
+  '/_authenticated/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/_authenticated/coordenador': typeof AuthenticatedCoordenadorRoute
   '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/agente'
     | '/campo'
+    | '/coordenacao'
     | '/coordenador'
     | '/cycles'
     | '/dashboard'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/agente'
     | '/campo'
+    | '/coordenacao'
     | '/coordenador'
     | '/cycles'
     | '/dashboard'
@@ -297,6 +309,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/agente'
     | '/_authenticated/campo'
+    | '/_authenticated/coordenacao'
     | '/_authenticated/coordenador'
     | '/_authenticated/cycles'
     | '/_authenticated/dashboard'
@@ -473,6 +486,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoordenadorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/coordenacao': {
+      id: '/_authenticated/coordenacao'
+      path: '/coordenacao'
+      fullPath: '/coordenacao'
+      preLoaderRoute: typeof AuthenticatedCoordenacaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/campo': {
       id: '/_authenticated/campo'
       path: '/campo'
@@ -500,6 +520,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
   AuthenticatedCampoRoute: typeof AuthenticatedCampoRoute
+  AuthenticatedCoordenacaoRoute: typeof AuthenticatedCoordenacaoRoute
   AuthenticatedCoordenadorRoute: typeof AuthenticatedCoordenadorRoute
   AuthenticatedCyclesRoute: typeof AuthenticatedCyclesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -520,6 +541,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
   AuthenticatedCampoRoute: AuthenticatedCampoRoute,
+  AuthenticatedCoordenacaoRoute: AuthenticatedCoordenacaoRoute,
   AuthenticatedCoordenadorRoute: AuthenticatedCoordenadorRoute,
   AuthenticatedCyclesRoute: AuthenticatedCyclesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
