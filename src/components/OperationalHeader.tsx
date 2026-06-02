@@ -162,6 +162,9 @@ export function OperationalHeader() {
               <h1 className="text-lg font-black tracking-tight leading-none text-white">
                 {agent?.name || "Agente"}
               </h1>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-300">
+                {getPanelTitle(role)}
+              </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tight">{agent?.registration_id || "MATRÍCULA"}</span>
                 <span className="h-1 w-1 rounded-full bg-slate-600" />
