@@ -117,6 +117,25 @@ function DashboardPage() {
     progress: 0,
   });
 
+  const panelTitle = (() => {
+    switch (userRole) {
+      case "admin_master":
+        return "Painel Administrativo";
+      case "coordenador":
+        return "Painel do Coordenador";
+      case "supervisor":
+        return "Painel do Supervisor";
+      case "agente":
+        return "Painel do Agente";
+      default:
+        return "Dashboard";
+    }
+  })();
+
+  useEffect(() => {
+    document.title = `${panelTitle} — VetorControl`;
+  }, [panelTitle]);
+
   useEffect(() => {
     fetchCurrentStatus();
   }, []);
