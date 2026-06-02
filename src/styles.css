@@ -46,6 +46,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-auth-background: var(--auth-background);
+  --color-auth-card: var(--auth-card);
+  --color-auth-foreground: var(--auth-foreground);
+  --color-auth-muted: var(--auth-muted);
+  --color-auth-field: var(--auth-field);
+  --color-auth-field-border: var(--auth-field-border);
+  --color-auth-icon: var(--auth-icon);
+  --color-auth-icon-hover: var(--auth-icon-hover);
+  --color-auth-link: var(--auth-link);
+  --color-auth-link-hover: var(--auth-link-hover);
+  --color-auth-warning: var(--auth-warning);
 }
 
 :root {
@@ -82,6 +93,17 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  --auth-background: oklch(0.13 0.03 255);
+  --auth-card: oklch(0.19 0.035 255);
+  --auth-foreground: oklch(0.98 0.004 247);
+  --auth-muted: oklch(0.74 0.035 255);
+  --auth-field: oklch(0.25 0.035 255);
+  --auth-field-border: oklch(0.45 0.055 255 / 55%);
+  --auth-icon: oklch(0.86 0.05 245);
+  --auth-icon-hover: oklch(0.98 0.004 247);
+  --auth-link: oklch(0.82 0.16 245);
+  --auth-link-hover: oklch(0.94 0.09 230);
+  --auth-warning: oklch(0.88 0.15 85);
 }
 
 @layer base {
