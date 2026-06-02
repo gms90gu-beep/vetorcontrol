@@ -110,31 +110,32 @@ function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw((v) => !v)}
-                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
+                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-auth-icon transition-colors hover:bg-auth-field-border hover:text-auth-icon-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
+                  aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
               {password && (
                 <div className="space-y-1">
-                  <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-auth-field rounded-full overflow-hidden">
                     <div
                       className={`h-full ${strength.color} transition-all`}
                       style={{ width: `${(strength.score / 5) * 100}%` }}
                     />
                   </div>
-                  <p className="text-xs text-slate-400 ml-1">Força: {strength.label}</p>
+                  <p className="text-xs text-auth-muted ml-1">Força: {strength.label}</p>
                 </div>
               )}
             </div>
             <div className="grid gap-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">Confirmar Senha</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-widest ml-1 text-auth-muted">Confirmar Senha</Label>
               <div className="relative">
-                <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   type={showCf ? "text" : "password"}
                   placeholder="Repita a senha"
-                  className="pl-12 pr-12 h-14 rounded-2xl border-white/5 bg-slate-800 text-base"
+                  className="pl-12 pr-16 h-14 rounded-2xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
