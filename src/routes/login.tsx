@@ -169,14 +169,32 @@ function LoginPage() {
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 pr-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotEmail(email.includes("@") ? email : "");
+                  setForgotOpen(true);
+                }}
+                className="text-xs text-primary font-semibold hover:underline self-end mr-1 mt-1"
+              >
+                Esqueceu sua senha?
+              </button>
             </div>
             <Button
               className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2"
