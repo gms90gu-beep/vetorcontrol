@@ -13,6 +13,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ComandoRouteImport } from './routes/comando'
 import { Route as AdminMasterRouteImport } from './routes/admin-master'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
@@ -29,6 +30,7 @@ import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
 import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
+import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 
@@ -50,6 +52,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComandoRoute = ComandoRouteImport.update({
+  id: '/comando',
+  path: '/comando',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminMasterRoute = AdminMasterRouteImport.update({
@@ -134,6 +141,11 @@ const AuthenticatedCoordenadorRoute =
     path: '/coordenador',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedCampoRoute = AuthenticatedCampoRouteImport.update({
+  id: '/campo',
+  path: '/campo',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
   id: '/agente',
   path: '/agente',
@@ -149,11 +161,13 @@ const AuthenticatedPropertyPropertyIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/admin-master': typeof AdminMasterRoute
+  '/comando': typeof ComandoRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/campo': typeof AuthenticatedCampoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -171,11 +185,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/admin-master': typeof AdminMasterRoute
+  '/comando': typeof ComandoRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/campo': typeof AuthenticatedCampoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -196,11 +212,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/admin-master': typeof AdminMasterRoute
+  '/comando': typeof ComandoRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/_authenticated/agente': typeof AuthenticatedAgenteRoute
+  '/_authenticated/campo': typeof AuthenticatedCampoRoute
   '/_authenticated/coordenador': typeof AuthenticatedCoordenadorRoute
   '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -222,11 +240,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin-master'
+    | '/comando'
     | '/login'
     | '/reset-password'
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/campo'
     | '/coordenador'
     | '/cycles'
     | '/dashboard'
@@ -244,11 +264,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/admin-master'
+    | '/comando'
     | '/login'
     | '/reset-password'
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/campo'
     | '/coordenador'
     | '/cycles'
     | '/dashboard'
@@ -268,11 +290,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/admin-master'
+    | '/comando'
     | '/login'
     | '/reset-password'
     | '/setup'
     | '/signup'
     | '/_authenticated/agente'
+    | '/_authenticated/campo'
     | '/_authenticated/coordenador'
     | '/_authenticated/cycles'
     | '/_authenticated/dashboard'
@@ -293,6 +317,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AdminMasterRoute: typeof AdminMasterRoute
+  ComandoRoute: typeof ComandoRoute
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
@@ -327,6 +352,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comando': {
+      id: '/comando'
+      path: '/comando'
+      fullPath: '/comando'
+      preLoaderRoute: typeof ComandoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin-master': {
@@ -441,6 +473,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoordenadorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/campo': {
+      id: '/_authenticated/campo'
+      path: '/campo'
+      fullPath: '/campo'
+      preLoaderRoute: typeof AuthenticatedCampoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/agente': {
       id: '/_authenticated/agente'
       path: '/agente'
@@ -460,6 +499,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
+  AuthenticatedCampoRoute: typeof AuthenticatedCampoRoute
   AuthenticatedCoordenadorRoute: typeof AuthenticatedCoordenadorRoute
   AuthenticatedCyclesRoute: typeof AuthenticatedCyclesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -479,6 +519,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
+  AuthenticatedCampoRoute: AuthenticatedCampoRoute,
   AuthenticatedCoordenadorRoute: AuthenticatedCoordenadorRoute,
   AuthenticatedCyclesRoute: AuthenticatedCyclesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -503,6 +544,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AdminMasterRoute: AdminMasterRoute,
+  ComandoRoute: ComandoRoute,
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
@@ -511,3 +553,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
