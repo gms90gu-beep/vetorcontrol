@@ -202,11 +202,17 @@ serve(async (req) => {
       const { userId, newPassword } = body;
       if (!userId) throw new Error("userId is required");
 
-      // Generate temp password if not provided
+      // Gera senha temporária e marca must_change_password no user_metadata
       const tempPassword = newPassword || (Math.random().toString(36).slice(-10) + "A1!");
-      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: tempPassword });
-      if (pwErr) throw pwErr;
-
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: tempPassword,
+        user_metadata: { must_change_password: true },
+      });
+      if (pwErr) {
+        console.error("[manage-agents] Erro ao redefinir senha:", pwErr);
+        throw pwErr;
+      }
+      console.log("[manage-agents] Senha temporária gerada para userId=", userId);
       return jsonResponse({ success: true, tempPassword });
     }
 
