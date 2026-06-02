@@ -216,7 +216,7 @@ export function AdminMasterDashboard() {
 
   const handleResetPassword = async () => {
     if (!selected) return;
-    if (!confirm("Gerar nova senha temporária para este usuário?")) return;
+    if (!confirm("Gerar nova senha temporária para este usuário?\n\nNo próximo login, ele será obrigado a definir uma nova senha.")) return;
     try {
       const { data, error } = await supabase.functions.invoke("manage-agents", {
         body: { action: "reset_password", userId: selected.id },
@@ -224,12 +224,33 @@ export function AdminMasterDashboard() {
       if (error) throw error;
       const temp = (data as any)?.tempPassword;
       if (temp) {
-        toast.success("Senha temporária: " + temp, { duration: 15000 });
+        toast.success("Senha temporária: " + temp, {
+          duration: 20000,
+          description: "Compartilhe com o usuário. Ele será obrigado a trocá-la no próximo login.",
+        });
       } else {
         toast.success("Senha redefinida");
       }
     } catch (e: any) {
+      console.error("[AdminMaster] Erro ao redefinir senha:", e);
       toast.error("Erro ao redefinir senha: " + (e.message ?? ""));
+    }
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!selected?.email) {
+      toast.error("Usuário sem e-mail cadastrado.");
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(selected.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("E-mail de redefinição enviado para " + selected.email);
+    } catch (e: any) {
+      console.error("[AdminMaster] Erro ao enviar e-mail de redefinição:", e);
+      toast.error("Erro ao enviar e-mail: " + (e.message ?? ""));
     }
   };
 
