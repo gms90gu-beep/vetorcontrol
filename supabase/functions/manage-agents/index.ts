@@ -172,6 +172,25 @@ serve(async (req) => {
 
       const isAdminMaster = callerRole === "admin_master";
 
+      // Verify the auth user exists FIRST. If not, treat as stale UI state and
+      // clean up any orphan rows so the next refresh shows correct data.
+      const { data: authLookup } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const authUserExists = !!authLookup?.user;
+
+      if (!authUserExists) {
+        // Clean up any orphan rows tied to this id
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+        await supabaseAdmin.from("agents").delete().eq("profile_id", userId);
+        await supabaseAdmin.from("profiles").delete().eq("id", userId);
+        return jsonResponse(
+          {
+            error: "Usuário não existe mais. A lista foi sincronizada — atualize a página.",
+            code: "USER_NOT_FOUND",
+          },
+          404,
+        );
+      }
+
       const profileUpdate: Record<string, unknown> = {};
       if (typeof full_name === "string") profileUpdate.full_name = full_name;
       if (typeof email === "string") profileUpdate.email = email;
@@ -188,22 +207,15 @@ serve(async (req) => {
         if (pErr) throw pErr;
       }
 
-      // Verify the auth user actually exists (orphan profiles would break FK on user_roles)
-      const { data: authLookup, error: authLookupErr } = await supabaseAdmin.auth.admin.getUserById(userId);
-      const authUserExists = !authLookupErr && !!authLookup?.user;
-
-      // Update auth email if changed and auth user exists
-      if (typeof email === "string" && authUserExists) {
+      if (typeof email === "string") {
         const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { email });
         if (aErr) console.warn("[manage-agents] auth email update warning:", aErr.message);
       }
 
-      // Sync user_roles when role is provided (admin master only)
       if (role && isAdminMaster) {
         await safeUpsertUserRole(supabaseAdmin, userId, role);
       }
 
-      // Sync agents table (name + phone) if record exists
       const agentUpdate: Record<string, unknown> = {};
       if (typeof full_name === "string") agentUpdate.name = full_name;
       if (typeof phone === "string") agentUpdate.phone = phone;
@@ -213,6 +225,7 @@ serve(async (req) => {
       }
 
       return jsonResponse({ success: true });
+
     }
 
     // ── RESET PASSWORD ───────────────────────────────────────────────────────
