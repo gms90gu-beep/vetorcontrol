@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export function SupervisionDashboard() {
   const { userRole } = useOperationalDate();
   const [agents, setAgents] = useState<any[]>([]);
+  const [supervisors, setSupervisors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
@@ -44,12 +45,27 @@ export function SupervisionDashboard() {
     email: "",
     password: "",
     registration_number: "",
-    city: ""
+    city: "",
+    supervisor_id: "" as string,
   });
+
+  const canChooseSupervisor = userRole === "admin_master" || userRole === "coordenador";
 
   useEffect(() => {
     fetchAgents();
-  }, []);
+    if (canChooseSupervisor) fetchSupervisors();
+  }, [canChooseSupervisor]);
+
+  async function fetchSupervisors() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "supervisor")
+      .eq("is_active", true)
+      .order("full_name");
+    if (!error && data) setSupervisors(data);
+  }
+
 
   async function fetchAgents() {
     setIsLoading(true);
@@ -98,11 +114,12 @@ export function SupervisionDashboard() {
     toast.info("Criando novo agente...");
     
     try {
+      const { supervisor_id, ...rest } = newAgent;
+      const payload: any = { ...rest, role: "agente" };
+      if (supervisor_id) payload.supervisor_id = supervisor_id;
+
       const { data, error } = await supabase.functions.invoke('manage-agents', {
-        body: { 
-          action: 'create',
-          agentData: { ...newAgent, role: 'agente' }
-        }
+        body: { action: 'create', agentData: payload },
       });
 
       if (error) throw error;
@@ -114,8 +131,10 @@ export function SupervisionDashboard() {
         email: "",
         password: "",
         registration_number: "",
-        city: ""
+        city: "",
+        supervisor_id: "",
       });
+
       fetchAgents();
     } catch (error: any) {
       console.error("Error creating agent:", error);
@@ -221,6 +240,24 @@ export function SupervisionDashboard() {
                   />
                 </div>
               </div>
+              {canChooseSupervisor && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Supervisor Responsável
+                  </label>
+                  <select
+                    value={newAgent.supervisor_id}
+                    onChange={(e) => setNewAgent({ ...newAgent, supervisor_id: e.target.value })}
+                    className="w-full h-10 rounded-xl bg-slate-50 border border-slate-100 px-3 text-sm"
+                  >
+                    <option value="">— Sem supervisor —</option>
+                    {supervisors.map((s) => (
+                      <option key={s.id} value={s.id}>{s.full_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold mt-2">
                 Salvar Cadastro
               </Button>

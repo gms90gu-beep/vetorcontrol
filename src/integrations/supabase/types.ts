@@ -335,6 +335,7 @@ export type Database = {
           is_active: boolean | null
           registration_number: string | null
           role: Database["public"]["Enums"]["user_role_type"]
+          supervisor_id: string | null
           updated_at: string
         }
         Insert: {
@@ -347,6 +348,7 @@ export type Database = {
           is_active?: boolean | null
           registration_number?: string | null
           role?: Database["public"]["Enums"]["user_role_type"]
+          supervisor_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -359,9 +361,18 @@ export type Database = {
           is_active?: boolean | null
           registration_number?: string | null
           role?: Database["public"]["Enums"]["user_role_type"]
+          supervisor_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       properties: {
         Row: {
@@ -1018,6 +1029,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_supervise_user: { Args: { target_user_id: string }; Returns: boolean }
       check_block_completion: {
         Args: { p_block_id: string; p_cycle_id: string }
         Returns: undefined

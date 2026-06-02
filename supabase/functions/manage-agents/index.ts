@@ -94,9 +94,19 @@ serve(async (req) => {
     const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { u_id: user.id });
     if (!managerRoles.includes(callerRole)) throw new Error("Forbidden: perfil sem permissão para gerenciar usuários");
 
+    // Resolve supervisor_id for this agent:
+    //  - admin_master / coordenador may pass any supervisor_id (or null)
+    //  - supervisor always becomes the supervisor of their own creations
+    function resolveSupervisorId(requested: string | null | undefined): string | null {
+      if (callerRole === "supervisor") return user.id;
+      if (requested === undefined) return null;
+      return requested ?? null;
+    }
+
     // ── CREATE AGENT (fluxo antigo) ──────────────────────────────────────────
     if (action === "create") {
-      const { email, password, full_name, registration_number, city } = agentData;
+      const { email, password, full_name, registration_number, city, supervisor_id } = agentData;
+      const finalSupervisorId = resolveSupervisorId(supervisor_id);
 
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
@@ -108,6 +118,7 @@ serve(async (req) => {
         city,
         is_active: true,
         role: "agente",
+        supervisor_id: finalSupervisorId,
       });
       if (profileError) throw profileError;
 
@@ -127,7 +138,7 @@ serve(async (req) => {
 
     // ── CREATE MANAGER (supervisor / agente / coordenador) ───────────────────
     if (action === "create_manager") {
-      const { email, password, full_name, role = "agente" } = userData;
+      const { email, password, full_name, role = "agente", supervisor_id } = userData;
 
       if (!["supervisor", "coordenador", "agente"].includes(role)) {
         throw new Error("Invalid role: " + role);
@@ -135,6 +146,8 @@ serve(async (req) => {
       if (!email || !password || !full_name) {
         throw new Error("Missing required fields: email, password, full_name");
       }
+
+      const finalSupervisorId = role === "agente" ? resolveSupervisorId(supervisor_id) : null;
 
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
@@ -144,6 +157,7 @@ serve(async (req) => {
         email,
         is_active: true,
         role,
+        supervisor_id: finalSupervisorId,
       });
       if (profileError) throw profileError;
 
@@ -152,7 +166,7 @@ serve(async (req) => {
       return jsonResponse({ success: true, user: authUser });
     }
 
-    // ── UPDATE STATUS ────────────────────────────────────────────────────────
+
     if (action === "update_status") {
       const { userId, active } = agentData;
 
@@ -167,7 +181,7 @@ serve(async (req) => {
 
     // ── UPDATE USER (admin master edits profile/role) ───────────────────────
     if (action === "update_user") {
-      const { userId, full_name, email, phone, role, is_active } = body.userData ?? {};
+      const { userId, full_name, email, phone, role, is_active, supervisor_id } = body.userData ?? {};
       if (!userId) throw new Error("userId is required");
 
       const isAdminMaster = callerRole === "admin_master";
@@ -201,6 +215,12 @@ serve(async (req) => {
         }
         profileUpdate.role = role;
       }
+      // Allow admin_master/coordenador to (re)assign supervisor; supervisor caller forces self
+      if (supervisor_id !== undefined) {
+        profileUpdate.supervisor_id =
+          callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
+      }
+
 
       if (Object.keys(profileUpdate).length > 0) {
         const { error: pErr } = await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", userId);
