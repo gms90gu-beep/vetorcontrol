@@ -160,18 +160,18 @@ function LoginPage() {
               <div className="flex items-center justify-between">
                 <Label
                   htmlFor="password"
-                  className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400"
+                  className="text-[10px] font-bold uppercase tracking-widest ml-1 text-auth-muted"
                 >
                   Senha
                 </Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-12 pr-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 pr-16 h-14 rounded-2xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -179,8 +179,8 @@ function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
-                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-auth-icon transition-colors hover:bg-auth-field-border hover:text-auth-icon-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -191,7 +191,7 @@ function LoginPage() {
                   setForgotEmail(email.includes("@") ? email : "");
                   setForgotOpen(true);
                 }}
-                className="text-xs text-primary font-semibold hover:underline self-end mr-1 mt-1"
+                className="min-h-11 self-end rounded-xl px-2 text-sm font-bold text-auth-link underline-offset-4 transition-colors hover:text-auth-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
               >
                 Esqueceu sua senha?
               </button>
