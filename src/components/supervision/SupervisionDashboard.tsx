@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
-  UserPlus, 
-  Search, 
-  UserCheck, 
-  UserX, 
-  MoreVertical,
+import {
+  Users,
+  UserPlus,
+  Search,
+  UserX,
   Activity,
+  Eye,
+  MoreVertical,
+  LogOut,
   MapPin,
-  ClipboardList,
-  Eye
+  FileText,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,15 +30,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "@tanstack/react-router";
+
+type FilterKey = "all" | "active" | "inactive" | "no_session";
+
+function initials(name?: string | null) {
+  if (!name) return "??";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "??";
+}
 
 export function SupervisionDashboard() {
-  const { userRole } = useOperationalDate();
+  const { user, role, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<any>(null);
   const [agents, setAgents] = useState<any[]>([]);
-  const [supervisors, setSupervisors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [viewingAgent, setViewingAgent] = useState<any | null>(null);
   const [newAgent, setNewAgent] = useState({
@@ -46,64 +58,69 @@ export function SupervisionDashboard() {
     password: "",
     registration_number: "",
     city: "",
-    supervisor_id: "" as string,
   });
 
-  const canChooseSupervisor = userRole === "admin_master" || userRole === "coordenador";
-
   useEffect(() => {
-    fetchAgents();
-    if (canChooseSupervisor) fetchSupervisors();
-  }, [canChooseSupervisor]);
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
-  async function fetchSupervisors() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("role", "supervisor")
-      .eq("is_active", true)
-      .order("full_name");
-    if (!error && data) setSupervisors(data);
-  }
-
-
-  async function fetchAgents() {
+  async function fetchAll() {
     setIsLoading(true);
     try {
-      // Fetch agents
+      if (user?.id) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        setProfile(prof);
+      }
+
+      // RLS já filtra por supervisor_id
       const { data: profiles, error: profileError } = await supabase
         .from("profiles")
         .select("*");
-
       if (profileError) throw profileError;
-      
-      const filteredAgents = profiles.filter((p: any) => 
-        p.role === 'agente' || p.role === 'agent'
+
+      const team = (profiles || []).filter(
+        (p: any) => p.role === "agente" || p.role === "agent",
       );
 
-      // Fetch stats for each agent
-      const { data: visits, error: visitError } = await supabase
-        .from("visits")
-        .select("agent_id, status, has_focus");
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-      if (visitError) throw visitError;
+      const [{ data: visits }, { data: sessions }] = await Promise.all([
+        supabase.from("visits").select("agent_id, status, has_focus"),
+        supabase
+          .from("field_work_sessions")
+          .select("user_id, status, session_date")
+          .gte("session_date", todayStart.toISOString().slice(0, 10)),
+      ]);
 
-      const agentsWithStats = filteredAgents.map(agent => {
-        const agentVisits = visits.filter(v => v.agent_id === agent.id);
+      const withStats = team.map((agent: any) => {
+        const av = (visits || []).filter((v: any) => v.agent_id === agent.id);
+        const todaySessions = (sessions || []).filter(
+          (s: any) => s.user_id === agent.id,
+        );
+        const hasOpenSession = todaySessions.some((s: any) => s.status === "active");
+        const hasAnyToday = todaySessions.length > 0;
         return {
           ...agent,
           stats: {
-            worked: agentVisits.length,
-            closed: agentVisits.filter(v => v.status === 'closed').length,
-            focus: agentVisits.filter(v => v.has_focus).length
-          }
+            worked: av.length,
+            closed: av.filter((v: any) => v.status === "closed").length,
+            focus: av.filter((v: any) => v.has_focus).length,
+          },
+          hasOpenSession,
+          hasAnyToday,
         };
       });
-      
-      setAgents(agentsWithStats);
-    } catch (error) {
-      console.error("Error fetching agents:", error);
-      toast.error("Erro ao carregar lista de agentes");
+
+      setAgents(withStats);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar equipe");
     } finally {
       setIsLoading(false);
     }
@@ -112,19 +129,13 @@ export function SupervisionDashboard() {
   const handleCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
     toast.info("Criando novo agente...");
-    
     try {
-      const { supervisor_id, ...rest } = newAgent;
-      const payload: any = { ...rest, role: "agente" };
-      if (supervisor_id) payload.supervisor_id = supervisor_id;
-
-      const { data, error } = await supabase.functions.invoke('manage-agents', {
-        body: { action: 'create', agentData: payload },
+      const payload: any = { ...newAgent, role: "agente" };
+      const { error } = await supabase.functions.invoke("manage-agents", {
+        body: { action: "create", agentData: payload },
       });
-
       if (error) throw error;
-
-      toast.success("Agente cadastrado com sucesso!");
+      toast.success("Agente cadastrado!");
       setIsAddingAgent(false);
       setNewAgent({
         full_name: "",
@@ -132,237 +143,325 @@ export function SupervisionDashboard() {
         password: "",
         registration_number: "",
         city: "",
-        supervisor_id: "",
       });
-
-      fetchAgents();
-    } catch (error: any) {
-      console.error("Error creating agent:", error);
-      toast.error(`Erro: ${error.message || "Não foi possível cadastrar o agente"}`);
+      fetchAll();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Erro ao cadastrar agente");
     }
   };
 
-  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase.functions.invoke('manage-agents', {
-        body: { 
-          action: 'update_status',
-          agentData: { userId, active: !currentStatus }
-        }
-      });
+  const totals = useMemo(() => {
+    const active = agents.filter((a) => a.is_active).length;
+    const inactive = agents.filter((a) => !a.is_active).length;
+    return { total: agents.length, active, inactive };
+  }, [agents]);
 
-      if (error) throw error;
+  const filteredAgents = useMemo(() => {
+    return agents.filter((a) => {
+      const m =
+        a.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.registration_number?.toLowerCase().includes(searchTerm.toLowerCase());
+      if (!m) return false;
+      if (filter === "active") return a.is_active;
+      if (filter === "inactive") return !a.is_active;
+      if (filter === "no_session") return !a.hasAnyToday;
+      return true;
+    });
+  }, [agents, searchTerm, filter]);
 
-      toast.success(`Agente ${!currentStatus ? 'ativado' : 'desativado'} com sucesso`);
-      fetchAgents();
-    } catch (error) {
-      console.error("Error toggling agent status:", error);
-      toast.error("Erro ao alterar status do agente");
-    }
-  };
-
-  const filteredAgents = agents.filter(a => 
-    a.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.registration_number?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const totalWorked = agents.reduce((s, a) => s + (a.stats?.worked || 0), 0);
+  const totalClosed = agents.reduce((s, a) => s + (a.stats?.closed || 0), 0);
+  const totalFocus = agents.reduce((s, a) => s + (a.stats?.focus || 0), 0);
+  const alertsNoActivity = agents.filter((a) => a.is_active && !a.hasAnyToday).length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <Badge className="bg-primary/10 text-primary mb-2 border-none">Painel de Supervisão</Badge>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Gestão de Equipe</h1>
-          <p className="text-sm font-medium text-slate-500">Monitore, cadastre e gerencie seus agentes de campo.</p>
+    <div className="min-h-screen bg-[#f4f5f7] -mx-4 md:-mx-0">
+      {/* HEADER ESCURO */}
+      <div className="bg-[#0b1520] text-white px-[14px] py-[14px] space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1a3a2a] px-2.5 py-1 text-[10px] font-bold text-[#34d399]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> EM TRABALHO
+          </span>
+          <Button
+            onClick={() => signOut()}
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-white/70 hover:text-white hover:bg-white/10 text-xs font-bold"
+          >
+            <LogOut className="h-3.5 w-3.5 mr-1" /> Sair
+          </Button>
         </div>
-        
-        <Dialog open={isAddingAgent} onOpenChange={setIsAddingAgent}>
-          <DialogTrigger asChild>
-            <Button className="rounded-2xl h-12 px-6 font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-lg transition-all active:scale-95">
-              <UserPlus className="mr-2 h-5 w-5" /> Novo Agente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-none shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase tracking-tight">Cadastrar Agente</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateAgent} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nome Completo</label>
-                <Input 
-                  value={newAgent.full_name} 
-                  onChange={e => setNewAgent({...newAgent, full_name: e.target.value})}
-                  className="rounded-xl bg-slate-50 border-slate-100" 
-                  placeholder="Ex: João da Silva" 
-                  required 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">E-mail (Login)</label>
-                <Input 
-                  type="email"
-                  value={newAgent.email} 
-                  onChange={e => setNewAgent({...newAgent, email: e.target.value})}
-                  className="rounded-xl bg-slate-50 border-slate-100" 
-                  placeholder="exemplo@email.com" 
-                  required 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Senha Temporária</label>
-                <Input 
-                  type="password"
-                  value={newAgent.password} 
-                  onChange={e => setNewAgent({...newAgent, password: e.target.value})}
-                  className="rounded-xl bg-slate-50 border-slate-100" 
-                  placeholder="Min. 6 caracteres" 
-                  required 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Matrícula</label>
-                  <Input 
-                    value={newAgent.registration_number} 
-                    onChange={e => setNewAgent({...newAgent, registration_number: e.target.value})}
-                    className="rounded-xl bg-slate-50 border-slate-100" 
-                    placeholder="00000" 
-                    required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Município</label>
-                  <Input 
-                    value={newAgent.city} 
-                    onChange={e => setNewAgent({...newAgent, city: e.target.value})}
-                    className="rounded-xl bg-slate-50 border-slate-100" 
-                    placeholder="Ex: Natal" 
-                    required 
-                  />
-                </div>
-              </div>
-              {canChooseSupervisor && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Supervisor Responsável
-                  </label>
-                  <select
-                    value={newAgent.supervisor_id}
-                    onChange={(e) => setNewAgent({ ...newAgent, supervisor_id: e.target.value })}
-                    className="w-full h-10 rounded-xl bg-slate-50 border border-slate-100 px-3 text-sm"
-                  >
-                    <option value="">— Sem supervisor —</option>
-                    {supervisors.map((s) => (
-                      <option key={s.id} value={s.id}>{s.full_name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
-              <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-bold mt-2">
-                Salvar Cadastro
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-[#3b9ede]/20 border border-[#3b9ede]/40 flex items-center justify-center font-black text-[#3b9ede]">
+            {initials(profile?.full_name)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-base font-black truncate">
+              {profile?.full_name || "Supervisor"}
+            </p>
+            <p className="text-[10px] font-bold tracking-widest text-[#3b9ede]">
+              {(role || "SUPERVISOR").toString().toUpperCase()}
+            </p>
+            <p className="text-[10px] text-white/50">
+              ACE · {profile?.city || "—"}
+            </p>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCard title="Total de Agentes" value={agents.length} icon={Users} color="bg-blue-50 text-blue-600" />
-        <StatsCard title="Ativos em Campo" value={agents.filter(a => a.is_active).length} icon={Activity} color="bg-emerald-50 text-emerald-600" />
-        <StatsCard title="Inativos" value={agents.filter(a => !a.is_active).length} icon={UserX} color="bg-rose-50 text-rose-600" />
-      </div>
-
-      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Buscar por nome ou matrícula..." 
-              className="pl-10 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none h-12"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+        {/* Território atual */}
+        <div className="rounded-2xl p-3 bg-[#111e2e] border border-[#1e3048]">
+          <div className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-white/40 uppercase">
+            <MapPin className="h-3 w-3" /> Território da Equipe
+          </div>
+          <p className="text-sm font-bold mt-1">
+            {totalWorked > 0
+              ? `${totalWorked} imóveis trabalhados pela equipe`
+              : "Sem atividade registrada hoje"}
+          </p>
+          <div className="mt-2 h-[3px] w-full rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full bg-[#34d399] transition-all"
+              style={{
+                width: `${Math.min(
+                  100,
+                  totalWorked > 0 ? Math.round((totalClosed / Math.max(totalWorked, 1)) * 100) : 0,
+                )}%`,
+              }}
             />
           </div>
         </div>
 
+        {/* 3 cards operacionais */}
+        <div className="grid grid-cols-3 gap-2">
+          <OpCard label="Trabalhados" value={totalWorked} color="text-white" />
+          <OpCard label="Fechados" value={totalClosed} color="text-white" />
+          <OpCard label="Focos" value={totalFocus} color="text-[#f87171]" />
+        </div>
+      </div>
+
+      {/* CORPO CLARO */}
+      <div className="px-4 py-5 space-y-5 pb-24">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">
+              Painel de Supervisão
+            </p>
+            <h1 className="text-xl font-black text-slate-900 leading-tight">
+              Gestão de Equipe
+            </h1>
+          </div>
+          <Dialog open={isAddingAgent} onOpenChange={setIsAddingAgent}>
+            <DialogTrigger asChild>
+              <Button className="h-11 rounded-2xl px-4 font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-sm">
+                <UserPlus className="mr-1.5 h-4 w-4" /> Novo Agente
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px] rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-black uppercase">
+                  Cadastrar Agente
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateAgent} className="space-y-3 mt-2">
+                <FormField
+                  label="Nome Completo"
+                  value={newAgent.full_name}
+                  onChange={(v) => setNewAgent({ ...newAgent, full_name: v })}
+                  required
+                />
+                <FormField
+                  label="E-mail"
+                  type="email"
+                  value={newAgent.email}
+                  onChange={(v) => setNewAgent({ ...newAgent, email: v })}
+                  required
+                />
+                <FormField
+                  label="Senha Temporária"
+                  type="password"
+                  value={newAgent.password}
+                  onChange={(v) => setNewAgent({ ...newAgent, password: v })}
+                  required
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    label="Matrícula"
+                    value={newAgent.registration_number}
+                    onChange={(v) =>
+                      setNewAgent({ ...newAgent, registration_number: v })
+                    }
+                    required
+                  />
+                  <FormField
+                    label="Município"
+                    value={newAgent.city}
+                    onChange={(v) => setNewAgent({ ...newAgent, city: v })}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-bold"
+                >
+                  Salvar
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Métricas */}
+        <div className="grid grid-cols-3 gap-3">
+          <MetricCard
+            label="Total"
+            value={totals.total}
+            icon={Users}
+            color="#185fa5"
+          />
+          <MetricCard
+            label="Ativos"
+            value={totals.active}
+            icon={Activity}
+            color="#3b6d11"
+          />
+          <MetricCard
+            label="Inativos"
+            value={totals.inactive}
+            icon={UserX}
+            color="#a32d2d"
+          />
+        </div>
+
+        {/* Alertas */}
+        {alertsNoActivity > 0 && (
+          <div
+            className="rounded-2xl border-l-4 bg-white p-3 flex items-center gap-2 shadow-sm"
+            style={{ borderColor: "#f59e0b" }}
+          >
+            <AlertTriangle className="h-4 w-4" style={{ color: "#f59e0b" }} />
+            <p className="text-xs font-bold text-slate-700">
+              {alertsNoActivity} agente(s) sem registro hoje.
+            </p>
+          </div>
+        )}
+
+        {/* Busca + Filtros */}
         <div className="space-y-3">
-          {isLoading ? (
-            <div className="py-20 text-center text-slate-400 font-medium">Carregando agentes...</div>
-          ) : filteredAgents.length === 0 ? (
-            <div className="py-20 text-center text-slate-400 font-medium">Nenhum agente encontrado.</div>
-          ) : (
-            filteredAgents.map(agent => (
-              <div 
-                key={agent.id} 
-                className="group flex flex-col md:flex-row md:items-center justify-between p-4 rounded-3xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Buscar por nome ou matrícula..."
+              className="pl-10 rounded-2xl bg-white border-slate-200 h-11"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+            {(
+              [
+                ["all", "Todos"],
+                ["active", "Ativos"],
+                ["inactive", "Inativos"],
+                ["no_session", "Sem sessão"],
+              ] as [FilterKey, string][]
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setFilter(k)}
+                className={cn(
+                  "shrink-0 px-3 h-8 rounded-full text-xs font-bold transition-all",
+                  filter === k
+                    ? "bg-slate-900 text-white"
+                    : "bg-white text-slate-600 border border-slate-200",
+                )}
               >
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center font-black text-slate-400">
-                    {agent.full_name?.charAt(0)}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Lista */}
+        <div className="space-y-2.5">
+          {isLoading ? (
+            <div className="py-16 text-center text-slate-400 text-sm">Carregando equipe...</div>
+          ) : filteredAgents.length === 0 ? (
+            <div className="py-16 text-center text-slate-400 text-sm">
+              Nenhum agente encontrado.
+            </div>
+          ) : (
+            filteredAgents.map((agent) => (
+              <div
+                key={agent.id}
+                className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="h-11 w-11 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-500 text-sm">
+                    {initials(agent.full_name)}
                   </div>
-                  <div>
-                    <h3 className="font-black text-slate-800 dark:text-white uppercase tracking-tight leading-none mb-1">
-                      {agent.full_name}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Matrícula: {agent.registration_number}</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{agent.city}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-black text-slate-900 text-sm truncate">
+                        {agent.full_name}
+                      </h3>
+                      <Badge
+                        className={cn(
+                          "rounded-md px-1.5 py-0 font-black text-[9px] uppercase tracking-wider border-none",
+                          agent.is_active
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700",
+                        )}
+                      >
+                        {agent.is_active ? "ATIVO" : "INATIVO"}
+                      </Badge>
                     </div>
-                    {/* Production stats */}
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                      {agent.registration_number || "—"} · {agent.city || "—"}
+                    </p>
+
                     <div className="flex items-center gap-4 mt-2">
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Trabalhados</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{agent.stats?.worked || 0}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Fechados</span>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{agent.stats?.closed || 0}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Focos</span>
-                        <span className="text-xs font-bold text-rose-500">{agent.stats?.focus || 0}</span>
-                      </div>
+                      <MiniStat label="Trab" value={agent.stats?.worked || 0} />
+                      <MiniStat label="Fech" value={agent.stats?.closed || 0} />
+                      <MiniStat label="Focos" value={agent.stats?.focus || 0} danger />
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end gap-3 mt-4 md:mt-0">
-                  <Badge className={cn(
-                    "rounded-lg px-2 py-1 font-black text-[9px] uppercase tracking-widest border-none",
-                    agent.is_active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                  )}>
-                    {agent.is_active ? "ATIVO" : "INATIVO"}
-                  </Badge>
-                  
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setViewingAgent(agent)}
-                      title="Ver detalhes do agente"
-                      className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90"
-                    >
-                      <Eye className="h-4 w-4 text-slate-400" />
-                    </Button>
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="rounded-xl hover:bg-white dark:hover:bg-slate-700 shadow-sm transition-all active:scale-90">
-                          <MoreVertical className="h-4 w-4 text-slate-400" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-xl border-slate-100 dark:border-slate-800 shadow-xl">
-                        <DropdownMenuItem 
-                          onClick={() => handleToggleStatus(agent.id, agent.is_active)}
-                          className="flex items-center gap-2 font-bold text-xs uppercase tracking-tight py-2"
-                        >
-                          {agent.is_active ? <UserX className="h-4 w-4 text-rose-500" /> : <UserCheck className="h-4 w-4 text-emerald-500" />}
-                          {agent.is_active ? "Desativar Agente" : "Ativar Agente"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
+                  {!agent.hasAnyToday && agent.is_active && (
+                    <span className="mr-auto inline-flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                      <AlertTriangle className="h-3 w-3" /> Sem sessão hoje
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setViewingAgent(agent)}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" /> Ver
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4 text-slate-400" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="rounded-xl">
+                      <DropdownMenuItem onClick={() => navigate({ to: "/reports" })}>
+                        <FileText className="h-3.5 w-3.5 mr-2" /> Ver Relatório
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setViewingAgent(agent)}>
+                        <Activity className="h-3.5 w-3.5 mr-2" /> Ver Jornada
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/map" })}>
+                        <MapPin className="h-3.5 w-3.5 mr-2" /> Ver Quarteirões
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))
@@ -370,57 +469,26 @@ export function SupervisionDashboard() {
         </div>
       </div>
 
-      <Dialog open={!!viewingAgent} onOpenChange={(open) => !open && setViewingAgent(null)}>
-        <DialogContent className="sm:max-w-[480px] rounded-[2rem] border-none shadow-2xl">
+      {/* Detalhe do agente */}
+      <Dialog open={!!viewingAgent} onOpenChange={(o) => !o && setViewingAgent(null)}>
+        <DialogContent className="sm:max-w-[420px] rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">
+            <DialogTitle className="text-xl font-black uppercase">
               {viewingAgent?.full_name}
             </DialogTitle>
           </DialogHeader>
           {viewingAgent && (
-            <div className="space-y-5 mt-2">
-              <div className="flex items-center gap-3">
-                <Badge className={cn(
-                  "rounded-lg px-2 py-1 font-black text-[9px] uppercase tracking-widest border-none",
-                  viewingAgent.is_active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-                )}>
-                  {viewingAgent.is_active ? "ATIVO" : "INATIVO"}
-                </Badge>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {viewingAgent.role}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Matrícula" value={viewingAgent.registration_number || "—"} />
                 <Field label="Município" value={viewingAgent.city || "—"} />
                 <Field label="E-mail" value={viewingAgent.email || "—"} />
-                <Field label="Telefone" value={viewingAgent.phone || "—"} />
+                <Field label="Status" value={viewingAgent.is_active ? "Ativo" : "Inativo"} />
               </div>
-
-              <div className="grid grid-cols-3 gap-3 pt-2">
-                <StatBox label="Trabalhados" value={viewingAgent.stats?.worked || 0} color="text-slate-800" />
-                <StatBox label="Fechados" value={viewingAgent.stats?.closed || 0} color="text-slate-800" />
-                <StatBox label="Focos" value={viewingAgent.stats?.focus || 0} color="text-rose-500" />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={() => {
-                    handleToggleStatus(viewingAgent.id, viewingAgent.is_active);
-                    setViewingAgent(null);
-                  }}
-                  variant="outline"
-                  className="flex-1 h-11 rounded-xl font-bold"
-                >
-                  {viewingAgent.is_active ? "Desativar" : "Ativar"}
-                </Button>
-                <Button
-                  onClick={() => setViewingAgent(null)}
-                  className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground font-bold"
-                >
-                  Fechar
-                </Button>
+              <div className="grid grid-cols-3 gap-2">
+                <StatBox label="Trabalhados" value={viewingAgent.stats?.worked || 0} />
+                <StatBox label="Fechados" value={viewingAgent.stats?.closed || 0} />
+                <StatBox label="Focos" value={viewingAgent.stats?.focus || 0} danger />
               </div>
             </div>
           )}
@@ -430,40 +498,135 @@ export function SupervisionDashboard() {
   );
 }
 
+function OpCard({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div className="rounded-xl bg-[#111e2e] border border-[#1e3048] p-2.5 text-center">
+      <p className={cn("text-xl font-black tracking-tight", color)}>{value}</p>
+      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-0.5">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: any;
+  color: string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
+      <Icon className="h-4 w-4" style={{ color }} />
+      <p className="text-2xl font-black text-slate-900 mt-1.5 leading-none">{value}</p>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  danger,
+}: {
+  label: string;
+  value: number;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+        {label}
+      </span>
+      <span
+        className={cn(
+          "text-xs font-black",
+          danger ? "text-[#f87171]" : "text-slate-700",
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-      <p className="text-sm font-bold text-slate-800 dark:text-slate-200 break-words">{value}</p>
+    <div>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+        {label}
+      </p>
+      <p className="text-sm font-bold text-slate-800 break-words">{value}</p>
     </div>
   );
 }
 
-function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({
+  label,
+  value,
+  danger,
+}: {
+  label: string;
+  value: number;
+  danger?: boolean;
+}) {
   return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-3 text-center">
-      <p className={cn("text-2xl font-black tracking-tighter", color)}>{value}</p>
-      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">{label}</p>
+    <div className="bg-slate-50 rounded-xl p-2.5 text-center">
+      <p
+        className={cn(
+          "text-xl font-black",
+          danger ? "text-[#f87171]" : "text-slate-800",
+        )}
+      >
+        {value}
+      </p>
+      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+        {label}
+      </p>
     </div>
   );
 }
 
-
-function StatsCard({ title, value, icon: Icon, color }: any) {
+function FormField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 border border-slate-100 dark:border-slate-800 shadow-sm">
-      <div className="flex items-center gap-4">
-        <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", color)}>
-          <Icon className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{title}</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">{value}</p>
-        </div>
-      </div>
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+        {label}
+      </label>
+      <Input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-xl bg-slate-50 border-slate-100"
+        required={required}
+      />
     </div>
   );
 }
-
-import { cn } from "@/lib/utils";
-import { useOperationalDate } from "@/hooks/useOperationalDate";
