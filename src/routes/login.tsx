@@ -152,6 +152,14 @@ function LoginPage() {
                 >
                   Senha
                 </Label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={forgotLoading}
+                  className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                  {forgotLoading ? "Enviando..." : "Esqueci minha senha"}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
