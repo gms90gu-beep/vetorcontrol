@@ -38,7 +38,6 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -57,34 +56,41 @@ function LoginPage() {
       const session = await getSessionAfterLogin();
       const authenticatedUser = session?.user ?? data.user;
 
-      // Se o admin marcou senha temporária, força troca antes de continuar
-      const mustChange = (authenticatedUser.user_metadata as any)?.must_change_password === true;
-      if (mustChange) {
-        toast.message("Você deve alterar sua senha antes de continuar.");
-        await navigate({ to: "/reset-password", replace: true });
-        return;
+      if (!session?.user) {
+        console.warn("[Login] Sessão ainda indisponível após login; usando usuário retornado pelo signIn como fallback.");
       }
 
+      // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
       const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: authenticatedUser.id });
+
       const role = roleData as string | null;
 
-      console.debug("[Login] Role encontrado via RPC:", role, "erro:", roleError);
+      console.debug("[Login] Role encontrado via RPC:", role);
+      console.debug("[Login] Erro RPC:", roleError);
+
+      if (roleError) {
+        console.error("[Login] Falha ao buscar role; usando /dashboard como fallback seguro:", roleError);
+      }
 
       toast.success("Login realizado com sucesso!");
 
       if (role === "admin_master") {
+        console.debug("[Login] Redirecionando admin_master para /admin-master");
         await navigate({ to: "/admin-master", replace: true });
       } else if (role === "coordenador") {
+        console.debug("[Login] Redirecionando coordenador para /coordenador");
         await navigate({ to: "/coordenador" as any, replace: true });
       } else if (role === "supervisor") {
+        console.debug("[Login] Redirecionando supervisor para /supervisor");
         await navigate({ to: "/supervisor" as any, replace: true });
       } else if (role === "agente") {
+        console.debug("[Login] Redirecionando agente para /agente");
         await navigate({ to: "/agente" as any, replace: true });
       } else {
+        console.debug("[Login] Redirecionando para /dashboard, role:", role);
         await navigate({ to: "/dashboard", replace: true });
       }
     } catch (error: any) {
-      console.error("[Login] Erro:", error);
       toast.error(error.message || "Erro ao fazer login");
       setIsLoading(false);
     }
@@ -130,12 +136,6 @@ function LoginPage() {
                 >
                   Senha
                 </Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-[11px] font-semibold text-primary hover:underline"
-                >
-                  Esqueceu sua senha?
-                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
