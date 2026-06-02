@@ -260,7 +260,7 @@ function LoginPage() {
                     Enviando...
                   </>
                 ) : (
-                  "Enviar Link de Recuperação"
+                  "Enviar link de recuperação"
                 )}
               </Button>
             </DialogFooter>
