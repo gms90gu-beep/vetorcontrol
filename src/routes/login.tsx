@@ -37,29 +37,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [forgotLoading, setForgotLoading] = useState(false);
 
-  const handleForgotPassword = async () => {
-    const target = email.trim();
-    if (!target) {
-      toast.error("Digite seu e-mail para receber o link de redefinição.");
-      return;
-    }
-    const loginEmail = target.includes("@") ? target : `${target}@vetor.com`;
-    setForgotLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-      toast.success("E-mail de redefinição enviado com sucesso. Verifique sua caixa de entrada.");
-    } catch (err: any) {
-      console.error("[Login] Erro ao enviar reset:", err);
-      toast.error(err.message || "Erro ao enviar e-mail de redefinição.");
-    } finally {
-      setForgotLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
