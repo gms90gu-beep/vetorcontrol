@@ -90,7 +90,7 @@ function ResetPasswordPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="grid gap-6 px-8 pb-10">
             {!ready && (
-              <p className="text-sm text-yellow-400 text-center">
+              <p className="text-sm text-auth-warning text-center">
                 Validando link de recuperação... Se a página não liberar, solicite um novo link.
               </p>
             )}
@@ -151,7 +151,7 @@ function ResetPasswordPage() {
                 </button>
               </div>
               {confirm && password !== confirm && (
-                <p className="text-xs text-red-400 ml-1">As senhas não coincidem</p>
+                <p className="text-xs text-destructive ml-1">As senhas não coincidem</p>
               )}
             </div>
             <Button
