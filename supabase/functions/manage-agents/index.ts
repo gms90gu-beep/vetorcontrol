@@ -181,7 +181,7 @@ serve(async (req) => {
 
     // ── UPDATE USER (admin master edits profile/role) ───────────────────────
     if (action === "update_user") {
-      const { userId, full_name, email, phone, role, is_active } = body.userData ?? {};
+      const { userId, full_name, email, phone, role, is_active, supervisor_id } = body.userData ?? {};
       if (!userId) throw new Error("userId is required");
 
       const isAdminMaster = callerRole === "admin_master";
