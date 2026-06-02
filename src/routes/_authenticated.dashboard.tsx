@@ -106,7 +106,7 @@ function DashboardPage() {
 
         setCycle({
           name: c.name || `Ciclo ${c.number}`,
-          year: c.year,
+          year: c.year ?? currentYear,
           week: week?.number ?? 1,
         });
 
