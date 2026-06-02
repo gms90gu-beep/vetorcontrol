@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ShieldCheck, Mail, Lock, Loader2 } from "lucide-react";
+import { ShieldCheck, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -37,6 +38,33 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const target = forgotEmail.trim();
+    if (!target || !target.includes("@")) {
+      toast.error("Informe um e-mail válido.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("Link de recuperação enviado! Verifique seu e-mail.");
+      setForgotOpen(false);
+      setForgotEmail("");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar e-mail de recuperação.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,14 +169,32 @@ function LoginPage() {
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 pr-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotEmail(email.includes("@") ? email : "");
+                  setForgotOpen(true);
+                }}
+                className="text-xs text-primary font-semibold hover:underline self-end mr-1 mt-1"
+              >
+                Esqueceu sua senha?
+              </button>
             </div>
             <Button
               className="w-full h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-2"
@@ -174,6 +220,53 @@ function LoginPage() {
           </p>
         </CardFooter>
       </Card>
+
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent className="bg-slate-900 border-white/10 text-white rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-primary">Recuperar Senha</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Informe o e-mail cadastrado e enviaremos um link para você redefinir sua senha.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleForgotPassword} className="grid gap-4 mt-2">
+            <div className="grid gap-2">
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">E-mail cadastrado</Label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 h-5 w-5 text-slate-500" />
+                <Input
+                  type="email"
+                  placeholder="exemplo@vetor.com"
+                  className="pl-12 h-12 rounded-xl border-white/5 bg-slate-800 text-base"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setForgotOpen(false)}
+                className="text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={forgotLoading} className="rounded-xl font-bold">
+                {forgotLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar Link de Recuperação"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
