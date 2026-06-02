@@ -172,14 +172,23 @@ serve(async (req) => {
         if (pErr) throw pErr;
       }
 
-      // Update auth email if changed
-      if (typeof email === "string") {
+      // Verify the auth user actually exists (orphan profiles would break FK on user_roles)
+      const { data: authLookup, error: authLookupErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const authUserExists = !authLookupErr && !!authLookup?.user;
+
+      // Update auth email if changed and auth user exists
+      if (typeof email === "string" && authUserExists) {
         const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { email });
         if (aErr) console.warn("[manage-agents] auth email update warning:", aErr.message);
       }
 
       // Sync user_roles when role is provided (admin master only)
       if (role && isAdminMaster) {
+        if (!authUserExists) {
+          throw new Error(
+            "Não é possível alterar o perfil: este usuário não possui conta de autenticação ativa. Recrie o usuário ou remova o registro órfão.",
+          );
+        }
         await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
         const { error: rErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
         if (rErr) throw rErr;
