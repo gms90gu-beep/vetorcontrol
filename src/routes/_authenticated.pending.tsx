@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { blockManagersGuard } from "@/lib/role-guards";
 import { useState } from "react";
 import { 
   AlertTriangle, 
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/pending")({
+  beforeLoad: blockManagersGuard,
   component: PendingPage,
 });
 

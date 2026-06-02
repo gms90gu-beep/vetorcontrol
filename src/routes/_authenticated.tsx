@@ -15,7 +15,8 @@ import {
   Home,
   CheckSquare,
   Car,
-  ShieldCheck
+  ShieldCheck,
+  Users
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -138,16 +139,26 @@ function BottomNav() {
   const { userRole } = useOperationalDate();
   if (!isMobile) return null;
 
+  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
+
+  if (isManager) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
+        <NavItem to="/supervision" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
+        <NavItem to="/supervision" icon={Users} label="Equipe" />
+        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+        <NavItem to="/reports" icon={FileText} label="Relat." />
+        <NavItem to="/settings" icon={Settings} label="Ajustes" />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
       <NavItem to="/dashboard" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
-      { (userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador") ? (
-        <NavItem to="/supervision" icon={LayoutDashboard} label="Superv." />
-      ) : (
-        <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      )}
+      <NavItem to="/map" icon={MapIcon} label="Mapa" />
       <NavItem to="/reports" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
@@ -185,21 +196,27 @@ function getPanelTitle(role: string | null) {
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
+  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
 
-  const navItems = [
-    { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
-    { label: "Veículos", icon: Car, to: "/vehicles" },
-    { label: "Ciclos", icon: Layers, to: "/cycles" },
-    { label: "Trabalho", icon: MapIcon, to: "/field-work" },
-    { label: "RG", icon: MapPin, to: "/rg" },
-    { label: "Pendências", icon: AlertTriangle, to: "/pending" },
-    { label: "Mapa", icon: MapIcon, to: "/map" },
-    { label: "Relatórios", icon: FileText, to: "/reports" },
-  ];
-
-  if (userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador") {
-    navItems.push({ label: "Supervisão", icon: LayoutDashboard, to: "/supervision" as any });
-  }
+  // Managers (supervisor/coordenador/admin_master) get a management-focused menu
+  // without operational field actions (Trabalho, RG, Pendências, Ciclos, Veículos).
+  const navItems = isManager
+    ? [
+        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
+        { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Mapa", icon: MapIcon, to: "/map" },
+        { label: "Relatórios", icon: FileText, to: "/reports" },
+      ]
+    : [
+        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
+        { label: "Veículos", icon: Car, to: "/vehicles" },
+        { label: "Ciclos", icon: Layers, to: "/cycles" },
+        { label: "Trabalho", icon: MapIcon, to: "/field-work" },
+        { label: "RG", icon: MapPin, to: "/rg" },
+        { label: "Pendências", icon: AlertTriangle, to: "/pending" },
+        { label: "Mapa", icon: MapIcon, to: "/map" },
+        { label: "Relatórios", icon: FileText, to: "/reports" },
+      ];
 
   if (userRole === "admin_master") {
     navItems.push({ label: "Admin Master", icon: ShieldCheck, to: "/admin-master" as any });

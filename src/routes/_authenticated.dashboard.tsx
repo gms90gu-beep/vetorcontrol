@@ -32,7 +32,10 @@ import { translate } from "@/lib/translations";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 
+import { blockManagersGuard } from "@/lib/role-guards";
+
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  beforeLoad: blockManagersGuard,
   component: DashboardPage,
 });
 
