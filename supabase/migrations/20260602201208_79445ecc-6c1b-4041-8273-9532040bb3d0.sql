@@ -1,0 +1,1 @@
+ALTER FUNCTION public.update_block_property_count() SET search_path = public;
