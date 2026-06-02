@@ -573,18 +573,25 @@ export function AdminMasterDashboard() {
                       variant="outline"
                       className="h-11 rounded-xl border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
                     >
-                      <KeyRound className="mr-2 h-4 w-4" /> Redefinir Senha
+                      <KeyRound className="mr-2 h-4 w-4" /> Senha Temporária
                     </Button>
-                    {isAdminMaster && selected.role !== "admin_master" && (
-                      <Button
-                        onClick={handleDelete}
-                        variant="outline"
-                        className="h-11 rounded-xl border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                      </Button>
-                    )}
+                    <Button
+                      onClick={handleSendResetEmail}
+                      variant="outline"
+                      className="h-11 rounded-xl border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                    >
+                      <KeyRound className="mr-2 h-4 w-4" /> Enviar E-mail
+                    </Button>
                   </div>
+                  {isAdminMaster && selected.role !== "admin_master" && (
+                    <Button
+                      onClick={handleDelete}
+                      variant="outline"
+                      className="w-full h-11 rounded-xl border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Excluir Usuário
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
