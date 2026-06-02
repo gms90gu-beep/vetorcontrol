@@ -6,6 +6,40 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const managerRoles = ["supervisor", "coordenador", "admin_master"];
+
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status,
+  });
+}
+
+async function getOrCreateAuthUser(supabaseAdmin: any, userData: { email: string; password: string; full_name: string }) {
+  const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email: userData.email,
+    password: userData.password,
+    email_confirm: true,
+    user_metadata: { full_name: userData.full_name },
+  });
+
+  if (!createError) return authUser.user;
+
+  const message = createError.message || "";
+  if (!message.toLowerCase().includes("already") && !message.toLowerCase().includes("registered")) {
+    throw createError;
+  }
+
+  const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listError) throw listError;
+
+  const existingUser = usersData.users.find((u: any) => u.email?.toLowerCase() === userData.email.toLowerCase());
+  if (!existingUser) throw createError;
+
+  console.log("[manage-agents] E-mail já existia; sincronizando perfil e role:", userData.email);
+  return existingUser;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -33,21 +67,19 @@ serve(async (req) => {
     const body = await req.json();
     const { action, agentData, userData } = body;
 
+    const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { u_id: user.id });
+    if (!managerRoles.includes(callerRole)) throw new Error("Forbidden: perfil sem permissão para gerenciar usuários");
+
     // ── CREATE AGENT (fluxo antigo) ──────────────────────────────────────────
     if (action === "create") {
       const { email, password, full_name, registration_number, city } = agentData;
 
-      const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name },
-      });
-      if (createError) throw createError;
+      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
-        id: authUser.user.id,
+        id: authUser.id,
         full_name,
+        email,
         registration_number,
         city,
         is_active: true,
@@ -55,10 +87,22 @@ serve(async (req) => {
       });
       if (profileError) throw profileError;
 
-      return new Response(JSON.stringify({ success: true, user: authUser.user }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
+        user_id: authUser.id,
+        role: "agente",
+      }, { onConflict: "user_id,role" });
+      if (roleError) throw roleError;
+
+      const { error: agentError } = await supabaseAdmin.from("agents").upsert({
+        profile_id: authUser.id,
+        name: full_name,
+        registration_id: registration_number,
+        municipality: city || "São Paulo",
+        status: "active",
+      }, { onConflict: "profile_id" });
+      if (agentError) throw agentError;
+
+      return jsonResponse({ success: true, user: authUser });
     }
 
     // ── CREATE MANAGER (supervisor / agente / coordenador) ───────────────────
@@ -72,16 +116,10 @@ serve(async (req) => {
         throw new Error("Missing required fields: email, password, full_name");
       }
 
-      const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { full_name },
-      });
-      if (createError) throw createError;
+      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
-        id: authUser.user.id,
+        id: authUser.id,
         full_name,
         email,
         is_active: true,
@@ -89,10 +127,13 @@ serve(async (req) => {
       });
       if (profileError) throw profileError;
 
-      return new Response(JSON.stringify({ success: true, user: authUser.user }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
+        user_id: authUser.id,
+        role,
+      }, { onConflict: "user_id,role" });
+      if (roleError) throw roleError;
+
+      return jsonResponse({ success: true, user: authUser });
     }
 
     // ── UPDATE STATUS ────────────────────────────────────────────────────────
@@ -105,10 +146,7 @@ serve(async (req) => {
         .eq("id", userId);
       if (updateError) throw updateError;
 
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return jsonResponse({ success: true });
     }
 
     // ── DELETE USER ──────────────────────────────────────────────────────────
@@ -118,18 +156,12 @@ serve(async (req) => {
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (deleteError) throw deleteError;
 
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return jsonResponse({ success: true });
     }
 
     throw new Error("Invalid action: " + action);
   } catch (error) {
     console.error("[manage-agents] Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+    return jsonResponse({ error: error.message }, 400);
   }
 });

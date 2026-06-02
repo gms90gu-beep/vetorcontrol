@@ -164,7 +164,7 @@ export function ReportsDashboard() {
     }
   };
 
-  const isSupervisor = userRole === "supervisor" || userRole === "admin";
+  const isSupervisor = userRole === "supervisor" || userRole === "coordenador" || userRole === "admin_master";
 
   return (
     <div id="reports-content" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">

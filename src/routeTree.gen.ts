@@ -16,6 +16,7 @@ import { Route as AdminMasterRouteImport } from './routes/admin-master'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
+import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated.supervisor'
 import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenticated.supervision'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
@@ -26,6 +27,8 @@ import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authen
 import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
+import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
+import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 
 const SignupRoute = SignupRouteImport.update({
@@ -60,6 +63,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   id: '/vehicles',
   path: '/vehicles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupervisorRoute = AuthenticatedSupervisorRouteImport.update({
+  id: '/supervisor',
+  path: '/supervisor',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedSupervisionRoute =
@@ -114,6 +122,17 @@ const AuthenticatedCyclesRoute = AuthenticatedCyclesRouteImport.update({
   path: '/cycles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCoordenadorRoute =
+  AuthenticatedCoordenadorRouteImport.update({
+    id: '/coordenador',
+    path: '/coordenador',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
+  id: '/agente',
+  path: '/agente',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedPropertyPropertyIdRoute =
   AuthenticatedPropertyPropertyIdRouteImport.update({
     id: '/property/$propertyId',
@@ -127,6 +146,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
+  '/agente': typeof AuthenticatedAgenteRoute
+  '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
@@ -137,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
+  '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -145,6 +167,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
+  '/agente': typeof AuthenticatedAgenteRoute
+  '/coordenador': typeof AuthenticatedCoordenadorRoute
   '/cycles': typeof AuthenticatedCyclesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
@@ -155,6 +179,7 @@ export interface FileRoutesByTo {
   '/rg': typeof AuthenticatedRgRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
+  '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/': typeof AuthenticatedIndexRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -166,6 +191,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
+  '/_authenticated/agente': typeof AuthenticatedAgenteRoute
+  '/_authenticated/coordenador': typeof AuthenticatedCoordenadorRoute
   '/_authenticated/cycles': typeof AuthenticatedCyclesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/field-work': typeof AuthenticatedFieldWorkRoute
@@ -176,6 +203,7 @@ export interface FileRoutesById {
   '/_authenticated/rg': typeof AuthenticatedRgRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/supervision': typeof AuthenticatedSupervisionRoute
+  '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -188,6 +216,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/signup'
+    | '/agente'
+    | '/coordenador'
     | '/cycles'
     | '/dashboard'
     | '/field-work'
@@ -198,6 +228,7 @@ export interface FileRouteTypes {
     | '/rg'
     | '/settings'
     | '/supervision'
+    | '/supervisor'
     | '/vehicles'
     | '/property/$propertyId'
   fileRoutesByTo: FileRoutesByTo
@@ -206,6 +237,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/signup'
+    | '/agente'
+    | '/coordenador'
     | '/cycles'
     | '/dashboard'
     | '/field-work'
@@ -216,6 +249,7 @@ export interface FileRouteTypes {
     | '/rg'
     | '/settings'
     | '/supervision'
+    | '/supervisor'
     | '/vehicles'
     | '/'
     | '/property/$propertyId'
@@ -226,6 +260,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/signup'
+    | '/_authenticated/agente'
+    | '/_authenticated/coordenador'
     | '/_authenticated/cycles'
     | '/_authenticated/dashboard'
     | '/_authenticated/field-work'
@@ -236,6 +272,7 @@ export interface FileRouteTypes {
     | '/_authenticated/rg'
     | '/_authenticated/settings'
     | '/_authenticated/supervision'
+    | '/_authenticated/supervisor'
     | '/_authenticated/vehicles'
     | '/_authenticated/'
     | '/_authenticated/property/$propertyId'
@@ -298,6 +335,13 @@ declare module '@tanstack/react-router' {
       path: '/vehicles'
       fullPath: '/vehicles'
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/supervisor': {
+      id: '/_authenticated/supervisor'
+      path: '/supervisor'
+      fullPath: '/supervisor'
+      preLoaderRoute: typeof AuthenticatedSupervisorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/supervision': {
@@ -370,6 +414,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCyclesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/coordenador': {
+      id: '/_authenticated/coordenador'
+      path: '/coordenador'
+      fullPath: '/coordenador'
+      preLoaderRoute: typeof AuthenticatedCoordenadorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/agente': {
+      id: '/_authenticated/agente'
+      path: '/agente'
+      fullPath: '/agente'
+      preLoaderRoute: typeof AuthenticatedAgenteRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/property/$propertyId': {
       id: '/_authenticated/property/$propertyId'
       path: '/property/$propertyId'
@@ -381,6 +439,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
+  AuthenticatedCoordenadorRoute: typeof AuthenticatedCoordenadorRoute
   AuthenticatedCyclesRoute: typeof AuthenticatedCyclesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFieldWorkRoute: typeof AuthenticatedFieldWorkRoute
@@ -391,12 +451,15 @@ interface AuthenticatedRouteChildren {
   AuthenticatedRgRoute: typeof AuthenticatedRgRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSupervisionRoute: typeof AuthenticatedSupervisionRoute
+  AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
+  AuthenticatedCoordenadorRoute: AuthenticatedCoordenadorRoute,
   AuthenticatedCyclesRoute: AuthenticatedCyclesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFieldWorkRoute: AuthenticatedFieldWorkRoute,
@@ -407,6 +470,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedRgRoute: AuthenticatedRgRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSupervisionRoute: AuthenticatedSupervisionRoute,
+  AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
@@ -426,3 +490,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
