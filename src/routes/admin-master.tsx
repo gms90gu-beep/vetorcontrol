@@ -1,9 +1,9 @@
-import { createFileRoute, redirect, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter, useNavigate } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Loader2 } from "lucide-react";
+import { LogOut, ArrowLeft, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin-master")({
