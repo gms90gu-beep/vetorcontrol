@@ -136,18 +136,23 @@ serve(async (req) => {
       return jsonResponse({ success: true, user: authUser });
     }
 
-    // ── CREATE MANAGER (supervisor / agente / coordenador) ───────────────────
+    // ── CREATE MANAGER (supervisor / agente / coordenador / admin_master) ───
     if (action === "create_manager") {
-      const { email, password, full_name, role = "agente", supervisor_id } = userData;
+      const { email, password, full_name, role = "agente", supervisor_id, coordinator_id } = userData;
 
-      if (!["supervisor", "coordenador", "agente"].includes(role)) {
+      if (!["supervisor", "coordenador", "agente", "admin_master"].includes(role)) {
         throw new Error("Invalid role: " + role);
       }
       if (!email || !password || !full_name) {
         throw new Error("Missing required fields: email, password, full_name");
       }
+      // Only admin_master may create supervisor / coordenador / admin_master
+      if (["supervisor", "coordenador", "admin_master"].includes(role) && callerRole !== "admin_master") {
+        throw new Error("Forbidden: apenas Admin Master pode criar este perfil");
+      }
 
       const finalSupervisorId = role === "agente" ? resolveSupervisorId(supervisor_id) : null;
+      const finalCoordinatorId = role === "supervisor" ? (coordinator_id ?? null) : null;
 
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
@@ -158,13 +163,25 @@ serve(async (req) => {
         is_active: true,
         role,
         supervisor_id: finalSupervisorId,
+        coordinator_id: finalCoordinatorId,
       });
       if (profileError) throw profileError;
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, role);
 
+      // Audit
+      await supabaseAdmin.from("audit_log").insert({
+        actor_id: user.id,
+        actor_email: user.email,
+        target_id: authUser.id,
+        action: "create_user",
+        entity: "user",
+        metadata: { role, full_name, email },
+      });
+
       return jsonResponse({ success: true, user: authUser });
     }
+
 
 
     if (action === "update_status") {
@@ -181,7 +198,7 @@ serve(async (req) => {
 
     // ── UPDATE USER (admin master edits profile/role) ───────────────────────
     if (action === "update_user") {
-      const { userId, full_name, email, phone, role, is_active, supervisor_id } = body.userData ?? {};
+      const { userId, full_name, email, phone, role, is_active, supervisor_id, coordinator_id } = body.userData ?? {};
       if (!userId) throw new Error("userId is required");
 
       const isAdminMaster = callerRole === "admin_master";
@@ -220,6 +237,22 @@ serve(async (req) => {
         profileUpdate.supervisor_id =
           callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
       }
+      // coordinator_id only settable by admin_master
+      if (coordinator_id !== undefined && isAdminMaster) {
+        profileUpdate.coordinator_id = coordinator_id ?? null;
+      }
+
+      // Audit
+      await supabaseAdmin.from("audit_log").insert({
+        actor_id: user.id,
+        actor_email: user.email,
+        target_id: userId,
+        action: "update_user",
+        entity: "user",
+        metadata: profileUpdate,
+      });
+
+
 
 
       if (Object.keys(profileUpdate).length > 0) {

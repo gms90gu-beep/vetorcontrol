@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/coordenador")({
       throw redirect({ to: "/dashboard" });
     }
 
-    throw redirect({ to: "/supervision" });
+    throw redirect({ to: "/coordenacao" });
   },
   component: () => null,
 });

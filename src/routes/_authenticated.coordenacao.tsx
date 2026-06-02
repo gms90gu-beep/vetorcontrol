@@ -1,0 +1,29 @@
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { CoordinatorDashboard } from "@/components/supervision/CoordinatorDashboard";
+import { supabase } from "@/integrations/supabase/client";
+
+export const Route = createFileRoute("/_authenticated/coordenacao")({
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw redirect({ to: "/login" });
+
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw redirect({ to: "/login" });
+
+    const { data: role } = await supabase.rpc("get_user_role", { u_id: userData.user.id });
+    if (!["coordenador", "admin_master"].includes(role || "")) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
+  component: CoordinatorPage,
+});
+
+function CoordinatorPage() {
+  return (
+    <div className="w-full h-full pb-20">
+      <CoordinatorDashboard />
+    </div>
+  );
+}

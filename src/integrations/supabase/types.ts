@@ -77,6 +77,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          entity: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          target_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          entity?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          target_id?: string | null
+        }
+        Relationships: []
+      }
       blocks: {
         Row: {
           id: string
@@ -328,6 +364,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           city: string | null
+          coordinator_id: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -341,6 +378,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           city?: string | null
+          coordinator_id?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -354,6 +392,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           city?: string | null
+          coordinator_id?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -365,6 +404,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_coordinator_id_fkey"
+            columns: ["coordinator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_supervisor_id_fkey"
             columns: ["supervisor_id"]
