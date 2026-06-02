@@ -125,8 +125,8 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <Card className="w-full max-w-md border-white/10 shadow-2xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-auth-background px-4 py-6">
+      <Card className="w-full max-w-md border-auth-field-border shadow-2xl bg-auth-card text-auth-foreground rounded-[2.5rem] overflow-hidden">
         <CardHeader className="space-y-1 text-center pt-10 pb-6">
           <div className="flex justify-center mb-6">
             <div className="h-20 w-20 rounded-[2rem] bg-primary flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 rotate-12 transition-transform hover:rotate-0">
@@ -134,22 +134,22 @@ function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-4xl font-black tracking-tighter text-primary">VetorControl</CardTitle>
-          <CardDescription className="text-base font-medium text-slate-400">
+          <CardDescription className="text-base font-medium text-auth-muted">
             Sistema de Controle Vetorial Urbano
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-auth-muted">
                 E-mail ou Matrícula
               </Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   id="email"
                   placeholder="exemplo@vetor.com ou 12345"
-                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 h-14 rounded-2xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -160,18 +160,18 @@ function LoginPage() {
               <div className="flex items-center justify-between">
                 <Label
                   htmlFor="password"
-                  className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400"
+                  className="text-[10px] font-bold uppercase tracking-widest ml-1 text-auth-muted"
                 >
                   Senha
                 </Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
+                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  className="pl-12 pr-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 pr-16 h-14 rounded-2xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -179,8 +179,8 @@ function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
-                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-auth-icon transition-colors hover:bg-auth-field-border hover:text-auth-icon-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -191,7 +191,7 @@ function LoginPage() {
                   setForgotEmail(email.includes("@") ? email : "");
                   setForgotOpen(true);
                 }}
-                className="text-xs text-primary font-semibold hover:underline self-end mr-1 mt-1"
+                className="min-h-11 self-end rounded-xl px-2 text-sm font-bold text-auth-link underline-offset-4 transition-colors hover:text-auth-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
               >
                 Esqueceu sua senha?
               </button>
@@ -212,9 +212,9 @@ function LoginPage() {
           </CardContent>
         </form>
         <CardFooter className="flex justify-center pb-10">
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-auth-muted font-medium">
             Não tem uma conta?{" "}
-            <Link to="/signup" className="text-primary font-bold hover:underline">
+            <Link to="/signup" className="text-auth-link font-bold hover:text-auth-link-hover hover:underline">
               Solicitar acesso
             </Link>
           </p>
@@ -222,22 +222,22 @@ function LoginPage() {
       </Card>
 
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
-        <DialogContent className="bg-slate-900 border-white/10 text-white rounded-3xl">
+        <DialogContent className="bg-auth-card border-auth-field-border text-auth-foreground rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black text-primary">Recuperar Senha</DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-auth-muted">
               Informe o e-mail cadastrado e enviaremos um link para você redefinir sua senha.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="grid gap-4 mt-2">
             <div className="grid gap-2">
-              <Label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">E-mail cadastrado</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-widest text-auth-muted">E-mail cadastrado</Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-3.5 h-5 w-5 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   type="email"
                   placeholder="exemplo@vetor.com"
-                  className="pl-12 h-12 rounded-xl border-white/5 bg-slate-800 text-base"
+                  className="pl-12 h-12 rounded-xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   required
@@ -249,18 +249,18 @@ function LoginPage() {
                 type="button"
                 variant="ghost"
                 onClick={() => setForgotOpen(false)}
-                className="text-slate-400 hover:text-white hover:bg-slate-800"
+                className="text-auth-muted hover:text-auth-foreground hover:bg-auth-field"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={forgotLoading} className="rounded-xl font-bold">
+              <Button type="submit" disabled={forgotLoading} className="min-h-11 rounded-xl font-bold">
                 {forgotLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Enviando...
                   </>
                 ) : (
-                  "Enviar Link de Recuperação"
+                  "Enviar link de recuperação"
                 )}
               </Button>
             </DialogFooter>
