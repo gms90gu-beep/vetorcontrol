@@ -118,6 +118,21 @@ function AuthenticatedLayout() {
   );
 }
 
+function getShortPanelTitle(role: string | null) {
+  switch (role) {
+    case "admin_master":
+      return "Admin";
+    case "coordenador":
+      return "Coord.";
+    case "supervisor":
+      return "Superv.";
+    case "agente":
+      return "Agente";
+    default:
+      return "Início";
+  }
+}
+
 function BottomNav() {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
@@ -125,7 +140,7 @@ function BottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
-      <NavItem to="/dashboard" icon={LayoutDashboard} label="Início" />
+      <NavItem to="/dashboard" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
       { (userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador") ? (
@@ -152,12 +167,27 @@ function NavItem({ to, icon: Icon, label }: any) {
   );
 }
 
+function getPanelTitle(role: string | null) {
+  switch (role) {
+    case "admin_master":
+      return "Painel Administrativo";
+    case "coordenador":
+      return "Painel do Coordenador";
+    case "supervisor":
+      return "Painel do Supervisor";
+    case "agente":
+      return "Painel do Agente";
+    default:
+      return "Dashboard";
+  }
+}
+
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
 
   const navItems = [
-    { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
+    { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
     { label: "Veículos", icon: Car, to: "/vehicles" },
     { label: "Ciclos", icon: Layers, to: "/cycles" },
     { label: "Trabalho", icon: MapIcon, to: "/field-work" },

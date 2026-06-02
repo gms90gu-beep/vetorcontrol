@@ -28,7 +28,23 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+
+function getPanelTitle(role: string | null) {
+  switch (role) {
+    case "admin_master":
+      return "Painel Administrativo";
+    case "coordenador":
+      return "Painel do Coordenador";
+    case "supervisor":
+      return "Painel do Supervisor";
+    case "agente":
+      return "Painel do Agente";
+    default:
+      return "Dashboard";
+  }
+}
 
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
@@ -39,6 +55,7 @@ export function OperationalHeader() {
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
+  const { role } = useAuth();
 
   useEffect(() => {
     fetchHeaderData();
@@ -145,6 +162,9 @@ export function OperationalHeader() {
               <h1 className="text-lg font-black tracking-tight leading-none text-white">
                 {agent?.name || "Agente"}
               </h1>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-300">
+                {getPanelTitle(role)}
+              </p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tight">{agent?.registration_id || "MATRÍCULA"}</span>
                 <span className="h-1 w-1 rounded-full bg-slate-600" />
