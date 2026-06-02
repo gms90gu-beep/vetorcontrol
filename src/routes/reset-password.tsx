@@ -144,7 +144,8 @@ function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowCf((v) => !v)}
-                  className="absolute right-4 top-4 text-slate-500 hover:text-slate-300"
+                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-auth-icon transition-colors hover:bg-auth-field-border hover:text-auth-icon-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-auth-link/60"
+                  aria-label={showCf ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
                 >
                   {showCf ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
