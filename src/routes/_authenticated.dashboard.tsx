@@ -1,37 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Users, 
-  Home, 
-  MapPin, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle,
-  TrendingUp,
-  Calendar,
-  ChevronRight,
-  FileText,
+import {
+  LogOut,
+  PlayCircle,
   CalendarCheck,
+  MapPin,
   BarChart3,
-  AlertCircle,
-  RefreshCw,
-  Search,
-  Plus,
-  Target,
-  ShieldAlert
+  AlertTriangle,
+  History,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-import { DailyWorkCloser } from "@/components/DailyWorkCloser";
-import { translate } from "@/lib/translations";
-import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
-
 import { blockManagersGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -39,387 +18,476 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function ActionCard({ title, description, icon: Icon, color, to, onClick, className, isCritical }: any) {
-  // Extract border color and text color from the passed bg class
-  const colorMap: Record<string, { border: string, text: string, iconBg: string }> = {
-    "bg-emerald-500": { border: "border-emerald-500/20", text: "text-emerald-600", iconBg: "bg-emerald-500/10" },
-    "bg-blue-500": { border: "border-blue-500/20", text: "text-blue-600", iconBg: "bg-blue-500/10" },
-    "bg-indigo-600": { border: "border-indigo-600/20", text: "text-indigo-600", iconBg: "bg-indigo-600/10" },
-    "bg-red-500": { border: "border-red-500/20", text: "text-red-600", iconBg: "bg-red-500/10" },
-    "bg-slate-800": { border: "border-slate-800/20", text: "text-slate-800", iconBg: "bg-slate-800/10" },
-  };
+type ShiftStatus = "encerrado" | "trabalho" | "pausa";
 
-  const colors = colorMap[color] || { border: "border-border", text: "text-foreground", iconBg: "bg-accent/50" };
+type ActivityItem = {
+  id: string;
+  type: "visit" | "focus";
+  title: string;
+  address: string;
+  time: string;
+};
 
-  const content = (
-    <div className={cn(
-      "flex flex-col h-full p-8 rounded-[2.5rem] transition-all duration-300 active:scale-95 shadow-lg hover:shadow-xl border-2 group relative overflow-hidden",
-      isCritical 
-        ? "bg-red-500 border-red-600 text-white" 
-        : "bg-white dark:bg-slate-950 " + colors.border,
-      className
-    )}>
-      <div className={cn(
-        "p-3.5 rounded-2xl w-fit mb-5 group-hover:scale-110 transition-transform duration-500",
-        isCritical ? "bg-white/20 text-white" : colors.iconBg + " " + colors.text
-      )}>
-        <Icon className="h-6 w-6" />
-      </div>
-      <div className="relative z-10">
-        <h3 className={cn(
-          "text-xl sm:text-2xl font-black leading-tight mb-1 tracking-tight break-words", 
-          isCritical ? "text-white" : colors.text
-        )}>{title}</h3>
-        <p className={cn(
-          "text-[10px] font-bold uppercase tracking-wider leading-relaxed",
-          isCritical ? "text-white/90" : "text-muted-foreground"
-        )}>{description}</p>
-      </div>
-    </div>
-  );
-
-  if (to) {
-    return (
-      <Link to={to} className="h-44 block">
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <button onClick={onClick} className="h-44 text-left w-full block">
-      {content}
-    </button>
-  );
+function initialsFrom(name?: string | null, email?: string | null) {
+  const base = (name && name.trim()) || (email ? email.split("@")[0] : "") || "";
+  const parts = base.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "AG";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const { userRole, isLoading: isRoleLoading } = useOperationalDate();
-  const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-  const [activeCycle, setActiveCycle] = useState<any>(null);
-  const [activeSession, setActiveSession] = useState<any>(null);
-  const [coverageData, setCoverageData] = useState<any>(null);
-  const [blockProgress, setBlockProgress] = useState(0);
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [activeWeek, setActiveWeek] = useState<any>(null);
+  const { user, signOut } = useAuth();
 
+  const [profile, setProfile] = useState<{
+    full_name: string | null;
+    registration_number: string | null;
+    city: string | null;
+  } | null>(null);
 
-  const [stats, setStats] = useState({
-    worked: 0,
-    visited: 0,
-    closed: 0,
-    refused: 0,
-    eliminated: 0,
-    treated: 0,
-    focus: 0,
-    progress: 0,
+  const [shift, setShift] = useState<ShiftStatus>("encerrado");
+  const [session, setSession] = useState({ trabalhados: 0, fechados: 0, focos: 0 });
+  const [cycle, setCycle] = useState<{ name: string; year: number; week: number } | null>(null);
+  const [coverage, setCoverage] = useState({ visited: 0, total: 0, percent: 0 });
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [reportsSeen, setReportsSeen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("reports_seen_v1") === "1";
   });
 
-  const panelTitle = (() => {
-    switch (userRole) {
-      case "admin_master":
-        return "Painel Administrativo";
-      case "coordenador":
-        return "Painel do Coordenador";
-      case "supervisor":
-        return "Painel do Supervisor";
-      case "agente":
-        return "Painel do Agente";
-      default:
-        return "Dashboard";
-    }
-  })();
-
   useEffect(() => {
-    document.title = `${panelTitle} — VetorControl`;
-  }, [panelTitle]);
-
-  useEffect(() => {
-    fetchCurrentStatus();
+    document.title = "Painel do Agente — VetorControl";
   }, []);
 
-  async function fetchCurrentStatus() {
-    try {
-      setIsLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("full_name, registration_number, city")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setProfile(p ?? null);
 
-      const { count } = await supabase
-        .from("visits")
-        .select("*", { count: 'exact', head: true })
-        .eq("status", "abandoned");
-      
-      setPendingCount(count || 0);
-
-      const currentYearVal = new Date().getFullYear();
-      setCurrentYear(currentYearVal);
-
-      const { data: cycle } = await supabase
-        .from("cycles")
-        .select("*")
+      const today = new Date().toISOString().split("T")[0];
+      const { data: active } = await supabase
+        .from("field_work_sessions")
+        .select("id, status")
+        .eq("user_id", user.id)
         .eq("status", "in_progress")
-        .eq("year", currentYearVal)
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      setHasActiveSession(!!active);
+      setShift(active ? "trabalho" : "encerrado");
+
+      const currentYear = new Date().getFullYear();
+      const { data: c } = await supabase
+        .from("cycles")
+        .select("id, name, year, number")
+        .eq("status", "in_progress")
+        .eq("year", currentYear)
         .order("number", { ascending: false })
         .limit(1)
         .maybeSingle();
-      
-      if (cycle) {
-        setActiveCycle(cycle);
-        
-        const { data: coverage } = await supabase
-          .from("cycle_coverage_summary")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .maybeSingle();
-        
-        if (coverage) setCoverageData(coverage);
 
+      if (c) {
         const { data: week } = await supabase
           .from("weeks")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .lte("start_date", new Date().toISOString().split('T')[0])
-          .gte("end_date", new Date().toISOString().split('T')[0])
+          .select("number")
+          .eq("cycle_id", c.id)
+          .lte("start_date", today)
+          .gte("end_date", today)
           .maybeSingle();
-        
-        if (week) {
-          setActiveWeek(week);
-        } else {
-          const { data: firstWeek } = await supabase
-            .from("weeks")
-            .select("*")
-            .eq("cycle_id", cycle.id)
-            .order("number", { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          if (firstWeek) setActiveWeek(firstWeek);
+
+        setCycle({
+          name: c.name || `Ciclo ${c.number}`,
+          year: c.year ?? currentYear,
+          week: week?.number ?? 1,
+        });
+
+        const { data: cov } = await supabase
+          .from("cycle_coverage_summary")
+          .select("worked_properties, total_properties, coverage_percentage")
+          .eq("cycle_id", c.id)
+          .maybeSingle();
+        if (cov) {
+          setCoverage({
+            visited: cov.worked_properties ?? 0,
+            total: cov.total_properties ?? 0,
+            percent: Math.round(Number(cov.coverage_percentage ?? 0)),
+          });
         }
 
         const { data: visits } = await supabase
           .from("visits")
-          .select("id, status")
-          .eq("cycle_id", cycle.id);
-        
+          .select("id, status, has_focus, visit_date")
+          .eq("agent_id", user.id)
+          .gte("visit_date", `${today}T00:00:00`)
+          .order("visit_date", { ascending: false });
+
         if (visits) {
-          setStats(prev => ({
-            ...prev,
-            worked: visits.length,
-            closed: visits.filter(v => v.status === 'closed').length,
-            refused: visits.filter(v => v.status === 'refused').length,
-          }));
+          setSession({
+            trabalhados: visits.length,
+            fechados: visits.filter((v) => v.status === "closed").length,
+            focos: visits.filter((v) => v.has_focus === true).length,
+          });
         }
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
-      const { data: session } = await supabase
-        .from("field_work_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (session) {
-        setActiveSession(session);
-        
-        const { data: blockProps } = await supabase
-          .from("properties")
-          .select("id")
-          .eq("block_number", session.block_number);
-        
-        if (blockProps && blockProps.length > 0 && session.cycle_id) {
-          const { data: sessionVisits } = await supabase
-            .from("visits")
-            .select("id")
-            .eq("cycle_id", session.cycle_id)
-            .in("property_id", blockProps.map(p => p.id));
-          
-          if (sessionVisits) {
-            setBlockProgress(Math.round((sessionVisits.length / blockProps.length) * 100));
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching status:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const fullName = profile?.full_name || user?.email?.split("@")[0] || "Agente";
+  const initials = initialsFrom(profile?.full_name, user?.email);
+  const matricula = profile?.registration_number || "—";
+  const cidade = profile?.city || "—";
 
-  const handleSync = () => {
-    setIsSyncing(true);
-    toast.info("Sincronizando dados...");
-    
-    setTimeout(() => {
-      setIsSyncing(false);
-      setLastSync(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-      fetchCurrentStatus();
-      toast.success("Dados sincronizados com sucesso!");
-    }, 2000);
+  const shiftBadge = useMemo(() => {
+    if (shift === "trabalho") return { bg: "#1a3a2a", color: "#34d399", label: "Em trabalho" };
+    if (shift === "pausa") return { bg: "#1a1500", color: "#fbbf24", label: "Em pausa" };
+    return { bg: "#1a1a2e", color: "#6366f1", label: "Expediente encerrado" };
+  }, [shift]);
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = "/login";
+  };
+
+  const markReportsSeen = () => {
+    localStorage.setItem("reports_seen_v1", "1");
+    setReportsSeen(true);
   };
 
   return (
-    <div className="pb-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Admin Master Access Button */}
-      {(userRole === 'admin_master' || user?.email === 'gms90gu@gmail.com') && (
-        <Card className="border-2 border-amber-500/50 bg-amber-500/10 p-4 rounded-[2rem] flex items-center justify-between group hover:bg-amber-500/20 transition-all cursor-pointer shadow-lg shadow-amber-500/10" onClick={() => navigate({ to: '/admin-master' as any })}>
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-amber-500 flex items-center justify-center text-amber-950 shadow-lg shadow-amber-500/20 group-hover:scale-110 transition-transform">
-              <ShieldAlert className="h-6 w-6" />
+    <div className="min-h-full" style={{ background: "#f4f5f7" }}>
+      {/* Header escuro */}
+      <header style={{ background: "#0b1520", padding: "14px" }}>
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2"
+              style={{ background: shiftBadge.bg }}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: shiftBadge.color }}
+              />
+              <span
+                className="text-[10px] font-semibold"
+                style={{ color: shiftBadge.color }}
+              >
+                {shiftBadge.label}
+              </span>
             </div>
-            <div>
-              <h3 className="text-lg font-black text-amber-500 uppercase italic tracking-tighter">Painel de Controle Master</h3>
-              <p className="text-[10px] font-bold text-amber-500/70 uppercase tracking-widest">Acesso restrito à gestão global do sistema</p>
+            <div className="text-white font-bold text-base leading-tight truncate">{fullName}</div>
+            <div
+              className="text-[9px] uppercase tracking-wider font-semibold mt-0.5"
+              style={{ color: "#4a6b80" }}
+            >
+              Painel do Agente
+            </div>
+            <div className="text-[9px] mt-0.5" style={{ color: "#2e4a60" }}>
+              {matricula} · {cidade}
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="text-amber-500 hover:bg-amber-500/20 rounded-xl">
-            <ChevronRight className="h-6 w-6" />
-          </Button>
-        </Card>
-      )}
-
-      {/* Cycle Coverage Card */}
-      <Card className="border-none shadow-xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden relative group">
-        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
-          <TrendingUp className="h-32 w-32" />
+          <div className="flex items-center gap-3 shrink-0">
+            <button
+              onClick={handleLogout}
+              aria-label="Sair"
+              className="transition-opacity hover:opacity-80"
+              style={{ color: "#2e4a60" }}
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+            <div
+              className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold"
+              style={{ background: "#1a3a5a", color: "#60a5fa", border: "1px solid #2a5a8a" }}
+            >
+              {initials}
+            </div>
+          </div>
         </div>
-        <CardHeader className="p-8 pb-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Cobertura do Ciclo</p>
-              <CardTitle className="text-4xl font-black tracking-tighter">
-                {coverageData ? `${coverageData.coverage_percentage}%` : "0%"}
-              </CardTitle>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <div className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
-                {activeCycle ? activeCycle.name : "Nenhum Ciclo Ativo"}
-              </div>
-              {activeWeek && (
-                <div className="bg-primary/20 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-primary/20 text-primary-foreground">
-                  Semana {activeWeek.number}
-                </div>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-8 pt-0">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Progresso Geral</span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              {coverageData ? `${coverageData.worked_properties}/${coverageData.total_properties}` : "0/0"} imóveis
-            </span>
-          </div>
-          <Progress value={coverageData?.coverage_percentage || 0} className="h-2 bg-white/10" />
-        </CardContent>
-      </Card>
-      
-      {!isLoading && !activeSession && (
-        <Button 
-          className="w-full h-16 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-lg tracking-tight shadow-lg shadow-emerald-500/20 gap-3 animate-in fade-in zoom-in duration-500 shrink-0"
-          onClick={() => navigate({ to: '/field-work' })}
+
+        <div className="my-3" style={{ height: 0.5, background: "#1e3048" }} />
+
+        <div
+          className="text-center text-[8px] uppercase tracking-widest mb-2"
+          style={{ color: "#2e4a60" }}
         >
-          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
-            <CalendarCheck className="h-5 w-5" />
-          </span>
-          ▶ INICIAR JORNADA DIÁRIA
-        </Button>
-      )}
+          {hasActiveSession ? "Sessão de trabalho em andamento" : "Nenhuma sessão de trabalho ativa"}
+        </div>
 
-      {isLoading && !activeSession && (
-        <div className="w-full h-16 rounded-2xl bg-slate-100 animate-pulse shrink-0" />
-      )}
-
-      {/* Active Session Progress */}
-      {activeSession && (
-        <Card className="border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-primary-foreground overflow-hidden relative rounded-[2rem] animate-in slide-in-from-top-4 duration-500">
-          <div className="absolute top-0 right-0 p-6 opacity-20">
-            <Target className="h-20 w-20" />
-          </div>
-          <CardHeader className="p-8 pb-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/70 mb-1">Trabalho em Andamento</p>
-            <CardTitle className="text-2xl font-black">Quarteirão {activeSession.block_number}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-8 pt-0">
-             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold opacity-90">{blockProgress}% do quarteirão</span>
-              <span className="text-xs font-bold opacity-70 underline underline-offset-4 decoration-white/30">{activeSession.street_name}</span>
+        {/* Cards de sessão */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Trabalhados", value: session.trabalhados, color: "#ffffff" },
+            { label: "Fechados", value: session.fechados, color: "#ffffff" },
+            { label: "Focos", value: `+${session.focos}`, color: "#f87171" },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="py-2.5 text-center"
+              style={{ background: "#111e2e", border: "1px solid #1e3048", borderRadius: 8 }}
+            >
+              <div className="text-lg font-bold" style={{ color: s.color }}>
+                {s.value}
+              </div>
+              <div
+                className="text-[8px] uppercase tracking-widest font-semibold mt-0.5"
+                style={{ color: "#2e4a60" }}
+              >
+                {s.label}
+              </div>
             </div>
-            <Progress value={blockProgress} className="h-2 bg-white/20" />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Main Grid Actions */}
-      <div className="grid grid-cols-2 gap-4">
-        <ActionCard 
-          title="Diário" 
-          description="Iniciar jornada" 
-          icon={CalendarCheck} 
-          color="bg-emerald-500"
-          to="/field-work"
-        />
-        <ActionCard 
-          title="RG" 
-          description="Cadastro de imóveis" 
-          icon={MapPin} 
-          color="bg-blue-500"
-          to="/rg"
-        />
-        <ActionCard 
-          title="Boletim" 
-          description="Resumo operacional" 
-          icon={BarChart3} 
-          color="bg-indigo-600"
-          to="/reports"
-        />
-        <ActionCard 
-          title="Pendências" 
-          description={pendingCount > 0 ? `${pendingCount} visitas pendentes` : "Recuperar visitas"} 
-          icon={AlertCircle} 
-          color="bg-red-500"
-          to="/pending"
-          isCritical={pendingCount > 10} // Just an example of what could be 'critical'
-        />
-        <div className="col-span-2">
-          <ActionCard 
-            title="Sincronizar" 
-            description={isSyncing ? "Enviando dados..." : `Sync: ${lastSync}`}
-            icon={RefreshCw} 
-            color="bg-slate-800"
-            onClick={handleSync}
-            className={isSyncing ? "animate-spin duration-[3s]" : ""}
-          />
+          ))}
         </div>
-      </div>
 
-      {/* Daily Work Closer Button */}
-      <div className="pt-2">
-        <DailyWorkCloser />
-      </div>
-
-      {/* Quick Summary Section */}
-      <div className="pt-2">
-        <div className="flex items-center justify-between mb-4 px-1">
-          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Produção do Ciclo</h3>
-          <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 p-0 h-auto">Ver Detalhes</Button>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{translate("worked")}</p>
-            <p className="text-3xl font-black text-slate-800">{stats.worked}</p>
+        {/* Barra de ciclo */}
+        <div
+          className="mt-2.5 p-3"
+          style={{ background: "#111e2e", border: "1px solid #1e3048", borderRadius: 10 }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div
+                className="text-[8px] uppercase tracking-widest font-semibold"
+                style={{ color: "#2e4a60" }}
+              >
+                Cobertura do ciclo
+              </div>
+              <div className="text-white font-bold leading-none mt-1" style={{ fontSize: 22 }}>
+                {coverage.percent}%
+              </div>
+              <div className="text-[9px] mt-1" style={{ color: "#2e4a60" }}>
+                Progresso geral
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <div
+                className="px-2 py-0.5 text-[9px] font-bold"
+                style={{ background: "#1a3a6a", color: "#60a5fa", borderRadius: 6 }}
+              >
+                {cycle ? `${cycle.name} / ${cycle.year}` : "Sem ciclo"}
+              </div>
+              <div className="text-[9px]" style={{ color: "#4a6b80" }}>
+                Semana {cycle?.week ?? 1}
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{translate("CLOSED")}</p>
-            <p className="text-3xl font-black text-blue-600">{stats.closed}</p>
+          <div
+            className="mt-3 overflow-hidden"
+            style={{ height: 3, background: "#1e3048", borderRadius: 999 }}
+          >
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${Math.min(100, coverage.percent)}%`,
+                background: "#34d399",
+              }}
+            />
+          </div>
+          <div
+            className="text-[8px] text-right mt-1.5 uppercase tracking-wider"
+            style={{ color: "#2e4a60" }}
+          >
+            {coverage.visited} / {coverage.total} imóveis
           </div>
         </div>
+      </header>
+
+      {/* Corpo claro */}
+      <div style={{ padding: "14px" }} className="space-y-5">
+        {/* Botão Iniciar jornada diária */}
+        <button
+          onClick={() => navigate({ to: "/field-work" })}
+          className="w-full flex items-center justify-center gap-2 font-bold text-[13px] active:scale-[0.98] transition-transform"
+          style={{
+            background: "#059669",
+            color: "#ffffff",
+            borderRadius: 12,
+            padding: 13,
+          }}
+        >
+          <PlayCircle className="h-5 w-5" />
+          Iniciar jornada diária
+        </button>
+
+        {/* Acesso rápido */}
+        <section>
+          <div
+            className="text-[9px] uppercase tracking-widest font-bold mb-2"
+            style={{ color: "#8a9ab0" }}
+          >
+            Acesso rápido
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <QuickCard
+              to="/field-work"
+              icon={<CalendarCheck className="h-5 w-5" />}
+              iconBg="#eaf3de"
+              iconColor="#3b6d11"
+              title="Diário"
+              subtitle="Iniciar jornada"
+            />
+            <QuickCard
+              to="/rg"
+              icon={<MapPin className="h-5 w-5" />}
+              iconBg="#e6f1fb"
+              iconColor="#185fa5"
+              title="RG"
+              subtitle="Cadastro de imóveis"
+            />
+            <QuickCard
+              to="/reports"
+              onClick={markReportsSeen}
+              icon={<BarChart3 className="h-5 w-5" />}
+              iconBg="#faeeda"
+              iconColor="#854f0b"
+              title="Relatórios"
+              subtitle="Ver histórico"
+              badge={!reportsSeen ? { label: "3 novos", bg: "#e6f1fb", color: "#185fa5" } : undefined}
+            />
+            <QuickCard
+              to="/pending"
+              icon={<AlertTriangle className="h-5 w-5" />}
+              iconBg="#fcebeb"
+              iconColor="#a32d2d"
+              title="Pendências"
+              subtitle="Imóveis abertos"
+              badge={{ label: "0 abertos", bg: "#eaf3de", color: "#3b6d11" }}
+            />
+          </div>
+        </section>
+
+        {/* Atividade recente */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div
+              className="text-[9px] uppercase tracking-widest font-bold"
+              style={{ color: "#8a9ab0" }}
+            >
+              Atividade recente
+            </div>
+            <Link to="/reports" className="text-[10px] font-semibold" style={{ color: "#185fa5" }}>
+              Ver tudo
+            </Link>
+          </div>
+          {activities.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center text-center"
+              style={{
+                background: "#ffffff",
+                border: "1px solid #e0e4ea",
+                borderRadius: 10,
+                padding: 16,
+              }}
+            >
+              <History className="h-6 w-6 mb-1" style={{ color: "#e0e4ea" }} />
+              <div className="text-[11px]" style={{ color: "#c0c8d4" }}>
+                Nenhuma atividade registrada hoje
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activities.slice(0, 5).map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-3 p-3"
+                  style={{
+                    background: "#ffffff",
+                    border: "1px solid #e0e4ea",
+                    borderRadius: 10,
+                  }}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ background: a.type === "focus" ? "#f87171" : "#34d399" }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] font-semibold truncate" style={{ color: "#0b1520" }}>
+                      {a.title}
+                    </div>
+                    <div className="text-[10px] truncate" style={{ color: "#8a9ab0" }}>
+                      {a.address}
+                    </div>
+                  </div>
+                  <div className="text-[10px] shrink-0" style={{ color: "#8a9ab0" }}>
+                    {a.time}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
+  );
+}
+
+function QuickCard({
+  to,
+  onClick,
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  subtitle,
+  badge,
+}: {
+  to: string;
+  onClick?: () => void;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  badge?: { label: string; bg: string; color: string };
+}) {
+  return (
+    <Link
+      to={to as any}
+      onClick={onClick}
+      className="block active:scale-[0.98] transition-transform"
+      style={{
+        background: "#ffffff",
+        border: "1px solid #e0e4ea",
+        borderRadius: 12,
+        padding: "14px 12px",
+      }}
+    >
+      <div
+        className="flex items-center justify-center mb-2"
+        style={{
+          width: 36,
+          height: 36,
+          background: iconBg,
+          color: iconColor,
+          borderRadius: 10,
+        }}
+      >
+        {icon}
+      </div>
+      <div className="text-[13px] font-bold leading-tight" style={{ color: "#0b1520" }}>
+        {title}
+      </div>
+      <div className="text-[10px] mt-0.5" style={{ color: "#aab0bc" }}>
+        {subtitle}
+      </div>
+      {badge && (
+        <div
+          className="inline-block mt-2 px-2 py-0.5 text-[9px] font-semibold rounded-full"
+          style={{ background: badge.bg, color: badge.color }}
+        >
+          {badge.label}
+        </div>
+      )}
+    </Link>
   );
 }
