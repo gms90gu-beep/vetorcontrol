@@ -124,9 +124,14 @@ function AdminMasterPage() {
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Button>
 
-          <h2 className="hidden sm:block text-xs font-black uppercase tracking-[0.2em] text-amber-500">
-            Painel Admin Master
-          </h2>
+          <div className="hidden sm:flex flex-col items-center leading-tight">
+            <h2 className="text-sm font-black uppercase tracking-[0.3em] text-amber-500">
+              Comando
+            </h2>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+              Gestão Global · Supervisores · Agentes · Admins
+            </p>
+          </div>
 
           <div className="flex items-center gap-2">
             <Button

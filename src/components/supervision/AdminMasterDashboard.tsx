@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,9 @@ import {
   Save,
   Power,
   Loader2,
+  UserCog,
+  Shield,
+  UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,7 +24,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Sheet,
@@ -42,6 +44,7 @@ type ProfileRow = {
   city: string | null;
   is_active: boolean | null;
   created_at: string;
+  supervisor_id: string | null;
 };
 
 type EditState = {
@@ -50,6 +53,7 @@ type EditState = {
   phone: string;
   role: string;
   is_active: boolean;
+  supervisor_id: string | null;
 };
 
 type HistoryStats = {
@@ -57,6 +61,40 @@ type HistoryStats = {
   blocks: number;
   lastActivity: string | null;
 };
+
+type RoleFilter = "all" | "supervisor" | "agente" | "coordenador" | "admin_master";
+
+type NewUserRole = "supervisor" | "coordenador" | "agente" | "admin_master";
+
+const ROLE_LABELS: Record<string, string> = {
+  admin_master: "Admin Master",
+  coordenador: "Coordenador",
+  supervisor: "Supervisor",
+  agente: "Agente",
+};
+
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
+}
+
+function roleBadgeClass(role: string): string {
+  switch (role) {
+    case "admin_master":
+      return "bg-purple-500 text-white";
+    case "coordenador":
+      return "bg-amber-500 text-slate-950";
+    case "supervisor":
+      return "bg-blue-500 text-white";
+    case "agente":
+      return "bg-emerald-500 text-white";
+    default:
+      return "bg-slate-800 text-slate-400";
+  }
+}
 
 export function AdminMasterDashboard() {
   const { role: currentUserRole, user: currentUser } = useAuth();
@@ -66,12 +104,13 @@ export function AdminMasterDashboard() {
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUser, setNewUser] = useState({
     full_name: "",
     email: "",
     password: "",
-    role: "supervisor" as "supervisor" | "coordenador" | "agente",
+    role: "supervisor" as NewUserRole,
   });
 
   // Detail/edit drawer state
@@ -80,7 +119,6 @@ export function AdminMasterDashboard() {
   const [saving, setSaving] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [history, setHistory] = useState<HistoryStats | null>(null);
-  const [agentPhone, setAgentPhone] = useState<string>("");
 
   useEffect(() => {
     fetchUsers();
@@ -103,15 +141,46 @@ export function AdminMasterDashboard() {
     }
   }
 
+  const handleOpenCreate = (role: NewUserRole) => {
+    setNewUser({ full_name: "", email: "", password: "", role });
+    setIsAddingUser(true);
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     toast.info("Processando cadastro...");
     try {
-      const { error } = await supabase.functions.invoke("manage-agents", {
-        body: { action: "create_manager", userData: newUser },
-      });
-      if (error) throw error;
-      toast.success(`${newUser.role} cadastrado com sucesso!`);
+      if (newUser.role === "admin_master") {
+        // Create as coordenador first, then promote via update_user (admin only)
+        const { error: cErr } = await supabase.functions.invoke("manage-agents", {
+          body: {
+            action: "create_manager",
+            userData: { ...newUser, role: "coordenador" },
+          },
+        });
+        if (cErr) throw cErr;
+        // Find created user id by listing
+        const { data: created } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", newUser.email)
+          .maybeSingle();
+        if (created?.id) {
+          const { error: pErr } = await supabase.functions.invoke("manage-agents", {
+            body: {
+              action: "update_user",
+              userData: { userId: created.id, role: "admin_master" },
+            },
+          });
+          if (pErr) throw pErr;
+        }
+      } else {
+        const { error } = await supabase.functions.invoke("manage-agents", {
+          body: { action: "create_manager", userData: newUser },
+        });
+        if (error) throw error;
+      }
+      toast.success(`${ROLE_LABELS[newUser.role]} cadastrado com sucesso!`);
       setIsAddingUser(false);
       setNewUser({ full_name: "", email: "", password: "", role: "supervisor" });
       fetchUsers();
@@ -129,13 +198,12 @@ export function AdminMasterDashboard() {
       phone: "",
       role: u.role,
       is_active: u.is_active ?? true,
+      supervisor_id: u.supervisor_id ?? null,
     });
     setHistory(null);
-    setAgentPhone("");
 
     setHistoryLoading(true);
     try {
-      // Get agent record for phone + agent_id
       const { data: agent } = await supabase
         .from("agents")
         .select("id, phone")
@@ -143,7 +211,6 @@ export function AdminMasterDashboard() {
         .maybeSingle();
 
       if (agent?.phone) {
-        setAgentPhone(agent.phone);
         setEdit((prev) => (prev ? { ...prev, phone: agent.phone ?? "" } : prev));
       }
 
@@ -199,6 +266,7 @@ export function AdminMasterDashboard() {
             phone: edit.phone,
             role: isAdminMaster ? edit.role : undefined,
             is_active: edit.is_active,
+            supervisor_id: edit.role === "agente" ? edit.supervisor_id : null,
           },
         },
       });
@@ -233,14 +301,27 @@ export function AdminMasterDashboard() {
     }
   };
 
-  const handleToggleActive = async () => {
+  const handleToggleActive = () => {
     if (!selected || !edit) return;
     setEdit({ ...edit, is_active: !edit.is_active });
   };
 
   const handleDelete = async () => {
     if (!selected) return;
-    if (!confirm(`Excluir definitivamente ${selected.full_name}?`)) return;
+    // Prevent deleting yourself
+    if (currentUser?.id === selected.id) {
+      toast.error("Você não pode excluir o próprio usuário logado.");
+      return;
+    }
+    // Prevent deleting last admin master
+    if (selected.role === "admin_master") {
+      const adminCount = users.filter((u) => u.role === "admin_master").length;
+      if (adminCount <= 1) {
+        toast.error("Não é possível excluir o último Admin Master do sistema.");
+        return;
+      }
+    }
+    if (!confirm(`Deseja realmente excluir ${selected.full_name}?`)) return;
     try {
       const { error } = await supabase.functions.invoke("manage-agents", {
         body: { action: "delete_user", userId: selected.id },
@@ -254,102 +335,147 @@ export function AdminMasterDashboard() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const counts = useMemo(() => {
+    let supervisors = 0;
+    let agents = 0;
+    let admins = 0;
+    let coordinators = 0;
+    for (const u of users) {
+      if (u.role === "supervisor") supervisors++;
+      else if (u.role === "agente") agents++;
+      else if (u.role === "admin_master") admins++;
+      else if (u.role === "coordenador") coordinators++;
+    }
+    return { supervisors, agents, admins, coordinators, total: users.length };
+  }, [users]);
+
+  const supervisorOptions = useMemo(
+    () => users.filter((u) => u.role === "supervisor" && u.is_active !== false),
+    [users],
   );
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-1000">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
-              <ShieldCheck className="h-6 w-6 text-amber-500" />
-            </div>
-            <Badge variant="outline" className="border-amber-500/30 text-amber-500 font-black uppercase tracking-[0.2em] text-[10px]">
-              Restricted Area • Admin Master
-            </Badge>
-          </div>
-          <h1 className="text-4xl font-black tracking-tighter text-white uppercase italic">Central de Comando</h1>
-          <p className="text-slate-400 font-medium">Gestão global: Supervisores, Agentes e Coordenadores.</p>
-        </div>
+  const filteredUsers = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return users.filter((u) => {
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      if (!term) return true;
+      return (
+        u.full_name?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term) ||
+        u.registration_number?.toLowerCase().includes(term)
+      );
+    });
+  }, [users, searchTerm, roleFilter]);
 
-        <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
-          <div className="flex flex-wrap gap-4">
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setNewUser((prev) => ({ ...prev, role: "supervisor" }))}
-                className="rounded-2xl h-14 px-8 font-black bg-blue-600 text-white hover:bg-blue-700 transition-all active:scale-95 shadow-2xl shadow-blue-500/10 uppercase tracking-widest text-xs"
-              >
-                <UserPlus className="mr-2 h-5 w-5" /> Novo Supervisor
-              </Button>
-            </DialogTrigger>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setNewUser((prev) => ({ ...prev, role: "agente" }))}
-                className="rounded-2xl h-14 px-8 font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-all active:scale-95 shadow-2xl shadow-emerald-500/10 uppercase tracking-widest text-xs"
-              >
-                <UserPlus className="mr-2 h-5 w-5" /> Novo Agente
-              </Button>
-            </DialogTrigger>
+  const supervisorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    users.forEach((u) => map.set(u.id, u.full_name ?? u.email ?? "—"));
+    return map;
+  }, [users]);
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-700">
+      {/* ── Cabeçalho ──────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+            <ShieldCheck className="h-6 w-6 text-amber-500" />
           </div>
-          <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white rounded-[2.5rem]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-black uppercase tracking-tight italic">Novo Gestor</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nome</label>
-                <Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} className="bg-slate-800 border-none rounded-xl" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">E-mail</label>
-                <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="bg-slate-800 border-none rounded-xl" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Senha</label>
-                <Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="bg-slate-800 border-none rounded-xl" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nível de Acesso</label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
-                  className="w-full bg-slate-800 border-none rounded-xl h-10 px-3 text-sm font-bold text-white outline-none"
-                >
-                  <option value="supervisor">SUPERVISOR</option>
-                  <option value="agente">AGENTE</option>
-                  <option value="coordenador">COORDENADOR</option>
-                </select>
-              </div>
-              <Button type="submit" className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black uppercase tracking-widest text-xs mt-4">
-                Confirmar Cadastro
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+          <Badge variant="outline" className="border-amber-500/30 text-amber-500 font-black uppercase tracking-[0.2em] text-[10px]">
+            Comando
+          </Badge>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tighter text-white uppercase italic">
+          Central de Comando
+        </h1>
+        <p className="text-slate-400 font-medium text-sm sm:text-base">
+          Gestão Global · Supervisores · Agentes · Administradores
+        </p>
       </div>
 
-      <div className="bg-slate-900/50 rounded-[3rem] border border-slate-800 overflow-hidden shadow-2xl backdrop-blur-xl">
-        <div className="p-8 border-b border-slate-800">
+      {/* ── Cards de Resumo ────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <SummaryCard label="Supervisores" value={counts.supervisors} icon={UserCog} accent="text-blue-400 border-blue-500/20 bg-blue-500/5" />
+        <SummaryCard label="Agentes" value={counts.agents} icon={UserCheck} accent="text-emerald-400 border-emerald-500/20 bg-emerald-500/5" />
+        <SummaryCard label="Admins" value={counts.admins} icon={Shield} accent="text-purple-400 border-purple-500/20 bg-purple-500/5" />
+        <SummaryCard label="Usuários" value={counts.total} icon={Users} accent="text-amber-400 border-amber-500/20 bg-amber-500/5" />
+      </div>
+
+      {/* ── Ações Rápidas ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3">
+        <QuickActionButton onClick={() => handleOpenCreate("supervisor")} className="bg-blue-600 hover:bg-blue-700 shadow-blue-500/10">
+          <UserPlus className="mr-2 h-4 w-4" /> Novo Supervisor
+        </QuickActionButton>
+        <QuickActionButton onClick={() => handleOpenCreate("agente")} className="bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10">
+          <UserPlus className="mr-2 h-4 w-4" /> Novo Agente
+        </QuickActionButton>
+        {isAdminMaster && (
+          <>
+            <QuickActionButton onClick={() => handleOpenCreate("coordenador")} className="bg-amber-600 hover:bg-amber-700 shadow-amber-500/10">
+              <UserPlus className="mr-2 h-4 w-4" /> Novo Coordenador
+            </QuickActionButton>
+            <QuickActionButton onClick={() => handleOpenCreate("admin_master")} className="bg-purple-600 hover:bg-purple-700 shadow-purple-500/10">
+              <UserPlus className="mr-2 h-4 w-4" /> Novo Admin Master
+            </QuickActionButton>
+          </>
+        )}
+      </div>
+
+      {/* ── Busca + Filtros ────────────────────────────────────────── */}
+      <div className="bg-slate-900/50 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl backdrop-blur-xl">
+        <div className="p-4 sm:p-6 border-b border-slate-800 space-y-4">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
             <Input
-              placeholder="Localizar usuário por nome ou e-mail..."
-              className="pl-12 bg-slate-950/50 border-none rounded-2xl h-14 text-white"
+              placeholder="Buscar por nome, e-mail ou matrícula..."
+              className="pl-12 bg-slate-950/50 border-none rounded-2xl h-12 sm:h-14 text-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { key: "all", label: "Todos" },
+                { key: "supervisor", label: "Supervisores" },
+                { key: "agente", label: "Agentes" },
+                { key: "coordenador", label: "Coordenadores" },
+                { key: "admin_master", label: "Admin Master" },
+              ] as { key: RoleFilter; label: string }[]
+            ).map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setRoleFilter(f.key)}
+                className={cn(
+                  "min-h-11 px-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all active:scale-95",
+                  roleFilter === f.key
+                    ? "bg-amber-500 text-slate-950"
+                    : "bg-slate-950/50 text-slate-400 hover:text-white hover:bg-slate-800",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-500">
+            {filteredUsers.length}{" "}
+            {filteredUsers.length === 1 ? "usuário encontrado" : "usuários encontrados"}
+          </p>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
           {isLoading ? (
-            <div className="py-20 text-center text-slate-500 font-bold animate-pulse uppercase tracking-[0.3em]">Carregando Sistema...</div>
+            <div className="py-20 text-center text-slate-500 font-bold animate-pulse uppercase tracking-[0.3em]">
+              Carregando Sistema...
+            </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="py-20 text-center text-slate-500 uppercase font-black opacity-30">Vazio</div>
+            <div className="py-20 text-center text-slate-500 uppercase font-black opacity-30">
+              Nenhum usuário
+            </div>
           ) : (
             filteredUsers.map((user) => (
               <div
@@ -360,37 +486,35 @@ export function AdminMasterDashboard() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") openDetails(user);
                 }}
-                className="group flex items-center justify-between p-6 rounded-3xl bg-slate-950/30 hover:bg-slate-950/60 transition-all border border-transparent hover:border-amber-500/30 cursor-pointer"
+                className="group flex items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl bg-slate-950/30 hover:bg-slate-950/60 transition-all border border-transparent hover:border-amber-500/30 cursor-pointer min-h-[68px]"
               >
-                <div className="flex items-center gap-6">
-                  <div className="h-14 w-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-slate-600 text-xl group-hover:text-amber-500 group-hover:border-amber-500/30 transition-all">
-                    {user.full_name?.charAt(0) ?? "?"}
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                  <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-slate-500 text-base group-hover:text-amber-500 group-hover:border-amber-500/30 transition-all shrink-0">
+                    {getInitials(user.full_name)}
                   </div>
-                  <div>
-                    <h3 className="font-black text-white uppercase text-lg italic tracking-tight">{user.full_name}</h3>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{user.email}</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-black text-white uppercase text-sm sm:text-base italic tracking-tight truncate">
+                      {user.full_name ?? "(sem nome)"}
+                    </h3>
+                    <p className="text-[11px] font-bold text-slate-500 tracking-wide truncate">
+                      {user.email}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 shrink-0">
                   {user.is_active === false && (
-                    <Badge className="bg-rose-500/20 text-rose-400 border-none text-[9px] font-black uppercase">Inativo</Badge>
+                    <Badge className="bg-rose-500/20 text-rose-400 border-none text-[9px] font-black uppercase">
+                      Inativo
+                    </Badge>
                   )}
                   <Badge
                     className={cn(
-                      "px-3 py-1 font-black text-[9px] uppercase tracking-[0.2em] border-none rounded-md",
-                      user.role === "admin_master"
-                        ? "bg-amber-500 text-slate-950"
-                        : user.role === "coordenador"
-                          ? "bg-blue-500 text-white"
-                          : user.role === "supervisor"
-                            ? "bg-purple-500 text-white"
-                            : user.role === "agente"
-                              ? "bg-emerald-500 text-white"
-                              : "bg-slate-800 text-slate-400",
+                      "px-2 py-1 font-black text-[9px] uppercase tracking-[0.15em] border-none rounded-md",
+                      roleBadgeClass(user.role),
                     )}
                   >
-                    {user.role?.replace("_", " ")}
+                    {ROLE_LABELS[user.role] ?? user.role}
                   </Badge>
                 </div>
               </div>
@@ -399,29 +523,57 @@ export function AdminMasterDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 relative overflow-hidden group">
-          <div className="absolute -right-8 -bottom-8 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-            <Users className="h-40 w-40 text-white" />
-          </div>
-          <h4 className="text-xl font-black text-white uppercase italic mb-2">Visão Geral</h4>
-          <p className="text-slate-400 text-sm font-medium">Monitoramento global de desempenho municipal.</p>
-        </div>
+      {/* ── Dialog: Criar Usuário ──────────────────────────────────── */}
+      <Dialog open={isAddingUser} onOpenChange={setIsAddingUser}>
+        <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-white rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight italic">
+              Novo {ROLE_LABELS[newUser.role]}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Nome</label>
+              <Input
+                value={newUser.full_name}
+                onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                className="bg-slate-800 border-none rounded-xl h-11"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">E-mail</label>
+              <Input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                className="bg-slate-800 border-none rounded-xl h-11"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Senha</label>
+              <Input
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                className="bg-slate-800 border-none rounded-xl h-11"
+                required
+                minLength={6}
+              />
+            </div>
+            <Button type="submit" className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black uppercase tracking-widest text-xs">
+              Confirmar Cadastro
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-        <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 relative overflow-hidden group">
-          <div className="absolute -right-8 -bottom-8 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-            <Lock className="h-40 w-40 text-white" />
-          </div>
-          <h4 className="text-xl font-black text-white uppercase italic mb-2">Segurança</h4>
-          <p className="text-slate-400 text-sm font-medium">Logs de auditoria e controle de acesso.</p>
-        </div>
-      </div>
-
-      {/* ── Drawer de Detalhes/Edição ───────────────────────────────────── */}
+      {/* ── Drawer de Detalhes/Edição ──────────────────────────────── */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-xl bg-slate-950 border-l border-slate-800 text-white overflow-y-auto"
+          className="w-[90vw] sm:max-w-xl bg-slate-950 border-l border-slate-800 text-white overflow-y-auto"
         >
           {selected && edit && (
             <>
@@ -440,7 +592,7 @@ export function AdminMasterDashboard() {
                   <Input
                     value={edit.full_name}
                     onChange={(e) => setEdit({ ...edit, full_name: e.target.value })}
-                    className="bg-slate-900 border-slate-800 rounded-xl"
+                    className="bg-slate-900 border-slate-800 rounded-xl h-11"
                   />
                 </Field>
 
@@ -449,7 +601,7 @@ export function AdminMasterDashboard() {
                     type="email"
                     value={edit.email}
                     onChange={(e) => setEdit({ ...edit, email: e.target.value })}
-                    className="bg-slate-900 border-slate-800 rounded-xl"
+                    className="bg-slate-900 border-slate-800 rounded-xl h-11"
                   />
                 </Field>
 
@@ -458,7 +610,7 @@ export function AdminMasterDashboard() {
                     value={edit.phone}
                     onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
                     placeholder="(11) 99999-9999"
-                    className="bg-slate-900 border-slate-800 rounded-xl"
+                    className="bg-slate-900 border-slate-800 rounded-xl h-11"
                   />
                 </Field>
 
@@ -467,14 +619,14 @@ export function AdminMasterDashboard() {
                     <Input
                       readOnly
                       value={selected.registration_number ?? "—"}
-                      className="bg-slate-900/60 border-slate-800 rounded-xl text-slate-400"
+                      className="bg-slate-900/60 border-slate-800 rounded-xl text-slate-400 h-11"
                     />
                   </Field>
                   <Field label="Município/Área">
                     <Input
                       readOnly
                       value={selected.city ?? "—"}
-                      className="bg-slate-900/60 border-slate-800 rounded-xl text-slate-400"
+                      className="bg-slate-900/60 border-slate-800 rounded-xl text-slate-400 h-11"
                     />
                   </Field>
                 </div>
@@ -484,7 +636,7 @@ export function AdminMasterDashboard() {
                     value={edit.role}
                     disabled={!isAdminMaster}
                     onChange={(e) => setEdit({ ...edit, role: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl h-10 px-3 text-sm font-bold text-white outline-none disabled:opacity-60"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl h-11 px-3 text-sm font-bold text-white outline-none disabled:opacity-60"
                   >
                     <option value="agente">AGENTE</option>
                     <option value="supervisor">SUPERVISOR</option>
@@ -496,6 +648,30 @@ export function AdminMasterDashboard() {
                   )}
                 </Field>
 
+                {edit.role === "agente" && (
+                  <Field label="Supervisor responsável">
+                    <select
+                      value={edit.supervisor_id ?? ""}
+                      onChange={(e) =>
+                        setEdit({ ...edit, supervisor_id: e.target.value || null })
+                      }
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl h-11 px-3 text-sm font-bold text-white outline-none"
+                    >
+                      <option value="">— Sem supervisor —</option>
+                      {supervisorOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.full_name ?? s.email}
+                        </option>
+                      ))}
+                    </select>
+                    {edit.supervisor_id && (
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Vinculado a {supervisorNameById.get(edit.supervisor_id) ?? "—"}
+                      </p>
+                    )}
+                  </Field>
+                )}
+
                 <Field label="Status">
                   <div className="flex items-center gap-3">
                     <Badge className={edit.is_active ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}>
@@ -505,7 +681,7 @@ export function AdminMasterDashboard() {
                       size="sm"
                       variant="outline"
                       onClick={handleToggleActive}
-                      className="border-slate-800 text-slate-300 hover:bg-slate-900"
+                      className="border-slate-800 text-slate-300 hover:bg-slate-900 min-h-11"
                     >
                       <Power className="mr-2 h-3 w-3" />
                       {edit.is_active ? "Desativar" : "Ativar"}
@@ -513,9 +689,10 @@ export function AdminMasterDashboard() {
                   </div>
                 </Field>
 
-                {/* História */}
                 <div className="pt-4 border-t border-slate-800">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Histórico</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">
+                    Histórico
+                  </h4>
                   {historyLoading ? (
                     <div className="flex items-center gap-2 text-slate-400 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" /> Carregando histórico...
@@ -536,7 +713,6 @@ export function AdminMasterDashboard() {
                   )}
                 </div>
 
-                {/* Ações */}
                 <div className="pt-4 border-t border-slate-800 space-y-3">
                   <Button
                     onClick={handleSave}
@@ -554,7 +730,7 @@ export function AdminMasterDashboard() {
                     >
                       <KeyRound className="mr-2 h-4 w-4" /> Redefinir Senha
                     </Button>
-                    {isAdminMaster && selected.role !== "admin_master" && (
+                    {isAdminMaster && currentUser?.id !== selected.id && (
                       <Button
                         onClick={handleDelete}
                         variant="outline"
@@ -571,6 +747,53 @@ export function AdminMasterDashboard() {
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  icon: Icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+}) {
+  return (
+    <div className={cn("rounded-2xl border bg-slate-900/40 p-4 sm:p-5 backdrop-blur-sm", accent)}>
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
+      </div>
+      <p className="text-2xl sm:text-3xl font-black text-white tabular-nums">{value}</p>
+      <p className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-400 mt-1">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function QuickActionButton({
+  children,
+  className,
+  onClick,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-2xl h-12 sm:h-14 px-4 font-black text-white transition-all active:scale-95 shadow-2xl uppercase tracking-widest text-[11px] sm:text-xs",
+        className,
+      )}
+    >
+      {children}
+    </Button>
   );
 }
 
