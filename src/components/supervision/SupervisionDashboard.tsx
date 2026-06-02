@@ -174,67 +174,76 @@ export function SupervisionDashboard() {
   const totalClosed = agents.reduce((s, a) => s + (a.stats?.closed || 0), 0);
   const totalFocus = agents.reduce((s, a) => s + (a.stats?.focus || 0), 0);
   const alertsNoActivity = agents.filter((a) => a.is_active && !a.hasAnyToday).length;
+  const progressPct = totalWorked > 0 ? Math.round((totalClosed / Math.max(totalWorked, 1)) * 100) : 0;
+  const panelTitle =
+    role === "admin_master"
+      ? "Painel Administrativo"
+      : role === "coordenador"
+        ? "Painel do Coordenador"
+        : "Painel do Supervisor";
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] -mx-4 md:-mx-0">
-      {/* HEADER ESCURO */}
-      <div className="bg-[#0b1520] text-white px-[14px] py-[14px] space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1a3a2a] px-2.5 py-1 text-[10px] font-bold text-[#34d399]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> EM TRABALHO
-          </span>
-          <Button
-            onClick={() => signOut()}
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 text-white/70 hover:text-white hover:bg-white/10 text-xs font-bold"
-          >
-            <LogOut className="h-3.5 w-3.5 mr-1" /> Sair
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-[#3b9ede]/20 border border-[#3b9ede]/40 flex items-center justify-center font-black text-[#3b9ede]">
-            {initials(profile?.full_name)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-base font-black truncate">
+    <div className="min-h-screen bg-[#f4f5f7]">
+      {/* HEADER ESCURO ÚNICO */}
+      <div className="bg-[#0b1520] text-white px-[14px] pt-[14px] pb-[14px]">
+        {/* Linha superior */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1a3a2a] px-2.5 py-1 text-[10px] font-bold text-[#34d399]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" /> Em trabalho
+            </span>
+            <p className="mt-2 text-base font-bold text-white truncate leading-tight">
               {profile?.full_name || "Supervisor"}
             </p>
-            <p className="text-[10px] font-bold tracking-widest text-[#3b9ede]">
-              {(role || "SUPERVISOR").toString().toUpperCase()}
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[#3b9ede]">
+              {panelTitle}
             </p>
-            <p className="text-[10px] text-white/50">
+            <p className="text-[9px] text-[#2e4a60] truncate">
               ACE · {profile?.city || "—"}
             </p>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              onClick={() => signOut()}
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2.5 bg-[#111e2e] border border-[#1e3048] text-[#4a6b80] hover:bg-[#1a2a3e] hover:text-white text-xs font-bold rounded-lg"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1" /> Sair
+            </Button>
+            <div className="h-10 w-10 rounded-full bg-[#1a4a7a] border border-[#2a6aaa] flex items-center justify-center font-black text-[#3b9ede] text-xs">
+              {initials(profile?.full_name)}
+            </div>
+          </div>
         </div>
 
-        {/* Território atual */}
-        <div className="rounded-2xl p-3 bg-[#111e2e] border border-[#1e3048]">
-          <div className="flex items-center gap-1.5 text-[9px] font-black tracking-widest text-white/40 uppercase">
-            <MapPin className="h-3 w-3" /> Território da Equipe
+        {/* Divisor */}
+        <div className="my-3 h-px bg-[#1e3048]" />
+
+        {/* Bloco de território */}
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-[8px] font-bold uppercase tracking-widest text-[#2e4a60]">
+              Território atual
+            </span>
+            <span className="text-[9px] font-bold text-[#34d399]">{progressPct}%</span>
           </div>
-          <p className="text-sm font-bold mt-1">
-            {totalWorked > 0
-              ? `${totalWorked} imóveis trabalhados pela equipe`
-              : "Sem atividade registrada hoje"}
+          <p className="mt-1 text-[13px] font-bold text-white">
+            {totalWorked > 0 ? "Equipe em campo" : "Sem atividade hoje"}
           </p>
-          <div className="mt-2 h-[3px] w-full rounded-full bg-white/10 overflow-hidden">
+          <div className="mt-1.5 h-[3px] w-full rounded-full bg-[#1e3048] overflow-hidden">
             <div
               className="h-full bg-[#34d399] transition-all"
-              style={{
-                width: `${Math.min(
-                  100,
-                  totalWorked > 0 ? Math.round((totalClosed / Math.max(totalWorked, 1)) * 100) : 0,
-                )}%`,
-              }}
+              style={{ width: `${progressPct}%` }}
             />
           </div>
+          <p className="mt-1 text-[9px] text-[#2e4a60]">
+            {totalClosed} de {Math.max(totalWorked, 0)} imóveis trabalhados
+          </p>
         </div>
 
-        {/* 3 cards operacionais */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Cards de sessão */}
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <OpCard label="Trabalhados" value={totalWorked} color="text-white" />
           <OpCard label="Fechados" value={totalClosed} color="text-white" />
           <OpCard label="Focos" value={totalFocus} color="text-[#f87171]" />
