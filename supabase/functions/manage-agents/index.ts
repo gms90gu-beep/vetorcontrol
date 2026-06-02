@@ -198,7 +198,7 @@ serve(async (req) => {
 
     // ── UPDATE USER (admin master edits profile/role) ───────────────────────
     if (action === "update_user") {
-      const { userId, full_name, email, phone, role, is_active, supervisor_id } = body.userData ?? {};
+      const { userId, full_name, email, phone, role, is_active, supervisor_id, coordinator_id } = body.userData ?? {};
       if (!userId) throw new Error("userId is required");
 
       const isAdminMaster = callerRole === "admin_master";
@@ -237,6 +237,22 @@ serve(async (req) => {
         profileUpdate.supervisor_id =
           callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
       }
+      // coordinator_id only settable by admin_master
+      if (coordinator_id !== undefined && isAdminMaster) {
+        profileUpdate.coordinator_id = coordinator_id ?? null;
+      }
+
+      // Audit
+      await supabaseAdmin.from("audit_log").insert({
+        actor_id: user.id,
+        actor_email: user.email,
+        target_id: userId,
+        action: "update_user",
+        entity: "user",
+        metadata: profileUpdate,
+      });
+
+
 
 
       if (Object.keys(profileUpdate).length > 0) {
