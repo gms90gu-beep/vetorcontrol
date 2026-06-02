@@ -125,8 +125,8 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
-      <Card className="w-full max-w-md border-white/10 shadow-2xl bg-slate-900 text-white rounded-[2.5rem] overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-auth-background px-4 py-6">
+      <Card className="w-full max-w-md border-auth-field-border shadow-2xl bg-auth-card text-auth-foreground rounded-[2.5rem] overflow-hidden">
         <CardHeader className="space-y-1 text-center pt-10 pb-6">
           <div className="flex justify-center mb-6">
             <div className="h-20 w-20 rounded-[2rem] bg-primary flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 rotate-12 transition-transform hover:rotate-0">
@@ -134,22 +134,22 @@ function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-4xl font-black tracking-tighter text-primary">VetorControl</CardTitle>
-          <CardDescription className="text-base font-medium text-slate-400">
+          <CardDescription className="text-base font-medium text-auth-muted">
             Sistema de Controle Vetorial Urbano
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="grid gap-6 px-8">
             <div className="grid gap-2">
-              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-slate-400">
+              <Label htmlFor="email" className="text-[10px] font-bold uppercase tracking-widest ml-1 text-auth-muted">
                 E-mail ou Matrícula
               </Label>
               <div className="relative">
-                <Mail className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-auth-icon" />
                 <Input
                   id="email"
                   placeholder="exemplo@vetor.com ou 12345"
-                  className="pl-12 h-14 rounded-2xl border-white/5 bg-slate-800 focus-visible:ring-primary/30 text-base"
+                  className="pl-12 h-14 rounded-2xl border-auth-field-border bg-auth-field text-base text-auth-foreground placeholder:text-auth-muted/70 focus-visible:ring-auth-link/40"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
