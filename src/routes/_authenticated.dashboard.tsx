@@ -119,22 +119,22 @@ function DashboardPage() {
           setCoverage({
             visited: cov.worked_properties ?? 0,
             total: cov.total_properties ?? 0,
-            percent: Math.round(Number(cov.coverage_percentage) || 0),
+            percent: Math.round(Number(cov.coverage_percentage ?? 0)),
           });
         }
 
         const { data: visits } = await supabase
           .from("visits")
-          .select("id, status, created_at")
-          .eq("user_id", user.id)
-          .gte("created_at", `${today}T00:00:00`)
-          .order("created_at", { ascending: false });
+          .select("id, status, has_focus, visit_date")
+          .eq("agent_id", user.id)
+          .gte("visit_date", `${today}T00:00:00`)
+          .order("visit_date", { ascending: false });
 
         if (visits) {
           setSession({
             trabalhados: visits.length,
             fechados: visits.filter((v) => v.status === "closed").length,
-            focos: visits.filter((v) => v.status === "focus_found").length,
+            focos: visits.filter((v) => v.has_focus === true).length,
           });
         }
       }
