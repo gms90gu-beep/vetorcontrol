@@ -67,6 +67,7 @@ export const Route = createFileRoute("/admin-master")({
 
 function AdminMasterPage() {
   const router = useRouter();
+  const navigate = useNavigate();
   const { user, role, isReady, isRoleLoading, signOut } = useAuth();
   const hasAdminAccess = user?.email === "gms90gu@gmail.com" || role === "admin_master";
 
@@ -88,6 +89,19 @@ function AdminMasterPage() {
     window.location.href = "/login";
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    navigate({ to: "/dashboard", replace: true });
+  };
+
+  const handleClose = () => {
+    navigate({ to: "/dashboard", replace: true });
+  };
+
   if (!isReady || isRoleLoading || !user || !hasAdminAccess) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
@@ -100,12 +114,14 @@ function AdminMasterPage() {
   return (
     <div className="w-full min-h-screen bg-slate-950">
       {/* ── Header Administrativo Fixo ─────────────────────────────── */}
-      <header className="sticky top-0 z-[100] bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-[1000] pointer-events-auto bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
+        <div className="relative z-[1001] pointer-events-auto max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Button
+            type="button"
             variant="ghost"
-            onClick={() => router.history.back()}
-            className="text-slate-400 hover:text-white hover:bg-white/10 h-10 px-3 gap-2 text-sm font-bold"
+            onClick={handleBack}
+            aria-label="Voltar para a tela anterior"
+            className="relative z-[1002] pointer-events-auto cursor-pointer touch-manipulation select-none min-h-11 min-w-24 text-slate-300 hover:text-white hover:bg-white/10 active:bg-white/15 active:scale-95 h-11 px-3 gap-2 text-sm font-bold"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Button>
@@ -116,16 +132,19 @@ function AdminMasterPage() {
 
           <div className="flex items-center gap-2">
             <Button
+              type="button"
               variant="ghost"
-              onClick={() => router.navigate({ to: "/dashboard", replace: true })}
-              className="text-slate-400 hover:text-white hover:bg-white/10 h-10 px-3 gap-2 text-sm font-bold"
+              onClick={handleClose}
+              aria-label="Fechar painel Admin Master e voltar ao dashboard"
+              className="relative z-[1002] pointer-events-auto cursor-pointer touch-manipulation select-none min-h-11 min-w-24 text-slate-300 hover:text-white hover:bg-white/10 active:bg-white/15 active:scale-95 h-11 px-3 gap-2 text-sm font-bold"
             >
               <X className="h-4 w-4" /> Fechar
             </Button>
             <Button
+              type="button"
               variant="ghost"
               onClick={handleLogout}
-              className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 h-10 px-3 gap-2 text-sm font-bold"
+              className="relative z-[1002] pointer-events-auto cursor-pointer touch-manipulation select-none min-h-11 text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 active:bg-rose-500/15 active:scale-95 h-11 px-3 gap-2 text-sm font-bold"
             >
               <LogOut className="h-4 w-4" /> Sair
             </Button>
@@ -133,7 +152,7 @@ function AdminMasterPage() {
         </div>
       </header>
 
-      <main className="p-4 sm:p-6">
+      <main className="relative z-0 p-4 sm:p-6">
         <AdminMasterDashboard />
       </main>
     </div>
