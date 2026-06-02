@@ -111,11 +111,7 @@ serve(async (req) => {
       });
       if (profileError) throw profileError;
 
-      const { error: roleError } = await supabaseAdmin.from("user_roles").upsert({
-        user_id: authUser.id,
-        role: "agente",
-      }, { onConflict: "user_id,role" });
-      if (roleError) throw roleError;
+      await safeUpsertUserRole(supabaseAdmin, authUser.id, "agente");
 
       const { error: agentError } = await supabaseAdmin.from("agents").upsert({
         profile_id: authUser.id,
