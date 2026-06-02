@@ -31,6 +31,21 @@ import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
+function getPanelTitle(role: string | null) {
+  switch (role) {
+    case "admin_master":
+      return "Painel Administrativo";
+    case "coordenador":
+      return "Painel do Coordenador";
+    case "supervisor":
+      return "Painel do Supervisor";
+    case "agente":
+      return "Painel do Agente";
+    default:
+      return "Dashboard";
+  }
+}
+
 export function OperationalHeader() {
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
@@ -40,6 +55,7 @@ export function OperationalHeader() {
   const [workStatus, setWorkStatus] = useState<string>('available');
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
+  const { role } = useAuth();
 
   useEffect(() => {
     fetchHeaderData();
