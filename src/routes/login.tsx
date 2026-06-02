@@ -249,11 +249,11 @@ function LoginPage() {
                 type="button"
                 variant="ghost"
                 onClick={() => setForgotOpen(false)}
-                className="text-slate-400 hover:text-white hover:bg-slate-800"
+                className="text-auth-muted hover:text-auth-foreground hover:bg-auth-field"
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={forgotLoading} className="rounded-xl font-bold">
+              <Button type="submit" disabled={forgotLoading} className="min-h-11 rounded-xl font-bold">
                 {forgotLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
