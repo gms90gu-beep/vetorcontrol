@@ -37,29 +37,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [forgotLoading, setForgotLoading] = useState(false);
 
-  const handleForgotPassword = async () => {
-    const target = email.trim();
-    if (!target) {
-      toast.error("Digite seu e-mail para receber o link de redefinição.");
-      return;
-    }
-    const loginEmail = target.includes("@") ? target : `${target}@vetor.com`;
-    setForgotLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-      toast.success("E-mail de redefinição enviado com sucesso. Verifique sua caixa de entrada.");
-    } catch (err: any) {
-      console.error("[Login] Erro ao enviar reset:", err);
-      toast.error(err.message || "Erro ao enviar e-mail de redefinição.");
-    } finally {
-      setForgotLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,14 +130,12 @@ function LoginPage() {
                 >
                   Senha
                 </Label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  disabled={forgotLoading}
-                  className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
+                <Link
+                  to="/forgot-password"
+                  className="text-[11px] font-semibold text-primary hover:underline"
                 >
-                  {forgotLoading ? "Enviando..." : "Esqueci minha senha"}
-                </button>
+                  Esqueceu sua senha?
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-4 h-5 w-5 text-slate-500" />
