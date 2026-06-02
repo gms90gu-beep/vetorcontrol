@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -51,6 +52,7 @@ import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
+  beforeLoad: blockManagersGuard,
   component: FieldWorkListPage,
 });
 

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -66,6 +67,7 @@ class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode
 }
 
 export const Route = createFileRoute("/_authenticated/rg")({
+  beforeLoad: blockManagersGuard,
   component: () => (
     <ErrorBoundary fallback={
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">

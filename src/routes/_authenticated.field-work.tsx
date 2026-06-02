@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -34,6 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
+  beforeLoad: blockManagersGuard,
   component: FieldWorkPage,
 });
 

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect } from "react";
 import { 
   Plus, 
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/cycles")({
+  beforeLoad: blockManagersGuard,
   component: CyclesPage,
 });
 
