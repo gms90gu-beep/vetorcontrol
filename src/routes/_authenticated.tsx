@@ -15,7 +15,8 @@ import {
   Home,
   CheckSquare,
   Car,
-  ShieldCheck
+  ShieldCheck,
+  Users
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
