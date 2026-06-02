@@ -94,22 +94,14 @@ serve(async (req) => {
     const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { u_id: user.id });
     if (!managerRoles.includes(callerRole)) throw new Error("Forbidden: perfil sem permissão para gerenciar usuários");
 
-    // Resolve supervisor_id for this agent:
-    //  - admin_master / coordenador may pass any supervisor_id (or null)
-    //  - supervisor always becomes the supervisor of their own creations
-    function resolveSupervisorId(requested: string | null | undefined): string | null {
-      if (callerRole === "supervisor") return user.id;
-      if (requested === undefined) return null;
-      return requested ?? null;
-    }
-
-    // ── CREATE AGENT (fluxo antigo) ──────────────────────────────────────────
+    // ── CREATE AGENT (fluxo antigo - cadastro isolado, sem side-effects) ────
     if (action === "create") {
-      const { email, password, full_name, registration_number, city, supervisor_id } = agentData;
-      const finalSupervisorId = resolveSupervisorId(supervisor_id);
+      const { email, password, full_name, registration_number, city } = agentData;
 
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
+      // Insert profile com APENAS dados explícitos do formulário.
+      // Não herda supervisor_id/coordinator_id da sessão do criador.
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authUser.id,
         full_name,
@@ -118,27 +110,19 @@ serve(async (req) => {
         city,
         is_active: true,
         role: "agente",
-        supervisor_id: finalSupervisorId,
+        supervisor_id: null,
+        coordinator_id: null,
       });
       if (profileError) throw profileError;
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, "agente");
-
-      const { error: agentError } = await supabaseAdmin.from("agents").upsert({
-        profile_id: authUser.id,
-        name: full_name,
-        registration_id: registration_number,
-        municipality: city || "São Paulo",
-        status: "active",
-      }, { onConflict: "profile_id" });
-      if (agentError) throw agentError;
 
       return jsonResponse({ success: true, user: authUser });
     }
 
     // ── CREATE MANAGER (supervisor / agente / coordenador / admin_master) ───
     if (action === "create_manager") {
-      const { email, password, full_name, role = "agente", supervisor_id, coordinator_id } = userData;
+      const { email, password, full_name, role = "agente" } = userData;
 
       if (!["supervisor", "coordenador", "agente", "admin_master"].includes(role)) {
         throw new Error("Invalid role: " + role);
@@ -151,20 +135,20 @@ serve(async (req) => {
         throw new Error("Forbidden: apenas Admin Master pode criar este perfil");
       }
 
-      const finalSupervisorId = role === "agente" ? resolveSupervisorId(supervisor_id) : null;
-      const finalCoordinatorId = role === "supervisor" ? (coordinator_id ?? null) : null;
-
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
+      // Cadastro isolado: NÃO herda supervisor_id/coordinator_id da sessão do criador.
+      // Vínculos devem ser feitos posteriormente via update_user explícito.
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authUser.id,
         full_name,
         email,
         is_active: true,
         role,
-        supervisor_id: finalSupervisorId,
-        coordinator_id: finalCoordinatorId,
+        supervisor_id: null,
+        coordinator_id: null,
       });
+
       if (profileError) throw profileError;
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, role);
