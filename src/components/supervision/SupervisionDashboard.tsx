@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export function SupervisionDashboard() {
   const { userRole } = useOperationalDate();
   const [agents, setAgents] = useState<any[]>([]);
+  const [supervisors, setSupervisors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
@@ -44,12 +45,27 @@ export function SupervisionDashboard() {
     email: "",
     password: "",
     registration_number: "",
-    city: ""
+    city: "",
+    supervisor_id: "" as string,
   });
+
+  const canChooseSupervisor = userRole === "admin_master" || userRole === "coordenador";
 
   useEffect(() => {
     fetchAgents();
-  }, []);
+    if (canChooseSupervisor) fetchSupervisors();
+  }, [canChooseSupervisor]);
+
+  async function fetchSupervisors() {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "supervisor")
+      .eq("is_active", true)
+      .order("full_name");
+    if (!error && data) setSupervisors(data);
+  }
+
 
   async function fetchAgents() {
     setIsLoading(true);
