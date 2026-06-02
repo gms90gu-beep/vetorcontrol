@@ -199,30 +199,19 @@ serve(async (req) => {
 
     // ── RESET PASSWORD ───────────────────────────────────────────────────────
     if (action === "reset_password") {
-      const { userId, newPassword, mode, email, redirectTo } = body;
-
-      // Mode "email": send password recovery e-mail to the user
-      if (mode === "email") {
-        const targetEmail = email;
-        if (!targetEmail) throw new Error("email is required for mode=email");
-        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-          type: "recovery",
-          email: targetEmail,
-          options: redirectTo ? { redirectTo } : undefined,
-        });
-        if (linkErr) throw linkErr;
-        console.log("[manage-agents] Recovery link gerado para", targetEmail);
-        return jsonResponse({ success: true, mode: "email" });
-      }
-
-      // Default mode: gera senha temporária e marca must_change_password
+      const { userId, newPassword } = body;
       if (!userId) throw new Error("userId is required");
+
+      // Gera senha temporária e marca must_change_password no user_metadata
       const tempPassword = newPassword || (Math.random().toString(36).slice(-10) + "A1!");
       const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: tempPassword,
         user_metadata: { must_change_password: true },
       });
-      if (pwErr) throw pwErr;
+      if (pwErr) {
+        console.error("[manage-agents] Erro ao redefinir senha:", pwErr);
+        throw pwErr;
+      }
       console.log("[manage-agents] Senha temporária gerada para userId=", userId);
       return jsonResponse({ success: true, tempPassword });
     }
