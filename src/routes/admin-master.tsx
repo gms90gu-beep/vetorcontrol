@@ -1,12 +1,9 @@
 import { createFileRoute, redirect, Link, useRouter } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldAlert, KeyRound, ArrowRight, LogOut, LayoutDashboard, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { LogOut, LayoutDashboard, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin-master")({
@@ -71,34 +68,20 @@ export const Route = createFileRoute("/admin-master")({
 function AdminMasterPage() {
   const router = useRouter();
   const { user, role, isReady, isRoleLoading, signOut } = useAuth();
-  const [password, setPassword] = useState("");
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const hasAdminAccess = user?.email === "gms90gu@gmail.com" || role === "admin_master";
 
   useEffect(() => {
     if (!isReady || isRoleLoading) return;
 
     if (!user) {
-      console.warn("[Admin-Master Page] Sem usuário após hidratação; redirecionando para login.");
       router.navigate({ to: "/login", replace: true });
       return;
     }
 
     if (!hasAdminAccess) {
-      console.warn("[Admin-Master Page] Usuário sem admin_master; redirecionando para dashboard. Role:", role);
       router.navigate({ to: "/dashboard", replace: true });
     }
   }, [hasAdminAccess, isReady, isRoleLoading, role, router, user]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === "VETOR_ADMIN_2026") {
-      setIsAuthorized(true);
-      toast.success("Acesso Master Autorizado");
-    } else {
-      toast.error("Senha Master Incorreta");
-    }
-  };
 
   const handleLogout = async () => {
     await signOut();
@@ -110,44 +93,6 @@ function AdminMasterPage() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
         <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
         <span className="text-sm font-medium">Validando acesso master...</span>
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-white/10 bg-slate-900 text-white shadow-2xl">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="h-16 w-16 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500 border border-red-500/30">
-                <ShieldAlert className="h-8 w-8" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-tighter">Painel Admin Master</CardTitle>
-            <CardDescription className="text-slate-400">
-              Área restrita. Insira a senha master para continuar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-3 h-5 w-5 text-slate-500" />
-                <Input
-                  type="password"
-                  placeholder="Senha Master"
-                  className="pl-10 h-12 bg-slate-800 border-white/10 focus:ring-red-500/50"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <Button className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all">
-                Acessar Sistema <ArrowRight className="h-4 w-4" />
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
       </div>
     );
   }
