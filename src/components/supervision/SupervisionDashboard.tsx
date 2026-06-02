@@ -114,11 +114,12 @@ export function SupervisionDashboard() {
     toast.info("Criando novo agente...");
     
     try {
+      const { supervisor_id, ...rest } = newAgent;
+      const payload: any = { ...rest, role: "agente" };
+      if (supervisor_id) payload.supervisor_id = supervisor_id;
+
       const { data, error } = await supabase.functions.invoke('manage-agents', {
-        body: { 
-          action: 'create',
-          agentData: { ...newAgent, role: 'agente' }
-        }
+        body: { action: 'create', agentData: payload },
       });
 
       if (error) throw error;
@@ -130,8 +131,10 @@ export function SupervisionDashboard() {
         email: "",
         password: "",
         registration_number: "",
-        city: ""
+        city: "",
+        supervisor_id: "",
       });
+
       fetchAgents();
     } catch (error: any) {
       console.error("Error creating agent:", error);
