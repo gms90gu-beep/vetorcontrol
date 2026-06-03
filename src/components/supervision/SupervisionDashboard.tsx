@@ -128,14 +128,53 @@ export function SupervisionDashboard() {
 
   const handleCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.info("Criando novo agente...");
+
+    // Validações
+    const full_name = newAgent.full_name.trim();
+    const email = newAgent.email.trim().toLowerCase();
+    const password = newAgent.password;
+
+    if (!full_name) return toast.error("Informe o nome completo.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast.error("E-mail inválido.");
+    if (!password || password.length < 6) return toast.error("Senha temporária deve ter ao menos 6 caracteres.");
+    if (!user?.id) return toast.error("Sessão expirada. Faça login novamente.");
+
+    const payload = {
+      full_name,
+      email,
+      password,
+      registration_number: newAgent.registration_number.trim() || null,
+      city: newAgent.city.trim() || null,
+      role: "agente",
+    };
+
+    console.log("[CreateAgent] Supervisor:", user.id);
+    console.log("[CreateAgent] Dados agente:", { ...payload, password: "***" });
+
+    const toastId = toast.loading("Criando novo agente...");
     try {
-      const payload: any = { ...newAgent, role: "agente" };
-      const { error } = await supabase.functions.invoke("manage-agents", {
+      const { data, error } = await supabase.functions.invoke("manage-agents", {
         body: { action: "create", agentData: payload },
       });
-      if (error) throw error;
-      toast.success("Agente cadastrado!");
+      console.log("[CreateAgent] Resultado:", data);
+      console.log("[CreateAgent] Erro:", error);
+
+      // Edge function pode retornar 4xx com { error: "..." } no body
+      const fnError = (data as any)?.error;
+      if (error || fnError) {
+        // Tenta extrair mensagem real do FunctionsHttpError
+        let msg = fnError || error?.message || "Erro ao cadastrar agente";
+        try {
+          const ctx: any = (error as any)?.context;
+          if (ctx?.json) {
+            const body = await ctx.json();
+            if (body?.error) msg = body.error;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+
+      toast.success("Agente cadastrado!", { id: toastId });
       setIsAddingAgent(false);
       setNewAgent({
         full_name: "",
@@ -144,10 +183,10 @@ export function SupervisionDashboard() {
         registration_number: "",
         city: "",
       });
-      fetchAll();
+      await fetchAll();
     } catch (e: any) {
-      console.error(e);
-      toast.error(e.message || "Erro ao cadastrar agente");
+      console.error("[CreateAgent] Falha:", e);
+      toast.error(e?.message || "Erro ao cadastrar agente", { id: toastId });
     }
   };
 
