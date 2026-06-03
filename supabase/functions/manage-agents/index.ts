@@ -94,14 +94,22 @@ serve(async (req) => {
     const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { u_id: user.id });
     if (!managerRoles.includes(callerRole)) throw new Error("Forbidden: perfil sem permissão para gerenciar usuários");
 
-    // ── CREATE AGENT (fluxo antigo - cadastro isolado, sem side-effects) ────
+    // ── CREATE AGENT ─────────────────────────────────────────────────────────
+    // Supervisores criam agentes vinculados automaticamente (supervisor_id = caller).
+    // Coordenadores criam agentes vinculados a si (coordinator_id = caller).
+    // Admin Master cria sem vínculo automático.
     if (action === "create") {
       const { email, password, full_name, registration_number, city } = agentData;
 
+      if (!email || !password || !full_name) {
+        throw new Error("Campos obrigatórios faltando: nome, e-mail e senha.");
+      }
+
       const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
-      // Insert profile com APENAS dados explícitos do formulário.
-      // Não herda supervisor_id/coordinator_id da sessão do criador.
+      const autoSupervisorId = callerRole === "supervisor" ? user.id : null;
+      const autoCoordinatorId = callerRole === "coordenador" ? user.id : null;
+
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authUser.id,
         full_name,
@@ -110,12 +118,21 @@ serve(async (req) => {
         city,
         is_active: true,
         role: "agente",
-        supervisor_id: null,
-        coordinator_id: null,
+        supervisor_id: autoSupervisorId,
+        coordinator_id: autoCoordinatorId,
       });
       if (profileError) throw profileError;
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, "agente");
+
+      await supabaseAdmin.from("audit_log").insert({
+        actor_id: user.id,
+        actor_email: user.email,
+        target_id: authUser.id,
+        action: "create_agent",
+        entity: "user",
+        metadata: { full_name, email, supervisor_id: autoSupervisorId, coordinator_id: autoCoordinatorId },
+      });
 
       return jsonResponse({ success: true, user: authUser });
     }
