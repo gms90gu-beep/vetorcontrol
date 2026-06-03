@@ -145,9 +145,12 @@ function EditarBoletim() {
     if (!boletimId) return;
     setSaving(true);
     const tid = toast.loading("Salvando...");
-    console.log("Salvando", form, imoveis);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log("[RG Editar] Usuário:", user);
+      console.log("[RG Editar] Boletim ID:", boletimId, "Block ID:", blockId);
+      console.log("[RG Editar] Form:", form);
+      console.log("[RG Editar] Imóveis (estado):", imoveis);
       if (!user) throw new Error("Não autenticado");
 
       const { error: bErr } = await supabase
@@ -165,16 +168,15 @@ function EditarBoletim() {
           category_2: form.category_2 || null,
         })
         .eq("id", boletimId);
-      if (bErr) throw bErr;
+      if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
 
-      // Imóveis: deletes
       const toDelete = imoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       if (toDelete.length > 0) {
+        console.log("[RG Editar] Deletando imóveis:", toDelete);
         const { error } = await supabase.from("properties").delete().in("id", toDelete);
-        if (error) throw error;
+        if (error) { console.error("[RG Editar] Erro delete:", error); throw error; }
       }
 
-      // Updates
       for (const im of imoveis) {
         if (im._deleted || im._new || !im.id) continue;
         const { error } = await supabase.from("properties").update({
@@ -186,13 +188,14 @@ function EditarBoletim() {
           type: im.type,
           inhabitants: im.inhabitants ?? 0,
         }).eq("id", im.id);
-        if (error) throw error;
+        if (error) { console.error("[RG Editar] Erro update imóvel", im.id, error); throw error; }
       }
 
-      // Inserts
+      // Inserts — um por um para identificar exatamente qual falha
       const toInsert = imoveis.filter((i) => i._new && !i._deleted);
-      if (toInsert.length > 0) {
-        const payload = toInsert.map((im) => ({
+      console.log("[RG Editar] Imóveis a inserir:", toInsert.length);
+      for (const im of toInsert) {
+        const payload = {
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number || "S/N",
@@ -204,9 +207,18 @@ function EditarBoletim() {
           block_id: blockId,
           block_number: form.block_number || null,
           user_id: user.id,
-        }));
-        const { error } = await supabase.from("properties").insert(payload);
-        if (error) throw error;
+        };
+        console.log("[RG Editar] INSERT payload:", payload);
+        const { data, error } = await supabase
+          .from("properties")
+          .insert(payload)
+          .select();
+        console.log("[RG Editar] INSERT resultado:", { data, error });
+        if (error) {
+          console.error("[RG Editar] Erro INSERT imóvel:", error);
+          const msg = `${error.message}${error.hint ? ` — ${error.hint}` : ""}${error.details ? ` (${error.details})` : ""}`;
+          throw new Error(msg);
+        }
       }
 
       toast.dismiss(tid);
