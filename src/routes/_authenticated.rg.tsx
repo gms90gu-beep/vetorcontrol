@@ -346,9 +346,12 @@ function RGPage() {
                 key={b.id}
                 b={b}
                 pdfBusy={pdfBusy === b.id}
-                onView={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                viewBusy={viewBusy === b.id}
+                editBusy={editBusy === b.id}
+                deleteBusy={deleteBusy === b.id}
+                onView={() => handleView(b)}
                 onPDF={() => handlePDF(b)}
-                onEdit={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                onEdit={() => handleEdit(b)}
                 onDelete={() => setPendingDelete(b)}
               />
             ))}
