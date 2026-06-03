@@ -92,6 +92,9 @@ function RGPage() {
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [viewBusy, setViewBusy] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BoletimRow | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [search, setSearch] = useState("");
