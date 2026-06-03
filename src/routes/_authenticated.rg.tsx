@@ -400,9 +400,12 @@ function RGPage() {
   );
 }
 
-function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
+function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
   b: BoletimRow;
   pdfBusy: boolean;
+  viewBusy: boolean;
+  editBusy: boolean;
+  deleteBusy: boolean;
   onView: () => void;
   onPDF: () => void;
   onEdit: () => void;
@@ -411,6 +414,7 @@ function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
   const status = b.finalized_at ? "Finalizado" : "Em aberto";
   const statusBg = b.finalized_at ? "#dcfce7" : C.blueBg;
   const statusFg = b.finalized_at ? "#15803d" : C.blue;
+  const anyBusy = pdfBusy || viewBusy || editBusy || deleteBusy;
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="p-4">
@@ -436,10 +440,10 @@ function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
       </div>
 
       <div className="grid grid-cols-4 gap-2 mt-3">
-        <ActionBtn onClick={onView} icon={<Eye className="h-4 w-4" />} label="Ver" bg={C.hdrBg} fg="#fff" />
-        <ActionBtn onClick={onPDF} icon={pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} label="PDF" bg={C.green} fg="#fff" disabled={pdfBusy} />
-        <ActionBtn onClick={onEdit} icon={<Pencil className="h-4 w-4" />} label="Editar" bg={C.blueBg} fg={C.blue} />
-        <ActionBtn onClick={onDelete} icon={<Trash2 className="h-4 w-4" />} label="Excluir" bg="#fee2e2" fg="#b91c1c" />
+        <ActionBtn onClick={onView} icon={viewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />} label={viewBusy ? "Abrindo..." : "Ver"} bg={C.hdrBg} fg="#fff" disabled={anyBusy} />
+        <ActionBtn onClick={onPDF} icon={pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} label={pdfBusy ? "Gerando..." : "PDF"} bg={C.green} fg="#fff" disabled={anyBusy} />
+        <ActionBtn onClick={onEdit} icon={editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />} label={editBusy ? "Abrindo..." : "Editar"} bg={C.blueBg} fg={C.blue} disabled={anyBusy} />
+        <ActionBtn onClick={onDelete} icon={deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} label={deleteBusy ? "Excluindo..." : "Excluir"} bg="#fee2e2" fg="#b91c1c" disabled={anyBusy} />
       </div>
     </div>
   );
@@ -450,10 +454,11 @@ function ActionBtn({ onClick, icon, label, bg, fg, disabled }: {
 }) {
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
       disabled={disabled}
       style={{ background: bg, color: fg, borderRadius: 10 }}
-      className="h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold disabled:opacity-60"
+      className="h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold disabled:opacity-60 cursor-pointer active:scale-[0.98] transition-transform"
     >
       {icon}
       <span>{label}</span>
