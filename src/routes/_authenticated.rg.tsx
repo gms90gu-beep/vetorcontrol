@@ -217,6 +217,7 @@ function RGPage() {
   async function handlePDF(b: BoletimRow) {
     console.log("[RG PDF] Boletim selecionado:", b.id, b);
     setPdfBusy(b.id);
+    const tid = toast.loading("Gerando PDF...");
     try {
       // Load properties linked to this boletim (fallback to block_number).
       let { data: props } = await supabase
