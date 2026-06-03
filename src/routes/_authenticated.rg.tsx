@@ -92,6 +92,9 @@ function RGPage() {
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [viewBusy, setViewBusy] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<BoletimRow | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [search, setSearch] = useState("");
@@ -182,24 +185,39 @@ function RGPage() {
   }
 
   async function handleDelete(b: BoletimRow) {
+    setDeleteBusy(b.id);
+    const t = toast.loading("Excluindo...");
     try {
-      // detach properties first (do not delete user data)
       await supabase.from("properties").update({ boletim_id: null }).eq("boletim_id", b.id);
       const { error } = await supabase.from("boletins_rg").delete().eq("id", b.id);
       if (error) throw error;
       setBoletins((arr) => arr.filter((x) => x.id !== b.id));
-      toast.success("Boletim excluído");
+      toast.success("Boletim excluído.", { id: t });
     } catch (e: any) {
       console.error("[RG] delete boletim", e);
-      toast.error("Erro: " + e.message);
+      toast.error("Erro ao excluir: " + e.message, { id: t });
     } finally {
+      setDeleteBusy(null);
       setPendingDelete(null);
     }
+  }
+
+  function handleView(b: BoletimRow) {
+    setViewBusy(b.id);
+    toast.loading("Abrindo...", { id: `view-${b.id}`, duration: 1500 });
+    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
+  }
+
+  function handleEdit(b: BoletimRow) {
+    setEditBusy(b.id);
+    toast.loading("Abrindo editor...", { id: `edit-${b.id}`, duration: 1500 });
+    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
   }
 
   async function handlePDF(b: BoletimRow) {
     console.log("[RG PDF] Boletim selecionado:", b.id, b);
     setPdfBusy(b.id);
+    const tid = toast.loading("Gerando PDF...");
     try {
       // Load properties linked to this boletim (fallback to block_number).
       let { data: props } = await supabase
@@ -220,7 +238,7 @@ function RGPage() {
       console.log("[RG PDF] Imóveis retornados:", props?.length || 0);
 
       if (!props || props.length === 0) {
-        toast.error("Este boletim não possui imóveis vinculados.");
+        toast.error("Este boletim não possui imóveis vinculados.", { id: tid });
         return;
       }
 
@@ -260,10 +278,10 @@ function RGPage() {
 
       const fileName = `RG_QTR_${blockLabel}_${(b.municipality || "").toUpperCase()}_${format(new Date(b.created_at), "yyyyMMdd")}.pdf`;
       doc.save(fileName);
-      toast.success("PDF gerado");
+      toast.success("PDF gerado.", { id: tid });
     } catch (e: any) {
       console.error("[RG PDF] erro", e);
-      toast.error("Erro ao gerar PDF: " + e.message);
+      toast.error("Erro ao gerar PDF: " + e.message, { id: tid });
     } finally {
       setPdfBusy(null);
     }
@@ -328,9 +346,12 @@ function RGPage() {
                 key={b.id}
                 b={b}
                 pdfBusy={pdfBusy === b.id}
-                onView={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                viewBusy={viewBusy === b.id}
+                editBusy={editBusy === b.id}
+                deleteBusy={deleteBusy === b.id}
+                onView={() => handleView(b)}
                 onPDF={() => handlePDF(b)}
-                onEdit={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                onEdit={() => handleEdit(b)}
                 onDelete={() => setPendingDelete(b)}
               />
             ))}
@@ -379,9 +400,12 @@ function RGPage() {
   );
 }
 
-function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
+function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
   b: BoletimRow;
   pdfBusy: boolean;
+  viewBusy: boolean;
+  editBusy: boolean;
+  deleteBusy: boolean;
   onView: () => void;
   onPDF: () => void;
   onEdit: () => void;
@@ -390,6 +414,7 @@ function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
   const status = b.finalized_at ? "Finalizado" : "Em aberto";
   const statusBg = b.finalized_at ? "#dcfce7" : C.blueBg;
   const statusFg = b.finalized_at ? "#15803d" : C.blue;
+  const anyBusy = pdfBusy || viewBusy || editBusy || deleteBusy;
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="p-4">
@@ -415,10 +440,10 @@ function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
       </div>
 
       <div className="grid grid-cols-4 gap-2 mt-3">
-        <ActionBtn onClick={onView} icon={<Eye className="h-4 w-4" />} label="Ver" bg={C.hdrBg} fg="#fff" />
-        <ActionBtn onClick={onPDF} icon={pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} label="PDF" bg={C.green} fg="#fff" disabled={pdfBusy} />
-        <ActionBtn onClick={onEdit} icon={<Pencil className="h-4 w-4" />} label="Editar" bg={C.blueBg} fg={C.blue} />
-        <ActionBtn onClick={onDelete} icon={<Trash2 className="h-4 w-4" />} label="Excluir" bg="#fee2e2" fg="#b91c1c" />
+        <ActionBtn onClick={onView} icon={viewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />} label={viewBusy ? "Abrindo..." : "Ver"} bg={C.hdrBg} fg="#fff" disabled={anyBusy} />
+        <ActionBtn onClick={onPDF} icon={pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} label={pdfBusy ? "Gerando..." : "PDF"} bg={C.green} fg="#fff" disabled={anyBusy} />
+        <ActionBtn onClick={onEdit} icon={editBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />} label={editBusy ? "Abrindo..." : "Editar"} bg={C.blueBg} fg={C.blue} disabled={anyBusy} />
+        <ActionBtn onClick={onDelete} icon={deleteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} label={deleteBusy ? "Excluindo..." : "Excluir"} bg="#fee2e2" fg="#b91c1c" disabled={anyBusy} />
       </div>
     </div>
   );
@@ -429,10 +454,11 @@ function ActionBtn({ onClick, icon, label, bg, fg, disabled }: {
 }) {
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
       disabled={disabled}
       style={{ background: bg, color: fg, borderRadius: 10 }}
-      className="h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold disabled:opacity-60"
+      className="h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold disabled:opacity-60 cursor-pointer active:scale-[0.98] transition-transform"
     >
       {icon}
       <span>{label}</span>
