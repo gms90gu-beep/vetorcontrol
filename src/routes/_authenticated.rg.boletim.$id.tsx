@@ -365,11 +365,24 @@ function BoletimView() {
     );
   }
 
-  if (!boletim) {
+  if (loadError || !boletim) {
+    const kind = loadError?.kind ?? "not_found";
+    const title =
+      kind === "forbidden"
+        ? "Você não possui acesso a este boletim."
+        : kind === "not_found"
+          ? "Boletim não encontrado."
+          : "Não foi possível carregar o boletim.";
+    const detail = loadError?.message && kind === "generic" ? loadError.message : null;
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <p className="font-bold text-slate-600">Boletim não encontrado.</p>
-        <Button onClick={() => navigate({ to: "/rg" })}>Voltar para RG</Button>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center">
+        <p className="font-bold text-slate-700 text-lg">{title}</p>
+        {detail && <p className="text-sm text-slate-500 max-w-md">{detail}</p>}
+        <p className="text-xs text-slate-400">ID: {id}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => load()}>Tentar novamente</Button>
+          <Button onClick={() => navigate({ to: "/rg" })}>Voltar para RG</Button>
+        </div>
       </div>
     );
   }
