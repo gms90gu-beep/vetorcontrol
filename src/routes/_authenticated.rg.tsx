@@ -238,7 +238,7 @@ function RGPage() {
       console.log("[RG PDF] Imóveis retornados:", props?.length || 0);
 
       if (!props || props.length === 0) {
-        toast.error("Este boletim não possui imóveis vinculados.");
+        toast.error("Este boletim não possui imóveis vinculados.", { id: tid });
         return;
       }
 
@@ -278,10 +278,10 @@ function RGPage() {
 
       const fileName = `RG_QTR_${blockLabel}_${(b.municipality || "").toUpperCase()}_${format(new Date(b.created_at), "yyyyMMdd")}.pdf`;
       doc.save(fileName);
-      toast.success("PDF gerado");
+      toast.success("PDF gerado.", { id: tid });
     } catch (e: any) {
       console.error("[RG PDF] erro", e);
-      toast.error("Erro ao gerar PDF: " + e.message);
+      toast.error("Erro ao gerar PDF: " + e.message, { id: tid });
     } finally {
       setPdfBusy(null);
     }
