@@ -75,7 +75,10 @@ export const Route = createFileRoute("/_authenticated/rg")({
 function RGRouteContent() {
   const location = useLocation();
 
-  if (location.pathname.startsWith("/rg/boletim/")) {
+  if (
+    location.pathname.startsWith("/rg/boletim/") ||
+    location.pathname.startsWith("/rg/editar/")
+  ) {
     return <Outlet />;
   }
 
@@ -231,7 +234,7 @@ function RGPage() {
     }
     setEditBusy(b.id);
     toast.loading("Abrindo editor...", { id: `edit-${b.id}`, duration: 1500 });
-    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
+    navigate({ to: "/rg/editar/$id", params: { id: b.id } });
   }
 
   async function handlePDF(b: BoletimRow) {
