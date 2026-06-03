@@ -6,37 +6,30 @@ import {
   Plus,
   Search,
   Map as MapIcon,
-  FileText,
-  Printer,
-  Save,
-  Trash2,
-  AlertCircle,
   ArrowLeft,
   X,
   Eye,
   Download,
-  Share2,
-  ChevronRight,
+  Pencil,
+  Trash2,
+  AlertCircle,
+  Loader2,
+  FileText,
 } from "lucide-react";
-import { generateRGPDF, uploadBlockPDF } from "@/lib/pdf-generator";
+import { generateRGPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { RGBulletinHeader } from "@/components/rg/RGBulletinHeader";
-import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable";
-import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
 
-// ===== Design tokens (spec exact hex) =====
+// ===== Design tokens =====
 const C = {
   bg: "#f4f5f7",
   card: "#ffffff",
@@ -51,36 +44,11 @@ const C = {
   green: "#059669",
   blue: "#185fa5",
   blueBg: "#e6f1fb",
-  blueRing: "#3b9ede",
   red: "#f87171",
-  amber: "#854f0b",
-  amberBg: "#faeeda",
-  purple: "#534ab7",
-  purpleBg: "#eeedfe",
   grayBg: "#f4f5f7",
   grayTx: "#5a6a7a",
   sep: "#f0f2f4",
-  dash: "#c0c8d4",
-  tabInactive: "#aab0bc",
 };
-
-type TipoKey = "R" | "C" | "TB" | "PE" | "O";
-const TIPO_META: Record<TipoKey, { label: string; bg: string; fg: string; dbType: Property["type"] }> = {
-  R: { label: "Residencial", bg: C.blueBg, fg: C.blue, dbType: "residence" },
-  C: { label: "Comercial", bg: C.amberBg, fg: C.amber, dbType: "commerce" },
-  TB: { label: "Terreno Baldio", bg: C.amberBg, fg: C.amber, dbType: "vacant_lot" },
-  PE: { label: "Pto. Estratégico", bg: C.purpleBg, fg: C.purple, dbType: "strategic_point" },
-  O: { label: "Outros", bg: C.grayBg, fg: C.grayTx, dbType: "others" },
-};
-
-function dbToTipo(t?: string | null): TipoKey {
-  const x = (t || "").toLowerCase();
-  if (x === "residence" || x === "residential") return "R";
-  if (x === "commerce" || x === "commercial") return "C";
-  if (x === "vacant_lot") return "TB";
-  if (x === "strategic_point") return "PE";
-  return "O";
-}
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
   constructor(props: any) { super(props); this.state = { hasError: false }; }
@@ -104,354 +72,302 @@ export const Route = createFileRoute("/_authenticated/rg")({
   ),
 });
 
-type TabKey = "cadastro" | "imoveis" | "boletim" | "historico";
+type Boletim = {
+  id: string;
+  block_number: string | null;
+  locality: string | null;
+  municipality: string | null;
+  uf: string | null;
+  agent_name: string | null;
+  agent_id: string;
+  created_at: string;
+  finalized_at: string | null;
+};
+
+type BoletimRow = Boletim & { total_imoveis: number };
 
 function RGPage() {
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<TabKey>("cadastro");
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [archivedPDFs, setArchivedPDFs] = useState<any[]>([]);
-  const [activeSession, setActiveSession] = useState<any>(null);
-  const [agent, setAgent] = useState<any>(null);
-  const [activeCycle, setActiveCycle] = useState<any>(null);
-  const [activeWeek, setActiveWeek] = useState<any>(null);
-
-  const [bulletinHeader, setBulletinHeader] = useState({
-    uf: "CE",
-    municipio: "",
-    localidade: "",
-    distrito: "",
-    categoria: "URBANA",
-    quarteirao: "",
-    sequencia: "01",
-    lado: "01",
-    agente: "",
+  const [boletins, setBoletins] = useState<BoletimRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<BoletimRow | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [search, setSearch] = useState("");
+  const [agentDefaults, setAgentDefaults] = useState<{ municipality: string; name: string; registration_id: string }>({
+    municipality: "", name: "", registration_id: "",
   });
 
-  // delete confirm dialog
-  const [pendingDelete, setPendingDelete] = useState<Property | null>(null);
-  const [pendingDeleteBlock, setPendingDeleteBlock] = useState(false);
+  useEffect(() => { void fetchAll(); }, []);
 
-  // tab Imóveis filters
-  const [search, setSearch] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<"ALL" | TipoKey>("ALL");
-
-  useEffect(() => {
-    fetchInitialData();
-    fetchArchivedPDFs();
-  }, []);
-
-  async function fetchArchivedPDFs() {
-    try {
-      const { data, error } = await supabase.storage.from("block-reports").list("", {
-        limit: 100, offset: 0, sortBy: { column: "created_at", order: "desc" },
-      });
-      if (error) throw error;
-      setArchivedPDFs(data || []);
-    } catch (e: any) { console.error(e.message); }
-  }
-
-  async function fetchInitialData() {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
-      if (agentData) {
-        setAgent(agentData);
-        setBulletinHeader((p) => ({ ...p, municipio: agentData.municipality || "", agente: agentData.name || "" }));
-      }
-
-      const { data: session } = await supabase
-        .from("field_work_sessions").select("*")
-        .eq("user_id", user.id).eq("status", "in_progress")
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (session) {
-        setActiveSession(session);
-        setBulletinHeader((p) => ({ ...p, quarteirao: session.block_number || "" }));
-      }
-
-      const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
-      if (cycle) {
-        setActiveCycle(cycle);
-        const { data: week } = await supabase.from("weeks").select("*").eq("cycle_id", cycle.id).order("number", { ascending: true }).limit(1).maybeSingle();
-        if (week) setActiveWeek(week);
-      }
-
-      const { data, error } = await supabase
-        .from("properties").select("*")
-        .eq("user_id", user.id)
-        .order("sequence", { ascending: true })
-        .order("street_name", { ascending: true });
-      if (error) throw error;
-      setProperties(data as Property[]);
-    } catch (e: any) {
-      toast.error("Erro ao carregar dados: " + e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // current quarteirão = bulletinHeader.quarteirao (fallback: empty filter shows all)
-  const currentBlock = bulletinHeader.quarteirao;
-
-  const blockProperties = useMemo(
-    () => properties.filter((p) => !currentBlock || p.block_number === currentBlock),
-    [properties, currentBlock],
-  );
-
-  const stats = useMemo(() => {
-    const c = { R: 0, C: 0, TB: 0, PE: 0, O: 0, total: 0, hab: 0 };
-    for (const p of blockProperties) {
-      c[dbToTipo(p.type)]++;
-      c.total++;
-      c.hab += p.inhabitants || 0;
-    }
-    return c;
-  }, [blockProperties]);
-
-  // session stats (placeholder — derived from session if present)
-  const sessionStats = {
-    trabalhados: activeSession?.properties_worked ?? blockProperties.length,
-    fechados: activeSession?.properties_closed ?? 0,
-    focos: activeSession?.foci_found ?? 0,
-  };
-
-  // ====== handlers ======
-  async function handleDeleteProperty(id: string) {
-    try {
-      const { error } = await supabase.from("properties").delete().eq("id", id);
-      if (error) throw error;
-      setProperties((p) => p.filter((x) => x.id !== id));
-      toast.success("Imóvel removido");
-    } catch (e: any) { toast.error("Erro: " + e.message); }
-  }
-
-  async function handleSaveHeader() {
+  async function fetchAll() {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
-      const { error } = await supabase.from("agents")
-        .update({ municipality: bulletinHeader.municipio, name: bulletinHeader.agente })
-        .eq("profile_id", user.id);
+
+      const { data: agentData } = await supabase
+        .from("agents").select("name, municipality, registration_id")
+        .eq("profile_id", user.id).maybeSingle();
+      if (agentData) {
+        setAgentDefaults({
+          municipality: agentData.municipality || "",
+          name: agentData.name || "",
+          registration_id: agentData.registration_id || "",
+        });
+      }
+
+      const { data: bs, error } = await supabase
+        .from("boletins_rg")
+        .select("id, block_number, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      toast.success("Cabeçalho salvo");
-    } catch (e: any) { toast.error("Erro: " + e.message); }
-  }
 
-  async function handleExportBlockPDF() {
-    console.log("[RG PDF] Gerando PDF do boletim atual", {
-      quarteirao: currentBlock || "(sem quarteirão)",
-      totalImoveis: blockProperties.length,
-      boletimHeader: bulletinHeader,
-    });
+      const ids = (bs || []).map((b: any) => b.id);
+      const counts: Record<string, number> = {};
+      if (ids.length) {
+        const { data: props } = await supabase
+          .from("properties")
+          .select("boletim_id")
+          .in("boletim_id", ids);
+        (props || []).forEach((p: any) => {
+          if (p.boletim_id) counts[p.boletim_id] = (counts[p.boletim_id] || 0) + 1;
+        });
+      }
 
-    if (blockProperties.length === 0) {
-      toast.error("Este boletim não possui imóveis cadastrados.");
-      return;
-    }
-
-    try {
-      toast.loading("Gerando PDF...");
-      const agentInfo = {
-        municipality: bulletinHeader.municipio,
-        name: bulletinHeader.agente,
-        registrationId: agent?.registration_id || "MAT-0000",
-        cycle: activeCycle?.number || "01/26",
-        week: activeWeek?.number?.toString() || "1",
-        block: currentBlock || "S/N",
-        street: blockProperties[0]?.street_name || "",
-      };
-      const metadata = {
-        total: stats.total, residences: stats.R, commerce: stats.C,
-        lots: stats.TB, strategicPoints: stats.PE, others: stats.O, inhabitants: stats.hab,
-      };
-      const blockLabel = currentBlock || "SN";
-      const doc = await generateRGPDF(blockProperties, agentInfo, metadata, { type: "block", value: blockLabel });
-      const fileName = `RG_QTR_${blockLabel}_${(bulletinHeader.municipio || "").toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
-      doc.save(fileName);
-      try {
-        await uploadBlockPDF(doc, blockLabel, bulletinHeader.municipio);
-        fetchArchivedPDFs();
-        toast.success("PDF gerado e arquivado");
-      } catch { toast.info("PDF baixado (sem arquivamento)"); }
-      toast.dismiss();
+      setBoletins((bs || []).map((b: any) => ({ ...b, total_imoveis: counts[b.id] || 0 })));
     } catch (e: any) {
-      toast.dismiss();
-      console.error("[RG PDF] Erro ao gerar PDF", e);
-      toast.error("Erro ao gerar PDF: " + e.message);
+      console.error("[RG] fetchAll", e);
+      toast.error("Erro ao carregar boletins: " + e.message);
+    } finally {
+      setLoading(false);
     }
   }
 
-  function handleBack() { window.history.back(); }
-  function handleClose() { navigate({ to: "/dashboard" }); }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return boletins;
+    return boletins.filter((b) =>
+      (b.block_number || "").toLowerCase().includes(q) ||
+      (b.locality || "").toLowerCase().includes(q) ||
+      (b.agent_name || "").toLowerCase().includes(q),
+    );
+  }, [boletins, search]);
+
+  async function handleNewBoletim(payload: { block_number: string; locality: string }) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+
+      const insert = {
+        agent_id: user.id,
+        block_number: payload.block_number,
+        locality: payload.locality || null,
+        municipality: agentDefaults.municipality || null,
+        uf: "CE",
+        agent_name: agentDefaults.name || null,
+        agent_registration: agentDefaults.registration_id || null,
+      };
+      const { data, error } = await supabase
+        .from("boletins_rg").insert(insert).select().single();
+      if (error) throw error;
+      setShowNew(false);
+      toast.success("Boletim criado");
+      navigate({ to: "/rg/boletim/$id", params: { id: data.id } });
+    } catch (e: any) {
+      console.error("[RG] new boletim", e);
+      toast.error("Erro: " + e.message);
+    }
+  }
+
+  async function handleDelete(b: BoletimRow) {
+    try {
+      // detach properties first (do not delete user data)
+      await supabase.from("properties").update({ boletim_id: null }).eq("boletim_id", b.id);
+      const { error } = await supabase.from("boletins_rg").delete().eq("id", b.id);
+      if (error) throw error;
+      setBoletins((arr) => arr.filter((x) => x.id !== b.id));
+      toast.success("Boletim excluído");
+    } catch (e: any) {
+      console.error("[RG] delete boletim", e);
+      toast.error("Erro: " + e.message);
+    } finally {
+      setPendingDelete(null);
+    }
+  }
+
+  async function handlePDF(b: BoletimRow) {
+    console.log("[RG PDF] Boletim selecionado:", b.id, b);
+    setPdfBusy(b.id);
+    try {
+      // Load properties linked to this boletim (fallback to block_number).
+      let { data: props } = await supabase
+        .from("properties")
+        .select("id, number, complement, type, street_name, side, sequence, inhabitants, status, observations")
+        .eq("boletim_id", b.id)
+        .order("sequence", { ascending: true });
+
+      if ((!props || props.length === 0) && b.block_number) {
+        const fb = await supabase
+          .from("properties")
+          .select("id, number, complement, type, street_name, side, sequence, inhabitants, status, observations")
+          .eq("block_number", b.block_number)
+          .order("sequence", { ascending: true });
+        props = fb.data || [];
+      }
+
+      console.log("[RG PDF] Imóveis retornados:", props?.length || 0);
+
+      if (!props || props.length === 0) {
+        toast.error("Este boletim não possui imóveis vinculados.");
+        return;
+      }
+
+      const stats = props.reduce(
+        (acc: any, p: any) => {
+          const t = (p.type || "").toLowerCase();
+          if (t === "residence" || t === "residential") acc.R++;
+          else if (t === "commerce" || t === "commercial") acc.C++;
+          else if (t === "vacant_lot") acc.TB++;
+          else if (t === "strategic_point") acc.PE++;
+          else acc.O++;
+          acc.total++;
+          acc.hab += p.inhabitants || 0;
+          return acc;
+        },
+        { R: 0, C: 0, TB: 0, PE: 0, O: 0, total: 0, hab: 0 },
+      );
+
+      const blockLabel = b.block_number || "SN";
+      const doc = await generateRGPDF(
+        props as any,
+        {
+          municipality: b.municipality || agentDefaults.municipality || "",
+          name: b.agent_name || agentDefaults.name || "",
+          registrationId: agentDefaults.registration_id || "MAT-0000",
+          cycle: "",
+          week: "",
+          block: blockLabel,
+          street: b.locality || (props[0] as any)?.street_name || "",
+        },
+        {
+          total: stats.total, residences: stats.R, commerce: stats.C,
+          lots: stats.TB, strategicPoints: stats.PE, others: stats.O, inhabitants: stats.hab,
+        },
+        { type: "block", value: blockLabel },
+      );
+
+      const fileName = `RG_QTR_${blockLabel}_${(b.municipality || "").toUpperCase()}_${format(new Date(b.created_at), "yyyyMMdd")}.pdf`;
+      doc.save(fileName);
+      toast.success("PDF gerado");
+    } catch (e: any) {
+      console.error("[RG PDF] erro", e);
+      toast.error("Erro ao gerar PDF: " + e.message);
+    } finally {
+      setPdfBusy(null);
+    }
+  }
 
   return (
     <div className="min-h-screen pb-24" style={{ background: C.bg }}>
-      {/* ============ HEADER ESCURO ============ */}
+      {/* HEADER */}
       <header style={{ background: C.hdrBg, padding: "14px" }} className="sticky top-0 z-40 pt-[calc(14px+env(safe-area-inset-top))]">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-between">
-            <button onClick={handleBack} style={{ color: C.hdrMute }} className="p-1 -ml-1 hover:opacity-80" aria-label="Voltar">
+            <button onClick={() => window.history.back()} style={{ color: C.hdrMute }} className="p-1 -ml-1 hover:opacity-80" aria-label="Voltar">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <h1 className="text-white" style={{ fontSize: "15px", fontWeight: 700 }}>RG Digital</h1>
-            <button onClick={handleClose} style={{ color: C.hdrMute }} className="p-1 -mr-1 hover:opacity-80" aria-label="Fechar">
+            <button onClick={() => navigate({ to: "/dashboard" })} style={{ color: C.hdrMute }} className="p-1 -mr-1 hover:opacity-80" aria-label="Fechar">
               <X className="h-5 w-5" />
             </button>
           </div>
 
           <p className="text-center mt-1" style={{ color: C.hdrMute, fontSize: "9px" }}>
-            Ciclo {activeCycle?.number ?? 1} / Semana {activeWeek?.number ?? 1}
-            {currentBlock ? ` · Quarteirão ${currentBlock}` : ""}
-            {bulletinHeader.municipio ? ` · ${bulletinHeader.municipio}` : ""}
-            {bulletinHeader.uf ? ` – ${bulletinHeader.uf}` : ""}
+            Boletins de Reconhecimento Geográfico · {boletins.length} cadastrado{boletins.length === 1 ? "" : "s"}
           </p>
-
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {[
-              { lbl: "Trabalhados", val: sessionStats.trabalhados, color: "#fff" },
-              { lbl: "Fechados", val: sessionStats.fechados, color: "#fff" },
-              { lbl: "Focos (+)", val: sessionStats.focos, color: C.red },
-            ].map((s) => (
-              <div key={s.lbl} style={{ background: C.hdrCard, border: `1px solid ${C.hdrBorder}`, borderRadius: 7 }} className="px-3 py-2.5 text-center">
-                <div style={{ color: C.hdrLabel, fontSize: "8px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.lbl}</div>
-                <div style={{ color: s.color, fontSize: "20px", fontWeight: 800, lineHeight: 1.1, marginTop: 2 }}>{s.val}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </header>
 
-      {/* ============ TABS ============ */}
-      <nav style={{ background: C.card, borderBottom: `1px solid ${C.border}` }} className="sticky z-30" >
-        <div className="max-w-3xl mx-auto flex">
-          {([
-            ["cadastro", "Cadastro"],
-            ["imoveis", `Imóveis (${blockProperties.length})`],
-            ["boletim", "Boletim"],
-            ["historico", "Histórico"],
-          ] as [TabKey, string][]).map(([k, lbl]) => {
-            const active = tab === k;
-            return (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className="flex-1 py-3 text-xs font-bold transition-colors"
-                style={{
-                  color: active ? C.text : C.tabInactive,
-                  borderBottom: active ? `2px solid ${C.text}` : "2px solid transparent",
-                }}
-              >
-                {lbl}
-              </button>
-            );
-          })}
+      <main className="max-w-3xl mx-auto p-[14px] space-y-3">
+        {/* Toolbar */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: C.text2 }} />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por quarteirão, logradouro ou agente"
+              className="pl-9 h-11 bg-white"
+            />
+          </div>
+          <button
+            onClick={() => setShowNew(true)}
+            style={{ background: C.hdrBg, color: "#fff", borderRadius: 10 }}
+            className="h-11 px-4 flex items-center gap-2 text-xs font-bold whitespace-nowrap"
+          >
+            <Plus className="h-4 w-4" /> Novo Boletim
+          </button>
         </div>
-      </nav>
 
-      <main className="max-w-3xl mx-auto p-[14px]">
-        {isLoading ? (
+        {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: C.text }} />
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: C.text }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14 }} className="p-10 text-center">
+            <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: C.text2 }} />
+            <div className="font-semibold" style={{ color: C.text }}>Nenhum boletim cadastrado</div>
+            <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
           </div>
         ) : (
-          <>
-            {tab === "cadastro" && (
-              <CadastroTab
-                C={C}
-                header={bulletinHeader}
-                setHeader={setBulletinHeader}
-                properties={blockProperties}
-                stats={stats}
-                onExportPDF={handleExportBlockPDF}
-                onSaveHeader={handleSaveHeader}
-                onDeleteProperty={(p) => setPendingDelete(p)}
-                onAdd={async (data) => {
-                  try {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    if (!user) throw new Error("Não autenticado");
-                    const payload = {
-                      ...data,
-                      block_number: bulletinHeader.quarteirao,
-                      user_id: user.id,
-                      status: "active" as const,
-                    };
-                    const { data: saved, error } = await supabase.from("properties").insert(payload).select().single();
-                    if (error) throw error;
-                    setProperties((p) => [...p, saved as Property]);
-                    toast.success("Imóvel adicionado");
-                  } catch (e: any) { toast.error("Erro: " + e.message); }
-                }}
+          <div className="space-y-2">
+            {filtered.map((b) => (
+              <BoletimCard
+                key={b.id}
+                b={b}
+                pdfBusy={pdfBusy === b.id}
+                onView={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                onPDF={() => handlePDF(b)}
+                onEdit={() => navigate({ to: "/rg/boletim/$id", params: { id: b.id } })}
+                onDelete={() => setPendingDelete(b)}
               />
-            )}
-
-            {tab === "imoveis" && (
-              <ImoveisTab
-                C={C}
-                properties={blockProperties}
-                search={search}
-                setSearch={setSearch}
-                tipoFilter={tipoFilter}
-                setTipoFilter={setTipoFilter}
-                onDelete={(p) => setPendingDelete(p)}
-              />
-            )}
-
-            {tab === "boletim" && (
-              <BoletimTab
-                C={C}
-                header={bulletinHeader}
-                setHeader={setBulletinHeader}
-                properties={blockProperties}
-                stats={stats}
-                onPrint={() => window.print()}
-                onPDF={handleExportBlockPDF}
-                onOpenOfficial={() => {
-                  const blockId = blockProperties.find((p) => p.block_id)?.block_id;
-                  if (!blockId) { toast.error("Cadastre ao menos um imóvel."); return; }
-                  navigate({ to: "/rg/boletim/$id", params: { id: blockId } });
-                }}
-              />
-            )}
-
-            {tab === "historico" && (
-              <HistoricoTab
-                C={C}
-                files={archivedPDFs}
-                onOpen={async (name) => {
-                  const { data } = await supabase.storage.from("block-reports").createSignedUrl(name, 60);
-                  if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                }}
-                onShare={(name) => {
-                  const text = encodeURIComponent(`Boletim Digital. Arquivo: ${name}`);
-                  window.open(`https://wa.me/?text=${text}`, "_blank");
-                }}
-              />
-            )}
-          </>
+            ))}
+          </div>
         )}
       </main>
 
-      {/* delete property dialog */}
+      {/* New boletim dialog */}
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base" style={{ color: C.text }}>
+              <MapIcon className="h-5 w-5" style={{ color: C.blue }} /> Novo Boletim
+            </DialogTitle>
+          </DialogHeader>
+          <NewBoletimForm onSubmit={handleNewBoletim} onCancel={() => setShowNew(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete dialog */}
       <Dialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base" style={{ color: C.text }}>
-              <AlertCircle className="h-5 w-5" style={{ color: C.red }} /> Excluir imóvel?
+              <AlertCircle className="h-5 w-5" style={{ color: C.red }} /> Excluir boletim?
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: C.text2 }}>
-            Esta ação não pode ser desfeita.
-            {pendingDelete && <> Imóvel <strong>{pendingDelete.number}</strong> {pendingDelete.street_name ? `(${pendingDelete.street_name})` : ""}.</>}
+            Esta ação não pode ser desfeita. Os imóveis vinculados serão desvinculados, mas não excluídos.
+            {pendingDelete && (
+              <> Boletim <strong>Q{pendingDelete.block_number || "—"}</strong>{pendingDelete.locality ? ` (${pendingDelete.locality})` : ""}.</>
+            )}
           </p>
           <div className="grid grid-cols-2 gap-2 mt-2">
             <Button variant="outline" onClick={() => setPendingDelete(null)}>Cancelar</Button>
             <Button
-              onClick={async () => { if (pendingDelete) { await handleDeleteProperty(pendingDelete.id); setPendingDelete(null); } }}
+              onClick={() => pendingDelete && handleDelete(pendingDelete)}
               style={{ background: C.red, color: "#fff" }}
             >
               <Trash2 className="h-4 w-4 mr-1" /> Excluir
@@ -463,414 +379,102 @@ function RGPage() {
   );
 }
 
-// =================== CADASTRO TAB ===================
-function CadastroTab(props: {
-  C: typeof C;
-  header: any;
-  setHeader: (h: any) => void;
-  properties: Property[];
-  stats: { R: number; C: number; TB: number; PE: number; O: number; total: number; hab: number };
-  onExportPDF: () => void;
-  onSaveHeader: () => void;
-  onDeleteProperty: (p: Property) => void;
-  onAdd: (data: any) => Promise<void>;
+function BoletimCard({ b, pdfBusy, onView, onPDF, onEdit, onDelete }: {
+  b: BoletimRow;
+  pdfBusy: boolean;
+  onView: () => void;
+  onPDF: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const { C, header, setHeader, properties, stats, onExportPDF, onSaveHeader, onDeleteProperty, onAdd } = props;
-  const nextSeq = (properties.reduce((m, p) => Math.max(m, p.sequence || 0), 0) || properties.length) + 1;
+  const status = b.finalized_at ? "Finalizado" : "Em aberto";
+  const statusBg = b.finalized_at ? "#dcfce7" : C.blueBg;
+  const statusFg = b.finalized_at ? "#15803d" : C.blue;
 
   return (
-    <div className="space-y-4">
-      {/* identidade card */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="p-4 flex items-center gap-3">
-        <div style={{ background: C.blueBg, borderRadius: 10 }} className="h-11 w-11 flex items-center justify-center">
-          <MapIcon className="h-5 w-5" style={{ color: C.blue }} />
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="p-4">
+      <div className="flex items-start gap-3">
+        <div style={{ background: C.blueBg, color: C.blue, borderRadius: 10 }} className="h-12 w-12 flex flex-col items-center justify-center shrink-0">
+          <span className="text-[8px] font-bold tracking-wider opacity-75">QTR</span>
+          <span className="text-sm font-bold leading-none">{b.block_number || "—"}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-[15px]" style={{ color: C.text }}>RG Digital</div>
-          <div className="text-[9px] uppercase tracking-widest" style={{ color: C.text2 }}>Reconhecimento Geográfico</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="font-bold text-sm truncate" style={{ color: C.text }}>
+              {b.locality || "Logradouro não informado"}
+            </div>
+            <span style={{ background: statusBg, color: statusFg, borderRadius: 6 }} className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+              {status}
+            </span>
+          </div>
+          <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
+            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {format(new Date(b.created_at), "dd/MM/yyyy")}
+            {b.agent_name ? ` · ${b.agent_name}` : ""}
+          </div>
         </div>
       </div>
 
-      {/* ações */}
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={onExportPDF} style={{ background: C.hdrBg, color: "#fff", borderRadius: 12 }} className="h-12 flex items-center justify-center gap-2 text-xs font-bold">
-          <FileText className="h-4 w-4" /> PDF Quarteirão
-        </button>
-        <button onClick={onSaveHeader} style={{ background: C.green, color: "#fff", borderRadius: 12 }} className="h-12 flex items-center justify-center gap-2 text-xs font-bold">
-          <Save className="h-4 w-4" /> Salvar
-        </button>
+      <div className="grid grid-cols-4 gap-2 mt-3">
+        <ActionBtn onClick={onView} icon={<Eye className="h-4 w-4" />} label="Ver" bg={C.hdrBg} fg="#fff" />
+        <ActionBtn onClick={onPDF} icon={pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} label="PDF" bg={C.green} fg="#fff" disabled={pdfBusy} />
+        <ActionBtn onClick={onEdit} icon={<Pencil className="h-4 w-4" />} label="Editar" bg={C.blueBg} fg={C.blue} />
+        <ActionBtn onClick={onDelete} icon={<Trash2 className="h-4 w-4" />} label="Excluir" bg="#fee2e2" fg="#b91c1c" />
       </div>
-
-      {/* dados do quarteirão (editáveis) */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="overflow-hidden">
-        <div className="px-4 py-3 text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2, borderBottom: `1px solid ${C.sep}` }}>
-          Dados do Quarteirão
-        </div>
-        {[
-          ["UF", "uf"], ["Município", "municipio"], ["Localidade", "localidade"],
-          ["Distrito", "distrito"], ["Categoria", "categoria"],
-          ["Quarteirão Nº", "quarteirao"], ["Sequência", "sequencia"], ["Lado", "lado"],
-        ].map(([lbl, key], i, arr) => (
-          <div key={key} className="flex items-center px-4 py-2.5" style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${C.sep}` : "none" }}>
-            <div className="flex-1 text-[11px]" style={{ color: C.text2 }}>{lbl}</div>
-            {key === "categoria" ? (
-              <span style={{ background: C.blueBg, color: C.blue, borderRadius: 6 }} className="px-2 py-0.5 text-[10px] font-bold uppercase">
-                {header[key] || "—"}
-              </span>
-            ) : (
-              <input
-                value={header[key] || ""}
-                onChange={(e) => setHeader({ ...header, [key]: e.target.value })}
-                className="text-right text-sm font-bold bg-transparent outline-none w-32"
-                style={{ color: C.text }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* totalizadores */}
-      <div className="grid grid-cols-3 gap-2">
-        <TotalCard C={C} label="Resid. (R)" value={stats.R} />
-        <TotalCard C={C} label="Comerc. (C)" value={stats.C} />
-        <TotalCard C={C} label="Ter. Baldio" value={stats.TB} />
-        <TotalCard C={C} label="Pto. Estrat." value={stats.PE} />
-        <TotalCard C={C} label="Outros" value={stats.O} />
-        <TotalCard C={C} label="Total Geral" value={stats.total} dark />
-      </div>
-      <div style={{ background: C.green, borderRadius: 10 }} className="p-3 flex items-center justify-between text-white">
-        <div className="text-[9px] uppercase tracking-widest font-bold opacity-90">Total Habitantes</div>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>{stats.hab}</div>
-      </div>
-
-      {/* lista imóveis */}
-      <div>
-        <div className="text-[9px] uppercase tracking-widest font-bold mb-2" style={{ color: C.text2 }}>
-          Imóveis cadastrados
-        </div>
-        {properties.length === 0 ? (
-          <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-6 text-center text-sm">
-            Nenhum imóvel cadastrado neste quarteirão.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {properties.map((p, idx) => {
-              const meta = TIPO_META[dbToTipo(p.type)];
-              const seq = String(p.sequence || idx + 1).padStart(3, "0");
-              return (
-                <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3 group">
-                  <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold tabular-nums">{seq}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold truncate" style={{ color: C.text }}>
-                      {p.number} {p.complement ? `· ${p.complement}` : ""} {p.street_name ? `— ${p.street_name}` : ""}
-                    </div>
-                    <div className="text-[10px]" style={{ color: C.text2 }}>
-                      Lado {p.side || "—"} · HAB: {p.inhabitants ?? 0}
-                    </div>
-                  </div>
-                  <span style={{ background: meta.bg, color: meta.fg, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold">
-                    {dbToTipo(p.type)}
-                  </span>
-                  <button
-                    onClick={() => onDeleteProperty(p)}
-                    className="p-1.5 rounded transition-colors"
-                    style={{ color: C.border }}
-                    onMouseEnter={(e) => ((e.currentTarget.style.color = C.red))}
-                    onMouseLeave={(e) => ((e.currentTarget.style.color = C.border))}
-                    aria-label="Excluir"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* form adicionar */}
-      <QuickAddCard C={C} nextSeq={nextSeq} defaultStreet={properties[properties.length - 1]?.street_name || ""} defaultSide={header.lado || ""} onAdd={onAdd} />
     </div>
   );
 }
 
-function TotalCard({ C, label, value, dark }: { C: any; label: string; value: number; dark?: boolean }) {
+function ActionBtn({ onClick, icon, label, bg, fg, disabled }: {
+  onClick: () => void; icon: ReactNode; label: string; bg: string; fg: string; disabled?: boolean;
+}) {
   return (
-    <div
-      style={{
-        background: dark ? C.hdrBg : C.card,
-        border: dark ? "none" : `1px solid ${C.border}`,
-        borderRadius: 10,
-        color: dark ? "#fff" : C.text,
-      }}
-      className="p-3 text-center"
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{ background: bg, color: fg, borderRadius: 10 }}
+      className="h-10 flex items-center justify-center gap-1.5 text-[11px] font-bold disabled:opacity-60"
     >
-      <div style={{ color: dark ? "#fff" : C.text2, opacity: dark ? 0.7 : 1 }} className="text-[9px] uppercase tracking-widest font-bold">{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
-    </div>
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
 
-function QuickAddCard(props: { C: any; nextSeq: number; defaultStreet: string; defaultSide: string; onAdd: (d: any) => Promise<void> }) {
-  const { C, nextSeq, defaultStreet, defaultSide, onAdd } = props;
-  const [street, setStreet] = useState(defaultStreet);
-  const [side, setSide] = useState(defaultSide);
-  const [number, setNumber] = useState("");
-  const [complement, setComplement] = useState("");
-  const [inhabitants, setInhabitants] = useState<number>(0);
-  const [tipo, setTipo] = useState<TipoKey>("R");
+function NewBoletimForm({ onSubmit, onCancel }: {
+  onSubmit: (p: { block_number: string; locality: string }) => Promise<void> | void;
+  onCancel: () => void;
+}) {
+  const [block, setBlock] = useState("");
+  const [locality, setLocality] = useState("");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => { if (defaultStreet && !street) setStreet(defaultStreet); }, [defaultStreet]);
-  useEffect(() => { if (defaultSide && !side) setSide(defaultSide); }, [defaultSide]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!street.trim()) { toast.error("Informe a Rua"); return; }
+    if (!block.trim()) { toast.error("Informe o número do quarteirão"); return; }
     setSaving(true);
     try {
-      await onAdd({
-        number: number || "S/N",
-        complement: complement || null,
-        type: TIPO_META[tipo].dbType,
-        street_name: street,
-        side,
-        sequence: nextSeq,
-        inhabitants,
-      });
-      setNumber(""); setComplement(""); setInhabitants(0);
-    } finally { setSaving(false); }
+      await onSubmit({ block_number: block.trim(), locality: locality.trim() });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <form onSubmit={submit} style={{ border: `1.5px dashed ${C.dash}`, borderRadius: 12, background: C.card }} className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="font-bold text-sm" style={{ color: C.text }}>Novo Imóvel</div>
-        <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-0.5 text-[10px] font-bold">SEQ: {String(nextSeq).padStart(3, "0")}</span>
-      </div>
-
+    <form onSubmit={submit} className="space-y-3">
       <div>
-        <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Rua / Logradouro</Label>
-        <Input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Nome da rua" className="h-10 mt-1" />
+        <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Quarteirão Nº</Label>
+        <Input value={block} onChange={(e) => setBlock(e.target.value)} placeholder="Ex: 05" className="h-10 mt-1" autoFocus />
       </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Lado</Label>
-          <Input value={side} onChange={(e) => setSide(e.target.value)} className="h-10 mt-1" />
-        </div>
-        <div>
-          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Número</Label>
-          <Input value={number} onChange={(e) => setNumber(e.target.value)} inputMode="numeric" className="h-10 mt-1" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Complemento</Label>
-          <Input value={complement} onChange={(e) => setComplement(e.target.value)} className="h-10 mt-1" />
-        </div>
-        <div>
-          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Habitantes</Label>
-          <Input value={inhabitants} onChange={(e) => setInhabitants(parseInt(e.target.value) || 0)} type="number" className="h-10 mt-1" />
-        </div>
-      </div>
-
       <div>
-        <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Tipo</Label>
-        <div className="grid grid-cols-5 gap-2 mt-1">
-          {(Object.keys(TIPO_META) as TipoKey[]).map((k) => {
-            const active = tipo === k;
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setTipo(k)}
-                className="h-10 text-[12px] font-bold rounded-md transition-all"
-                style={{
-                  background: active ? C.blueBg : C.grayBg,
-                  color: active ? C.blue : C.grayTx,
-                  border: active ? `1.5px solid ${C.blueRing}` : "1.5px solid transparent",
-                }}
-              >
-                {k}
-              </button>
-            );
-          })}
-        </div>
+        <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Logradouro / Localidade</Label>
+        <Input value={locality} onChange={(e) => setLocality(e.target.value)} placeholder="Ex: Rua Castro Alves" className="h-10 mt-1" />
       </div>
-
-      <button
-        type="submit"
-        disabled={saving}
-        style={{ background: C.hdrBg, color: "#fff", borderRadius: 10 }}
-        className="w-full h-12 flex items-center justify-center gap-2 text-xs font-bold disabled:opacity-60"
-      >
-        <Plus className="h-4 w-4" /> Adicionar Imóvel
-      </button>
+      <div className="grid grid-cols-2 gap-2 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
+        <Button type="submit" disabled={saving} style={{ background: C.hdrBg, color: "#fff" }}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Criar</>}
+        </Button>
+      </div>
     </form>
-  );
-}
-
-// =================== IMÓVEIS TAB ===================
-function ImoveisTab(props: {
-  C: any;
-  properties: Property[];
-  search: string;
-  setSearch: (v: string) => void;
-  tipoFilter: "ALL" | TipoKey;
-  setTipoFilter: (v: "ALL" | TipoKey) => void;
-  onDelete: (p: Property) => void;
-}) {
-  const { C, properties, search, setSearch, tipoFilter, setTipoFilter, onDelete } = props;
-  const filtered = properties.filter((p) => {
-    const okSearch = !search ||
-      (p.street_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.number || "").toLowerCase().includes(search.toLowerCase());
-    const okTipo = tipoFilter === "ALL" || dbToTipo(p.type) === tipoFilter;
-    return okSearch && okTipo;
-  });
-
-  return (
-    <div className="space-y-3">
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: C.text2 }} />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por endereço ou número" className="pl-9 h-10" />
-        </div>
-        <div className="flex gap-2">
-          {(["ALL", "R", "C", "TB", "PE", "O"] as const).map((k) => {
-            const active = tipoFilter === k;
-            return (
-              <button
-                key={k}
-                onClick={() => setTipoFilter(k)}
-                className={cn("flex-1 h-9 text-[11px] font-bold rounded-md")}
-                style={{
-                  background: active ? C.blueBg : C.grayBg,
-                  color: active ? C.blue : C.grayTx,
-                  border: active ? `1.5px solid ${C.blueRing}` : "1.5px solid transparent",
-                }}
-              >
-                {k === "ALL" ? "Todos" : k}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-6 text-center text-sm">
-          Nenhum imóvel encontrado.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map((p, idx) => {
-            const meta = TIPO_META[dbToTipo(p.type)];
-            const seq = String(p.sequence || idx + 1).padStart(3, "0");
-            return (
-              <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3">
-                <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold tabular-nums">{seq}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate" style={{ color: C.text }}>
-                    {p.number} {p.street_name ? `— ${p.street_name}` : ""}
-                  </div>
-                  <div className="text-[10px]" style={{ color: C.text2 }}>
-                    Lado {p.side || "—"} · HAB: {p.inhabitants ?? 0}
-                  </div>
-                </div>
-                <span style={{ background: meta.bg, color: meta.fg, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold">
-                  {dbToTipo(p.type)}
-                </span>
-                <button onClick={() => onDelete(p)} className="p-1.5 rounded transition-colors" style={{ color: C.border }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = C.red)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = C.border)}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// =================== BOLETIM TAB ===================
-function BoletimTab(props: {
-  C: any;
-  header: any;
-  setHeader: (h: any) => void;
-  properties: Property[];
-  stats: { R: number; C: number; TB: number; PE: number; O: number; total: number; hab: number };
-  onPrint: () => void;
-  onPDF: () => void;
-  onOpenOfficial: () => void;
-}) {
-  const { C, header, setHeader, properties, stats, onPrint, onPDF, onOpenOfficial } = props;
-  const adapted = {
-    residence: stats.R, commerce: stats.C, vacant_lot: stats.TB,
-    strategic_point: stats.PE, others: stats.O, total: stats.total, inhabitants: stats.hab,
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2 no-print">
-        <button onClick={onPrint} style={{ background: C.hdrBg, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
-          <Printer className="h-4 w-4" /> Imprimir
-        </button>
-        <button onClick={onPDF} style={{ background: C.green, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
-          <Download className="h-4 w-4" /> Baixar PDF
-        </button>
-        <button onClick={onOpenOfficial} style={{ background: C.blue, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
-          <Eye className="h-4 w-4" /> BRG Oficial
-        </button>
-      </div>
-
-      <div className="rounded-md overflow-hidden bg-white border" style={{ borderColor: C.border }}>
-        <RGBulletinHeader data={header} onChange={(f, v) => setHeader({ ...header, [f]: v })} />
-        <div className="overflow-x-auto">
-          <RGBulletinTable properties={properties} onEdit={() => {}} onDelete={() => {}} />
-        </div>
-        <RGBulletinFooter stats={adapted} />
-      </div>
-
-      <style>{`@media print { .no-print { display: none !important; } header, nav { display: none !important; } }`}</style>
-    </div>
-  );
-}
-
-// =================== HISTÓRICO TAB ===================
-function HistoricoTab(props: { C: any; files: any[]; onOpen: (name: string) => void; onShare: (name: string) => void }) {
-  const { C, files, onOpen, onShare } = props;
-  if (!files.length) {
-    return (
-      <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-8 text-center text-sm">
-        Nenhum boletim arquivado ainda.
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      {files.map((f, i) => (
-        <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3">
-          <div style={{ background: C.blueBg, borderRadius: 8 }} className="h-10 w-10 flex items-center justify-center">
-            <FileText className="h-5 w-5" style={{ color: C.blue }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold truncate" style={{ color: C.text }}>{f.name}</div>
-            <div className="text-[10px]" style={{ color: C.text2 }}>
-              {f.created_at ? format(new Date(f.created_at), "dd/MM/yyyy HH:mm") : "—"}
-            </div>
-          </div>
-          <button onClick={() => onShare(f.name)} className="p-2 rounded" style={{ color: C.green }} aria-label="Compartilhar">
-            <Share2 className="h-4 w-4" />
-          </button>
-          <button onClick={() => onOpen(f.name)} className="p-2 rounded" style={{ color: C.blue }} aria-label="Visualizar">
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      ))}
-    </div>
   );
 }
