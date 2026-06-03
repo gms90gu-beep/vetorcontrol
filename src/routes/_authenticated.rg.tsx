@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,10 +67,20 @@ export const Route = createFileRoute("/_authenticated/rg")({
         </div>
       }
     >
-      <RGPage />
+      <RGRouteContent />
     </ErrorBoundary>
   ),
 });
+
+function RGRouteContent() {
+  const location = useLocation();
+
+  if (location.pathname.startsWith("/rg/boletim/")) {
+    return <Outlet />;
+  }
+
+  return <RGPage />;
+}
 
 type Boletim = {
   id: string;
