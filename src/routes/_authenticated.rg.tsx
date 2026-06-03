@@ -20,7 +20,8 @@ import {
   AlertCircle,
   ArrowLeft,
   X,
-  Edit2
+  Edit2,
+  Eye
 } from "lucide-react";
 import { generateRGPDF, uploadBlockPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
