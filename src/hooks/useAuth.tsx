@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
@@ -62,6 +62,7 @@ async function getRoleForUser(userId: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const lastAuthUserIdRef = useRef<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return;
       setSession(nextAuthState.session);
       setUser(nextAuthState.user);
+      lastAuthUserIdRef.current = nextAuthState.user?.id ?? null;
       setIsReady(true);
     });
 
@@ -115,17 +117,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.debug("[Auth] Evento de autenticação:", event, nextSession?.user?.email ?? "sem usuário");
       if (!isMounted) return;
 
+      const nextUser = nextSession?.user ?? null;
+      const previousUserId = lastAuthUserIdRef.current;
+      const nextUserId = nextUser?.id ?? null;
+
       setSession(nextSession);
-      setUser(nextSession?.user ?? null);
+      setUser(nextUser);
+      lastAuthUserIdRef.current = nextUserId;
       setIsReady(true);
 
-      if (!nextSession?.user) {
+      if (!nextUser) {
         setRole(null);
         setIsRoleLoading(false);
       }
 
-      router.invalidate();
-      queryClient.invalidateQueries();
+      if (event !== "INITIAL_SESSION" && previousUserId !== nextUserId) {
+        router.invalidate();
+        queryClient.invalidateQueries();
+      }
     });
 
     return () => {
