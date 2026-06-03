@@ -34,6 +34,7 @@ import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
+import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
 import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
 
 const SignupRoute = SignupRouteImport.update({
@@ -165,6 +166,11 @@ const AuthenticatedPropertyPropertyIdRoute =
     path: '/property/$propertyId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedRgEditarIdRoute = AuthenticatedRgEditarIdRouteImport.update({
+  id: '/editar/$id',
+  path: '/editar/$id',
+  getParentRoute: () => AuthenticatedRgRoute,
+} as any)
 const AuthenticatedRgBoletimIdRoute =
   AuthenticatedRgBoletimIdRouteImport.update({
     id: '/boletim/$id',
@@ -198,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
+  '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
 export interface FileRoutesByTo {
   '/admin-master': typeof AdminMasterRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
+  '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
+  '/_authenticated/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -283,6 +292,7 @@ export interface FileRouteTypes {
     | '/vehicles'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
+    | '/rg/editar/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/admin-master'
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
+    | '/rg/editar/$id'
   id:
     | '__root__'
     | '/_authenticated'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
+    | '/_authenticated/rg/editar/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -527,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPropertyPropertyIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/rg/editar/$id': {
+      id: '/_authenticated/rg/editar/$id'
+      path: '/editar/$id'
+      fullPath: '/rg/editar/$id'
+      preLoaderRoute: typeof AuthenticatedRgEditarIdRouteImport
+      parentRoute: typeof AuthenticatedRgRoute
+    }
     '/_authenticated/rg/boletim/$id': {
       id: '/_authenticated/rg/boletim/$id'
       path: '/boletim/$id'
@@ -539,10 +558,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRgRouteChildren {
   AuthenticatedRgBoletimIdRoute: typeof AuthenticatedRgBoletimIdRoute
+  AuthenticatedRgEditarIdRoute: typeof AuthenticatedRgEditarIdRoute
 }
 
 const AuthenticatedRgRouteChildren: AuthenticatedRgRouteChildren = {
   AuthenticatedRgBoletimIdRoute: AuthenticatedRgBoletimIdRoute,
+  AuthenticatedRgEditarIdRoute: AuthenticatedRgEditarIdRoute,
 }
 
 const AuthenticatedRgRouteWithChildren = AuthenticatedRgRoute._addFileChildren(

@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
   component: EditarBoletim,
 });
 
-type PropertyType = "residence" | "commerce" | "vacant_lot" | "strategic_point" | "other";
+type PropertyType = "residence" | "commerce" | "vacant_lot" | "strategic_point" | "others";
 
 type Imovel = {
   id?: string;
@@ -313,7 +313,7 @@ function EditarBoletim() {
                       <option value="commerce">Comércio</option>
                       <option value="vacant_lot">Terreno Baldio</option>
                       <option value="strategic_point">Ponto Estratégico</option>
-                      <option value="other">Outro</option>
+                      <option value="others">Outro</option>
                     </select>
                   </div>
                   <div className="flex items-end gap-2">
