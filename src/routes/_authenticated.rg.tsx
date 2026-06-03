@@ -539,9 +539,27 @@ function RGPage() {
                       </SelectContent>
                     </Select>
                     {blockFilter !== "all" && (
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100" onClick={() => setIsDeleteDialogOpen(true)} title="Excluir este quarteirão">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 bg-slate-50 border border-slate-100"
+                          title="Visualizar BRG oficial (FA-D-05)"
+                          onClick={() => {
+                            const blockId = filteredProperties.find(p => p.block_id)?.block_id;
+                            if (!blockId) {
+                              toast.error("Quarteirão sem id vinculado. Cadastre ao menos um imóvel.");
+                              return;
+                            }
+                            navigate({ to: "/rg/boletim/$id", params: { id: blockId } });
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100" onClick={() => setIsDeleteDialogOpen(true)} title="Excluir este quarteirão">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
