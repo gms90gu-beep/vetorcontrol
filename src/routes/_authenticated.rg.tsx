@@ -75,7 +75,10 @@ export const Route = createFileRoute("/_authenticated/rg")({
 function RGRouteContent() {
   const location = useLocation();
 
-  if (location.pathname.startsWith("/rg/boletim/")) {
+  if (
+    location.pathname.startsWith("/rg/boletim/") ||
+    location.pathname.startsWith("/rg/editar/")
+  ) {
     return <Outlet />;
   }
 
