@@ -34,6 +34,7 @@ import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
+import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -164,6 +165,12 @@ const AuthenticatedPropertyPropertyIdRoute =
     path: '/property/$propertyId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedRgBoletimIdRoute =
+  AuthenticatedRgBoletimIdRouteImport.update({
+    id: '/boletim/$id',
+    path: '/boletim/$id',
+    getParentRoute: () => AuthenticatedRgRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -184,12 +191,13 @@ export interface FileRoutesByFullPath {
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/rg': typeof AuthenticatedRgRoute
+  '/rg': typeof AuthenticatedRgRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
 }
 export interface FileRoutesByTo {
   '/admin-master': typeof AdminMasterRoute
@@ -209,13 +217,14 @@ export interface FileRoutesByTo {
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/rg': typeof AuthenticatedRgRoute
+  '/rg': typeof AuthenticatedRgRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/': typeof AuthenticatedIndexRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -237,13 +246,14 @@ export interface FileRoutesById {
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
-  '/_authenticated/rg': typeof AuthenticatedRgRoute
+  '/_authenticated/rg': typeof AuthenticatedRgRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/supervision': typeof AuthenticatedSupervisionRoute
   '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -272,6 +282,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vehicles'
     | '/property/$propertyId'
+    | '/rg/boletim/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/admin-master'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/vehicles'
     | '/'
     | '/property/$propertyId'
+    | '/rg/boletim/$id'
   id:
     | '__root__'
     | '/_authenticated'
@@ -325,6 +337,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vehicles'
     | '/_authenticated/'
     | '/_authenticated/property/$propertyId'
+    | '/_authenticated/rg/boletim/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -514,8 +527,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPropertyPropertyIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/rg/boletim/$id': {
+      id: '/_authenticated/rg/boletim/$id'
+      path: '/boletim/$id'
+      fullPath: '/rg/boletim/$id'
+      preLoaderRoute: typeof AuthenticatedRgBoletimIdRouteImport
+      parentRoute: typeof AuthenticatedRgRoute
+    }
   }
 }
+
+interface AuthenticatedRgRouteChildren {
+  AuthenticatedRgBoletimIdRoute: typeof AuthenticatedRgBoletimIdRoute
+}
+
+const AuthenticatedRgRouteChildren: AuthenticatedRgRouteChildren = {
+  AuthenticatedRgBoletimIdRoute: AuthenticatedRgBoletimIdRoute,
+}
+
+const AuthenticatedRgRouteWithChildren = AuthenticatedRgRoute._addFileChildren(
+  AuthenticatedRgRouteChildren,
+)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
@@ -529,7 +561,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
-  AuthenticatedRgRoute: typeof AuthenticatedRgRoute
+  AuthenticatedRgRoute: typeof AuthenticatedRgRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSupervisionRoute: typeof AuthenticatedSupervisionRoute
   AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
@@ -550,7 +582,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
-  AuthenticatedRgRoute: AuthenticatedRgRoute,
+  AuthenticatedRgRoute: AuthenticatedRgRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSupervisionRoute: AuthenticatedSupervisionRoute,
   AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
@@ -575,13 +607,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
