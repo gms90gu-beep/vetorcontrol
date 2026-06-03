@@ -63,6 +63,7 @@ function BoletimView() {
   const [loading, setLoading] = useState(true);
   const [boletim, setBoletim] = useState<Boletim | null>(null);
   const [imoveis, setImoveis] = useState<Property[]>([]);
+  const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
 
   useEffect(() => {
     load();
@@ -70,29 +71,44 @@ function BoletimView() {
   }, [id]);
 
   async function load() {
+    console.log("[BRG] ID recebido:", id);
     setLoading(true);
+    setLoadError(null);
     try {
       // The :id can be either a boletim_id or a block_id.
       // Try boletim first; if not found, treat as block_id and find-or-create.
       let b: Boletim | null = null;
 
-      const { data: byBoletim } = await supabase
+      const { data: byBoletim, error: byBoletimErr } = await supabase
         .from("boletins_rg")
         .select("*")
         .eq("id", id)
         .maybeSingle();
 
+      console.log("[BRG] boletins_rg by id:", { data: byBoletim, error: byBoletimErr });
+
+      if (byBoletimErr) {
+        const msg = byBoletimErr.message || "";
+        if (/permission|denied|policy|rls/i.test(msg)) {
+          setLoadError({ kind: "forbidden", message: "Você não possui acesso a este boletim." });
+          return;
+        }
+        throw byBoletimErr;
+      }
+
       if (byBoletim) {
         b = byBoletim as Boletim;
       } else {
         // treat as block_id
-        const { data: byBlock } = await supabase
+        const { data: byBlock, error: byBlockErr } = await supabase
           .from("boletins_rg")
           .select("*")
           .eq("block_id", id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        console.log("[BRG] boletins_rg by block_id:", { data: byBlock, error: byBlockErr });
 
         if (byBlock) {
           b = byBlock as Boletim;
@@ -104,6 +120,11 @@ function BoletimView() {
           const { data: blockRow } = await supabase
             .from("blocks").select("*").eq("id", id).maybeSingle();
 
+          if (!blockRow) {
+            setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
+            return;
+          }
+
           const { data: profile } = await supabase
             .from("profiles").select("full_name, registration_number, city")
             .eq("id", user.id).maybeSingle();
@@ -113,8 +134,8 @@ function BoletimView() {
             .eq("profile_id", user.id).maybeSingle();
 
           const insertPayload = {
-            block_id: blockRow?.id ?? null,
-            block_number: blockRow?.number ?? null,
+            block_id: blockRow.id,
+            block_number: blockRow.number ?? null,
             agent_id: user.id,
             uf: "CE",
             municipality: agentRow?.municipality ?? profile?.city ?? null,
@@ -123,12 +144,22 @@ function BoletimView() {
           };
           const { data: created, error: createErr } = await supabase
             .from("boletins_rg").insert(insertPayload).select().single();
-          if (createErr) throw createErr;
+          console.log("[BRG] create boletim:", { data: created, error: createErr });
+          if (createErr) {
+            if (/permission|denied|policy|rls/i.test(createErr.message)) {
+              setLoadError({ kind: "forbidden", message: "Você não possui acesso para criar este boletim." });
+              return;
+            }
+            throw createErr;
+          }
           b = created as Boletim;
         }
       }
 
-      if (!b) throw new Error("Boletim não encontrado");
+      if (!b) {
+        setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
+        return;
+      }
       setBoletim(b);
 
       // Load properties: prefer boletim_id link; fallback to block_id/block_number
@@ -157,9 +188,11 @@ function BoletimView() {
         props = (data || []) as Property[];
       }
 
+      console.log("[BRG] imóveis carregados:", props.length);
       setImoveis(props);
     } catch (e: any) {
-      toast.error("Erro ao carregar boletim: " + e.message);
+      console.error("[BRG] erro ao carregar:", e);
+      setLoadError({ kind: "generic", message: e?.message || "Erro desconhecido ao carregar boletim." });
     } finally {
       setLoading(false);
     }
@@ -332,11 +365,24 @@ function BoletimView() {
     );
   }
 
-  if (!boletim) {
+  if (loadError || !boletim) {
+    const kind = loadError?.kind ?? "not_found";
+    const title =
+      kind === "forbidden"
+        ? "Você não possui acesso a este boletim."
+        : kind === "not_found"
+          ? "Boletim não encontrado."
+          : "Não foi possível carregar o boletim.";
+    const detail = loadError?.message && kind === "generic" ? loadError.message : null;
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <p className="font-bold text-slate-600">Boletim não encontrado.</p>
-        <Button onClick={() => navigate({ to: "/rg" })}>Voltar para RG</Button>
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center">
+        <p className="font-bold text-slate-700 text-lg">{title}</p>
+        {detail && <p className="text-sm text-slate-500 max-w-md">{detail}</p>}
+        <p className="text-xs text-slate-400">ID: {id}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => load()}>Tentar novamente</Button>
+          <Button onClick={() => navigate({ to: "/rg" })}>Voltar para RG</Button>
+        </div>
       </div>
     );
   }
