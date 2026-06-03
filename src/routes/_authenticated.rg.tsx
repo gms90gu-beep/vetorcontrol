@@ -243,10 +243,17 @@ function RGPage() {
   }
 
   async function handleExportBlockPDF() {
-    if (!currentBlock || blockProperties.length === 0) {
-      toast.error("Selecione um quarteirão com imóveis cadastrados.");
+    console.log("[RG PDF] Gerando PDF do boletim atual", {
+      quarteirao: currentBlock || "(sem quarteirão)",
+      totalImoveis: blockProperties.length,
+      boletimHeader: bulletinHeader,
+    });
+
+    if (blockProperties.length === 0) {
+      toast.error("Este boletim não possui imóveis cadastrados.");
       return;
     }
+
     try {
       toast.loading("Gerando PDF...");
       const agentInfo = {
@@ -255,24 +262,26 @@ function RGPage() {
         registrationId: agent?.registration_id || "MAT-0000",
         cycle: activeCycle?.number || "01/26",
         week: activeWeek?.number?.toString() || "1",
-        block: currentBlock,
+        block: currentBlock || "S/N",
         street: blockProperties[0]?.street_name || "",
       };
       const metadata = {
         total: stats.total, residences: stats.R, commerce: stats.C,
         lots: stats.TB, strategicPoints: stats.PE, others: stats.O, inhabitants: stats.hab,
       };
-      const doc = await generateRGPDF(blockProperties, agentInfo, metadata, { type: "block", value: currentBlock });
-      const fileName = `RG_QTR_${currentBlock}_${(bulletinHeader.municipio || "").toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
+      const blockLabel = currentBlock || "SN";
+      const doc = await generateRGPDF(blockProperties, agentInfo, metadata, { type: "block", value: blockLabel });
+      const fileName = `RG_QTR_${blockLabel}_${(bulletinHeader.municipio || "").toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
       doc.save(fileName);
       try {
-        await uploadBlockPDF(doc, currentBlock, bulletinHeader.municipio);
+        await uploadBlockPDF(doc, blockLabel, bulletinHeader.municipio);
         fetchArchivedPDFs();
         toast.success("PDF gerado e arquivado");
       } catch { toast.info("PDF baixado (sem arquivamento)"); }
       toast.dismiss();
     } catch (e: any) {
       toast.dismiss();
+      console.error("[RG PDF] Erro ao gerar PDF", e);
       toast.error("Erro ao gerar PDF: " + e.message);
     }
   }
