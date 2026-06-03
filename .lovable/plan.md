@@ -1,19 +1,46 @@
-## Situação
+## Redesign /rg — RG Digital
 
-O `src/routes/login.tsx` já contém exatamente a lógica de redirecionamento que você descreveu (linhas 34–52): chama `get_user_role`, lê o role e redireciona para `/admin-master`, `/supervision` ou `/dashboard`.
+Refazer a tela `/rg` seguindo o design system enviado (header escuro #0b1520, cards #111e2e, fundo #f4f5f7, abas brancas, tipografia compacta com labels 8-9px uppercase). **Mantenho 100% das funcionalidades atuais e o schema atual** — só muda a apresentação.
 
-A única diferença é o nome do parâmetro da RPC:
-- Sua mensagem pede: `{ user_id: data.user.id }`
-- O código atual usa: `{ u_id: data.user.id }`
+### Esclarecimento de schema (importante)
+O spec diz "INSERT na tabela `blocks` com logradouro/lado/numero/tipo/habitantes". No banco real:
+- `blocks` = quarteirão (subarea_id, number, status) — **não armazena imóveis individuais**
+- `properties` = imóveis (number, street_name, type, container_count, block_id, user_id…)
 
-A assinatura da função SQL `get_user_role` no banco espera **`u_id`** — foi exatamente isso que corrigimos nas últimas duas rodadas (erro TS2353). Se trocarmos de volta para `user_id`, o build quebra outra vez com o mesmo erro.
+O fluxo atual já usa `properties` corretamente (com RLS por `user_id = auth.uid()`). Vou **manter `properties`** como fonte dos imóveis cadastrados — caso contrário, quebraria boletim, RG, mapa e supervisão. Apenas o visual muda.
 
-## Proposta
+### Escopo das mudanças (somente `src/routes/_authenticated.rg.tsx`)
 
-Duas opções — preciso da sua confirmação antes de aplicar:
+1. **Header escuro** `#0b1520` com:
+   - Linha superior: voltar `←` · "RG Digital" · fechar `✕` (cores `#4a6b80`)
+   - Subtítulo "Ciclo N / Semana N · Quarteirão N · Município – UF"
+   - Grid 3 cards `#111e2e` borda `#1e3048`: Trabalhados / Fechados / Focos (focos em `#f87171`)
 
-**Opção A (recomendada):** Manter `u_id` no `login.tsx`. Nenhuma mudança de código necessária — o comportamento de redirecionamento já é o que você descreveu.
+2. **Tabs brancas** (4): Cadastro · Imóveis (N) · Boletim · Histórico
+   - Aba ativa: texto `#0b1520`, borda inferior 2px `#0b1520`
+   - Inativa: `#aab0bc`
 
-**Opção B:** Renomear o parâmetro da função SQL de `u_id` para `user_id` via migration (`DROP FUNCTION public.get_user_role(uuid); CREATE FUNCTION public.get_user_role(user_id uuid) ...`) e então atualizar `login.tsx` e `admin-master.tsx` para passarem `{ user_id: ... }`. Mais invasivo, mas alinha com o nome que você prefere.
+3. **Aba Cadastro**:
+   - Card identidade (ícone map em quadrado azul `#e6f1fb`)
+   - Grid 2 botões: "PDF Quarteirão" (`#0b1520`) e "Salvar" (`#059669`)
+   - Card "Dados do Quarteirão" (read-only, separadores `#f0f2f4`)
+   - Totalizadores grid 3×2: R / C / TB / PE / O / Total Geral (este último `#0b1520` branco)
+   - Linha "Total Habitantes" `#059669` 20px bold
+   - Lista de imóveis com badge SEQ (001, 002…), badge tipo colorido conforme paleta (R/C/TB/PE/O), lixeira `#e0e4ea` → `#f87171` no hover, confirmação delete
+   - Formulário "Novo Imóvel" com borda tracejada `#c0c8d4`, pills clicáveis de tipo, SEQ automático, mantém Rua/Lado ao limpar
 
-Qual opção devo seguir?
+4. **Aba Imóveis (N)**: busca por endereço + filtro por tipo (pills) + editar/excluir cada item
+
+5. **Aba Boletim**: renderiza componente existente (`RGBulletinHeader` + `RGBulletinTable` + `RGBulletinFooter`) com botões Imprimir (`window.print`) e Baixar PDF (`generateRGPDF`)
+
+6. **Aba Histórico**: lista de PDFs arquivados (já existe `archivedPDFs`) — Data · Quarteirão · total · Visualizar · PDF
+
+### O que NÃO mexo
+- Schema, migrations, RLS, edge functions
+- Componentes `RGBulletinHeader/Table/Footer`, `RGQuickAddForm`, `RGImportByPhoto` continuam disponíveis (uso direto onde aplicável)
+- Lógica de fetch, salvar PDF no storage, boletins_rg
+- Outras rotas, navegação inferior, etc.
+
+### Riscos
+- Arquivo grande (778 linhas) será largamente reescrito; mantendo nomes de state/funções para não quebrar handlers.
+- Cores hex aplicadas inline (style) já que o spec fixa hex exatos — não convertendo para tokens do design system para evitar drift.

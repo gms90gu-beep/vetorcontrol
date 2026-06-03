@@ -2,117 +2,141 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Plus, 
-  Search, 
-  MapPin, 
-  ChevronRight, 
-  History as HistoryIcon,
+import {
+  Plus,
+  Search,
+  Map as MapIcon,
   FileText,
-  Target,
   Printer,
-  Share2,
-  Filter,
   Save,
   Trash2,
-  LayoutDashboard,
-  ClipboardList,
   AlertCircle,
   ArrowLeft,
   X,
-  Edit2,
-  Eye
+  Eye,
+  Download,
+  Share2,
+  ChevronRight,
 } from "lucide-react";
 import { generateRGPDF, uploadBlockPDF } from "@/lib/pdf-generator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useOrientation } from "@/hooks/useOrientation";
 import { RGBulletinHeader } from "@/components/rg/RGBulletinHeader";
 import { RGBulletinTable, type Property } from "@/components/rg/RGBulletinTable";
 import { RGBulletinFooter } from "@/components/rg/RGBulletinFooter";
-import { RGQuickAddForm } from "@/components/rg/RGQuickAddForm";
-import { RGImportByPhoto } from "@/components/rg/RGImportByPhoto";
-import { translate } from "@/lib/translations";
 
-class ErrorBoundary extends Component<{ children: ReactNode, fallback: ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: ReactNode, fallback: ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
+// ===== Design tokens (spec exact hex) =====
+const C = {
+  bg: "#f4f5f7",
+  card: "#ffffff",
+  border: "#e0e4ea",
+  hdrBg: "#0b1520",
+  hdrCard: "#111e2e",
+  hdrBorder: "#1e3048",
+  hdrMute: "#4a6b80",
+  hdrLabel: "#2e4a60",
+  text: "#0b1520",
+  text2: "#8a9ab0",
+  green: "#059669",
+  blue: "#185fa5",
+  blueBg: "#e6f1fb",
+  blueRing: "#3b9ede",
+  red: "#f87171",
+  amber: "#854f0b",
+  amberBg: "#faeeda",
+  purple: "#534ab7",
+  purpleBg: "#eeedfe",
+  grayBg: "#f4f5f7",
+  grayTx: "#5a6a7a",
+  sep: "#f0f2f4",
+  dash: "#c0c8d4",
+  tabInactive: "#aab0bc",
+};
+
+type TipoKey = "R" | "C" | "TB" | "PE" | "O";
+const TIPO_META: Record<TipoKey, { label: string; bg: string; fg: string; dbType: Property["type"] }> = {
+  R: { label: "Residencial", bg: C.blueBg, fg: C.blue, dbType: "residence" },
+  C: { label: "Comercial", bg: C.amberBg, fg: C.amber, dbType: "commerce" },
+  TB: { label: "Terreno Baldio", bg: C.amberBg, fg: C.amber, dbType: "vacant_lot" },
+  PE: { label: "Pto. Estratégico", bg: C.purpleBg, fg: C.purple, dbType: "strategic_point" },
+  O: { label: "Outros", bg: C.grayBg, fg: C.grayTx, dbType: "others" },
+};
+
+function dbToTipo(t?: string | null): TipoKey {
+  const x = (t || "").toLowerCase();
+  if (x === "residence" || x === "residential") return "R";
+  if (x === "commerce" || x === "commercial") return "C";
+  if (x === "vacant_lot") return "TB";
+  if (x === "strategic_point") return "PE";
+  return "O";
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
-  render() {
-    if (this.state.hasError) return this.props.fallback;
-    return this.props.children;
-  }
+  render() { return this.state.hasError ? this.props.fallback : this.props.children; }
 }
 
 export const Route = createFileRoute("/_authenticated/rg")({
   beforeLoad: blockManagersGuard,
   component: () => (
-    <ErrorBoundary fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-        <h2 className="text-xl font-bold mb-4">Erro ao carregar o módulo RG</h2>
-        <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
-      </div>
-    }>
+    <ErrorBoundary
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
+          <h2 className="text-xl font-bold mb-4">Erro ao carregar o módulo RG</h2>
+          <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
+        </div>
+      }
+    >
       <RGPage />
     </ErrorBoundary>
   ),
 });
 
+type TabKey = "cadastro" | "imoveis" | "boletim" | "historico";
 
 function RGPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [blockFilter, setBlockFilter] = useState("all");
+  const navigate = useNavigate();
+
+  const [tab, setTab] = useState<TabKey>("cadastro");
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [archivedPDFs, setArchivedPDFs] = useState<any[]>([]);
-  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [agent, setAgent] = useState<any>(null);
   const [activeCycle, setActiveCycle] = useState<any>(null);
   const [activeWeek, setActiveWeek] = useState<any>(null);
-  const [resetKey, setResetKey] = useState(0);
-  const [isDirty, setIsDirty] = useState(false);
+
   const [bulletinHeader, setBulletinHeader] = useState({
     uf: "CE",
     municipio: "",
     localidade: "",
     distrito: "",
     categoria: "URBANA",
-
     quarteirao: "",
     sequencia: "01",
     lado: "01",
-    agente: ""
+    agente: "",
   });
 
-  const navigate = useNavigate();
-  const isLandscape = useOrientation();
+  // delete confirm dialog
+  const [pendingDelete, setPendingDelete] = useState<Property | null>(null);
+  const [pendingDeleteBlock, setPendingDeleteBlock] = useState(false);
+
+  // tab Imóveis filters
+  const [search, setSearch] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"ALL" | TipoKey>("ALL");
 
   useEffect(() => {
     fetchInitialData();
@@ -121,19 +145,12 @@ function RGPage() {
 
   async function fetchArchivedPDFs() {
     try {
-      const { data, error } = await supabase.storage
-        .from('block-reports')
-        .list('', {
-          limit: 100,
-          offset: 0,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
-
+      const { data, error } = await supabase.storage.from("block-reports").list("", {
+        limit: 100, offset: 0, sortBy: { column: "created_at", order: "desc" },
+      });
       if (error) throw error;
       setArchivedPDFs(data || []);
-    } catch (error: any) {
-      console.error("Erro ao buscar arquivos:", error.message);
-    }
+    } catch (e: any) { console.error(e.message); }
   }
 
   async function fetchInitialData() {
@@ -145,29 +162,16 @@ function RGPage() {
       const { data: agentData } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (agentData) {
         setAgent(agentData);
-        setBulletinHeader(prev => ({
-          ...prev,
-          municipio: agentData.municipality || "",
-          agente: agentData.name || ""
-        }));
+        setBulletinHeader((p) => ({ ...p, municipio: agentData.municipality || "", agente: agentData.name || "" }));
       }
 
       const { data: session } = await supabase
-        .from("field_work_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
+        .from("field_work_sessions").select("*")
+        .eq("user_id", user.id).eq("status", "in_progress")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (session) {
         setActiveSession(session);
-        setBlockFilter(session.block_number || "all");
-        setBulletinHeader(prev => ({
-          ...prev,
-          quarteirao: session.block_number || ""
-        }));
+        setBulletinHeader((p) => ({ ...p, quarteirao: session.block_number || "" }));
       }
 
       const { data: cycle } = await supabase.from("cycles").select("*").eq("status", "in_progress").maybeSingle();
@@ -178,601 +182,686 @@ function RGPage() {
       }
 
       const { data, error } = await supabase
-        .from("properties")
-        .select("*")
+        .from("properties").select("*")
+        .eq("user_id", user.id)
         .order("sequence", { ascending: true })
-        .order("street_name", { ascending: true })
-        .order("number", { ascending: true });
-
+        .order("street_name", { ascending: true });
       if (error) throw error;
       setProperties(data as Property[]);
-    } catch (error: any) {
-      toast.error("Erro ao carregar dados: " + error.message);
+    } catch (e: any) {
+      toast.error("Erro ao carregar dados: " + e.message);
     } finally {
       setIsLoading(false);
     }
   }
 
-  const filteredProperties = useMemo(() => {
-    return properties.filter(p => {
-      const matchesSearch = 
-        (p.number || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.street_name?.toLowerCase() || "").includes(searchTerm.toLowerCase());
-      
-      const matchesBlock = blockFilter === "all" || p.block_number === blockFilter;
-      
-      return matchesSearch && matchesBlock;
-    });
-  }, [properties, searchTerm, blockFilter]);
+  // current quarteirão = bulletinHeader.quarteirao (fallback: empty filter shows all)
+  const currentBlock = bulletinHeader.quarteirao;
+
+  const blockProperties = useMemo(
+    () => properties.filter((p) => !currentBlock || p.block_number === currentBlock),
+    [properties, currentBlock],
+  );
 
   const stats = useMemo(() => {
-    const residence = filteredProperties.filter(p => p.type?.toLowerCase() === 'residence' || p.type?.toLowerCase() === 'residential').length;
-    const commerce = filteredProperties.filter(p => p.type?.toLowerCase() === 'commerce' || p.type?.toLowerCase() === 'commercial').length;
-    const vacant_lot = filteredProperties.filter(p => p.type?.toLowerCase() === 'vacant_lot').length;
-    const strategic_point = filteredProperties.filter(p => p.type?.toLowerCase() === 'strategic_point').length;
-    const others = filteredProperties.filter(p => p.type?.toLowerCase() === 'others').length;
-    const total = filteredProperties.length;
-    const inhabitants = filteredProperties.reduce((sum, p) => sum + (p.inhabitants || 0), 0);
-    
-    return {
-      residence,
-      commerce,
-      vacant_lot,
-      strategic_point,
-      others,
-      total,
-      inhabitants
-    };
-  }, [filteredProperties]);
-
-  const handleHeaderChange = (field: string, value: string) => {
-    setBulletinHeader(prev => ({ ...prev, [field]: value }));
-    setIsDirty(true);
-    if (field === 'quarteirao' && value) {
-      setBlockFilter(value);
+    const c = { R: 0, C: 0, TB: 0, PE: 0, O: 0, total: 0, hab: 0 };
+    for (const p of blockProperties) {
+      c[dbToTipo(p.type)]++;
+      c.total++;
+      c.hab += p.inhabitants || 0;
     }
+    return c;
+  }, [blockProperties]);
+
+  // session stats (placeholder — derived from session if present)
+  const sessionStats = {
+    trabalhados: activeSession?.properties_worked ?? blockProperties.length,
+    fechados: activeSession?.properties_closed ?? 0,
+    focos: activeSession?.foci_found ?? 0,
   };
 
-  const handleResetForm = () => {
-    setBulletinHeader({
-      uf: "CE",
-      municipio: agent?.municipality || "",
-      localidade: "",
-      distrito: "",
-
-      categoria: "URBANA",
-      quarteirao: activeSession?.block_number || "",
-      sequencia: "01",
-      lado: "01",
-      agente: agent?.name || ""
-    });
-    setSearchTerm("");
-    setBlockFilter("all");
-    setResetKey(prev => prev + 1);
-    toast.info("Campos do formulário limpos");
-  };
-
-  const handleQuickAdd = async (data: any) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const propertyToSave = {
-        ...data,
-        block_number: bulletinHeader.quarteirao,
-        user_id: user.id,
-        status: "active"
-      };
-
-      const { data: saved, error } = await supabase
-        .from("properties")
-        .insert(propertyToSave)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      setProperties(prev => [...prev, saved as Property]);
-      toast.success("Imóvel adicionado!");
-    } catch (error: any) {
-      toast.error("Erro ao adicionar: " + error.message);
-    }
-  };
-
-  const handleDeleteProperty = async (id: string) => {
+  // ====== handlers ======
+  async function handleDeleteProperty(id: string) {
     try {
       const { error } = await supabase.from("properties").delete().eq("id", id);
       if (error) throw error;
-      setProperties(prev => prev.filter(p => p.id !== id));
+      setProperties((p) => p.filter((x) => x.id !== id));
       toast.success("Imóvel removido");
-    } catch (error: any) {
-      toast.error("Erro ao remover: " + error.message);
-    }
-  };
+    } catch (e: any) { toast.error("Erro: " + e.message); }
+  }
 
-  const handleDeleteBlock = async () => {
-    if (blockFilter === "all") return;
-    
+  async function handleSaveHeader() {
     try {
-      setIsLoading(true);
-      setIsDeleteDialogOpen(false);
-      
-      const blockToDelete = properties.find(p => p.block_number === blockFilter);
-      
-      const { error: propError } = await supabase
-        .from("properties")
-        .delete()
-        .eq("block_number", blockFilter);
-
-      if (propError) throw propError;
-
-      if (blockToDelete?.block_id) {
-        await supabase.from("blocks").delete().eq("id", blockToDelete.block_id);
-      } else {
-        await supabase.from("blocks").delete().eq("number", blockFilter);
-      }
-      
-      if (activeSession && activeSession.block_number === blockFilter) {
-        await supabase.from("field_work_sessions").update({ block_number: "" }).eq("id", activeSession.id);
-      }
-      
-      toast.success(`Quarteirão ${blockFilter} e seus imóveis foram excluídos.`);
-      setProperties(prev => prev.filter(p => p.block_number !== blockFilter));
-      setBlockFilter("all");
-      if (bulletinHeader.quarteirao === blockFilter) {
-        setBulletinHeader(prev => ({ ...prev, quarteirao: "" }));
-      }
-    } catch (error: any) {
-      toast.error("Erro ao excluir quarteirão: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveHeader = async () => {
-    try {
-      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
-
-      const { error } = await supabase
-        .from("agents")
-        .update({
-          municipality: bulletinHeader.municipio,
-          name: bulletinHeader.agente
-        })
+      const { error } = await supabase.from("agents")
+        .update({ municipality: bulletinHeader.municipio, name: bulletinHeader.agente })
         .eq("profile_id", user.id);
-
       if (error) throw error;
-      setIsDirty(false);
-      toast.success("Cabeçalho salvo com sucesso!");
-    } catch (error: any) {
-      toast.error("Erro ao salvar cabeçalho: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      toast.success("Cabeçalho salvo");
+    } catch (e: any) { toast.error("Erro: " + e.message); }
+  }
 
-  const handleExportBlockPDF = async () => {
-    if (blockFilter === 'all' && filteredProperties.length === 0) {
-      toast.error("Selecione um quarteirão ou certifique-se que há imóveis listados.");
+  async function handleExportBlockPDF() {
+    if (!currentBlock || blockProperties.length === 0) {
+      toast.error("Selecione um quarteirão com imóveis cadastrados.");
       return;
     }
-
     try {
-      toast.loading("Gerando PDF do Quarteirão...");
-      const blockValue = blockFilter === 'all' ? bulletinHeader.quarteirao : blockFilter;
-      
+      toast.loading("Gerando PDF...");
       const agentInfo = {
         municipality: bulletinHeader.municipio,
         name: bulletinHeader.agente,
         registrationId: agent?.registration_id || "MAT-0000",
         cycle: activeCycle?.number || "01/26",
         week: activeWeek?.number?.toString() || "1",
-        block: blockValue,
-        street: filteredProperties[0]?.street_name || ""
+        block: currentBlock,
+        street: blockProperties[0]?.street_name || "",
       };
-
       const metadata = {
-        total: stats.total,
-        residences: stats.residence,
-        commerce: stats.commerce,
-        lots: stats.vacant_lot,
-        strategicPoints: stats.strategic_point,
-        others: stats.others,
-        inhabitants: stats.inhabitants
+        total: stats.total, residences: stats.R, commerce: stats.C,
+        lots: stats.TB, strategicPoints: stats.PE, others: stats.O, inhabitants: stats.hab,
       };
-
-      const doc = await generateRGPDF(filteredProperties, agentInfo, metadata, { type: 'block', value: blockValue });
-      const fileName = `RG_QTR_${blockValue}_${bulletinHeader.municipio.toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
+      const doc = await generateRGPDF(blockProperties, agentInfo, metadata, { type: "block", value: currentBlock });
+      const fileName = `RG_QTR_${currentBlock}_${(bulletinHeader.municipio || "").toUpperCase()}_${format(new Date(), "yyyyMMdd_HHmm")}.pdf`;
       doc.save(fileName);
-      
       try {
-        await uploadBlockPDF(doc, blockValue, bulletinHeader.municipio);
-        toast.success("PDF gerado e arquivado com sucesso!");
+        await uploadBlockPDF(doc, currentBlock, bulletinHeader.municipio);
         fetchArchivedPDFs();
-      } catch (uploadError) {
-        console.error("Erro ao fazer upload:", uploadError);
-        toast.info("PDF baixado, mas não foi possível salvar no arquivo digital.");
-      }
-      
+        toast.success("PDF gerado e arquivado");
+      } catch { toast.info("PDF baixado (sem arquivamento)"); }
       toast.dismiss();
-    } catch (error: any) {
+    } catch (e: any) {
       toast.dismiss();
-      toast.error("Erro ao gerar PDF: " + error.message);
+      toast.error("Erro ao gerar PDF: " + e.message);
     }
-  };
+  }
 
-  const handleShareOnWhatsApp = (fileName: string) => {
-    toast.info("Link de compartilhamento gerado. Abra o WhatsApp para enviar.");
-    const text = encodeURIComponent(`Segue o Boletim Digital do Quarteirão. Arquivo: ${fileName}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-  };
-
-  const handleBack = () => {
-    if (isDirty) {
-      if (confirm("Deseja sair sem salvar as alterações do boletim?")) {
-        navigate({ to: "/dashboard" });
-      }
-    } else {
-      window.history.back();
-    }
-  };
-
-  const handleClose = () => {
-    if (isDirty) {
-      if (confirm("Deseja sair sem salvar as alterações do boletim?")) {
-        navigate({ to: "/dashboard" });
-      }
-    } else {
-      navigate({ to: "/dashboard" });
-    }
-  };
-
-  const handlePropertyClick = (property: Property) => {
-    setEditingProperty(property);
-    setIsFormOpen(true);
-  };
-
-  const handleSaveProperty = (savedProperty: Property) => {
-    if (editingProperty) {
-      setProperties(properties.map(p => p.id === savedProperty.id ? savedProperty : p));
-    } else {
-      setProperties([...properties, savedProperty]);
-    }
-    setIsFormOpen(false);
-    setEditingProperty(null);
-  };
+  function handleBack() { window.history.back(); }
+  function handleClose() { navigate({ to: "/dashboard" }); }
 
   return (
-    <div className="flex flex-col bg-slate-100 dark:bg-slate-950 min-h-screen pb-24 lg:pb-8">
-      <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm pt-[env(safe-area-inset-top)]">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all rounded-xl h-9" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Voltar</span>
-          </Button>
-          <div className="flex flex-col items-center">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 dark:text-white">Boletim Digital</h2>
-            <div className="h-1 w-6 bg-emerald-500 rounded-full mt-1" />
+    <div className="min-h-screen pb-24" style={{ background: C.bg }}>
+      {/* ============ HEADER ESCURO ============ */}
+      <header style={{ background: C.hdrBg, padding: "14px" }} className="sticky top-0 z-40 pt-[calc(14px+env(safe-area-inset-top))]">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center justify-between">
+            <button onClick={handleBack} style={{ color: C.hdrMute }} className="p-1 -ml-1 hover:opacity-80" aria-label="Voltar">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-white" style={{ fontSize: "15px", fontWeight: 700 }}>RG Digital</h1>
+            <button onClick={handleClose} style={{ color: C.hdrMute }} className="p-1 -mr-1 hover:opacity-80" aria-label="Fechar">
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <Button variant="ghost" size="sm" className="gap-2 font-black text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-red-500 transition-all rounded-xl h-9" onClick={handleClose}>
-            <span className="hidden sm:inline">Fechar</span>
-            <X className="h-4 w-4" />
-          </Button>
+
+          <p className="text-center mt-1" style={{ color: C.hdrMute, fontSize: "9px" }}>
+            Ciclo {activeCycle?.number ?? 1} / Semana {activeWeek?.number ?? 1}
+            {currentBlock ? ` · Quarteirão ${currentBlock}` : ""}
+            {bulletinHeader.municipio ? ` · ${bulletinHeader.municipio}` : ""}
+            {bulletinHeader.uf ? ` – ${bulletinHeader.uf}` : ""}
+          </p>
+
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {[
+              { lbl: "Trabalhados", val: sessionStats.trabalhados, color: "#fff" },
+              { lbl: "Fechados", val: sessionStats.fechados, color: "#fff" },
+              { lbl: "Focos (+)", val: sessionStats.focos, color: C.red },
+            ].map((s) => (
+              <div key={s.lbl} style={{ background: C.hdrCard, border: `1px solid ${C.hdrBorder}`, borderRadius: 7 }} className="px-3 py-2.5 text-center">
+                <div style={{ color: C.hdrLabel, fontSize: "8px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.lbl}</div>
+                <div style={{ color: s.color, fontSize: "20px", fontWeight: 800, lineHeight: 1.1, marginTop: 2 }}>{s.val}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </header>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 pt-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
-              <ClipboardList className="h-5 w-5 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-900 uppercase">RG Digital</h1>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reconhecimento Geográfico</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[280px]">
-            <div className="flex items-center gap-2 w-full">
-              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={handleExportBlockPDF}>
-                <Printer className="h-4 w-4 text-emerald-600" />
-                PDF Quarteirão
-              </Button>
-              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={handleSaveHeader}>
-                <Save className="h-4 w-4 text-blue-600" />
-                Salvar
-              </Button>
-              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={() => navigate({ to: '/field-work-list' })}>
-                <HistoryIcon className="h-4 w-4 text-slate-400" />
-                Histórico
-              </Button>
-              <Button variant="outline" className="flex-1 h-11 rounded-xl bg-white border-none shadow-sm font-black text-[10px] uppercase tracking-widest gap-2" onClick={() => setIsArchiveOpen(true)}>
-                <FileText className="h-4 w-4 text-orange-500" />
-                Arquivos
-              </Button>
-            </div>
-          </div>
+      {/* ============ TABS ============ */}
+      <nav style={{ background: C.card, borderBottom: `1px solid ${C.border}` }} className="sticky z-30" >
+        <div className="max-w-3xl mx-auto flex">
+          {([
+            ["cadastro", "Cadastro"],
+            ["imoveis", `Imóveis (${blockProperties.length})`],
+            ["boletim", "Boletim"],
+            ["historico", "Histórico"],
+          ] as [TabKey, string][]).map(([k, lbl]) => {
+            const active = tab === k;
+            return (
+              <button
+                key={k}
+                onClick={() => setTab(k)}
+                className="flex-1 py-3 text-xs font-bold transition-colors"
+                style={{
+                  color: active ? C.text : C.tabInactive,
+                  borderBottom: active ? `2px solid ${C.text}` : "2px solid transparent",
+                }}
+              >
+                {lbl}
+              </button>
+            );
+          })}
         </div>
+      </nav>
 
-        <div className="px-4 space-y-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
-            </div>
-          ) : (
-            <Card className="border-none shadow-2xl rounded-sm overflow-hidden border border-slate-300">
-              <RGBulletinHeader data={bulletinHeader} onChange={handleHeaderChange} />
-              <div className="p-0 overflow-x-auto">
-                <RGBulletinTable properties={filteredProperties} onEdit={handlePropertyClick} onDelete={handleDeleteProperty} />
-              </div>
-              <RGBulletinFooter stats={stats} />
-            </Card>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-            <div className="lg:col-span-1">
-              <RGQuickAddForm key={resetKey} onAdd={handleQuickAdd} lastSequence={filteredProperties.length > 0 ? (filteredProperties[filteredProperties.length - 1].sequence || filteredProperties.length) : 0} defaultStreet={filteredProperties.length > 0 ? filteredProperties[filteredProperties.length - 1].street_name || "" : activeSession?.street_name || ""} defaultSide={bulletinHeader.lado} />
-            </div>
-            <div className="lg:col-span-2 flex flex-col gap-4">
-              <Card className="border-none shadow-xl bg-white rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Filtrar Território</h3>
-                  <Filter className="h-4 w-4 text-slate-400" />
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-[200px] relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <Input placeholder="Buscar por rua ou número..." className="pl-10 h-10 rounded-xl border-slate-100 bg-slate-50 font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Select value={blockFilter} onValueChange={setBlockFilter}>
-                      <SelectTrigger className="w-[150px] h-10 rounded-xl border-slate-100 bg-slate-50 font-bold">
-                        <SelectValue placeholder="Quarteirão" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-2xl">
-                        <SelectItem value="all">Todos Qtrs</SelectItem>
-                        {Array.from(new Set(properties.map(p => p.block_number))).filter(Boolean).map(block => (
-                          <SelectItem key={block} value={block!}>Qtr {block}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {blockFilter !== "all" && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10 rounded-xl text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 bg-slate-50 border border-slate-100"
-                          title="Visualizar BRG oficial (FA-D-05)"
-                          onClick={() => {
-                            const blockId = filteredProperties.find(p => p.block_id)?.block_id;
-                            if (!blockId) {
-                              toast.error("Quarteirão sem id vinculado. Cadastre ao menos um imóvel.");
-                              return;
-                            }
-                            navigate({ to: "/rg/boletim/$id", params: { id: blockId } });
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100" onClick={() => setIsDeleteDialogOpen(true)} title="Excluir este quarteirão">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </Card>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Residencial</p>
-                  <p className="text-2xl font-black text-blue-600">{stats.residence}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Comercial</p>
-                  <p className="text-2xl font-black text-purple-600">{stats.commerce}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">T. Baldio</p>
-                  <p className="text-2xl font-black text-amber-600">{stats.vacant_lot}</p>
-                </div>
-                <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-50">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">P. Estratégico</p>
-                  <p className="text-2xl font-black text-emerald-600">{stats.strategic_point}</p>
-                </div>
-              </div>
-            </div>
+      <main className="max-w-3xl mx-auto p-[14px]">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: C.text }} />
           </div>
-        </div>
+        ) : (
+          <>
+            {tab === "cadastro" && (
+              <CadastroTab
+                C={C}
+                header={bulletinHeader}
+                setHeader={setBulletinHeader}
+                properties={blockProperties}
+                stats={stats}
+                onExportPDF={handleExportBlockPDF}
+                onSaveHeader={handleSaveHeader}
+                onDeleteProperty={(p) => setPendingDelete(p)}
+                onAdd={async (data) => {
+                  try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) throw new Error("Não autenticado");
+                    const payload = {
+                      ...data,
+                      block_number: bulletinHeader.quarteirao,
+                      user_id: user.id,
+                      status: "active" as const,
+                    };
+                    const { data: saved, error } = await supabase.from("properties").insert(payload).select().single();
+                    if (error) throw error;
+                    setProperties((p) => [...p, saved as Property]);
+                    toast.success("Imóvel adicionado");
+                  } catch (e: any) { toast.error("Erro: " + e.message); }
+                }}
+              />
+            )}
 
-        <Dialog open={isArchiveOpen} onOpenChange={setIsArchiveOpen}>
-          <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                <FileText className="h-6 w-6 text-orange-500" />
-                Arquivo de Quarteirões
-              </DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="h-[50vh] pr-4">
-              <div className="space-y-3 py-4">
-                {archivedPDFs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 text-slate-400">
-                    <FileText className="h-8 w-8 mb-2 opacity-20" />
-                    <p className="font-bold uppercase text-[10px]">Nenhum PDF arquivado.</p>
-                  </div>
-                ) : (
-                  archivedPDFs.map((pdf, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-orange-600" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-slate-900 truncate max-w-[200px] sm:max-w-xs">{pdf.name}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {format(new Date(pdf.created_at), "dd/MM/yyyy HH:mm")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-emerald-600 hover:bg-emerald-50" onClick={() => handleShareOnWhatsApp(pdf.name)}>
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-blue-600 hover:bg-blue-50" onClick={async () => {
-                          const { data } = await supabase.storage.from('block-reports').createSignedUrl(pdf.name, 60);
-                          if (data?.signedUrl) window.open(data.signedUrl, '_blank');
-                        }}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
+            {tab === "imoveis" && (
+              <ImoveisTab
+                C={C}
+                properties={blockProperties}
+                search={search}
+                setSearch={setSearch}
+                tipoFilter={tipoFilter}
+                setTipoFilter={setTipoFilter}
+                onDelete={(p) => setPendingDelete(p)}
+              />
+            )}
 
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="rounded-3xl border-none shadow-2xl max-w-[90vw] sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                <AlertCircle className="h-6 w-6 text-red-500" />
-                Confirmar Exclusão
-              </DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <p className="text-slate-600 font-bold leading-relaxed">
-                Tem certeza que deseja excluir o <span className="text-red-600">Quarteirão {blockFilter}</span>? 
-                Esta ação não pode ser desfeita e todos os {filteredProperties.length} imóveis vinculados serão removidos.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button variant="outline" className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest border-slate-200" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
-                <Button className="flex-1 h-12 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black uppercase text-[10px] tracking-widest gap-2" onClick={handleDeleteBlock}>
-                  <Trash2 className="h-4 w-4" /> Sim, Excluir e Salvar
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            {tab === "boletim" && (
+              <BoletimTab
+                C={C}
+                header={bulletinHeader}
+                setHeader={setBulletinHeader}
+                properties={blockProperties}
+                stats={stats}
+                onPrint={() => window.print()}
+                onPDF={handleExportBlockPDF}
+                onOpenOfficial={() => {
+                  const blockId = blockProperties.find((p) => p.block_id)?.block_id;
+                  if (!blockId) { toast.error("Cadastre ao menos um imóvel."); return; }
+                  navigate({ to: "/rg/boletim/$id", params: { id: blockId } });
+                }}
+              />
+            )}
 
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="sm:max-w-[425px] rounded-[2.5rem] border-none shadow-2xl overflow-hidden p-0">
-            <div className="bg-slate-900 p-8 text-white relative">
-              <div className="absolute top-0 right-0 p-8 opacity-10"><HistoryIcon className="h-24 w-24" /></div>
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-black tracking-tighter">{editingProperty ? `Imóvel ${editingProperty.number}` : "Novo Imóvel"}</DialogTitle>
-                <p className="text-slate-400 text-xs font-medium uppercase tracking-widest">{editingProperty ? "Atualizar Cadastro" : "Cadastro de Território"}</p>
-              </DialogHeader>
-            </div>
-            <ScrollArea className="max-h-[60vh] p-6">
-              <PropertyForm initialData={editingProperty} onSave={handleSaveProperty} onCancel={() => setIsFormOpen(false)} />
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-      </div>
+            {tab === "historico" && (
+              <HistoricoTab
+                C={C}
+                files={archivedPDFs}
+                onOpen={async (name) => {
+                  const { data } = await supabase.storage.from("block-reports").createSignedUrl(name, 60);
+                  if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                }}
+                onShare={(name) => {
+                  const text = encodeURIComponent(`Boletim Digital. Arquivo: ${name}`);
+                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                }}
+              />
+            )}
+          </>
+        )}
+      </main>
+
+      {/* delete property dialog */}
+      <Dialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base" style={{ color: C.text }}>
+              <AlertCircle className="h-5 w-5" style={{ color: C.red }} /> Excluir imóvel?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: C.text2 }}>
+            Esta ação não pode ser desfeita.
+            {pendingDelete && <> Imóvel <strong>{pendingDelete.number}</strong> {pendingDelete.street_name ? `(${pendingDelete.street_name})` : ""}.</>}
+          </p>
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>Cancelar</Button>
+            <Button
+              onClick={async () => { if (pendingDelete) { await handleDeleteProperty(pendingDelete.id); setPendingDelete(null); } }}
+              style={{ background: C.red, color: "#fff" }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PropertyForm({ initialData, onSave, onCancel }: { initialData: Property | null, onSave: (p: Property) => void, onCancel: () => void }) {
-  const [formData, setFormData] = useState<Partial<Property>>(initialData || {
-    number: "",
-    complement: "",
-    type: "residence",
-    street_name: "",
-    side: "01",
-    sequence: 1,
-    inhabitants: 0,
-    status: "active"
+// =================== CADASTRO TAB ===================
+function CadastroTab(props: {
+  C: typeof C;
+  header: any;
+  setHeader: (h: any) => void;
+  properties: Property[];
+  stats: { R: number; C: number; TB: number; PE: number; O: number; total: number; hab: number };
+  onExportPDF: () => void;
+  onSaveHeader: () => void;
+  onDeleteProperty: (p: Property) => void;
+  onAdd: (data: any) => Promise<void>;
+}) {
+  const { C, header, setHeader, properties, stats, onExportPDF, onSaveHeader, onDeleteProperty, onAdd } = props;
+  const nextSeq = (properties.reduce((m, p) => Math.max(m, p.sequence || 0), 0) || properties.length) + 1;
+
+  return (
+    <div className="space-y-4">
+      {/* identidade card */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="p-4 flex items-center gap-3">
+        <div style={{ background: C.blueBg, borderRadius: 10 }} className="h-11 w-11 flex items-center justify-center">
+          <MapIcon className="h-5 w-5" style={{ color: C.blue }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-[15px]" style={{ color: C.text }}>RG Digital</div>
+          <div className="text-[9px] uppercase tracking-widest" style={{ color: C.text2 }}>Reconhecimento Geográfico</div>
+        </div>
+      </div>
+
+      {/* ações */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={onExportPDF} style={{ background: C.hdrBg, color: "#fff", borderRadius: 12 }} className="h-12 flex items-center justify-center gap-2 text-xs font-bold">
+          <FileText className="h-4 w-4" /> PDF Quarteirão
+        </button>
+        <button onClick={onSaveHeader} style={{ background: C.green, color: "#fff", borderRadius: 12 }} className="h-12 flex items-center justify-center gap-2 text-xs font-bold">
+          <Save className="h-4 w-4" /> Salvar
+        </button>
+      </div>
+
+      {/* dados do quarteirão (editáveis) */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14 }} className="overflow-hidden">
+        <div className="px-4 py-3 text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2, borderBottom: `1px solid ${C.sep}` }}>
+          Dados do Quarteirão
+        </div>
+        {[
+          ["UF", "uf"], ["Município", "municipio"], ["Localidade", "localidade"],
+          ["Distrito", "distrito"], ["Categoria", "categoria"],
+          ["Quarteirão Nº", "quarteirao"], ["Sequência", "sequencia"], ["Lado", "lado"],
+        ].map(([lbl, key], i, arr) => (
+          <div key={key} className="flex items-center px-4 py-2.5" style={{ borderBottom: i < arr.length - 1 ? `0.5px solid ${C.sep}` : "none" }}>
+            <div className="flex-1 text-[11px]" style={{ color: C.text2 }}>{lbl}</div>
+            {key === "categoria" ? (
+              <span style={{ background: C.blueBg, color: C.blue, borderRadius: 6 }} className="px-2 py-0.5 text-[10px] font-bold uppercase">
+                {header[key] || "—"}
+              </span>
+            ) : (
+              <input
+                value={header[key] || ""}
+                onChange={(e) => setHeader({ ...header, [key]: e.target.value })}
+                className="text-right text-sm font-bold bg-transparent outline-none w-32"
+                style={{ color: C.text }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* totalizadores */}
+      <div className="grid grid-cols-3 gap-2">
+        <TotalCard C={C} label="Resid. (R)" value={stats.R} />
+        <TotalCard C={C} label="Comerc. (C)" value={stats.C} />
+        <TotalCard C={C} label="Ter. Baldio" value={stats.TB} />
+        <TotalCard C={C} label="Pto. Estrat." value={stats.PE} />
+        <TotalCard C={C} label="Outros" value={stats.O} />
+        <TotalCard C={C} label="Total Geral" value={stats.total} dark />
+      </div>
+      <div style={{ background: C.green, borderRadius: 10 }} className="p-3 flex items-center justify-between text-white">
+        <div className="text-[9px] uppercase tracking-widest font-bold opacity-90">Total Habitantes</div>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>{stats.hab}</div>
+      </div>
+
+      {/* lista imóveis */}
+      <div>
+        <div className="text-[9px] uppercase tracking-widest font-bold mb-2" style={{ color: C.text2 }}>
+          Imóveis cadastrados
+        </div>
+        {properties.length === 0 ? (
+          <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-6 text-center text-sm">
+            Nenhum imóvel cadastrado neste quarteirão.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {properties.map((p, idx) => {
+              const meta = TIPO_META[dbToTipo(p.type)];
+              const seq = String(p.sequence || idx + 1).padStart(3, "0");
+              return (
+                <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3 group">
+                  <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold tabular-nums">{seq}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate" style={{ color: C.text }}>
+                      {p.number} {p.complement ? `· ${p.complement}` : ""} {p.street_name ? `— ${p.street_name}` : ""}
+                    </div>
+                    <div className="text-[10px]" style={{ color: C.text2 }}>
+                      Lado {p.side || "—"} · HAB: {p.inhabitants ?? 0}
+                    </div>
+                  </div>
+                  <span style={{ background: meta.bg, color: meta.fg, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold">
+                    {dbToTipo(p.type)}
+                  </span>
+                  <button
+                    onClick={() => onDeleteProperty(p)}
+                    className="p-1.5 rounded transition-colors"
+                    style={{ color: C.border }}
+                    onMouseEnter={(e) => ((e.currentTarget.style.color = C.red))}
+                    onMouseLeave={(e) => ((e.currentTarget.style.color = C.border))}
+                    aria-label="Excluir"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* form adicionar */}
+      <QuickAddCard C={C} nextSeq={nextSeq} defaultStreet={properties[properties.length - 1]?.street_name || ""} defaultSide={header.lado || ""} onAdd={onAdd} />
+    </div>
+  );
+}
+
+function TotalCard({ C, label, value, dark }: { C: any; label: string; value: number; dark?: boolean }) {
+  return (
+    <div
+      style={{
+        background: dark ? C.hdrBg : C.card,
+        border: dark ? "none" : `1px solid ${C.border}`,
+        borderRadius: 10,
+        color: dark ? "#fff" : C.text,
+      }}
+      className="p-3 text-center"
+    >
+      <div style={{ color: dark ? "#fff" : C.text2, opacity: dark ? 0.7 : 1 }} className="text-[9px] uppercase tracking-widest font-bold">{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.1, marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
+function QuickAddCard(props: { C: any; nextSeq: number; defaultStreet: string; defaultSide: string; onAdd: (d: any) => Promise<void> }) {
+  const { C, nextSeq, defaultStreet, defaultSide, onAdd } = props;
+  const [street, setStreet] = useState(defaultStreet);
+  const [side, setSide] = useState(defaultSide);
+  const [number, setNumber] = useState("");
+  const [complement, setComplement] = useState("");
+  const [inhabitants, setInhabitants] = useState<number>(0);
+  const [tipo, setTipo] = useState<TipoKey>("R");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (defaultStreet && !street) setStreet(defaultStreet); }, [defaultStreet]);
+  useEffect(() => { if (defaultSide && !side) setSide(defaultSide); }, [defaultSide]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!street.trim()) { toast.error("Informe a Rua"); return; }
+    setSaving(true);
+    try {
+      await onAdd({
+        number: number || "S/N",
+        complement: complement || null,
+        type: TIPO_META[tipo].dbType,
+        street_name: street,
+        side,
+        sequence: nextSeq,
+        inhabitants,
+      });
+      setNumber(""); setComplement(""); setInhabitants(0);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={submit} style={{ border: `1.5px dashed ${C.dash}`, borderRadius: 12, background: C.card }} className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="font-bold text-sm" style={{ color: C.text }}>Novo Imóvel</div>
+        <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-0.5 text-[10px] font-bold">SEQ: {String(nextSeq).padStart(3, "0")}</span>
+      </div>
+
+      <div>
+        <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Rua / Logradouro</Label>
+        <Input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Nome da rua" className="h-10 mt-1" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Lado</Label>
+          <Input value={side} onChange={(e) => setSide(e.target.value)} className="h-10 mt-1" />
+        </div>
+        <div>
+          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Número</Label>
+          <Input value={number} onChange={(e) => setNumber(e.target.value)} inputMode="numeric" className="h-10 mt-1" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Complemento</Label>
+          <Input value={complement} onChange={(e) => setComplement(e.target.value)} className="h-10 mt-1" />
+        </div>
+        <div>
+          <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Habitantes</Label>
+          <Input value={inhabitants} onChange={(e) => setInhabitants(parseInt(e.target.value) || 0)} type="number" className="h-10 mt-1" />
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-[9px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Tipo</Label>
+        <div className="grid grid-cols-5 gap-2 mt-1">
+          {(Object.keys(TIPO_META) as TipoKey[]).map((k) => {
+            const active = tipo === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTipo(k)}
+                className="h-10 text-[12px] font-bold rounded-md transition-all"
+                style={{
+                  background: active ? C.blueBg : C.grayBg,
+                  color: active ? C.blue : C.grayTx,
+                  border: active ? `1.5px solid ${C.blueRing}` : "1.5px solid transparent",
+                }}
+              >
+                {k}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving}
+        style={{ background: C.hdrBg, color: "#fff", borderRadius: 10 }}
+        className="w-full h-12 flex items-center justify-center gap-2 text-xs font-bold disabled:opacity-60"
+      >
+        <Plus className="h-4 w-4" /> Adicionar Imóvel
+      </button>
+    </form>
+  );
+}
+
+// =================== IMÓVEIS TAB ===================
+function ImoveisTab(props: {
+  C: any;
+  properties: Property[];
+  search: string;
+  setSearch: (v: string) => void;
+  tipoFilter: "ALL" | TipoKey;
+  setTipoFilter: (v: "ALL" | TipoKey) => void;
+  onDelete: (p: Property) => void;
+}) {
+  const { C, properties, search, setSearch, tipoFilter, setTipoFilter, onDelete } = props;
+  const filtered = properties.filter((p) => {
+    const okSearch = !search ||
+      (p.street_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.number || "").toLowerCase().includes(search.toLowerCase());
+    const okTipo = tipoFilter === "ALL" || dbToTipo(p.type) === tipoFilter;
+    return okSearch && okTipo;
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.number) {
-      toast.error("Número obrigatório");
-      return;
-    }
+  return (
+    <div className="space-y-3">
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: C.text2 }} />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por endereço ou número" className="pl-9 h-10" />
+        </div>
+        <div className="flex gap-2">
+          {(["ALL", "R", "C", "TB", "PE", "O"] as const).map((k) => {
+            const active = tipoFilter === k;
+            return (
+              <button
+                key={k}
+                onClick={() => setTipoFilter(k)}
+                className={cn("flex-1 h-9 text-[11px] font-bold rounded-md")}
+                style={{
+                  background: active ? C.blueBg : C.grayBg,
+                  color: active ? C.blue : C.grayTx,
+                  border: active ? `1.5px solid ${C.blueRing}` : "1.5px solid transparent",
+                }}
+              >
+                {k === "ALL" ? "Todos" : k}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
+      {filtered.length === 0 ? (
+        <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-6 text-center text-sm">
+          Nenhum imóvel encontrado.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((p, idx) => {
+            const meta = TIPO_META[dbToTipo(p.type)];
+            const seq = String(p.sequence || idx + 1).padStart(3, "0");
+            return (
+              <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3">
+                <span style={{ background: C.grayBg, color: C.grayTx, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold tabular-nums">{seq}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold truncate" style={{ color: C.text }}>
+                    {p.number} {p.street_name ? `— ${p.street_name}` : ""}
+                  </div>
+                  <div className="text-[10px]" style={{ color: C.text2 }}>
+                    Lado {p.side || "—"} · HAB: {p.inhabitants ?? 0}
+                  </div>
+                </div>
+                <span style={{ background: meta.bg, color: meta.fg, borderRadius: 6 }} className="px-2 py-1 text-[10px] font-bold">
+                  {dbToTipo(p.type)}
+                </span>
+                <button onClick={() => onDelete(p)} className="p-1.5 rounded transition-colors" style={{ color: C.border }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = C.red)}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = C.border)}>
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      const propertyToSave = {
-        number: formData.number || "",
-        complement: formData.complement || null,
-        type: formData.type || "residence",
-        street_name: formData.street_name || null,
-        side: formData.side || null,
-        sequence: formData.sequence || null,
-        inhabitants: formData.inhabitants || 0,
-        status: formData.status || "active",
-        user_id: user.id,
-        id: initialData?.id || undefined
-      };
-
-      const { data, error } = await supabase.from("properties").upsert(propertyToSave).select().single();
-      if (error) throw error;
-      onSave(data as Property);
-      toast.success(initialData ? "Atualizado!" : "Cadastrado!");
-    } catch (error: any) {
-      toast.error("Erro: " + error.message);
-    }
+// =================== BOLETIM TAB ===================
+function BoletimTab(props: {
+  C: any;
+  header: any;
+  setHeader: (h: any) => void;
+  properties: Property[];
+  stats: { R: number; C: number; TB: number; PE: number; O: number; total: number; hab: number };
+  onPrint: () => void;
+  onPDF: () => void;
+  onOpenOfficial: () => void;
+}) {
+  const { C, header, setHeader, properties, stats, onPrint, onPDF, onOpenOfficial } = props;
+  const adapted = {
+    residence: stats.R, commerce: stats.C, vacant_lot: stats.TB,
+    strategic_point: stats.PE, others: stats.O, total: stats.total, inhabitants: stats.hab,
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Rua</Label>
-          <Input value={formData.street_name || ""} onChange={(e) => setFormData({...formData, street_name: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Lado</Label>
-          <Input value={formData.side || ""} onChange={(e) => setFormData({...formData, side: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
-        </div>
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2 no-print">
+        <button onClick={onPrint} style={{ background: C.hdrBg, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
+          <Printer className="h-4 w-4" /> Imprimir
+        </button>
+        <button onClick={onPDF} style={{ background: C.green, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
+          <Download className="h-4 w-4" /> Baixar PDF
+        </button>
+        <button onClick={onOpenOfficial} style={{ background: C.blue, color: "#fff", borderRadius: 10 }} className="h-11 flex items-center justify-center gap-2 text-xs font-bold">
+          <Eye className="h-4 w-4" /> BRG Oficial
+        </button>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Número</Label>
-          <Input value={formData.number} onChange={(e) => setFormData({...formData, number: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
+
+      <div className="rounded-md overflow-hidden bg-white border" style={{ borderColor: C.border }}>
+        <RGBulletinHeader data={header} onChange={(f, v) => setHeader({ ...header, [f]: v })} />
+        <div className="overflow-x-auto">
+          <RGBulletinTable properties={properties} onEdit={() => {}} onDelete={() => {}} />
         </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sequência</Label>
-          <Input type="number" value={formData.sequence || ""} onChange={(e) => setFormData({...formData, sequence: parseInt(e.target.value)})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
+        <RGBulletinFooter stats={adapted} />
+      </div>
+
+      <style>{`@media print { .no-print { display: none !important; } header, nav { display: none !important; } }`}</style>
+    </div>
+  );
+}
+
+// =================== HISTÓRICO TAB ===================
+function HistoricoTab(props: { C: any; files: any[]; onOpen: (name: string) => void; onShare: (name: string) => void }) {
+  const { C, files, onOpen, onShare } = props;
+  if (!files.length) {
+    return (
+      <div style={{ background: C.card, border: `1px dashed ${C.dash}`, borderRadius: 12, color: C.text2 }} className="p-8 text-center text-sm">
+        Nenhum boletim arquivado ainda.
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {files.map((f, i) => (
+        <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }} className="p-3 flex items-center gap-3">
+          <div style={{ background: C.blueBg, borderRadius: 8 }} className="h-10 w-10 flex items-center justify-center">
+            <FileText className="h-5 w-5" style={{ color: C.blue }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold truncate" style={{ color: C.text }}>{f.name}</div>
+            <div className="text-[10px]" style={{ color: C.text2 }}>
+              {f.created_at ? format(new Date(f.created_at), "dd/MM/yyyy HH:mm") : "—"}
+            </div>
+          </div>
+          <button onClick={() => onShare(f.name)} className="p-2 rounded" style={{ color: C.green }} aria-label="Compartilhar">
+            <Share2 className="h-4 w-4" />
+          </button>
+          <button onClick={() => onOpen(f.name)} className="p-2 rounded" style={{ color: C.blue }} aria-label="Visualizar">
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Complemento</Label>
-          <Input value={formData.complement || ""} onChange={(e) => setFormData({...formData, complement: e.target.value})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Habitantes</Label>
-          <Input type="number" value={formData.inhabitants || 0} onChange={(e) => setFormData({...formData, inhabitants: parseInt(e.target.value)})} className="rounded-xl border-slate-100 bg-slate-50 font-bold" />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo de Imóvel</Label>
-        <Select value={formData.type} onValueChange={(val: any) => setFormData({...formData, type: val})}>
-          <SelectTrigger className="rounded-xl border-slate-100 bg-slate-50 font-bold"><SelectValue /></SelectTrigger>
-          <SelectContent className="rounded-2xl border-none shadow-2xl">
-            <SelectItem value="residence" className="rounded-xl font-bold">{translate("residence")}</SelectItem>
-            <SelectItem value="commerce" className="rounded-xl font-bold">{translate("commerce")}</SelectItem>
-            <SelectItem value="vacant_lot" className="rounded-xl font-bold">{translate("vacant_lot")}</SelectItem>
-            <SelectItem value="strategic_point" className="rounded-xl font-bold">{translate("strategic_point")}</SelectItem>
-            <SelectItem value="others" className="rounded-xl font-bold">{translate("others")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex gap-3">
-        <Button type="button" variant="outline" className="flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit" className="flex-[2] h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20 font-black text-[10px] uppercase tracking-widest gap-2">
-          <Save className="h-4 w-4" /> Salvar
-        </Button>
-      </div>
-    </form>
+      ))}
+    </div>
   );
 }
