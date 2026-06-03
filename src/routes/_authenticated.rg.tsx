@@ -203,12 +203,22 @@ function RGPage() {
   }
 
   function handleView(b: BoletimRow) {
+    console.log("[RG] Ver Boletim ID:", b.id, b);
+    if (!b?.id) {
+      toast.error("ID do boletim inválido.");
+      return;
+    }
     setViewBusy(b.id);
     toast.loading("Abrindo...", { id: `view-${b.id}`, duration: 1500 });
     navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
   }
 
   function handleEdit(b: BoletimRow) {
+    console.log("[RG] Editar Boletim ID:", b.id, b);
+    if (!b?.id) {
+      toast.error("ID do boletim inválido.");
+      return;
+    }
     setEditBusy(b.id);
     toast.loading("Abrindo editor...", { id: `edit-${b.id}`, duration: 1500 });
     navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
