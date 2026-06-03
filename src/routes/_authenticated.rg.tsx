@@ -185,19 +185,33 @@ function RGPage() {
   }
 
   async function handleDelete(b: BoletimRow) {
+    setDeleteBusy(b.id);
+    const t = toast.loading("Excluindo...");
     try {
-      // detach properties first (do not delete user data)
       await supabase.from("properties").update({ boletim_id: null }).eq("boletim_id", b.id);
       const { error } = await supabase.from("boletins_rg").delete().eq("id", b.id);
       if (error) throw error;
       setBoletins((arr) => arr.filter((x) => x.id !== b.id));
-      toast.success("Boletim excluído");
+      toast.success("Boletim excluído.", { id: t });
     } catch (e: any) {
       console.error("[RG] delete boletim", e);
-      toast.error("Erro: " + e.message);
+      toast.error("Erro ao excluir: " + e.message, { id: t });
     } finally {
+      setDeleteBusy(null);
       setPendingDelete(null);
     }
+  }
+
+  function handleView(b: BoletimRow) {
+    setViewBusy(b.id);
+    toast.loading("Abrindo...", { id: `view-${b.id}`, duration: 1500 });
+    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
+  }
+
+  function handleEdit(b: BoletimRow) {
+    setEditBusy(b.id);
+    toast.loading("Abrindo editor...", { id: `edit-${b.id}`, duration: 1500 });
+    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
   }
 
   async function handlePDF(b: BoletimRow) {
