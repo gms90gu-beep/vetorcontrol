@@ -145,6 +145,89 @@ export type Database = {
           },
         ]
       }
+      boletins_rg: {
+        Row: {
+          agent_id: string
+          agent_name: string | null
+          agent_registration: string | null
+          block_id: string | null
+          block_number: string | null
+          category_1: string | null
+          category_2: string | null
+          created_at: string
+          district: string | null
+          finalized_at: string | null
+          id: string
+          inspector: string | null
+          inspector_general: string | null
+          locality: string | null
+          municipality: string | null
+          sequence: string | null
+          side: string | null
+          subdistrict: string | null
+          sublocality: string | null
+          team_lead: string | null
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          agent_name?: string | null
+          agent_registration?: string | null
+          block_id?: string | null
+          block_number?: string | null
+          category_1?: string | null
+          category_2?: string | null
+          created_at?: string
+          district?: string | null
+          finalized_at?: string | null
+          id?: string
+          inspector?: string | null
+          inspector_general?: string | null
+          locality?: string | null
+          municipality?: string | null
+          sequence?: string | null
+          side?: string | null
+          subdistrict?: string | null
+          sublocality?: string | null
+          team_lead?: string | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_name?: string | null
+          agent_registration?: string | null
+          block_id?: string | null
+          block_number?: string | null
+          category_1?: string | null
+          category_2?: string | null
+          created_at?: string
+          district?: string | null
+          finalized_at?: string | null
+          id?: string
+          inspector?: string | null
+          inspector_general?: string | null
+          locality?: string | null
+          municipality?: string | null
+          sequence?: string | null
+          side?: string | null
+          subdistrict?: string | null
+          sublocality?: string | null
+          team_lead?: string | null
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boletins_rg_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cycles: {
         Row: {
           created_at: string
@@ -424,6 +507,7 @@ export type Database = {
         Row: {
           block_id: string | null
           block_number: string | null
+          boletim_id: string | null
           complement: string | null
           container_count: number | null
           created_at: string
@@ -450,6 +534,7 @@ export type Database = {
         Insert: {
           block_id?: string | null
           block_number?: string | null
+          boletim_id?: string | null
           complement?: string | null
           container_count?: number | null
           created_at?: string
@@ -476,6 +561,7 @@ export type Database = {
         Update: {
           block_id?: string | null
           block_number?: string | null
+          boletim_id?: string | null
           complement?: string | null
           container_count?: number | null
           created_at?: string
@@ -505,6 +591,13 @@ export type Database = {
             columns: ["block_id"]
             isOneToOne: false
             referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_boletim_id_fkey"
+            columns: ["boletim_id"]
+            isOneToOne: false
+            referencedRelation: "boletins_rg"
             referencedColumns: ["id"]
           },
           {
