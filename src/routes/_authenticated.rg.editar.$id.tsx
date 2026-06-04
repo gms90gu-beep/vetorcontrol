@@ -156,6 +156,39 @@ function EditarBoletim() {
       console.log("[RG Editar] Imóveis (estado):", imoveis);
       if (!user) throw new Error("Não autenticado");
 
+      const effectiveAgentId = agentId || user.id;
+      let effectiveBlockId = blockId || imoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
+
+      if (!effectiveBlockId && form.block_number.trim()) {
+        const blockPayload = { number: form.block_number.trim(), total_properties: 0 };
+        console.log("[RG Editar] Dados do quarteirão:", blockPayload);
+        const { data: existingBlock, error: existingBlockError } = await supabase
+          .from("blocks")
+          .select("id, number, total_properties")
+          .eq("number", blockPayload.number)
+          .maybeSingle();
+        console.log("[RG Editar] Resultado busca quarteirão:", existingBlock, "Erro:", existingBlockError);
+        if (existingBlockError) throw existingBlockError;
+
+        if (existingBlock?.id) {
+          effectiveBlockId = existingBlock.id;
+        } else {
+          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
+          const insertBlockPayload = { ...blockPayload, subarea_id: subarea.id };
+          console.log("[RG Editar] INSERT blocks payload:", insertBlockPayload);
+          const { data: createdBlock, error: blockError } = await supabase
+            .from("blocks")
+            .insert(insertBlockPayload)
+            .select("id, number, total_properties")
+            .single();
+          console.log("[RG Editar] INSERT blocks resultado:", { data: createdBlock, error: blockError });
+          if (blockError) throw blockError;
+          effectiveBlockId = createdBlock.id;
+        }
+        setBlockId(effectiveBlockId);
+      }
+
       const { error: bErr } = await supabase
         .from("boletins_rg")
         .update({
@@ -169,6 +202,7 @@ function EditarBoletim() {
           side: form.side || null,
           category_1: form.category_1 || null,
           category_2: form.category_2 || null,
+          block_id: effectiveBlockId,
         })
         .eq("id", boletimId);
       if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
@@ -198,34 +232,43 @@ function EditarBoletim() {
       const toInsert = imoveis.filter((i) => i._new && !i._deleted);
       console.log("[RG Editar] Imóveis a inserir:", toInsert.length);
       for (const im of toInsert) {
+        if (!im.number?.trim()) throw new Error("Número do imóvel é obrigatório.");
+        if (!im.type) throw new Error("Tipo do imóvel é obrigatório.");
+        if (!im.sequence) throw new Error("Sequência do imóvel é obrigatória.");
+        if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const payload = {
           street_name: im.street_name || null,
           side: im.side || null,
-          number: im.number || "S/N",
+          number: im.number.trim(),
           sequence: im.sequence,
           complement: im.complement || null,
           type: im.type,
           inhabitants: im.inhabitants ?? 0,
           boletim_id: boletimId,
-          block_id: blockId,
+          block_id: effectiveBlockId,
           block_number: form.block_number || null,
-          user_id: user.id,
+          user_id: effectiveAgentId,
         };
-        console.log("[RG Editar] INSERT payload:", payload);
+        console.log("[RG Editar] Dados do imóvel:", payload);
+        console.log("[RG Editar] Quarteirão:", { id: effectiveBlockId, number: form.block_number });
+        console.log("[RG Editar] Usuário:", user);
         const { data, error } = await supabase
           .from("properties")
           .insert(payload)
-          .select();
-        console.log("[RG Editar] INSERT resultado:", { data, error });
+          .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
+          .single();
+        console.log("[RG Editar] Resultado:", data);
+        console.log("[RG Editar] Erro:", error);
         if (error) {
           console.error("[RG Editar] Erro INSERT imóvel:", error);
           const msg = `${error.message}${error.hint ? ` — ${error.hint}` : ""}${error.details ? ` (${error.details})` : ""}`;
           throw new Error(msg);
         }
+        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false } : item)));
       }
 
       toast.dismiss(tid);
-      toast.success("Boletim atualizado com sucesso.");
+      toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.");
       await load();
     } catch (e: any) {
       console.log("Erro", e);
