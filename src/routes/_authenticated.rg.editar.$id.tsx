@@ -55,6 +55,7 @@ function EditarBoletim() {
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [boletimId, setBoletimId] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(null);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -69,6 +70,7 @@ function EditarBoletim() {
       if (!data) { setError("Boletim não encontrado."); return; }
       setBoletimId(data.id);
       setBlockId(data.block_id);
+      setAgentId(data.agent_id);
       setForm({
         uf: data.uf || "",
         municipality: data.municipality || "",
