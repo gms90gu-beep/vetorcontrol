@@ -17,6 +17,7 @@ type Imovel = {
   id?: string;
   _new?: boolean;
   _deleted?: boolean;
+  block_id?: string | null;
   street_name: string | null;
   side: string | null;
   number: string;
@@ -87,14 +88,14 @@ function EditarBoletim() {
       // Load properties linked to this boletim
       let { data: props } = await supabase
         .from("properties")
-        .select("id, street_name, side, number, sequence, complement, type, inhabitants")
+        .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
         .eq("boletim_id", data.id)
         .order("sequence", { ascending: true });
 
       if ((!props || props.length === 0) && data.block_id) {
         const r = await supabase
           .from("properties")
-          .select("id, street_name, side, number, sequence, complement, type, inhabitants")
+          .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
           .eq("block_id", data.block_id)
           .order("sequence", { ascending: true });
         props = r.data || [];
