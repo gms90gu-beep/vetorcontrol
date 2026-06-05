@@ -85,21 +85,14 @@ function EditarBoletim() {
         category_2: data.category_2 || "",
       });
 
-      // Load properties linked to this boletim
-      let { data: props } = await supabase
+      // Load properties strictly linked to this boletim (sem fallback por
+      // block_id, para não puxar imóveis de outros boletins).
+      const { data: props } = await supabase
         .from("properties")
         .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
         .eq("boletim_id", data.id)
         .order("sequence", { ascending: true });
 
-      if ((!props || props.length === 0) && data.block_id) {
-        const r = await supabase
-          .from("properties")
-          .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
-          .eq("block_id", data.block_id)
-          .order("sequence", { ascending: true });
-        props = r.data || [];
-      }
       console.log("Imóveis carregados:", props?.length || 0);
       setImoveis((props || []) as Imovel[]);
     } catch (e: any) {

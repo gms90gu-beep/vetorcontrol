@@ -1173,6 +1173,7 @@ export type Database = {
         Args: { p_block_id: string; p_cycle_id: string }
         Returns: undefined
       }
+      cleanup_demo_data: { Args: never; Returns: Json }
       ensure_annual_cycles: {
         Args: { target_year: number }
         Returns: undefined
