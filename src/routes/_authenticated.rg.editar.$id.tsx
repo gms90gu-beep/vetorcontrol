@@ -145,10 +145,6 @@ function EditarBoletim() {
       const nb = parseInt(b.number, 10) || 0;
       return na - nb;
     });
-    // Reatribuir sequência na ordem numérica
-    sorted.forEach((im, idx) => {
-      im.sequence = idx + 1;
-    });
     return [...sorted, ...deletados];
   }
 
@@ -389,10 +385,10 @@ function EditarBoletim() {
             {imoveis.map((im, i) => {
               if (im._deleted) return null;
               return (
-                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
+                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
-                  <Field label="Seq" value={String(im.sequence ?? "")} onChange={(v) => updateImovel(i, { sequence: v ? Number(v) : null })} />
+                  
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
                   <div>
                     <Label className="text-[10px] uppercase tracking-wider text-slate-500">Tipo</Label>
