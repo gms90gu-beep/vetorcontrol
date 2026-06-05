@@ -230,14 +230,14 @@ function EditarBoletim() {
         .eq("id", boletimId);
       if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
 
-      const toDelete = imoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
+      const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       if (toDelete.length > 0) {
         console.log("[RG Editar] Deletando imóveis:", toDelete);
         const { error } = await supabase.from("properties").delete().in("id", toDelete);
         if (error) { console.error("[RG Editar] Erro delete:", error); throw error; }
       }
 
-      for (const im of imoveis) {
+      for (const im of sortedImoveis) {
         if (im._deleted || im._new || !im.id) continue;
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const { data: updatedProperty, error } = await supabase.from("properties").update({
