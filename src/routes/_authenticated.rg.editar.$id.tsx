@@ -263,7 +263,7 @@ function EditarBoletim() {
         const payload = {
           street_name: im.street_name || null,
           side: im.side || null,
-          number: im.number.trim(),
+          number: numero,
           sequence: im.sequence ?? null,
           complement: im.complement || null,
           type: im.type,
