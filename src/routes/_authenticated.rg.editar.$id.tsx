@@ -145,10 +145,6 @@ function EditarBoletim() {
       const nb = parseInt(b.number, 10) || 0;
       return na - nb;
     });
-    // Reatribuir sequência na ordem numérica
-    sorted.forEach((im, idx) => {
-      im.sequence = idx + 1;
-    });
     return [...sorted, ...deletados];
   }
 
