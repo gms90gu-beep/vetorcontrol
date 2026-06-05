@@ -257,7 +257,7 @@ function EditarBoletim() {
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
       console.log("[RG Editar] Imóveis a inserir:", toInsert.length);
       for (const im of toInsert) {
-        if (!im.number?.trim()) throw new Error("Número do imóvel é obrigatório.");
+        const numero = (im.number || "").trim() || "S/N";
         if (!im.type) throw new Error("Tipo do imóvel é obrigatório.");
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const payload = {
