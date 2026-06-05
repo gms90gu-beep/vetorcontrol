@@ -328,7 +328,13 @@ function EditarBoletim() {
     );
   }
 
-  const visiveis = imoveis.filter((i) => !i._deleted);
+  const visiveis = [...imoveis]
+    .filter((i) => !i._deleted)
+    .sort((a, b) => {
+      const na = parseInt(a.number, 10) || 0;
+      const nb = parseInt(b.number, 10) || 0;
+      return na - nb;
+    });
 
   return (
     <div className="min-h-screen bg-slate-50">
