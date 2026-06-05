@@ -164,6 +164,9 @@ function EditarBoletim() {
       console.log("[RG Editar] Imóveis (estado):", imoveis);
       if (!user) throw new Error("Não autenticado");
 
+      // Reordenar imóveis por número antes de salvar
+      setImoveis((prev) => sortImoveisByNumber(prev));
+
       const effectiveAgentId = agentId || user.id;
       let effectiveBlockId = blockId || imoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
 
