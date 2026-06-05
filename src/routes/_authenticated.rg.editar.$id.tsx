@@ -129,12 +129,27 @@ function EditarBoletim() {
         street_name: "",
         side: form.side || "",
         number: "",
-        sequence: arr.filter((a) => !a._deleted).length + 1,
+        sequence: null,
         complement: "",
         type: "residence",
         inhabitants: 0,
       },
     ]);
+  }
+
+  function sortImoveisByNumber(arr: Imovel[]): Imovel[] {
+    const visiveis = arr.filter((i) => !i._deleted);
+    const deletados = arr.filter((i) => i._deleted);
+    const sorted = [...visiveis].sort((a, b) => {
+      const na = parseInt(a.number, 10) || 0;
+      const nb = parseInt(b.number, 10) || 0;
+      return na - nb;
+    });
+    // Reatribuir sequência na ordem numérica
+    sorted.forEach((im, idx) => {
+      im.sequence = idx + 1;
+    });
+    return [...sorted, ...deletados];
   }
 
   async function save() {
@@ -149,8 +164,12 @@ function EditarBoletim() {
       console.log("[RG Editar] Imóveis (estado):", imoveis);
       if (!user) throw new Error("Não autenticado");
 
+      // Reordenar imóveis por número antes de salvar e usar a lista ordenada localmente
+      const sortedImoveis = sortImoveisByNumber(imoveis);
+      setImoveis(sortedImoveis);
+
       const effectiveAgentId = agentId || user.id;
-      let effectiveBlockId = blockId || imoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
+      let effectiveBlockId = blockId || sortedImoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
 
       // Validate cached block_id still exists (cleanups / SET NULL race conditions).
       if (effectiveBlockId) {
@@ -211,14 +230,14 @@ function EditarBoletim() {
         .eq("id", boletimId);
       if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
 
-      const toDelete = imoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
+      const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       if (toDelete.length > 0) {
         console.log("[RG Editar] Deletando imóveis:", toDelete);
         const { error } = await supabase.from("properties").delete().in("id", toDelete);
         if (error) { console.error("[RG Editar] Erro delete:", error); throw error; }
       }
 
-      for (const im of imoveis) {
+      for (const im of sortedImoveis) {
         if (im._deleted || im._new || !im.id) continue;
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const { data: updatedProperty, error } = await supabase.from("properties").update({
@@ -239,7 +258,7 @@ function EditarBoletim() {
       }
 
       // Inserts — um por um para identificar exatamente qual falha
-      const toInsert = imoveis.filter((i) => i._new && !i._deleted);
+      const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
       console.log("[RG Editar] Imóveis a inserir:", toInsert.length);
       for (const im of toInsert) {
         if (!im.number?.trim()) throw new Error("Número do imóvel é obrigatório.");
@@ -309,7 +328,13 @@ function EditarBoletim() {
     );
   }
 
-  const visiveis = imoveis.filter((i) => !i._deleted);
+  const visiveis = [...imoveis]
+    .filter((i) => !i._deleted)
+    .sort((a, b) => {
+      const na = parseInt(a.number, 10) || 0;
+      const nb = parseInt(b.number, 10) || 0;
+      return na - nb;
+    });
 
   return (
     <div className="min-h-screen bg-slate-50">
