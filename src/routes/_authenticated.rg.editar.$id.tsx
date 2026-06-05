@@ -385,11 +385,22 @@ function EditarBoletim() {
             {imoveis.map((im, i) => {
               if (im._deleted) return null;
               return (
-                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
                   
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
+                  <div>
+                    <Label className="text-[10px] uppercase tracking-wider text-slate-500">Sequência</Label>
+                    <label className="flex h-9 items-center gap-2 rounded-md border border-input px-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(im.sequence ?? 0) > 0}
+                        onChange={(e) => updateImovel(i, { sequence: e.target.checked ? 1 : null })}
+                      />
+                      <span className="text-xs text-slate-600">Sim</span>
+                    </label>
+                  </div>
                   <div>
                     <Label className="text-[10px] uppercase tracking-wider text-slate-500">Tipo</Label>
                     <select
@@ -404,6 +415,7 @@ function EditarBoletim() {
                       <option value="others">Outro</option>
                     </select>
                   </div>
+
                   <div className="flex items-end gap-2">
                     <Field
                       label="Hab."
