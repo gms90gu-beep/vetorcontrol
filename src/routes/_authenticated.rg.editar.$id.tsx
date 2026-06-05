@@ -244,13 +244,12 @@ function EditarBoletim() {
       for (const im of toInsert) {
         if (!im.number?.trim()) throw new Error("Número do imóvel é obrigatório.");
         if (!im.type) throw new Error("Tipo do imóvel é obrigatório.");
-        if (!im.sequence) throw new Error("Sequência do imóvel é obrigatória.");
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const payload = {
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number.trim(),
-          sequence: im.sequence,
+          sequence: im.sequence ?? null,
           complement: im.complement || null,
           type: im.type,
           inhabitants: im.inhabitants ?? 0,
