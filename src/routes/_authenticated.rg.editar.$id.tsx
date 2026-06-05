@@ -152,6 +152,17 @@ function EditarBoletim() {
       const effectiveAgentId = agentId || user.id;
       let effectiveBlockId = blockId || imoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
 
+      // Validate cached block_id still exists (cleanups / SET NULL race conditions).
+      if (effectiveBlockId) {
+        const { data: existsBlock } = await supabase
+          .from("blocks").select("id").eq("id", effectiveBlockId).maybeSingle();
+        if (!existsBlock?.id) {
+          console.warn("[RG Editar] block_id em cache não existe mais; recriando.", effectiveBlockId);
+          effectiveBlockId = null;
+          setBlockId(null);
+        }
+      }
+
       if (!effectiveBlockId && form.block_number.trim()) {
         const blockPayload = { number: form.block_number.trim(), total_properties: 0 };
         console.log("[RG Editar] Dados do quarteirão:", blockPayload);
