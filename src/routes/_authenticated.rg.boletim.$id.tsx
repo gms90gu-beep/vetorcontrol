@@ -57,6 +57,10 @@ function tipoCodigo(t: string): "R" | "C" | "TB" | "PE" | "O" {
   return "O";
 }
 
+function comparePropertyNumber(a: Property, b: Property) {
+  return (Number.parseInt(a.number, 10) || 0) - (Number.parseInt(b.number, 10) || 0);
+}
+
 function BoletimView() {
   const { id } = useParams({ from: "/_authenticated/rg/boletim/$id" });
   const navigate = useNavigate();
@@ -170,7 +174,7 @@ function BoletimView() {
         .eq("boletim_id", b.id)
         .order("sequence", { ascending: true });
 
-      const props: Property[] = (byBoletimLink || []) as Property[];
+      const props: Property[] = [...((byBoletimLink || []) as Property[])].sort(comparePropertyNumber);
 
       console.log("[BRG] imóveis carregados:", props.length);
       setImoveis(props);
