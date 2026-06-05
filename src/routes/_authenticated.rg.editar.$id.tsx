@@ -385,7 +385,7 @@ function EditarBoletim() {
             {imoveis.map((im, i) => {
               if (im._deleted) return null;
               return (
-                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
+                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
                   
