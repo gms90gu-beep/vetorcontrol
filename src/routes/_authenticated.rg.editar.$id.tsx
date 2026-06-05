@@ -129,12 +129,27 @@ function EditarBoletim() {
         street_name: "",
         side: form.side || "",
         number: "",
-        sequence: arr.filter((a) => !a._deleted).length + 1,
+        sequence: null,
         complement: "",
         type: "residence",
         inhabitants: 0,
       },
     ]);
+  }
+
+  function sortImoveisByNumber(arr: Imovel[]): Imovel[] {
+    const visiveis = arr.filter((i) => !i._deleted);
+    const deletados = arr.filter((i) => i._deleted);
+    const sorted = [...visiveis].sort((a, b) => {
+      const na = parseInt(a.number, 10) || 0;
+      const nb = parseInt(b.number, 10) || 0;
+      return na - nb;
+    });
+    // Reatribuir sequência na ordem numérica
+    sorted.forEach((im, idx) => {
+      im.sequence = idx + 1;
+    });
+    return [...sorted, ...deletados];
   }
 
   async function save() {
