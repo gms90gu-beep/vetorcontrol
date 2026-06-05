@@ -425,6 +425,10 @@ export function AdminMasterDashboard() {
         )}
       </div>
 
+      {/* ── Ferramentas do Sistema (apenas Admin Master) ───────────── */}
+      {isAdminMaster && <SystemToolsCard />}
+
+
       {/* ── Busca + Filtros ────────────────────────────────────────── */}
       <div className="bg-slate-900/50 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl backdrop-blur-xl">
         <div className="p-4 sm:p-6 border-b border-slate-800 space-y-4">
