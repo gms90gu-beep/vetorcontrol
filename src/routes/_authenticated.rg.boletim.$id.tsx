@@ -162,31 +162,15 @@ function BoletimView() {
       }
       setBoletim(b);
 
-      // Load properties: prefer boletim_id link; fallback to block_id/block_number
-      let props: Property[] = [];
+      // Load properties strictly linked to this boletim (no block_id fallback,
+      // to evitar mostrar imóveis de outros boletins ou registros órfãos).
       const { data: byBoletimLink } = await supabase
         .from("properties")
         .select("id, street_name, side, number, sequence, complement, type, inhabitants")
         .eq("boletim_id", b.id)
         .order("sequence", { ascending: true });
 
-      if (byBoletimLink && byBoletimLink.length > 0) {
-        props = byBoletimLink as Property[];
-      } else if (b.block_id) {
-        const { data } = await supabase
-          .from("properties")
-          .select("id, street_name, side, number, sequence, complement, type, inhabitants")
-          .eq("block_id", b.block_id)
-          .order("sequence", { ascending: true });
-        props = (data || []) as Property[];
-      } else if (b.block_number) {
-        const { data } = await supabase
-          .from("properties")
-          .select("id, street_name, side, number, sequence, complement, type, inhabitants")
-          .eq("block_number", b.block_number)
-          .order("sequence", { ascending: true });
-        props = (data || []) as Property[];
-      }
+      const props: Property[] = (byBoletimLink || []) as Property[];
 
       console.log("[BRG] imóveis carregados:", props.length);
       setImoveis(props);
