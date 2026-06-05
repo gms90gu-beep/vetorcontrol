@@ -164,11 +164,12 @@ function EditarBoletim() {
       console.log("[RG Editar] Imóveis (estado):", imoveis);
       if (!user) throw new Error("Não autenticado");
 
-      // Reordenar imóveis por número antes de salvar
-      setImoveis((prev) => sortImoveisByNumber(prev));
+      // Reordenar imóveis por número antes de salvar e usar a lista ordenada localmente
+      const sortedImoveis = sortImoveisByNumber(imoveis);
+      setImoveis(sortedImoveis);
 
       const effectiveAgentId = agentId || user.id;
-      let effectiveBlockId = blockId || imoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
+      let effectiveBlockId = blockId || sortedImoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
 
       // Validate cached block_id still exists (cleanups / SET NULL race conditions).
       if (effectiveBlockId) {
