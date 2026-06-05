@@ -220,7 +220,8 @@ function EditarBoletim() {
 
       for (const im of imoveis) {
         if (im._deleted || im._new || !im.id) continue;
-        const { error } = await supabase.from("properties").update({
+        if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
+        const { data: updatedProperty, error } = await supabase.from("properties").update({
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number,
@@ -228,8 +229,13 @@ function EditarBoletim() {
           complement: im.complement || null,
           type: im.type,
           inhabitants: im.inhabitants ?? 0,
-        }).eq("id", im.id);
+          boletim_id: boletimId,
+          block_id: effectiveBlockId,
+          block_number: form.block_number || null,
+          user_id: effectiveAgentId,
+        }).eq("id", im.id).select("id").maybeSingle();
         if (error) { console.error("[RG Editar] Erro update imóvel", im.id, error); throw error; }
+        if (!updatedProperty?.id) throw new Error("Um imóvel existente não foi encontrado para atualização. Recarregue o boletim e tente novamente.");
       }
 
       // Inserts — um por um para identificar exatamente qual falha
