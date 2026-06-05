@@ -76,14 +76,20 @@ function FieldWorkPage() {
         }
       }
 
-      // Fetch blocks that have properties and are available
+      // Only show blocks that have at least one property linked to a registered
+      // boletim RG (evita exibir quarteirões/dados de demonstração).
       const { data: blocksData } = await supabase
         .from("blocks")
-        .select(`*`)
-
+        .select(`*, properties!inner(id, boletim_id)`)
+        .not("properties.boletim_id", "is", null)
         .order("number", { ascending: true });
-      
-      if (blocksData) setBlocks(blocksData);
+
+      if (blocksData) {
+        // Deduplicate (inner join may repeat blocks per property).
+        const seen = new Set<string>();
+        const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+        setBlocks(uniq);
+      }
 
     } catch (error) {
       console.error("Error fetching initial data:", error);
