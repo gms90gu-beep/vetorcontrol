@@ -813,6 +813,104 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function SystemToolsCard() {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleCleanup = async () => {
+    if (confirm !== "LIMPAR") {
+      toast.error('Digite "LIMPAR" para confirmar.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("cleanup_demo_data");
+      if (error) throw error;
+      toast.success("Dados de demonstração removidos.");
+      console.log("[cleanup_demo_data] counts:", data);
+      setOpen(false);
+      setConfirm("");
+    } catch (e: any) {
+      toast.error("Falha ao limpar dados: " + (e?.message || "desconhecido"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900/50 rounded-3xl border border-slate-800 p-4 sm:p-6 shadow-2xl">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-9 w-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+          <Wrench className="h-4 w-4 text-rose-400" />
+        </div>
+        <div>
+          <h2 className="text-sm font-black uppercase tracking-widest text-white">Ferramentas do Sistema</h2>
+          <p className="text-[11px] text-slate-500 font-medium">Ações administrativas sensíveis</p>
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest text-xs h-12 rounded-2xl px-5"
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        Limpar Dados de Demonstração
+      </Button>
+
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirm(""); }}>
+        <DialogContent className="bg-slate-950 border-slate-800 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-400">
+              <AlertTriangle className="h-5 w-5" /> Limpar Dados de Demonstração
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-slate-300">
+            <p>
+              Esta ação <strong className="text-rose-400">apaga em definitivo</strong> todos os registros
+              operacionais do sistema:
+            </p>
+            <ul className="list-disc list-inside text-xs text-slate-400 space-y-1">
+              <li>Boletins RG, quarteirões e imóveis</li>
+              <li>Visitas e depósitos de visitas</li>
+              <li>Sessões de campo, fechamentos diários, boletins semanais</li>
+              <li>Uploads de RG, importações por OCR e exportações de PDF</li>
+            </ul>
+            <p className="text-xs text-slate-500">
+              Usuários, papéis, ciclos, áreas e ruas <strong>não</strong> são afetados.
+            </p>
+            <div className="pt-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 block">
+                Digite <span className="text-rose-400">LIMPAR</span> para confirmar
+              </label>
+              <Input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="LIMPAR"
+                className="bg-slate-900 border-slate-800 text-white"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy} className="text-slate-300">
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCleanup}
+              disabled={busy || confirm !== "LIMPAR"}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-black"
+            >
+              {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+              Apagar agora
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
