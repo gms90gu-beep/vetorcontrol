@@ -178,6 +178,14 @@ function FieldWorkListPage() {
               latest_visit: latestVisit
             };
           });
+          normalizedProps.sort((a: any, b: any) => {
+            const na = parseInt(a.number, 10);
+            const nb = parseInt(b.number, 10);
+            if (isNaN(na) && isNaN(nb)) return 0;
+            if (isNaN(na)) return 1;
+            if (isNaN(nb)) return -1;
+            return na - nb;
+          });
           setProperties(normalizedProps);
         }
       }
