@@ -39,7 +39,7 @@ export function OperationalDashboard() {
       setLoading(true);
       try {
         const [{ data: profs }, { data: vs }, { data: cs }, { data: ws }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name").in("role", ["agente", "agent"]),
+          supabase.from("profiles").select("id, full_name, role").eq("role", "agente"),
           supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id"),
           supabase.from("cycles").select("id, name, year, number").order("year", { ascending: false }),
           supabase.from("weeks").select("id, number, cycle_id, start_date, end_date"),
