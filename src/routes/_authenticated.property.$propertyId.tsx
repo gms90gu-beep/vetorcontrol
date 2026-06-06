@@ -296,7 +296,11 @@ function PropertyVisitPage() {
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
               sampleCollected: existingVisit.sample_collected || false,
-              tubitosColetados: existingVisit.tubitos_coletados || 0
+              tubitosColetados: existingVisit.tubitos_coletados || 0,
+              treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
+              treatmentAmount: existingVisit.activity_type === 'infestation_survey' ? (Number(existingVisit.treatment_amount) || 0) : 0,
+              larvicideUnit: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.larvicide_unit || "gramas") : "gramas",
+              treatedDeposits: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treated_deposits || 0) : 0
             });
             
             setPendingData({
