@@ -271,11 +271,11 @@ function BoletimView() {
 
         // Tabela
         const tableY = ry + 12;
-        const body = folha.map((p, i) => [
+        const body = folha.map((p) => [
           p.street_name || "",
           p.side || "",
           p.number || "",
-          String(p.sequence ?? idx * LINHAS_POR_FOLHA + i + 1),
+          p.sequence != null ? String(p.sequence) : "",
           p.complement || "",
           tipoCodigo(p.type),
           String(p.inhabitants ?? 0),
