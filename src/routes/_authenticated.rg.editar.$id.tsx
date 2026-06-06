@@ -167,7 +167,7 @@ function EditarBoletim() {
       ...arr,
       {
         _new: true,
-        street_name: "",
+        street_name: blockLoc.address || "",
         side: form.side || "",
         number: "",
         sequence: null,
@@ -176,6 +176,57 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
+  }
+
+  async function captureLocation() {
+    if (!("geolocation" in navigator)) {
+      toast.error("Geolocalização não disponível neste dispositivo.");
+      return;
+    }
+    setCapturing(true);
+    const tid = toast.loading("Capturando localização...");
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+        });
+      });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const result = await reverseGeocodeFn({ data: { lat, lng } });
+      toast.dismiss(tid);
+      if (result.ok) {
+        setBlockLoc({
+          address: result.address || "",
+          neighborhood: result.neighborhood || "",
+          city: result.city || "",
+          latitude: lat,
+          longitude: lng,
+          location_source: "gps",
+        });
+        if (result.city && !form.municipality) update("municipality", result.city);
+        if (result.state && !form.uf) update("uf", result.state);
+        toast.success(`Localização encontrada: ${result.formatted || `${result.address || ""}, ${result.neighborhood || ""}`}`);
+      } else {
+        setBlockLoc((b) => ({
+          ...b,
+          latitude: lat,
+          longitude: lng,
+          location_source: "gps",
+        }));
+        toast.warning(
+          result.reason === "google_maps_not_connected"
+            ? "Coordenadas capturadas. Conecte o Google Maps para identificar o endereço automaticamente."
+            : `Coordenadas capturadas. Endereço não identificado (${result.reason}). Preencha manualmente.`,
+        );
+      }
+    } catch (e: any) {
+      toast.dismiss(tid);
+      toast.error("Não foi possível capturar a localização: " + (e?.message || "permissão negada"));
+    } finally {
+      setCapturing(false);
+    }
   }
 
   function sortImoveisByNumber(arr: Imovel[]): Imovel[] {
