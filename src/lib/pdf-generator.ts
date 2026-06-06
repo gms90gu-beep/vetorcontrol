@@ -94,8 +94,16 @@ export const generateRGPDF = async (
     propertiesByStreet[street].push(p);
   });
 
-  // Preserve the order coming from the database (agent-defined). Do not
-  // reorder by sequence or number — SEQ is independent of NÚMERO.
+  // Sort by property number ascending (same order as the listing view).
+  // SEQ remains independent and is displayed as stored.
+  properties = [...properties].sort((a, b) => {
+    const na = parseInt(a.number, 10);
+    const nb = parseInt(b.number, 10);
+    if (isNaN(na) && isNaN(nb)) return (a.number || "").localeCompare(b.number || "");
+    if (isNaN(na)) return 1;
+    if (isNaN(nb)) return -1;
+    return na - nb;
+  });
 
   const streets = Object.keys(propertiesByStreet).sort();
   
