@@ -381,8 +381,8 @@ function EditarBoletim() {
             {visiveis.length === 0 && (
               <p className="text-sm text-slate-500 text-center py-6">Nenhum imóvel cadastrado.</p>
             )}
-            {imoveis.map((im, i) => {
-              if (im._deleted) return null;
+            {visiveis.map((im) => {
+              const i = imoveis.indexOf(im);
               return (
                 <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
@@ -436,6 +436,13 @@ function EditarBoletim() {
               );
             })}
           </div>
+
+          <div className="mt-4 flex justify-center">
+            <Button size="sm" variant="outline" onClick={addImovel}>
+              <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
+            </Button>
+          </div>
+
         </section>
 
         <div className="flex justify-end gap-2 pb-8">
