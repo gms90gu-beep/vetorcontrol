@@ -215,7 +215,7 @@ function EditarBoletim() {
             arr.map((im) =>
               im._deleted || (im.street_name && im.street_name.trim())
                 ? im
-                : { ...im, street_name: result.address!, _dirty: true },
+                : { ...im, street_name: result.address! },
             ),
           );
         }
