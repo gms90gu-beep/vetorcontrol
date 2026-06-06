@@ -111,16 +111,17 @@ export const generateRGPDF = async (
     const startIdx = i * propertiesPerPage;
     const endIdx = startIdx + propertiesPerPage;
     const pageProperties = properties.slice(startIdx, endIdx);
+    console.log("Dados enviados ao PDF:", pageProperties);
 
-    const tableData = pageProperties.map((p, idx) => [
+    const tableData = pageProperties.map((p) => [
       p.street_name || "",
       p.side || "",
       p.number || "",
-      p.sequence || startIdx + idx + 1,
+      p.sequence ?? "",
       p.complement || "",
-      (p.type === 'residence' || p.type === 'residential') ? 'R' : 
-      (p.type === 'commerce' || p.type === 'commercial') ? 'C' : 
-      p.type === 'vacant_lot' ? 'TB' : 
+      (p.type === 'residence' || p.type === 'residential') ? 'R' :
+      (p.type === 'commerce' || p.type === 'commercial') ? 'C' :
+      p.type === 'vacant_lot' ? 'TB' :
       p.type === 'strategic_point' ? 'PE' : 'O',
       p.inhabitants || 0
     ]);
