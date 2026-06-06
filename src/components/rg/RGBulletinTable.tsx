@@ -78,7 +78,7 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
                   {prop.number}
                 </TableCell>
                 <TableCell className="border-r border-slate-300 px-2 py-1 text-[11px] font-black text-slate-800 text-center">
-                  {prop.sequence || index + 1}
+                  {prop.sequence ?? "--"}
                 </TableCell>
                 <TableCell className="border-r border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-600 text-center">
                   {prop.complement || "--"}

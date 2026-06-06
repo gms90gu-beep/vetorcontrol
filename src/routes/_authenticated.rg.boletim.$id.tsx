@@ -271,11 +271,11 @@ function BoletimView() {
 
         // Tabela
         const tableY = ry + 12;
-        const body = folha.map((p, i) => [
+        const body = folha.map((p) => [
           p.street_name || "",
           p.side || "",
           p.number || "",
-          String(p.sequence ?? idx * LINHAS_POR_FOLHA + i + 1),
+          p.sequence != null ? String(p.sequence) : "",
           p.complement || "",
           tipoCodigo(p.type),
           String(p.inhabitants ?? 0),
@@ -474,12 +474,12 @@ function BoletimView() {
                 <tbody>
                   {folha.length === 0 ? (
                     <tr><td colSpan={7} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
-                  ) : folha.map((p, i) => (
+                  ) : folha.map((p) => (
                     <tr key={p.id}>
                       <td>{p.street_name || ""}</td>
                       <td className="text-center">{p.side || ""}</td>
                       <td className="text-center font-bold">{p.number}</td>
-                      <td className="text-center">{p.sequence ?? idx * LINHAS_POR_FOLHA + i + 1}</td>
+                      <td className="text-center">{p.sequence ?? ""}</td>
                       <td className="text-center">{p.complement || ""}</td>
                       <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
                       <td className="text-center">{p.inhabitants ?? 0}</td>

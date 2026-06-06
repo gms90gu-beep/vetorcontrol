@@ -281,7 +281,9 @@ function EditarBoletim() {
           .insert(payload)
           .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
           .single();
-        console.log("[RG Editar] Resultado:", data);
+        console.log("Imóvel salvo:", data);
+        console.log("Número:", data?.number);
+        console.log("SEQ:", data?.sequence);
         console.log("[RG Editar] Erro:", error);
         if (error) {
           console.error("[RG Editar] Erro INSERT imóvel:", error);
