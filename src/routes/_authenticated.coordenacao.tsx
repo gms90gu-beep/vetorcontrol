@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { CoordinatorDashboard } from "@/components/supervision/CoordinatorDashboard";
+import { MunicipalIntelligence } from "@/components/coordination/MunicipalIntelligence";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/coordenacao")({
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/coordenacao")({
 function CoordinatorPage() {
   return (
     <div className="w-full h-full pb-20">
-      <CoordinatorDashboard />
+      <MunicipalIntelligence />
     </div>
   );
 }
