@@ -111,7 +111,7 @@ function PropertyVisitPage() {
     guidance: false, 
     notes: "" 
   });
-  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0 });
+  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 });
   const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
