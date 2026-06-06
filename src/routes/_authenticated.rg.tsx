@@ -95,6 +95,7 @@ type Boletim = {
   agent_id: string;
   created_at: string;
   finalized_at: string | null;
+  block_id?: string | null;
 };
 
 type BoletimRow = Boletim & { total_imoveis: number };
