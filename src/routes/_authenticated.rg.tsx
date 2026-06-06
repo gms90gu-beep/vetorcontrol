@@ -137,7 +137,7 @@ function RGPage() {
 
       const { data: bs, error } = await supabase
         .from("boletins_rg")
-        .select("id, block_number, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
+        .select("id, block_number, block_id, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
