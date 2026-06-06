@@ -40,7 +40,7 @@ export function MunicipalIntelligence() {
           supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }),
         ]);
         const sups = (profs || []).filter((p: any) => p.role === "supervisor");
-        const ags = (profs || []).filter((p: any) => p.role === "agente" || p.role === "agent");
+        const ags = (profs || []).filter((p: any) => p.role === "agente");
         setSupervisors(sups);
         setAgents(ags);
         setVisits(vs || []);
