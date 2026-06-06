@@ -318,6 +318,21 @@ function EditarBoletim() {
         .eq("id", boletimId);
       if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
 
+      // Persist hybrid location on the block
+      if (effectiveBlockId) {
+        const blockUpdate: Record<string, unknown> = {
+          address: blockLoc.address || null,
+          neighborhood: blockLoc.neighborhood || null,
+          city: blockLoc.city || form.municipality || null,
+          latitude: blockLoc.latitude,
+          longitude: blockLoc.longitude,
+          location_source: blockLoc.location_source,
+        };
+        const { error: locErr } = await supabase
+          .from("blocks").update(blockUpdate).eq("id", effectiveBlockId);
+        if (locErr) console.warn("[RG Editar] Falha ao salvar localização do quarteirão:", locErr);
+      }
+
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       if (toDelete.length > 0) {
         console.log("[RG Editar] Deletando imóveis:", toDelete);
