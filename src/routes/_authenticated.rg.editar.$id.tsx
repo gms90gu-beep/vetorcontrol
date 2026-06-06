@@ -389,17 +389,12 @@ function EditarBoletim() {
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
                   
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
-                  <div>
-                    <Label className="text-[10px] uppercase tracking-wider text-slate-500">Sequência</Label>
-                    <label className="flex h-9 items-center gap-2 rounded-md border border-input px-2 text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={(im.sequence ?? 0) > 0}
-                        onChange={(e) => updateImovel(i, { sequence: e.target.checked ? 1 : null })}
-                      />
-                      <span className="text-xs text-slate-600">Sim</span>
-                    </label>
-                  </div>
+                  <Field
+                    label="Sequência"
+                    type="number"
+                    value={im.sequence != null ? String(im.sequence) : ""}
+                    onChange={(v) => updateImovel(i, { sequence: v.trim() === "" ? null : Number(v) })}
+                  />
                   <div>
                     <Label className="text-[10px] uppercase tracking-wider text-slate-500">Tipo</Label>
                     <select
