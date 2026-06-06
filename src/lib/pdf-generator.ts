@@ -86,7 +86,23 @@ export const generateRGPDF = async (
     doc.text(`MATRÍCULA: ${agent.registrationId || ""}`, 102, 30);
     doc.text(`CICLO: ${agent.cycle || ""}`, 152, 30);
     doc.text(`SEMANA: ${agent.week || ""}`, 202, 30);
-    
+
+    // Optional: hybrid location info
+    if (agent.address || agent.latitude != null) {
+      const parts: string[] = [];
+      if (agent.address) parts.push(`LOGRADOURO: ${agent.address}${agent.neighborhood ? ` — ${agent.neighborhood}` : ""}`);
+      if (agent.locationSource) parts.push(`ORIGEM: ${agent.locationSource === "gps" ? "GPS" : "Manual"}`);
+      if (agent.latitude != null && agent.longitude != null) {
+        parts.push(`LAT: ${agent.latitude.toFixed(6)}`);
+        parts.push(`LNG: ${agent.longitude.toFixed(6)}`);
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.text(parts.join("   "), margin + 2, 36);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+    }
+
     doc.setFontSize(8);
     doc.text(`Página ${pageNumber} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 5);
   };
