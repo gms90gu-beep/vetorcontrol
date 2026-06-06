@@ -94,10 +94,8 @@ export const generateRGPDF = async (
     propertiesByStreet[street].push(p);
   });
 
-  // Sort properties within each street by sequence
-  Object.keys(propertiesByStreet).forEach(street => {
-    propertiesByStreet[street].sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-  });
+  // Preserve the order coming from the database (agent-defined). Do not
+  // reorder by sequence or number — SEQ is independent of NÚMERO.
 
   const streets = Object.keys(propertiesByStreet).sort();
   
