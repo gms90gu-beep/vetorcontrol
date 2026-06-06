@@ -384,10 +384,10 @@ function EditarBoletim() {
             {visiveis.map((im) => {
               const i = imoveis.indexOf(im);
               return (
-                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-7 gap-2 items-end">
+                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-8 gap-2 items-end">
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
+                  <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
-                  
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
                   <Field
                     label="Sequência"
