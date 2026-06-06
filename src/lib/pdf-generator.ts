@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { format } from "date-fns";
 import { translate } from "./translations";
@@ -127,7 +127,7 @@ export const generateRGPDF = async (
       p.inhabitants || 0
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 38,
       head: [['RUA OU LOGRADOURO', 'LADO', 'NÚMERO', 'SEQ.', 'COMP.', 'TIPO', 'HAB.']],
       body: tableData,
