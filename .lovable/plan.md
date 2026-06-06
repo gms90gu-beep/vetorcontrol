@@ -1,46 +1,84 @@
-## Redesign /rg — RG Digital
+# Sistema Híbrido de Logradouro do Quarteirão
 
-Refazer a tela `/rg` seguindo o design system enviado (header escuro #0b1520, cards #111e2e, fundo #f4f5f7, abas brancas, tipografia compacta com labels 8-9px uppercase). **Mantenho 100% das funcionalidades atuais e o schema atual** — só muda a apresentação.
+Permitir ao agente escolher entre **capturar via GPS** ou **digitar manualmente** o logradouro do quarteirão, e fazer os imóveis herdarem esses dados automaticamente.
 
-### Esclarecimento de schema (importante)
-O spec diz "INSERT na tabela `blocks` com logradouro/lado/numero/tipo/habitantes". No banco real:
-- `blocks` = quarteirão (subarea_id, number, status) — **não armazena imóveis individuais**
-- `properties` = imóveis (number, street_name, type, container_count, block_id, user_id…)
+## 1. Banco de dados
 
-O fluxo atual já usa `properties` corretamente (com RLS por `user_id = auth.uid()`). Vou **manter `properties`** como fonte dos imóveis cadastrados — caso contrário, quebraria boletim, RG, mapa e supervisão. Apenas o visual muda.
+Migração na tabela `blocks` adicionando:
+- `latitude` (double precision, null)
+- `longitude` (double precision, null)
+- `address` (text, null) — logradouro
+- `neighborhood` (text, null) — bairro
+- `city` (text, null) — município
+- `location_source` (text, null) — valores: `gps` | `manual`
 
-### Escopo das mudanças (somente `src/routes/_authenticated.rg.tsx`)
+(Mantém compatibilidade — todos nullable, registros existentes seguem funcionando.)
 
-1. **Header escuro** `#0b1520` com:
-   - Linha superior: voltar `←` · "RG Digital" · fechar `✕` (cores `#4a6b80`)
-   - Subtítulo "Ciclo N / Semana N · Quarteirão N · Município – UF"
-   - Grid 3 cards `#111e2e` borda `#1e3048`: Trabalhados / Fechados / Focos (focos em `#f87171`)
+## 2. Tela de criação/edição do quarteirão (RG)
 
-2. **Tabs brancas** (4): Cadastro · Imóveis (N) · Boletim · Histórico
-   - Aba ativa: texto `#0b1520`, borda inferior 2px `#0b1520`
-   - Inativa: `#aab0bc`
+No `src/routes/_authenticated.rg.editar.$id.tsx` (e no fluxo de criação do boletim), adicionar acima dos campos do quarteirão:
 
-3. **Aba Cadastro**:
-   - Card identidade (ícone map em quadrado azul `#e6f1fb`)
-   - Grid 2 botões: "PDF Quarteirão" (`#0b1520`) e "Salvar" (`#059669`)
-   - Card "Dados do Quarteirão" (read-only, separadores `#f0f2f4`)
-   - Totalizadores grid 3×2: R / C / TB / PE / O / Total Geral (este último `#0b1520` branco)
-   - Linha "Total Habitantes" `#059669` 20px bold
-   - Lista de imóveis com badge SEQ (001, 002…), badge tipo colorido conforme paleta (R/C/TB/PE/O), lixeira `#e0e4ea` → `#f87171` no hover, confirmação delete
-   - Formulário "Novo Imóvel" com borda tracejada `#c0c8d4`, pills clicáveis de tipo, SEQ automático, mantém Rua/Lado ao limpar
+```
+Como deseja informar o logradouro?
+( ) 📍 Capturar localização    ( ) ✍️ Digitar manualmente
+```
 
-4. **Aba Imóveis (N)**: busca por endereço + filtro por tipo (pills) + editar/excluir cada item
+**Modo GPS:**
+- Botão "📍 Capturar Localização"
+- Usa `navigator.geolocation.getCurrentPosition`
+- Faz reverse geocoding via gateway Google Maps (`/maps/api/geocode/json?latlng=…`)
+- Preenche automaticamente address/neighborhood/city/uf + lat/lng
+- Mostra "Localização encontrada: Rua X, Bairro Y" + botão "✓ Confirmar"
+- Salva `location_source = 'gps'`
 
-5. **Aba Boletim**: renderiza componente existente (`RGBulletinHeader` + `RGBulletinTable` + `RGBulletinFooter`) com botões Imprimir (`window.print`) e Baixar PDF (`generateRGPDF`)
+**Modo manual:**
+- Campos editáveis: Logradouro, Bairro, Município, Observação
+- Salva `location_source = 'manual'` (lat/lng ficam null)
 
-6. **Aba Histórico**: lista de PDFs arquivados (já existe `archivedPDFs`) — Data · Quarteirão · total · Visualizar · PDF
+## 3. Herança nos imóveis
 
-### O que NÃO mexo
-- Schema, migrations, RLS, edge functions
-- Componentes `RGBulletinHeader/Table/Footer`, `RGQuickAddForm`, `RGImportByPhoto` continuam disponíveis (uso direto onde aplicável)
-- Lógica de fetch, salvar PDF no storage, boletins_rg
-- Outras rotas, navegação inferior, etc.
+Em `addImovel()` e ao criar imóvel novo, pré-preencher do quarteirão:
+- `street_name` ← `block.address`
+- (bairro/município ficam no boletim; já existem)
+- `latitude`/`longitude` do imóvel ← do quarteirão quando GPS (campos já existem em `properties`)
 
-### Riscos
-- Arquivo grande (778 linhas) será largamente reescrito; mantendo nomes de state/funções para não quebrar handlers.
-- Cores hex aplicadas inline (style) já que o spec fixa hex exatos — não convertendo para tokens do design system para evitar drift.
+Agente ainda pode editar por imóvel se precisar.
+
+## 4. Exibição
+
+- Lista de quarteirões / detalhe do boletim: mostrar
+  ```
+  📍 Rua José Bonifácio
+  Origem: GPS    (badge verde) | Manual (badge cinza)
+  ```
+
+## 5. PDF BRG
+
+Em `src/lib/pdf-generator.ts`, no cabeçalho do boletim adicionar linha opcional:
+```
+Logradouro: <address>   Origem: GPS/Manual
+Lat: <latitude>   Lng: <longitude>
+```
+(Só renderiza se houver dados.)
+
+## 6. Conector Google Maps
+
+Requer conexão Google Maps Platform (gateway) para reverse geocoding. Se o usuário ainda não tem, pedimos para conectar antes de testar o modo GPS. Sem a conexão, o modo GPS captura lat/lng mas não preenche endereço (fallback: usuário completa manualmente).
+
+## Compatibilidade
+
+`navigator.geolocation` funciona em Android, iOS, tablets e desktop modernos. Requer HTTPS (preview Lovable já é HTTPS).
+
+## Arquivos afetados
+
+- **Migração**: novas colunas em `blocks`
+- `src/routes/_authenticated.rg.editar.$id.tsx` — UI de seleção GPS/manual + herança
+- `src/routes/_authenticated.rg.tsx` — exibição da origem na listagem
+- `src/routes/_authenticated.rg.boletim.$id.tsx` — exibição no boletim
+- `src/lib/pdf-generator.ts` — linhas de logradouro/origem/coords no header
+- (novo) `src/lib/geocoding.ts` — helper reverse geocoding via gateway
+
+## Confirmações necessárias
+
+1. **Google Maps** — você já tem o conector Google Maps Platform conectado? Sem ele, o GPS captura coordenadas mas não consegue identificar o endereço automaticamente.
+2. **Escopo do "quarteirão"** — hoje o cadastro do quarteirão acontece dentro do boletim RG (campos UF/Município/Logradouro já existem no boletim). Confirmar: os novos campos (address/neighborhood/lat/lng/source) devem ficar em `blocks` (compartilhado entre boletins do mesmo quarteirão) ou em `boletins_rg` (por boletim)? O plano acima assume `blocks`.

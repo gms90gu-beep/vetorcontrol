@@ -115,21 +115,39 @@ export type Database = {
       }
       blocks: {
         Row: {
+          address: string | null
+          city: string | null
           id: string
+          latitude: number | null
+          location_source: string | null
+          longitude: number | null
+          neighborhood: string | null
           number: string
           status: Database["public"]["Enums"]["block_status"]
           subarea_id: string
           total_properties: number | null
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           id?: string
+          latitude?: number | null
+          location_source?: string | null
+          longitude?: number | null
+          neighborhood?: string | null
           number: string
           status?: Database["public"]["Enums"]["block_status"]
           subarea_id: string
           total_properties?: number | null
         }
         Update: {
+          address?: string | null
+          city?: string | null
           id?: string
+          latitude?: number | null
+          location_source?: string | null
+          longitude?: number | null
+          neighborhood?: string | null
           number?: string
           status?: Database["public"]["Enums"]["block_status"]
           subarea_id?: string
