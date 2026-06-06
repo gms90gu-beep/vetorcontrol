@@ -1,16 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createFileRoute as _, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  LogOut,
-  PlayCircle,
-  CalendarCheck,
-  MapPin,
-  BarChart3,
-  AlertTriangle,
-  History,
-} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { AgentDashboard } from "@/components/agent/AgentDashboard";
 
