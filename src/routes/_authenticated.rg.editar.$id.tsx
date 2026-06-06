@@ -453,12 +453,12 @@ function EditarBoletim() {
 }
 
 function Field({
-  label, value, onChange, className,
-}: { label: string; value: string; onChange: (v: string) => void; className?: string }) {
+  label, value, onChange, className, type,
+}: { label: string; value: string; onChange: (v: string) => void; className?: string; type?: string }) {
   return (
     <div className={className}>
       <Label className="text-[10px] uppercase tracking-wider text-slate-500">{label}</Label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
