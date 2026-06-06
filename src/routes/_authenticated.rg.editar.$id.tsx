@@ -320,7 +320,7 @@ function EditarBoletim() {
 
       // Persist hybrid location on the block
       if (effectiveBlockId) {
-        const blockUpdate: Record<string, unknown> = {
+        const blockUpdate = {
           address: blockLoc.address || null,
           neighborhood: blockLoc.neighborhood || null,
           city: blockLoc.city || form.municipality || null,
