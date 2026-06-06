@@ -111,7 +111,7 @@ function PropertyVisitPage() {
     guidance: false, 
     notes: "" 
   });
-  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0 });
+  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 });
   const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -296,7 +296,11 @@ function PropertyVisitPage() {
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
               sampleCollected: existingVisit.sample_collected || false,
-              tubitosColetados: existingVisit.tubitos_coletados || 0
+              tubitosColetados: existingVisit.tubitos_coletados || 0,
+              treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
+              treatmentAmount: existingVisit.activity_type === 'infestation_survey' ? (Number(existingVisit.treatment_amount) || 0) : 0,
+              larvicideUnit: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.larvicide_unit || "gramas") : "gramas",
+              treatedDeposits: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treated_deposits || 0) : 0
             });
             
             setPendingData({
@@ -458,6 +462,17 @@ function PropertyVisitPage() {
       }
     }
 
+    if (status === 'visited' && activity === 'survey' && surveyData.treatment) {
+      if (surveyData.treatmentAmount <= 0) {
+        toast.error("Informe a quantidade de larvicida utilizada.");
+        return;
+      }
+      if (surveyData.treatedDeposits <= 0) {
+        toast.error("Informe a quantidade de depósitos tratados.");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -485,10 +500,10 @@ function PropertyVisitPage() {
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
-            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
-            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
-            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
-            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
+            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
+            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
+            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
+            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
@@ -511,10 +526,10 @@ function PropertyVisitPage() {
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
-            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : false,
-            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : 0,
-            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : null,
-            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : 0,
+            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
+            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
+            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
+            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
             guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
@@ -1065,6 +1080,58 @@ function PropertyVisitPage() {
                         <p className="text-[9px] font-bold text-amber-500 text-center uppercase tracking-tighter">
                           Total acumulado hoje: {dailyStats.tubitos + (surveyData.tubitosColetados || 0)} tubitos
                         </p>
+                      </div>
+                    )}
+
+                    <BooleanButton 
+                      label="Tratamento realizado?" 
+                      value={surveyData.treatment} 
+                      onChange={(v) => setSurveyData({...surveyData, treatment: v})} 
+                    />
+                    {surveyData.treatment && (
+                      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de larvicida utilizado</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={surveyData.treatmentAmount} 
+                            onChange={(e) => setSurveyData({...surveyData, treatmentAmount: Math.max(0, Number(e.target.value))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Unidade</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {["gramas", "ml", "tabletes", "sachês"].map((unit) => (
+                              <Button
+                                key={unit}
+                                type="button"
+                                variant={surveyData.larvicideUnit === unit ? "default" : "outline"}
+                                onClick={() => setSurveyData({...surveyData, larvicideUnit: unit})}
+                                className={`h-10 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${
+                                  surveyData.larvicideUnit === unit 
+                                    ? 'bg-primary shadow-md shadow-primary/20' 
+                                    : 'border-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {unit}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade de depósitos tratados</Label>
+                          <Input 
+                            type="number" 
+                            min="0"
+                            value={surveyData.treatedDeposits} 
+                            onChange={(e) => setSurveyData({...surveyData, treatedDeposits: Math.max(0, Math.floor(Number(e.target.value)))})}
+                            className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
+                          />
+                        </div>
                       </div>
                     )}
                   </CardContent>
