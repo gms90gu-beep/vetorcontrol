@@ -115,6 +115,27 @@ function EditarBoletim() {
 
       console.log("Imóveis carregados:", props?.length || 0);
       setImoveis((props || []) as Imovel[]);
+
+      // Load block location data (hybrid GPS / manual address)
+      if (data.block_id) {
+        const { data: block } = await supabase
+          .from("blocks")
+          .select("address, neighborhood, city, latitude, longitude, location_source")
+          .eq("id", data.block_id)
+          .maybeSingle();
+        if (block) {
+          setBlockLoc({
+            address: (block as any).address || "",
+            neighborhood: (block as any).neighborhood || "",
+            city: (block as any).city || "",
+            latitude: (block as any).latitude ?? null,
+            longitude: (block as any).longitude ?? null,
+            location_source: ((block as any).location_source as "gps" | "manual" | null) ?? null,
+          });
+          if ((block as any).location_source === "gps") setLocationMode("gps");
+          else if ((block as any).address || (block as any).neighborhood) setLocationMode("manual");
+        }
+      }
     } catch (e: any) {
       console.log("Erro", e);
       setError(e?.message || "Erro ao carregar boletim.");
