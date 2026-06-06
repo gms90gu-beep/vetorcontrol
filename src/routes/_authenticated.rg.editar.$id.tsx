@@ -48,17 +48,35 @@ const EMPTY_FORM: Form = {
   category_1: "", category_2: "",
 };
 
+type BlockLoc = {
+  address: string;
+  neighborhood: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: "gps" | "manual" | null;
+};
+
+const EMPTY_BLOCK_LOC: BlockLoc = {
+  address: "", neighborhood: "", city: "",
+  latitude: null, longitude: null, location_source: null,
+};
+
 function EditarBoletim() {
   const { id } = useParams({ from: "/_authenticated/rg/editar/$id" });
   const navigate = useNavigate();
+  const reverseGeocodeFn = useServerFn(reverseGeocode);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [boletimId, setBoletimId] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
+  const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
