@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { Loader2, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { reverseGeocode } from "@/lib/geocoding.functions";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
   component: EditarBoletim,
