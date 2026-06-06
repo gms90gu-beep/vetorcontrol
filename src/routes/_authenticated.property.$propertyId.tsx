@@ -37,9 +37,9 @@ const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
   { code: "A2", name: "Tambor/Barril" },
   { code: "B", name: "Vasos/Pratos" },
-  { code: "C", name: "Pneus" },
-  { code: "D1", name: "Lixo" },
-  { code: "D2", name: "Entulho" },
+  { code: "C", name: "Tanque" },
+  { code: "D1", name: "Pneu" },
+  { code: "D2", name: "Lixos" },
   { code: "E", name: "Depósitos naturais" }
 ];
 
