@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { Loader2, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { reverseGeocode } from "@/lib/geocoding.functions";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
   component: EditarBoletim,
@@ -46,17 +48,35 @@ const EMPTY_FORM: Form = {
   category_1: "", category_2: "",
 };
 
+type BlockLoc = {
+  address: string;
+  neighborhood: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: "gps" | "manual" | null;
+};
+
+const EMPTY_BLOCK_LOC: BlockLoc = {
+  address: "", neighborhood: "", city: "",
+  latitude: null, longitude: null, location_source: null,
+};
+
 function EditarBoletim() {
   const { id } = useParams({ from: "/_authenticated/rg/editar/$id" });
   const navigate = useNavigate();
+  const reverseGeocodeFn = useServerFn(reverseGeocode);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [boletimId, setBoletimId] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
+  const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
@@ -95,6 +115,27 @@ function EditarBoletim() {
 
       console.log("Imóveis carregados:", props?.length || 0);
       setImoveis((props || []) as Imovel[]);
+
+      // Load block location data (hybrid GPS / manual address)
+      if (data.block_id) {
+        const { data: block } = await supabase
+          .from("blocks")
+          .select("address, neighborhood, city, latitude, longitude, location_source")
+          .eq("id", data.block_id)
+          .maybeSingle();
+        if (block) {
+          setBlockLoc({
+            address: (block as any).address || "",
+            neighborhood: (block as any).neighborhood || "",
+            city: (block as any).city || "",
+            latitude: (block as any).latitude ?? null,
+            longitude: (block as any).longitude ?? null,
+            location_source: ((block as any).location_source as "gps" | "manual" | null) ?? null,
+          });
+          if ((block as any).location_source === "gps") setLocationMode("gps");
+          else if ((block as any).address || (block as any).neighborhood) setLocationMode("manual");
+        }
+      }
     } catch (e: any) {
       console.log("Erro", e);
       setError(e?.message || "Erro ao carregar boletim.");
@@ -126,7 +167,7 @@ function EditarBoletim() {
       ...arr,
       {
         _new: true,
-        street_name: "",
+        street_name: blockLoc.address || "",
         side: form.side || "",
         number: "",
         sequence: null,
@@ -135,6 +176,57 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
+  }
+
+  async function captureLocation() {
+    if (!("geolocation" in navigator)) {
+      toast.error("Geolocalização não disponível neste dispositivo.");
+      return;
+    }
+    setCapturing(true);
+    const tid = toast.loading("Capturando localização...");
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 15000,
+        });
+      });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const result = await reverseGeocodeFn({ data: { lat, lng } });
+      toast.dismiss(tid);
+      if (result.ok) {
+        setBlockLoc({
+          address: result.address || "",
+          neighborhood: result.neighborhood || "",
+          city: result.city || "",
+          latitude: lat,
+          longitude: lng,
+          location_source: "gps",
+        });
+        if (result.city && !form.municipality) update("municipality", result.city);
+        if (result.state && !form.uf) update("uf", result.state);
+        toast.success(`Localização encontrada: ${result.formatted || `${result.address || ""}, ${result.neighborhood || ""}`}`);
+      } else {
+        setBlockLoc((b) => ({
+          ...b,
+          latitude: lat,
+          longitude: lng,
+          location_source: "gps",
+        }));
+        toast.warning(
+          result.reason === "google_maps_not_connected"
+            ? "Coordenadas capturadas. Conecte o Google Maps para identificar o endereço automaticamente."
+            : `Coordenadas capturadas. Endereço não identificado (${result.reason}). Preencha manualmente.`,
+        );
+      }
+    } catch (e: any) {
+      toast.dismiss(tid);
+      toast.error("Não foi possível capturar a localização: " + (e?.message || "permissão negada"));
+    } finally {
+      setCapturing(false);
+    }
   }
 
   function sortImoveisByNumber(arr: Imovel[]): Imovel[] {
@@ -225,6 +317,21 @@ function EditarBoletim() {
         })
         .eq("id", boletimId);
       if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
+
+      // Persist hybrid location on the block
+      if (effectiveBlockId) {
+        const blockUpdate = {
+          address: blockLoc.address || null,
+          neighborhood: blockLoc.neighborhood || null,
+          city: blockLoc.city || form.municipality || null,
+          latitude: blockLoc.latitude,
+          longitude: blockLoc.longitude,
+          location_source: blockLoc.location_source,
+        };
+        const { error: locErr } = await supabase
+          .from("blocks").update(blockUpdate).eq("id", effectiveBlockId);
+        if (locErr) console.warn("[RG Editar] Falha ao salvar localização do quarteirão:", locErr);
+      }
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       if (toDelete.length > 0) {
@@ -354,6 +461,70 @@ function EditarBoletim() {
       </div>
 
       <div className="max-w-5xl mx-auto p-4 space-y-6">
+        <section className="bg-white rounded-lg border p-4">
+          <h2 className="font-bold text-sm uppercase tracking-wider text-slate-700 mb-3">
+            Logradouro do Quarteirão
+          </h2>
+          <p className="text-xs text-slate-500 mb-3">Como deseja informar o logradouro?</p>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            <Button
+              type="button"
+              size="sm"
+              variant={locationMode === "gps" ? "default" : "outline"}
+              onClick={() => setLocationMode("gps")}
+            >
+              <MapPin className="h-4 w-4 mr-1" /> Capturar localização
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={locationMode === "manual" ? "default" : "outline"}
+              onClick={() => setLocationMode("manual")}
+            >
+              <Pencil className="h-4 w-4 mr-1" /> Digitar manualmente
+            </Button>
+          </div>
+
+          {locationMode === "gps" && (
+            <div className="mb-4">
+              <Button
+                type="button"
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={captureLocation}
+                disabled={capturing}
+              >
+                {capturing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
+                Capturar Localização
+              </Button>
+              {blockLoc.latitude != null && blockLoc.longitude != null && (
+                <div className="mt-2 text-xs text-slate-600">
+                  <div>Lat: {blockLoc.latitude.toFixed(6)} · Lng: {blockLoc.longitude.toFixed(6)}</div>
+                  {blockLoc.address && (
+                    <div className="mt-1 text-emerald-700 font-medium">
+                      ✓ {blockLoc.address}{blockLoc.neighborhood ? `, ${blockLoc.neighborhood}` : ""}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Field label="Logradouro" value={blockLoc.address} onChange={(v) => setBlockLoc((b) => ({ ...b, address: v, location_source: b.location_source ?? "manual" }))} className="md:col-span-3" />
+            <Field label="Bairro" value={blockLoc.neighborhood} onChange={(v) => setBlockLoc((b) => ({ ...b, neighborhood: v, location_source: b.location_source ?? "manual" }))} />
+            <Field label="Município" value={blockLoc.city} onChange={(v) => setBlockLoc((b) => ({ ...b, city: v, location_source: b.location_source ?? "manual" }))} />
+            <div className="flex items-end">
+              <div className="text-xs text-slate-500">
+                Origem:{" "}
+                <span className={blockLoc.location_source === "gps" ? "text-emerald-700 font-semibold" : "text-slate-700 font-semibold"}>
+                  {blockLoc.location_source === "gps" ? "GPS" : blockLoc.location_source === "manual" ? "Manual" : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="bg-white rounded-lg border p-4">
           <h2 className="font-bold text-sm uppercase tracking-wider text-slate-700 mb-3">Dados do Boletim</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

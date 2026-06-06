@@ -95,6 +95,7 @@ type Boletim = {
   agent_id: string;
   created_at: string;
   finalized_at: string | null;
+  block_id?: string | null;
 };
 
 type BoletimRow = Boletim & { total_imoveis: number };
@@ -136,7 +137,7 @@ function RGPage() {
 
       const { data: bs, error } = await supabase
         .from("boletins_rg")
-        .select("id, block_number, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
+        .select("id, block_number, block_id, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
 
@@ -281,6 +282,18 @@ function RGPage() {
       );
 
       const blockLabel = b.block_number || "SN";
+
+      // Hybrid location from block (if any)
+      let blockLoc: { address?: string | null; neighborhood?: string | null; latitude?: number | null; longitude?: number | null; location_source?: "gps" | "manual" | null } = {};
+      if (b.block_id) {
+        const { data: blk } = await supabase
+          .from("blocks")
+          .select("address, neighborhood, latitude, longitude, location_source")
+          .eq("id", b.block_id)
+          .maybeSingle();
+        if (blk) blockLoc = blk as any;
+      }
+
       const doc = await generateRGPDF(
         props as any,
         {
@@ -291,6 +304,11 @@ function RGPage() {
           week: "",
           block: blockLabel,
           street: b.locality || (props[0] as any)?.street_name || "",
+          address: blockLoc.address ?? null,
+          neighborhood: blockLoc.neighborhood ?? null,
+          latitude: blockLoc.latitude ?? null,
+          longitude: blockLoc.longitude ?? null,
+          locationSource: blockLoc.location_source ?? null,
         },
         {
           total: stats.total, residences: stats.R, commerce: stats.C,
