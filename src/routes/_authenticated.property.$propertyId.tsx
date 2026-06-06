@@ -462,6 +462,17 @@ function PropertyVisitPage() {
       }
     }
 
+    if (status === 'visited' && activity === 'survey' && surveyData.treatment) {
+      if (surveyData.treatmentAmount <= 0) {
+        toast.error("Informe a quantidade de larvicida utilizada.");
+        return;
+      }
+      if (surveyData.treatedDeposits <= 0) {
+        toast.error("Informe a quantidade de depósitos tratados.");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
