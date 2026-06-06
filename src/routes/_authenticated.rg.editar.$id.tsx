@@ -205,8 +205,20 @@ function EditarBoletim() {
           longitude: lng,
           location_source: "gps",
         });
-        if (result.city && !form.municipality) update("municipality", result.city);
-        if (result.state && !form.uf) update("uf", result.state);
+        if (result.city) update("municipality", result.city);
+        if (result.state) update("uf", result.state);
+        if (result.address) update("locality", result.address);
+        if (result.neighborhood) update("sublocality", result.neighborhood);
+        // Propaga logradouro para imóveis sem street_name preenchido
+        if (result.address) {
+          setImoveis((arr) =>
+            arr.map((im) =>
+              im._deleted || (im.street_name && im.street_name.trim())
+                ? im
+                : { ...im, street_name: result.address!, _dirty: true },
+            ),
+          );
+        }
         toast.success(`Localização encontrada: ${result.formatted || `${result.address || ""}, ${result.neighborhood || ""}`}`);
       } else {
         setBlockLoc((b) => ({
