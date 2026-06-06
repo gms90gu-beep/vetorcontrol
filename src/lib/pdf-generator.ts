@@ -24,6 +24,11 @@ interface AgentInfo {
   week: string;
   block?: string;
   street?: string;
+  address?: string | null;
+  neighborhood?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationSource?: "gps" | "manual" | null;
 }
 
 interface ExportMetadata {
