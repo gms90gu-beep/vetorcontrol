@@ -1,84 +1,112 @@
-# Sistema Híbrido de Logradouro do Quarteirão
+## Reestruturação por Perfil
 
-Permitir ao agente escolher entre **capturar via GPS** ou **digitar manualmente** o logradouro do quarteirão, e fazer os imóveis herdarem esses dados automaticamente.
+Objetivo: separar claramente o que cada perfil enxerga, removendo a "Inteligência Operacional" do Agente e criando experiências dedicadas para Supervisor e Coordenador.
 
-## 1. Banco de dados
+---
 
-Migração na tabela `blocks` adicionando:
-- `latitude` (double precision, null)
-- `longitude` (double precision, null)
-- `address` (text, null) — logradouro
-- `neighborhood` (text, null) — bairro
-- `city` (text, null) — município
-- `location_source` (text, null) — valores: `gps` | `manual`
+### 1. PERFIL AGENTE — `/dashboard` (quando role = agente)
 
-(Mantém compatibilidade — todos nullable, registros existentes seguem funcionando.)
+Remover bloco atual "Inteligência Operacional" e substituir por 4 seções:
 
-## 2. Tela de criação/edição do quarteirão (RG)
+**a) Meu Desempenho**
+- Card "Produção de Hoje": imóveis trabalhados, fechados, recusas, focos, depósitos tratados, larvicidas aplicados
+- Card "Produção da Semana": imóveis visitados, focos, recusas, quarteirões concluídos
+- Fonte: tabela `visits` + `visit_deposits` filtrada por `agent_id = auth.uid()` e data
 
-No `src/routes/_authenticated.rg.editar.$id.tsx` (e no fluxo de criação do boletim), adicionar acima dos campos do quarteirão:
+**b) Meta Operacional**
+- Meta diária (configurável em `system_settings`, default 30 imóveis/dia)
+- Produção atual do dia
+- Percentual + barra de progresso (`<Progress>`)
 
-```
-Como deseja informar o logradouro?
-( ) 📍 Capturar localização    ( ) ✍️ Digitar manualmente
-```
+**c) Meu Histórico** — Tabs: Hoje / Semana / Mês
+- Lista agrupada de visitas do agente no período
 
-**Modo GPS:**
-- Botão "📍 Capturar Localização"
-- Usa `navigator.geolocation.getCurrentPosition`
-- Faz reverse geocoding via gateway Google Maps (`/maps/api/geocode/json?latlng=…`)
-- Preenche automaticamente address/neighborhood/city/uf + lat/lng
-- Mostra "Localização encontrada: Rua X, Bairro Y" + botão "✓ Confirmar"
-- Salva `location_source = 'gps'`
+**d) Minha Área**
+- Quarteirão atual (último `field_work_sessions` ativo)
+- Quarteirões concluídos / pendentes do agente
+- Botão "Abrir Mapa" → `/map` filtrado
 
-**Modo manual:**
-- Campos editáveis: Logradouro, Bairro, Município, Observação
-- Salva `location_source = 'manual'` (lat/lng ficam null)
+**Mapa do Agente (`/map`)**
+- Mostrar apenas imóveis vinculados ao agente (via `boletins_rg.agent_id = auth.uid()` ou `visits.agent_id`)
+- Pins: visitados (verde), focos (vermelho)
 
-## 3. Herança nos imóveis
+---
 
-Em `addImovel()` e ao criar imóvel novo, pré-preencher do quarteirão:
-- `street_name` ← `block.address`
-- (bairro/município ficam no boletim; já existem)
-- `latitude`/`longitude` do imóvel ← do quarteirão quando GPS (campos já existem em `properties`)
+### 2. PERFIL SUPERVISOR — `/supervision`
 
-Agente ainda pode editar por imóvel se precisar.
+Manter `SupervisionDashboard` atual e adicionar nova aba **"Dashboard Operacional"**:
 
-## 4. Exibição
+- **Produção por Agente** (tabela): imóveis trabalhados, recusas, fechados, focos
+- **Cobertura Territorial**: % por área e por ciclo
+- **Ranking de Agentes**: produtividade diária e semanal (ordenado)
+- **Pendências**: imóveis não visitados, quarteirões pendentes
+- **Filtros**: agente, ciclo, semana, área
+- **Relatórios**: botões "Exportar PDF" / "Exportar Excel"
 
-- Lista de quarteirões / detalhe do boletim: mostrar
-  ```
-  📍 Rua José Bonifácio
-  Origem: GPS    (badge verde) | Manual (badge cinza)
-  ```
+Escopo de dados: apenas agentes onde `profiles.supervisor_id = auth.uid()` (já garantido por RLS via `can_supervise_user`).
 
-## 5. PDF BRG
+---
 
-Em `src/lib/pdf-generator.ts`, no cabeçalho do boletim adicionar linha opcional:
-```
-Logradouro: <address>   Origem: GPS/Manual
-Lat: <latitude>   Lng: <longitude>
-```
-(Só renderiza se houver dados.)
+### 3. PERFIL COORDENADOR — `/coordenacao`
 
-## 6. Conector Google Maps
+Substituir `CoordinatorDashboard` por nova **Central de Inteligência Municipal** com tabs:
 
-Requer conexão Google Maps Platform (gateway) para reverse geocoding. Se o usuário ainda não tem, pedimos para conectar antes de testar o modo GPS. Sem a conexão, o modo GPS captura lat/lng mas não preenche endereço (fallback: usuário completa manualmente).
+**a) Indicadores Gerais**
+- Cobertura municipal, imóveis trabalhados, focos, recusas, fechados
 
-## Compatibilidade
+**b) Cobertura por Bairro**
+- % execução por bairro; destacar áreas críticas (< 50%)
 
-`navigator.geolocation` funciona em Android, iOS, tablets e desktop modernos. Requer HTTPS (preview Lovable já é HTTPS).
+**c) Indicadores por Supervisor**
+- Produtividade da equipe de cada supervisor, comparativos
 
-## Arquivos afetados
+**d) Indicadores por Ciclo**
+- Andamento e % concluído de cada ciclo
 
-- **Migração**: novas colunas em `blocks`
-- `src/routes/_authenticated.rg.editar.$id.tsx` — UI de seleção GPS/manual + herança
-- `src/routes/_authenticated.rg.tsx` — exibição da origem na listagem
-- `src/routes/_authenticated.rg.boletim.$id.tsx` — exibição no boletim
-- `src/lib/pdf-generator.ts` — linhas de logradouro/origem/coords no header
-- (novo) `src/lib/geocoding.ts` — helper reverse geocoding via gateway
+**e) Mapa Estratégico** (`/map?scope=municipal`)
+- Focos, pendências, imóveis trabalhados, cobertura territorial
 
-## Confirmações necessárias
+**f) Exportações**
+- PDF consolidado, Excel consolidado
 
-1. **Google Maps** — você já tem o conector Google Maps Platform conectado? Sem ele, o GPS captura coordenadas mas não consegue identificar o endereço automaticamente.
-2. **Escopo do "quarteirão"** — hoje o cadastro do quarteirão acontece dentro do boletim RG (campos UF/Município/Logradouro já existem no boletim). Confirmar: os novos campos (address/neighborhood/lat/lng/source) devem ficar em `blocks` (compartilhado entre boletins do mesmo quarteirão) ou em `boletins_rg` (por boletim)? O plano acima assume `blocks`.
+**g) Relatórios Gerenciais**
+- Por área, supervisor, agente, ciclo
+
+Escopo: agentes/supervisores onde `profiles.coordinator_id = auth.uid()` ou supervisores subordinados (já em RLS).
+
+---
+
+### 4. SEGURANÇA (RLS)
+
+RLS atual já cobre os escopos via `can_supervise_user()` e `has_role()`. Nenhuma migração necessária — apenas garantir que as queries do frontend usem `select` sem bypass.
+
+Adicionar `system_settings.daily_goal` (integer) se ainda não existir — migração simples.
+
+---
+
+### Arquivos afetados
+
+- **Novo**: `src/components/agent/AgentDashboard.tsx` (Meu Desempenho, Meta, Histórico, Minha Área)
+- **Novo**: `src/components/supervision/OperationalDashboard.tsx` (aba dentro de SupervisionDashboard)
+- **Novo**: `src/components/coordination/MunicipalIntelligence.tsx`
+- **Editado**: `src/routes/_authenticated.dashboard.tsx` (renderizar AgentDashboard quando role=agente)
+- **Editado**: `src/components/supervision/SupervisionDashboard.tsx` (adicionar tab)
+- **Editado**: `src/routes/_authenticated.coordenacao.tsx` (usar novo componente)
+- **Editado**: `src/routes/_authenticated.map.tsx` (filtrar por role)
+- **Migração**: adicionar `daily_goal` em `system_settings` (se necessário)
+
+---
+
+### Detalhes técnicos
+
+- Reutilizar `useAuth()` para role-gating
+- Queries via `supabase` client (RLS já filtra)
+- Gráficos: usar `recharts` (já em `src/components/ui/chart.tsx`)
+- Exportação PDF: reutilizar `src/lib/pdf-generator.ts`
+- Exportação Excel: adicionar `xlsx` via `bun add xlsx`
+
+### Perguntas antes de implementar
+
+1. Meta diária do agente: usar valor fixo (ex: 30 imóveis/dia) ou criar campo configurável em `system_settings`?
+2. Manter o conteúdo atual da seção "Inteligência Operacional" do Agente como referência ao mover para o Supervisor, ou pode ser reescrito do zero?
+3. Exportação Excel: tudo bem adicionar a dependência `xlsx`?
