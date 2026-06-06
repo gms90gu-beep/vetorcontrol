@@ -127,7 +127,7 @@ export const generateRGPDF = async (
       p.inhabitants || 0
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 38,
       head: [['RUA OU LOGRADOURO', 'LADO', 'NÚMERO', 'SEQ.', 'COMP.', 'TIPO', 'HAB.']],
       body: tableData,
