@@ -178,11 +178,12 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
-    // Scroll the newly added imóvel (just above the "Adicionar Imóvel" button) into view
+    // Scroll the newly added imóvel into view (it is rendered as the last item)
     requestAnimationFrame(() => {
       setTimeout(() => {
-        addBtnRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
+        const target = lastItemRef.current || addBtnRef.current;
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
     });
   }
 
