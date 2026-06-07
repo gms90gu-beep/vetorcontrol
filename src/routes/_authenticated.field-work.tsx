@@ -76,19 +76,33 @@ function FieldWorkPage() {
         }
       }
 
-      // Only show blocks that have at least one property linked to a registered
-      // boletim RG (evita exibir quarteirões/dados de demonstração).
-      const { data: blocksData } = await supabase
-        .from("blocks")
-        .select(`*, properties!inner(id, boletim_id)`)
-        .not("properties.boletim_id", "is", null)
-        .order("number", { ascending: true });
+      // Only show blocks that have properties linked to a boletim RG
+      // belonging to the CURRENT agent. Each agent only sees their own
+      // RG-registered blocks — new agents start empty until they fill an RG.
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: myBoletins } = await supabase
+          .from("boletins_rg")
+          .select("id")
+          .eq("agent_id", currentUser.id);
 
-      if (blocksData) {
-        // Deduplicate (inner join may repeat blocks per property).
-        const seen = new Set<string>();
-        const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
-        setBlocks(uniq);
+        const boletimIds = (myBoletins ?? []).map((b: any) => b.id);
+
+        if (boletimIds.length === 0) {
+          setBlocks([]);
+        } else {
+          const { data: blocksData } = await supabase
+            .from("blocks")
+            .select(`*, properties!inner(id, boletim_id)`)
+            .in("properties.boletim_id", boletimIds)
+            .order("number", { ascending: true });
+
+          if (blocksData) {
+            const seen = new Set<string>();
+            const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+            setBlocks(uniq);
+          }
+        }
       }
 
     } catch (error) {
