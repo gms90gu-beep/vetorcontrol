@@ -176,6 +176,12 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
+    // Scroll the newly added imóvel (just above the "Adicionar Imóvel" button) into view
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        addBtnRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    });
   }
 
   async function captureLocation() {
