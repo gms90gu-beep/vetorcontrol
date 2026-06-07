@@ -252,6 +252,8 @@ function EditarBoletim() {
     const visiveis = arr.filter((i) => !i._deleted);
     const deletados = arr.filter((i) => i._deleted);
     const sorted = [...visiveis].sort((a, b) => {
+      if (a._new && !b._new) return 1;
+      if (!a._new && b._new) return -1;
       const na = parseInt(a.number, 10) || 0;
       const nb = parseInt(b.number, 10) || 0;
       return na - nb;
@@ -455,6 +457,8 @@ function EditarBoletim() {
   const visiveis = [...imoveis]
     .filter((i) => !i._deleted)
     .sort((a, b) => {
+      if (a._new && !b._new) return 1;
+      if (!a._new && b._new) return -1;
       const na = parseInt(a.number, 10) || 0;
       const nb = parseInt(b.number, 10) || 0;
       return na - nb;
