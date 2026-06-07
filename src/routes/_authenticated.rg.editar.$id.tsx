@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,7 @@ function EditarBoletim() {
   const [boletimId, setBoletimId] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const addBtnRef = useRef<HTMLDivElement | null>(null);
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
@@ -176,6 +177,12 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
+    // Scroll the newly added imóvel (just above the "Adicionar Imóvel" button) into view
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        addBtnRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    });
   }
 
   async function captureLocation() {
@@ -617,7 +624,7 @@ function EditarBoletim() {
             })}
           </div>
 
-          <div className="mt-4 flex justify-center">
+          <div ref={addBtnRef} className="mt-4 flex justify-center scroll-mt-24">
             <Button size="sm" variant="outline" onClick={addImovel}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
             </Button>
