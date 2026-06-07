@@ -76,6 +76,7 @@ function EditarBoletim() {
   const [blockId, setBlockId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const addBtnRef = useRef<HTMLDivElement | null>(null);
+  const lastItemRef = useRef<HTMLDivElement | null>(null);
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
@@ -177,11 +178,12 @@ function EditarBoletim() {
         inhabitants: 0,
       },
     ]);
-    // Scroll the newly added imóvel (just above the "Adicionar Imóvel" button) into view
+    // Scroll the newly added imóvel into view (it is rendered as the last item)
     requestAnimationFrame(() => {
       setTimeout(() => {
-        addBtnRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 50);
+        const target = lastItemRef.current || addBtnRef.current;
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
     });
   }
 
@@ -577,10 +579,15 @@ function EditarBoletim() {
             {visiveis.length === 0 && (
               <p className="text-sm text-slate-500 text-center py-6">Nenhum imóvel cadastrado.</p>
             )}
-            {visiveis.map((im) => {
+            {visiveis.map((im, vIdx) => {
               const i = imoveis.indexOf(im);
+              const isLast = vIdx === visiveis.length - 1;
               return (
-                <div key={im.id || `new-${i}`} className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-8 gap-2 items-end">
+                <div
+                  key={im.id || `new-${i}`}
+                  ref={isLast ? lastItemRef : undefined}
+                  className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-8 gap-2 items-end"
+                >
                   <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
                   <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
