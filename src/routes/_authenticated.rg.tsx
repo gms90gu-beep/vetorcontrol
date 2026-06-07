@@ -164,12 +164,23 @@ function RGPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return boletins;
-    return boletins.filter((b) =>
-      (b.block_number || "").toLowerCase().includes(q) ||
-      (b.locality || "").toLowerCase().includes(q) ||
-      (b.agent_name || "").toLowerCase().includes(q),
-    );
+    const base = !q
+      ? boletins
+      : boletins.filter((b) =>
+          (b.block_number || "").toLowerCase().includes(q) ||
+          (b.locality || "").toLowerCase().includes(q) ||
+          (b.agent_name || "").toLowerCase().includes(q),
+        );
+    return [...base].sort((a, b) => {
+      const na = parseInt((a.block_number || "").replace(/\D/g, ""), 10);
+      const nb = parseInt((b.block_number || "").replace(/\D/g, ""), 10);
+      const aHas = !isNaN(na);
+      const bHas = !isNaN(nb);
+      if (aHas && bHas && na !== nb) return na - nb;
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return (a.block_number || "").localeCompare(b.block_number || "");
+    });
   }, [boletins, search]);
 
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
