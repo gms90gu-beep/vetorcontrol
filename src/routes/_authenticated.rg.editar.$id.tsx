@@ -75,6 +75,7 @@ function EditarBoletim() {
   const [boletimId, setBoletimId] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
+  const addBtnRef = useRef<HTMLDivElement | null>(null);
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
