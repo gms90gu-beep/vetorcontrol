@@ -624,7 +624,7 @@ function EditarBoletim() {
             })}
           </div>
 
-          <div className="mt-4 flex justify-center">
+          <div ref={addBtnRef} className="mt-4 flex justify-center scroll-mt-24">
             <Button size="sm" variant="outline" onClick={addImovel}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
             </Button>
