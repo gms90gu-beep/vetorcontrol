@@ -282,6 +282,17 @@ export function DailyWorkCloser({
         .eq("session_date", operationalWorkDate);
       const blocksCompleted = new Set((completedSessions || []).map(s => s.block_number)).size;
 
+      // Semana epidemiológica (ISO) da data da jornada — chave para consolidar o Relatório Semanal
+      const epi = (() => {
+        const ref = new Date(`${operationalWorkDate}T12:00:00`);
+        const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        return { week, year: d.getUTCFullYear() };
+      })();
+
       const recordData = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
@@ -304,6 +315,8 @@ export function DailyWorkCloser({
         samples_collected: samples,
         blocks_completed: blocksCompleted,
         pending_visits: pendingCount,
+        epi_week: epi.week,
+        epi_year: epi.year,
         updated_at: new Date().toISOString()
       };
 
