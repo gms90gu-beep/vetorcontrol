@@ -1236,7 +1236,7 @@ function PropertyVisitPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => navigate({ to: `/property/${prevProperty.id}` })}
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }}
                 className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-500"
                 title="Imóvel anterior"
               >
