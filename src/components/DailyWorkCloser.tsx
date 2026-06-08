@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { 
   CheckCircle2, 
   XCircle, 
@@ -31,6 +33,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
+
 
 interface DailyWorkCloserProps {
   stats?: {
