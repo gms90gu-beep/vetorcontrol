@@ -404,12 +404,14 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+
       if (currentVisitId) {
         const { error: updateError } = await supabase
           .from("visits")
           .update({ 
             status: newStatus as any,
-            visit_date: new Date().toISOString()
+            visit_date: operationalVisitDate
           })
           .eq("id", currentVisitId);
         
@@ -424,7 +426,7 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: newStatus as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString()
+            visit_date: operationalVisitDate
           })
           .select()
           .single();
