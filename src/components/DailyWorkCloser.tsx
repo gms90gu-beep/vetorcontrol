@@ -76,6 +76,10 @@ export function DailyWorkCloser({
     larvicideUsed: 0,
     progress: 0
   });
+  const [pendingCount, setPendingCount] = useState(0);
+  const [recoveredCount, setRecoveredCount] = useState(0);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const stats = externalStats || localStats;
 
