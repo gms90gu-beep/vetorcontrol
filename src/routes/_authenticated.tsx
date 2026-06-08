@@ -160,7 +160,6 @@ function BottomNav() {
       <NavItem to="/rg" icon={MapPin} label="RG" />
       <NavItem to="/pending" icon={AlertTriangle} label="Pend." />
       <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
