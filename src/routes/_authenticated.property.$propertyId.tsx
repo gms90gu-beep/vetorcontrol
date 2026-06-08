@@ -1284,7 +1284,7 @@ function PropertyVisitPage() {
             </button>
             <span className="h-4 w-px bg-slate-200 shrink-0" />
             <button
-              onClick={() => navigate({ to: "/dashboard" })}
+              onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/dashboard" }); }}
               className="flex-1 min-w-0 text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest py-1 truncate"
             >
               Tela Inicial
