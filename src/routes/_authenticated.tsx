@@ -214,7 +214,6 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
-        { label: "Relatórios", icon: FileText, to: "/reports" },
       ];
 
   if (userRole === "admin_master") {
