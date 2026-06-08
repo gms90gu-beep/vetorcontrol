@@ -152,6 +152,8 @@ function FieldWorkListPage() {
               elimination_done,
               elimination_amount,
               visit_date,
+              agent_id,
+              cycle_id,
               visit_deposits (
                 id,
                 is_positive,
@@ -160,8 +162,13 @@ function FieldWorkListPage() {
             )
           `)
           .eq("block_number", session.block_number)
-          .eq("visits.cycle_id", session.cycle_id as string)
+          .eq("visits.agent_id", user.id)
           .order("number", { ascending: true });
+
+        if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
+        console.log("[FieldWorkList] session:", { id: session.id, block: session.block_number, cycle_id: session.cycle_id, status: session.status });
+        console.log("[FieldWorkList] imóveis retornados:", props?.length, "com visitas:", (props || []).filter((p: any) => p.visits?.length).length);
+
         
         if (props) {
           const normalizedProps = props.map(p => {
