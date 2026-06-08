@@ -158,6 +158,11 @@ function PropertyVisitPage() {
     setIsDirty(true);
   }, [status, activity, routineData, surveyData, pendingData, deposits]);
 
+  // Ao terminar o carregamento, o estado inicial é considerado limpo
+  useEffect(() => {
+    if (!isLoading) setIsDirty(false);
+  }, [isLoading, propertyId]);
+
   // Aviso ao fechar/recarregar a aba com dados não salvos
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
