@@ -507,6 +507,11 @@ function NewAttemptDialog({
   const [result, setResult] = useState<RecoveryResult>("closed");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [treated, setTreated] = useState<"yes" | "no" | "">("");
+  const [depositCount, setDepositCount] = useState<string>("");
+  const [larvicideAmount, setLarvicideAmount] = useState<string>("");
+  const [larvicideUnit, setLarvicideUnit] = useState<string>("g");
+
 
   const submit = async () => {
     if (!user) return;
@@ -530,11 +535,23 @@ function NewAttemptDialog({
         }
       } catch {}
 
+      let finalNotes = notes.trim();
+      if (result === "visited" && treated) {
+        const parts: string[] = [];
+        parts.push(treated === "yes" ? "Tratado: SIM" : "Tratado: NÃO");
+        if (treated === "yes") {
+          if (depositCount) parts.push(`Depósitos tratados: ${depositCount}`);
+          if (larvicideAmount) parts.push(`Larvicida: ${larvicideAmount} ${larvicideUnit}`);
+        }
+        const meta = `[${parts.join(" · ")}]`;
+        finalNotes = finalNotes ? `${finalNotes}\n${meta}` : meta;
+      }
+
       const { error } = await (supabase as any).from("property_recovery_attempts").insert({
         property_id: pendency.property_id,
         agent_id: user.id,
         result,
-        notes: notes.trim() || null,
+        notes: finalNotes || null,
         latitude: lat,
         longitude: lng,
       });
@@ -542,7 +559,11 @@ function NewAttemptDialog({
       toast.success("Tentativa registrada");
       setNotes("");
       setResult("closed");
+      setTreated("");
+      setDepositCount("");
+      setLarvicideAmount("");
       onCreated();
+
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || "Erro ao registrar tentativa");
@@ -576,6 +597,73 @@ function NewAttemptDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {result === "visited" && (
+            <div className="space-y-3 rounded-lg border bg-emerald-50/40 p-3">
+              <div>
+                <label className="text-xs font-bold uppercase text-muted-foreground">
+                  O imóvel foi tratado?
+                </label>
+                <Select value={treated} onValueChange={(v) => setTreated(v as any)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Sim, foi tratado</SelectItem>
+                    <SelectItem value="no">Não foi tratado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {treated === "yes" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Depósitos tratados
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      inputMode="numeric"
+                      value={depositCount}
+                      onChange={(e) => setDepositCount(e.target.value)}
+                      placeholder="0"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Larvicida
+                    </label>
+                    <div className="mt-1 flex gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={larvicideAmount}
+                        onChange={(e) => setLarvicideAmount(e.target.value)}
+                        placeholder="0"
+                        className="flex-1"
+                      />
+                      <Select value={larvicideUnit} onValueChange={setLarvicideUnit}>
+                        <SelectTrigger className="w-[72px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="g">g</SelectItem>
+                          <SelectItem value="ml">ml</SelectItem>
+                          <SelectItem value="sachê">sachê</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+
           <div>
             <label className="text-xs font-bold uppercase text-muted-foreground">Observação</label>
             <Textarea
