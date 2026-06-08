@@ -1,15 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useOperationalDate } from "@/hooks/useOperationalDate";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  RefreshCw,
   FileText,
   Download,
   Share2,
@@ -21,11 +13,47 @@ import {
   ClipboardList,
   FileSpreadsheet,
   Activity,
+  Printer,
+  Eye,
+  RotateCw,
+  ChevronDown,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Filter,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   generateWeeklyReportPDF,
   openWhatsAppShare,
 } from "@/components/reports/WeeklyReportGenerator";
+import {
+  generateDailyReportPDF,
+  printPdf,
+  shareBlobViaWhatsApp,
+} from "@/components/reports/DailyReportGenerator";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
@@ -33,12 +61,8 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 
 function RelatoriosPage() {
   const { userRole } = useOperationalDate();
-
-  if (!userRole) {
-    return (
-      <div className="p-8 text-sm text-muted-foreground">Carregando…</div>
-    );
-  }
+  if (!userRole)
+    return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
   const isAgent = userRole === "agente";
   const isSupervisor = userRole === "supervisor";
@@ -55,7 +79,7 @@ function RelatoriosPage() {
           Relatórios
         </h1>
         <p className="text-sm text-slate-500 font-medium">
-          {isAgent && "Seus relatórios operacionais — diários, semanais e ciclos."}
+          {isAgent && "Histórico operacional, auditoria e geração de PDFs."}
           {(isSupervisor || isAdmin) &&
             "Relatórios da equipe — por agente, área e pendências."}
           {isCoordinator && "Relatórios municipais e boletins oficiais."}
@@ -71,26 +95,62 @@ function RelatoriosPage() {
 
 /* ───────────────────────── AGENTE ───────────────────────── */
 
+type Daily = {
+  id: string;
+  work_date: string;
+  epi_week: number | null;
+  epi_year: number | null;
+  cycle_id: string | null;
+  status: string;
+  properties_worked: number | null;
+  properties_closed: number | null;
+  properties_refused: number | null;
+  properties_recovered: number | null;
+  deposits_inspected: number | null;
+  deposits_treated: number | null;
+  positive_foci: number | null;
+  tubitos_collected: number | null;
+  larvicide_amount: number | null;
+  pending_visits: number | null;
+};
+
 function AgentReports() {
   const [loading, setLoading] = useState(true);
-  const [dailies, setDailies] = useState<any[]>([]);
-  const [generating, setGenerating] = useState(false);
+  const [dailies, setDailies] = useState<Daily[]>([]);
+  const [cycles, setCycles] = useState<
+    { id: string; number: number | null; name: string | null }[]
+  >([]);
   const [authId, setAuthId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string>("Agente");
+  const [agentMeta, setAgentMeta] = useState<{
+    name: string;
+    registration: string;
+    municipality: string;
+  }>({ name: "Agente", registration: "—", municipality: "—" });
+
+  // Filtros
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [cycleFilter, setCycleFilter] = useState("all");
+  const [seFilter, setSeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const [generatingWeekly, setGeneratingWeekly] = useState(false);
+  const [auditWeek, setAuditWeek] = useState<{ week: number; year: number } | null>(
+    null
+  );
 
   const fetchDailies = useCallback(async (aId: string) => {
     const { data, error } = await supabase
       .from("daily_work_records")
       .select(
-        "id, work_date, epi_week, epi_year, properties_worked, properties_closed, properties_refused, deposits_inspected, focuses_found, tubitos_collected"
+        "id, work_date, epi_week, epi_year, cycle_id, status, properties_worked, properties_closed, properties_refused, properties_recovered, deposits_inspected, deposits_treated, positive_foci, tubitos_collected, larvicide_amount, pending_visits"
       )
       .eq("agent_id", aId)
       .order("work_date", { ascending: false })
-      .limit(30);
+      .limit(180);
     if (error) console.error("[RELATÓRIOS] erro ao buscar:", error);
-    console.log(`[RELATÓRIOS] ${data?.length ?? 0} diárias encontradas`);
-    setDailies(data || []);
+    setDailies((data || []) as Daily[]);
   }, []);
 
   useEffect(() => {
@@ -107,26 +167,38 @@ function AgentReports() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name")
+        .select("full_name, registration_number, city")
         .eq("id", session.user.id)
         .maybeSingle();
-      if (profile?.full_name) setFullName(profile.full_name);
 
       const { data: agent } = await supabase
         .from("agents")
-        .select("id")
+        .select("id, name, registration_id, municipality")
         .eq("profile_id", session.user.id)
         .maybeSingle();
 
       if (agent?.id) {
         setAgentId(agent.id);
+        setAgentMeta({
+          name: agent.name || profile?.full_name || "Agente",
+          registration:
+            agent.registration_id || profile?.registration_number || "—",
+          municipality: agent.municipality || profile?.city || "—",
+        });
         await fetchDailies(agent.id);
       }
+
+      const { data: cs } = await supabase
+        .from("cycles")
+        .select("id, number, name")
+        .order("number", { ascending: false });
+      setCycles(cs || []);
+
       setLoading(false);
     })();
   }, [fetchDailies]);
 
-  // Refetch quando voltar para a aba/janela
+  // Refetch on focus
   useEffect(() => {
     if (!agentId) return;
     const onFocus = () => fetchDailies(agentId);
@@ -138,7 +210,7 @@ function AgentReports() {
     };
   }, [agentId, fetchDailies]);
 
-  // Realtime: novo/atualizado registro do agente aparece na hora
+  // Realtime
   useEffect(() => {
     if (!agentId) return;
     const channel = supabase
@@ -159,155 +231,601 @@ function AgentReports() {
     };
   }, [agentId, fetchDailies]);
 
-  const handleWeekly = async () => {
+  const cycleMap = useMemo(() => {
+    const m = new Map<string, string>();
+    cycles.forEach((c) =>
+      m.set(c.id, c.number != null ? String(c.number) : c.name || "—")
+    );
+    return m;
+  }, [cycles]);
+
+  // SE únicas
+  const seOptions = useMemo(() => {
+    const set = new Set<string>();
+    dailies.forEach((d) => {
+      if (d.epi_week && d.epi_year) set.add(`${d.epi_week}/${d.epi_year}`);
+    });
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+  }, [dailies]);
+
+  // Filtered dailies
+  const filteredDailies = useMemo(() => {
+    return dailies.filter((d) => {
+      if (from && d.work_date < from) return false;
+      if (to && d.work_date > to) return false;
+      if (cycleFilter !== "all" && d.cycle_id !== cycleFilter) return false;
+      if (seFilter !== "all") {
+        const k = `${d.epi_week}/${d.epi_year}`;
+        if (k !== seFilter) return false;
+      }
+      if (statusFilter !== "all" && d.status !== statusFilter) return false;
+      return true;
+    });
+  }, [dailies, from, to, cycleFilter, seFilter, statusFilter]);
+
+  // Weekly aggregation
+  const weeklyAgg = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        week: number;
+        year: number;
+        records: Daily[];
+        worked: number;
+        closed: number;
+        refused: number;
+        focos: number;
+        tubitos: number;
+        larvicide: number;
+      }
+    >();
+    filteredDailies.forEach((d) => {
+      if (!d.epi_week || !d.epi_year) return;
+      const key = `${d.epi_year}-${String(d.epi_week).padStart(2, "0")}`;
+      const cur = map.get(key) || {
+        week: d.epi_week,
+        year: d.epi_year,
+        records: [],
+        worked: 0,
+        closed: 0,
+        refused: 0,
+        focos: 0,
+        tubitos: 0,
+        larvicide: 0,
+      };
+      cur.records.push(d);
+      cur.worked += d.properties_worked || 0;
+      cur.closed += d.properties_closed || 0;
+      cur.refused += d.properties_refused || 0;
+      cur.focos += d.positive_foci || 0;
+      cur.tubitos += d.tubitos_collected || 0;
+      cur.larvicide += Number(d.larvicide_amount || 0);
+      map.set(key, cur);
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([, v]) => v);
+  }, [filteredDailies]);
+
+  // ── Actions
+  const buildDailyPdf = async (id: string) => {
+    const cycleNumber = (() => {
+      const d = dailies.find((x) => x.id === id);
+      return d?.cycle_id ? cycleMap.get(d.cycle_id) || null : null;
+    })();
+    return await generateDailyReportPDF(id, {
+      agentName: agentMeta.name,
+      registration: agentMeta.registration,
+      municipality: agentMeta.municipality,
+      cycleNumber,
+    });
+  };
+
+  const handleDailyDownload = async (id: string) => {
+    toast.info("Gerando PDF…");
+    const res = await buildDailyPdf(id);
+    if (res) {
+      res.pdf.save(res.fileName);
+      toast.success("PDF gerado");
+    }
+  };
+
+  const handleDailyPrint = async (id: string) => {
+    const res = await buildDailyPdf(id);
+    if (res) printPdf(res.pdf);
+  };
+
+  const handleDailyShare = async (id: string) => {
+    const res = await buildDailyPdf(id);
+    if (res)
+      await shareBlobViaWhatsApp(
+        res.blob,
+        res.fileName,
+        `Relatório Diário — ${agentMeta.name}`
+      );
+  };
+
+  const handleDailyView = async (id: string) => {
+    const res = await buildDailyPdf(id);
+    if (res) {
+      const url = URL.createObjectURL(res.blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  };
+
+  const handleWeekly = async (week?: number, year?: number) => {
     if (!authId) return;
-    setGenerating(true);
+    setGeneratingWeekly(true);
     toast.info("Gerando Boletim Semanal…");
-    const result = await generateWeeklyReportPDF(authId);
+    const ref =
+      week && year
+        ? // Quarta-feira da SE para garantir cálculo correto
+          (() => {
+            const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+            return simple;
+          })()
+        : new Date();
+    const result = await generateWeeklyReportPDF(authId, ref);
     if (result) {
       result.pdf.save(result.fileName);
       toast.success(
         `SE ${result.epiWeek}/${result.epiYear} — ${result.dailyCount} diária(s) consolidada(s).`
       );
     }
-    setGenerating(false);
+    setGeneratingWeekly(false);
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleWeeklyShare = async () => {
     if (!authId) return;
     const result = await generateWeeklyReportPDF(authId);
-    if (result) openWhatsAppShare(result.fileName, fullName);
+    if (result) openWhatsAppShare(result.fileName, agentMeta.name);
   };
+
+  const auditRecords = useMemo(() => {
+    if (!auditWeek) return [];
+    return dailies.filter(
+      (d) => d.epi_week === auditWeek.week && d.epi_year === auditWeek.year
+    );
+  }, [auditWeek, dailies]);
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <ActionCard
-          icon={<Calendar className="h-6 w-6" />}
-          title="Relatório Semanal"
-          description="Boletim oficial consolidado da semana epidemiológica atual."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleWeekly}
-                disabled={generating}
-                className="h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wide"
-              >
-                <Download className="mr-2 h-4 w-4" /> Baixar PDF
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleShareWhatsApp}
-                disabled={generating}
-                className="h-11 rounded-xl font-bold text-xs uppercase tracking-wide"
-              >
-                <Share2 className="mr-2 h-4 w-4" /> WhatsApp
-              </Button>
-            </div>
-          }
-        />
-        <ActionCard
-          icon={<TrendingUp className="h-6 w-6" />}
-          title="Produção do Ciclo"
-          description="Acompanhe sua produção acumulada no ciclo em andamento."
-          action={
-            <Button
-              asChild
-              variant="outline"
-              className="h-11 rounded-xl font-bold text-xs uppercase tracking-wide"
-            >
-              <Link to="/dashboard">
-                <Activity className="mr-2 h-4 w-4" /> Ver no Dashboard
-              </Link>
-            </Button>
-          }
-        />
-      </div>
-
-      <Card className="p-6 rounded-3xl border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">
-              Histórico de Diárias
-            </h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Últimos 30 fechamentos
-            </p>
+      {/* Filtros */}
+      <Card className="p-4 rounded-2xl border-slate-100">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="h-4 w-4 text-slate-500" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Filtros
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-slate-400">De</label>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-9 text-xs"
+            />
           </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-slate-400">Até</label>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-9 text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-slate-400">Ciclo</label>
+            <Select value={cycleFilter} onValueChange={setCycleFilter}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {cycles.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    Ciclo {c.number ?? c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-slate-400">SE</label>
+            <Select value={seFilter} onValueChange={setSeFilter}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {seOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    SE {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase text-slate-400">Status</label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="completed">Encerrada</SelectItem>
+                <SelectItem value="in_progress">Em andamento</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-[10px] font-bold uppercase text-slate-400">
+            {filteredDailies.length} registro(s) • {weeklyAgg.length} semana(s)
+          </span>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => agentId && fetchDailies(agentId)}
-            className="h-8 px-2 rounded-lg text-slate-400 hover:text-slate-700"
-            title="Atualizar"
+            className="h-8 px-2 text-slate-500"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3.5 w-3.5 mr-1" /> Atualizar
           </Button>
         </div>
+      </Card>
 
-        {loading ? (
-          <p className="text-sm text-slate-400 py-6 text-center">Carregando…</p>
-        ) : dailies.length === 0 ? (
-          <p className="text-sm text-slate-400 py-8 text-center font-medium">
-            Nenhuma diária registrada ainda.
-          </p>
-        ) : (
-          <div className="overflow-x-auto -mx-2">
-            <table className="w-full text-sm">
+      <Tabs defaultValue="diarias" className="w-full">
+        <TabsList className="bg-slate-100 h-10 p-1 rounded-xl">
+          <TabsTrigger
+            value="diarias"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 font-bold text-xs uppercase tracking-wide px-4"
+          >
+            <Calendar className="h-3.5 w-3.5 mr-1.5" /> Diárias
+          </TabsTrigger>
+          <TabsTrigger
+            value="semanais"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-slate-900 font-bold text-xs uppercase tracking-wide px-4"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5" /> Semanais
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ── DIÁRIAS ── */}
+        <TabsContent value="diarias" className="mt-4">
+          <Card className="p-5 rounded-3xl border-slate-100">
+            <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-1">
+              Histórico de Diárias
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+              Cada registro é um snapshot oficial da jornada encerrada
+            </p>
+
+            {loading ? (
+              <p className="text-sm text-slate-400 py-6 text-center">Carregando…</p>
+            ) : filteredDailies.length === 0 ? (
+              <p className="text-sm text-slate-400 py-8 text-center font-medium">
+                Nenhuma diária encontrada com os filtros atuais.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                      <th className="px-2 py-2 text-left">Data</th>
+                      <th className="px-2 py-2 text-center">SE</th>
+                      <th className="px-2 py-2 text-center">Ciclo</th>
+                      <th className="px-2 py-2 text-center">Trab.</th>
+                      <th className="px-2 py-2 text-center">Fech.</th>
+                      <th className="px-2 py-2 text-center">Rec.</th>
+                      <th className="px-2 py-2 text-center">Focos</th>
+                      <th className="px-2 py-2 text-center">Tub.</th>
+                      <th className="px-2 py-2 text-center">Larv.</th>
+                      <th className="px-2 py-2 text-center">Status</th>
+                      <th className="px-2 py-2 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDailies.map((d) => (
+                      <tr
+                        key={d.id}
+                        className="border-b border-slate-50 text-slate-700 font-medium hover:bg-slate-50/60"
+                      >
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {format(
+                            new Date(`${d.work_date}T12:00:00`),
+                            "dd/MM/yyyy",
+                            { locale: ptBR }
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center text-slate-500">
+                          {d.epi_week ? `${d.epi_week}/${d.epi_year}` : "—"}
+                        </td>
+                        <td className="px-2 py-2 text-center text-slate-500">
+                          {d.cycle_id ? cycleMap.get(d.cycle_id) || "—" : "—"}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {d.properties_worked ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {d.properties_closed ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {d.properties_refused ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center text-rose-600 font-bold">
+                          {d.positive_foci ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {d.tubitos_collected ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {d.larvicide_amount ?? 0}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <StatusBadge status={d.status} />
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <IconBtn
+                              title="Visualizar"
+                              onClick={() => handleDailyView(d.id)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </IconBtn>
+                            <IconBtn
+                              title="Baixar PDF"
+                              onClick={() => handleDailyDownload(d.id)}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </IconBtn>
+                            <IconBtn
+                              title="Regerar PDF"
+                              onClick={() => handleDailyDownload(d.id)}
+                            >
+                              <RotateCw className="h-3.5 w-3.5" />
+                            </IconBtn>
+                            <IconBtn
+                              title="Imprimir"
+                              onClick={() => handleDailyPrint(d.id)}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </IconBtn>
+                            <IconBtn
+                              title="Compartilhar"
+                              onClick={() => handleDailyShare(d.id)}
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
+                            </IconBtn>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* ── SEMANAIS ── */}
+        <TabsContent value="semanais" className="mt-4 space-y-4">
+          <Card className="p-5 rounded-3xl border-slate-100">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">
+                  Boletins Semanais
+                </h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Soma oficial dos diários por semana epidemiológica
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleWeekly()}
+                  disabled={generatingWeekly}
+                  className="h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] uppercase tracking-wide"
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> SE Atual
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleWeeklyShare}
+                  disabled={generatingWeekly}
+                  className="h-9 rounded-xl font-bold text-[11px] uppercase tracking-wide"
+                >
+                  <Share2 className="mr-1.5 h-3.5 w-3.5" /> WhatsApp
+                </Button>
+              </div>
+            </div>
+
+            {weeklyAgg.length === 0 ? (
+              <p className="text-sm text-slate-400 py-8 text-center font-medium">
+                Nenhuma semana com diárias encerradas ainda.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                      <th className="px-2 py-2 text-left">SE</th>
+                      <th className="px-2 py-2 text-center">Ano</th>
+                      <th className="px-2 py-2 text-center">Diárias</th>
+                      <th className="px-2 py-2 text-center">Trab.</th>
+                      <th className="px-2 py-2 text-center">Fech.</th>
+                      <th className="px-2 py-2 text-center">Rec.</th>
+                      <th className="px-2 py-2 text-center">Focos</th>
+                      <th className="px-2 py-2 text-center">Tub.</th>
+                      <th className="px-2 py-2 text-right">PDF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weeklyAgg.map((w) => (
+                      <tr
+                        key={`${w.year}-${w.week}`}
+                        className="border-b border-slate-50 text-slate-700 font-medium hover:bg-slate-50/60"
+                      >
+                        <td className="px-2 py-2 font-black text-slate-900">
+                          SE {w.week}
+                        </td>
+                        <td className="px-2 py-2 text-center text-slate-500">
+                          {w.year}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <button
+                            onClick={() =>
+                              setAuditWeek({ week: w.week, year: w.year })
+                            }
+                            className="inline-flex items-center gap-1 text-blue-600 hover:underline font-bold text-xs"
+                            title="Ver diárias consolidadas"
+                          >
+                            {w.records.length}
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </td>
+                        <td className="px-2 py-2 text-center">{w.worked}</td>
+                        <td className="px-2 py-2 text-center">{w.closed}</td>
+                        <td className="px-2 py-2 text-center">{w.refused}</td>
+                        <td className="px-2 py-2 text-center text-rose-600 font-bold">
+                          {w.focos}
+                        </td>
+                        <td className="px-2 py-2 text-center">{w.tubitos}</td>
+                        <td className="px-2 py-2 text-right">
+                          <IconBtn
+                            title="Gerar boletim"
+                            onClick={() => handleWeekly(w.week, w.year)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </IconBtn>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Auditoria — diárias que compõem a semana */}
+      <Dialog open={!!auditWeek} onOpenChange={(v) => !v && setAuditWeek(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-black uppercase tracking-tight">
+              Auditoria — SE {auditWeek?.week}/{auditWeek?.year}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="bg-blue-50 text-blue-800 text-xs font-bold px-3 py-2 rounded-lg">
+            Consolidado de {auditRecords.length} relatório
+            {auditRecords.length === 1 ? "" : "s"} diário
+            {auditRecords.length === 1 ? "" : "s"} — soma oficial da semana.
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                  <th className="px-2 py-2 text-left">Data</th>
-                  <th className="px-2 py-2 text-center">SE</th>
-                  <th className="px-2 py-2 text-center">Trab.</th>
-                  <th className="px-2 py-2 text-center">Fech.</th>
-                  <th className="px-2 py-2 text-center">Rec.</th>
-                  <th className="px-2 py-2 text-center">Dep.</th>
-                  <th className="px-2 py-2 text-center">Focos</th>
-                  <th className="px-2 py-2 text-center">Tub.</th>
+                <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
+                  <th className="px-2 py-1.5 text-left">Data</th>
+                  <th className="px-2 py-1.5 text-center">Trab.</th>
+                  <th className="px-2 py-1.5 text-center">Fech.</th>
+                  <th className="px-2 py-1.5 text-center">Rec.</th>
+                  <th className="px-2 py-1.5 text-center">Focos</th>
+                  <th className="px-2 py-1.5 text-center">Tub.</th>
+                  <th className="px-2 py-1.5 text-center">Status</th>
+                  <th className="px-2 py-1.5 text-right">PDF</th>
                 </tr>
               </thead>
               <tbody>
-                {dailies.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="border-b border-slate-50 text-slate-700 font-medium"
-                  >
-                    <td className="px-2 py-2 whitespace-nowrap">
+                {auditRecords.map((d) => (
+                  <tr key={d.id} className="border-b border-slate-50">
+                    <td className="px-2 py-1.5">
                       {format(
                         new Date(`${d.work_date}T12:00:00`),
                         "dd/MM/yyyy",
                         { locale: ptBR }
                       )}
                     </td>
-                    <td className="px-2 py-2 text-center text-slate-500">
-                      {d.epi_week ? `${d.epi_week}/${d.epi_year}` : "—"}
-                    </td>
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       {d.properties_worked ?? 0}
                     </td>
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       {d.properties_closed ?? 0}
                     </td>
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       {d.properties_refused ?? 0}
                     </td>
-                    <td className="px-2 py-2 text-center">
-                      {d.deposits_inspected ?? 0}
+                    <td className="px-2 py-1.5 text-center text-rose-600 font-bold">
+                      {d.positive_foci ?? 0}
                     </td>
-                    <td className="px-2 py-2 text-center text-rose-600 font-bold">
-                      {d.focuses_found ?? 0}
-                    </td>
-                    <td className="px-2 py-2 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       {d.tubitos_collected ?? 0}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <StatusBadge status={d.status} />
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <IconBtn
+                        title="PDF"
+                        onClick={() => handleDailyDownload(d.id)}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </IconBtn>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </Card>
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+/* ─────────────────────── helpers ─────────────────────── */
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "completed")
+    return (
+      <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+        <CheckCircle2 className="h-3 w-3" /> Encerrada
+      </span>
+    );
+  if (status === "in_progress")
+    return (
+      <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+        <Clock className="h-3 w-3" /> Em andamento
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full text-[10px] font-black uppercase">
+      <AlertCircle className="h-3 w-3" /> Erro
+    </span>
+  );
+}
+
+function IconBtn({
+  title,
+  onClick,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -342,7 +860,6 @@ function SupervisorReports() {
           to="/pending"
         />
       </div>
-
       <IntelligenceShortcut />
     </>
   );
@@ -379,38 +896,8 @@ function CoordinatorReports() {
           to="/reports"
         />
       </div>
-
       <IntelligenceShortcut />
     </>
-  );
-}
-
-/* ─────────────────────── helpers ─────────────────────── */
-
-function ActionCard({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  action: React.ReactNode;
-}) {
-  return (
-    <Card className="p-6 rounded-3xl border-slate-100 hover:shadow-md transition-shadow">
-      <div className="h-12 w-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-4 shadow-lg shadow-slate-200">
-        {icon}
-      </div>
-      <h3 className="text-base font-black tracking-tight text-slate-800 mb-1">
-        {title}
-      </h3>
-      <p className="text-xs text-slate-500 font-medium mb-4 leading-relaxed">
-        {description}
-      </p>
-      {action}
-    </Card>
   );
 }
 
@@ -426,10 +913,7 @@ function NavCard({
   to: string;
 }) {
   return (
-    <Link
-      to={to as any}
-      className="block group"
-    >
+    <Link to={to as any} className="block group">
       <Card className="p-6 rounded-3xl border-slate-100 hover:border-slate-900 hover:shadow-lg transition-all active:scale-[0.98] h-full">
         <div className="h-12 w-12 rounded-2xl bg-slate-100 group-hover:bg-slate-900 group-hover:text-white text-slate-700 flex items-center justify-center mb-4 transition-colors">
           {icon}
@@ -473,3 +957,6 @@ function IntelligenceShortcut() {
     </Card>
   );
 }
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
+const _activityKeep = Activity; // mantém import para futura aba
