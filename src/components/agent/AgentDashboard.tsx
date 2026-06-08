@@ -63,6 +63,8 @@ export function AgentDashboard() {
   const [todayVisits, setTodayVisits] = useState<Visit[]>([]);
   const [weekVisits, setWeekVisits] = useState<Visit[]>([]);
   const [monthVisits, setMonthVisits] = useState<Visit[]>([]);
+  const [cycleVisits, setCycleVisits] = useState<Visit[]>([]);
+  const [cycleInfo, setCycleInfo] = useState<{ number: number; year: number } | null>(null);
   const [todayDeposits, setTodayDeposits] = useState({ tratados: 0, focos: 0 });
   const [weekFocos, setWeekFocos] = useState(0);
   const [blockStats, setBlockStats] = useState({ atual: "—", concluidos: 0, pendentes: 0 });
