@@ -397,8 +397,10 @@ export function DailyWorkCloser({
                 <Power className="h-8 w-8 text-white" />
               </div>
               <div className="text-left">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200 mb-0.5">Operacional</p>
-                <h3 className="text-xl font-black tracking-tight uppercase">Encerrar Trabalho do Dia</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200 mb-0.5">
+                  Operacional · {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : 'Hoje'}
+                </p>
+                <h3 className="text-xl font-black tracking-tight uppercase">Encerrar Jornada do Dia</h3>
               </div>
             </div>
             <ChevronRight className="h-8 w-8 text-white/50 group-hover:translate-x-2 group-hover:text-white transition-all" />
