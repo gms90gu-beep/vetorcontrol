@@ -155,10 +155,11 @@ function BottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
       <NavItem to="/dashboard" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
+      <NavItem to="/pending" icon={AlertTriangle} label="Pend." />
       <NavItem to="/map" icon={MapIcon} label="Mapa" />
       <NavItem to="/reports" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
