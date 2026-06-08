@@ -189,18 +189,35 @@ export function DailyWorkCloser({
 
       if (!currentAgent) throw new Error("Agent not found");
 
+      // Usa a data da jornada ativa como work_date
+      const { data: activeSessionForClose } = await supabase
+        .from("field_work_sessions")
+        .select("session_date")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const operationalWorkDate: string = activeSessionForClose?.session_date
+        ? activeSessionForClose.session_date
+        : new Date().toISOString().split('T')[0];
+
+      console.log("[DailyWorkCloser:close] Data atual:", new Date().toISOString().split('T')[0]);
+      console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
+
       const { data: existingRecord } = await supabase
         .from("daily_work_records")
         .select("id")
         .eq("agent_id", currentAgent.id)
-        .eq("work_date", new Date().toISOString().split('T')[0])
+        .eq("work_date", operationalWorkDate)
         .maybeSingle();
 
       const recordData = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
         week_id: activeWeek?.id,
-        work_date: new Date().toISOString().split('T')[0],
+        work_date: operationalWorkDate,
         status: 'completed',
         end_time: new Date().toISOString(),
         properties_worked: stats.worked,
