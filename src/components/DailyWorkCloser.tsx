@@ -446,7 +446,7 @@ export function DailyWorkCloser({
           )}
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo desta Jornada (apenas o dia)</h4>
             <div className="grid grid-cols-2 gap-3">
               <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
