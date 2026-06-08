@@ -93,6 +93,19 @@ function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (
   );
 }
 
+const DEFAULT_ROUTINE = {
+  treatment: false,
+  treatmentAmount: 0,
+  larvicideUnit: "gramas",
+  treatedDeposits: 0,
+  elimination: false,
+  eliminationAmount: 0,
+  guidance: false,
+  notes: ""
+};
+const DEFAULT_SURVEY = { hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 };
+const DEFAULT_PENDING = { isRecovered: false, notes: "" };
+
 function PropertyVisitPage() {
   const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
@@ -102,18 +115,9 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
-  const [routineData, setRoutineData] = useState({ 
-    treatment: false, 
-    treatmentAmount: 0, 
-    larvicideUnit: "gramas",
-    treatedDeposits: 0,
-    elimination: false, 
-    eliminationAmount: 0, 
-    guidance: false, 
-    notes: "" 
-  });
-  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 });
-  const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
+  const [routineData, setRoutineData] = useState({ ...DEFAULT_ROUTINE });
+  const [surveyData, setSurveyData] = useState({ ...DEFAULT_SURVEY });
+  const [pendingData, setPendingData] = useState({ ...DEFAULT_PENDING });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,12 +129,51 @@ function PropertyVisitPage() {
   const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
+  const resetForm = () => {
+    setStatus("visited");
+    setActivity("routine");
+    setCurrentVisitId(null);
+    setRoutineData({ ...DEFAULT_ROUTINE });
+    setSurveyData({ ...DEFAULT_SURVEY });
+    setPendingData({ ...DEFAULT_PENDING });
+    setDeposits([]);
+    setIsDirty(false);
+  };
+
+  // Reset form imediatamente quando o imóvel muda (evita reaproveitar dados)
   useEffect(() => {
+    resetForm();
     fetchData();
     fetchDailyStats();
     fetchAgentData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId]);
+
+  // Marca formulário como sujo quando o usuário edita campos
+  useEffect(() => {
+    if (isLoading || justSaved) return;
+    setIsDirty(true);
+  }, [status, activity, routineData, surveyData, pendingData, deposits]);
+
+  // Aviso ao fechar/recarregar a aba com dados não salvos
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  const confirmLeaveIfDirty = (): boolean => {
+    if (!isDirty) return true;
+    return window.confirm("⚠️ Existem dados não salvos nesta visita.\n\nDeseja realmente sair?");
+  };
 
   const fetchAdjacentProperties = async () => {
     if (!property) return;
