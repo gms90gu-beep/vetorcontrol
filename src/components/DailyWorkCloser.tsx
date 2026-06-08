@@ -168,6 +168,22 @@ export function DailyWorkCloser({
             progress: 0 
           });
         }
+
+        // Pendências em aberto + recuperadas hoje
+        const { count: pCount } = await supabase
+          .from("property_pendencies")
+          .select("id", { count: 'exact', head: true })
+          .eq("agent_id", user.id)
+          .is("resolved_at", null);
+        setPendingCount(pCount || 0);
+
+        const { count: rCount } = await supabase
+          .from("property_pendencies")
+          .select("id", { count: 'exact', head: true })
+          .eq("agent_id", user.id)
+          .gte("resolved_at", startOfDay.toISOString())
+          .lte("resolved_at", endOfDay.toISOString());
+        setRecoveredCount(rCount || 0);
       }
     } catch (error) {
       console.error("Error fetching daily context:", error);
