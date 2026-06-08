@@ -14,7 +14,6 @@ import {
   MapPin,
   Home,
   CheckSquare,
-  Car,
   ShieldCheck,
   Users
 } from "lucide-react";
@@ -211,7 +210,6 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
       ]
     : [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
-        { label: "Veículos", icon: Car, to: "/vehicles" },
         { label: "Ciclos", icon: Layers, to: "/cycles" },
         { label: "Trabalho", icon: MapIcon, to: "/field-work" },
         { label: "RG", icon: MapPin, to: "/rg" },
