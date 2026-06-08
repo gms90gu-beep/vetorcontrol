@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { getOperationalVisitDate } from "@/lib/operational-date";
 
@@ -1341,6 +1342,10 @@ function PropertyVisitPage() {
               <AlertCircle className="h-3 w-3 shrink-0" />
               <span className="truncate">Encerrar Quarteirão</span>
             </button>
+            <span className="h-4 w-px bg-slate-200 shrink-0" />
+            <div className="flex-1 min-w-0 flex items-center justify-center">
+              <DailyWorkCloser />
+            </div>
             <span className="h-4 w-px bg-slate-200 shrink-0" />
             <button
               onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/dashboard" }); }}
