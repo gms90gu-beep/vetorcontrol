@@ -404,7 +404,7 @@ export function DailyWorkCloser({
           </div>
           <div className="flex gap-3 w-full pt-2">
             <Button 
-              onClick={onGeneratePDF}
+              onClick={handleGeneratePDF}
               className="flex-1 h-12 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 font-black uppercase tracking-widest text-[9px] gap-2 shadow-sm"
             >
               <Printer className="h-4 w-4 text-blue-500" /> PDF Diário
