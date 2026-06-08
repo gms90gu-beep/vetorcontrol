@@ -269,6 +269,14 @@ export function DailyWorkCloser({
         .update({ work_status: 'work_completed' })
         .eq("id", currentAgent.id);
 
+      // Encerra jornada(s) de campo em andamento
+      await supabase
+        .from("field_work_sessions")
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("status", "in_progress");
+
+
       toast.success("Trabalho do dia encerrado com sucesso!");
       setShowSummary(true);
       setIsOpen(false);
