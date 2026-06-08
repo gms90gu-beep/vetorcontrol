@@ -758,7 +758,7 @@ function PropertyVisitPage() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate({ to: `/property/${prevProperty.id}` })} 
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
                 title="Imóvel anterior"
               >
