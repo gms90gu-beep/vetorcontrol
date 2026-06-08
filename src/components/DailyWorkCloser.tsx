@@ -80,6 +80,7 @@ export function DailyWorkCloser({
   const [recoveredCount, setRecoveredCount] = useState(0);
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [jornadaDate, setJornadaDate] = useState<string | null>(null);
 
   const stats = externalStats || localStats;
 
