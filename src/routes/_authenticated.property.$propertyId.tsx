@@ -961,8 +961,10 @@ function PropertyVisitPage() {
                           <Input 
                             type="number" 
                             min="0"
-                            value={routineData.treatmentAmount} 
-                            onChange={(e) => setRoutineData({...routineData, treatmentAmount: Math.max(0, Number(e.target.value))})}
+                            inputMode="decimal"
+                            placeholder="0"
+                            value={routineData.treatmentAmount === 0 ? "" : routineData.treatmentAmount} 
+                            onChange={(e) => setRoutineData({...routineData, treatmentAmount: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value))})}
                             className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
                           />
                         </div>
@@ -993,8 +995,10 @@ function PropertyVisitPage() {
                           <Input 
                             type="number" 
                             min="0"
-                            value={routineData.treatedDeposits} 
-                            onChange={(e) => setRoutineData({...routineData, treatedDeposits: Math.max(0, Math.floor(Number(e.target.value)))})}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={routineData.treatedDeposits === 0 ? "" : routineData.treatedDeposits} 
+                            onChange={(e) => setRoutineData({...routineData, treatedDeposits: e.target.value === "" ? 0 : Math.max(0, Math.floor(Number(e.target.value)))})}
                             className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
                           />
                         </div>
@@ -1011,8 +1015,11 @@ function PropertyVisitPage() {
                         <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Quantidade eliminada</Label>
                         <Input 
                           type="number" 
-                          value={routineData.eliminationAmount} 
-                          onChange={(e) => setRoutineData({...routineData, eliminationAmount: Number(e.target.value)})}
+                          min="0"
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={routineData.eliminationAmount === 0 ? "" : routineData.eliminationAmount} 
+                          onChange={(e) => setRoutineData({...routineData, eliminationAmount: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value))})}
                           className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
                         />
                       </div>
@@ -1093,9 +1100,12 @@ function PropertyVisitPage() {
                               <td className="p-4">
                                 <Input 
                                   type="number" 
-                                  value={deposit.quantity}
+                                  min="0"
+                                  inputMode="numeric"
+                                  placeholder="0"
+                                  value={deposit.quantity === 0 ? "" : deposit.quantity}
                                   disabled={!deposit.selected}
-                                  onChange={(e) => updateDeposit(deposit.id, 'quantity', Number(e.target.value))}
+                                  onChange={(e) => updateDeposit(deposit.id, 'quantity', e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)))}
                                   className="h-10 w-16 rounded-xl border-slate-200 font-bold text-center bg-white"
                                 />
                               </td>
@@ -1172,9 +1182,10 @@ function PropertyVisitPage() {
                           type="number"
                           inputMode="numeric"
                           min="1"
+                          placeholder="0"
                           autoFocus
-                          value={surveyData.tubitosColetados}
-                          onChange={(e) => setSurveyData({...surveyData, tubitosColetados: Math.max(0, Number(e.target.value))})}
+                          value={surveyData.tubitosColetados === 0 ? "" : surveyData.tubitosColetados}
+                          onChange={(e) => setSurveyData({...surveyData, tubitosColetados: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value))})}
                           className="h-14 rounded-xl border-amber-200 bg-white text-xl font-black text-center focus:ring-amber-500"
                         />
                         <p className="text-[9px] font-bold text-amber-500 text-center uppercase tracking-tighter">
@@ -1195,8 +1206,10 @@ function PropertyVisitPage() {
                           <Input 
                             type="number" 
                             min="0"
-                            value={surveyData.treatmentAmount} 
-                            onChange={(e) => setSurveyData({...surveyData, treatmentAmount: Math.max(0, Number(e.target.value))})}
+                            inputMode="decimal"
+                            placeholder="0"
+                            value={surveyData.treatmentAmount === 0 ? "" : surveyData.treatmentAmount} 
+                            onChange={(e) => setSurveyData({...surveyData, treatmentAmount: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value))})}
                             className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
                           />
                         </div>
@@ -1227,8 +1240,10 @@ function PropertyVisitPage() {
                           <Input 
                             type="number" 
                             min="0"
-                            value={surveyData.treatedDeposits} 
-                            onChange={(e) => setSurveyData({...surveyData, treatedDeposits: Math.max(0, Math.floor(Number(e.target.value)))})}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={surveyData.treatedDeposits === 0 ? "" : surveyData.treatedDeposits} 
+                            onChange={(e) => setSurveyData({...surveyData, treatedDeposits: e.target.value === "" ? 0 : Math.max(0, Math.floor(Number(e.target.value)))})}
                             className="h-14 rounded-2xl border-slate-200 font-bold text-lg focus:ring-primary bg-slate-50/50"
                           />
                         </div>
