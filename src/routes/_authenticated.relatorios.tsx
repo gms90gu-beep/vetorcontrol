@@ -234,7 +234,15 @@ function AgentReports() {
               Últimos 30 fechamentos
             </p>
           </div>
-          <FileText className="h-5 w-5 text-slate-300" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => agentId && fetchDailies(agentId)}
+            className="h-8 px-2 rounded-lg text-slate-400 hover:text-slate-700"
+            title="Atualizar"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
 
         {loading ? (
