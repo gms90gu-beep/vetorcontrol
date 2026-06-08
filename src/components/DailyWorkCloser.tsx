@@ -418,6 +418,23 @@ export function DailyWorkCloser({
         </div>
 
         <div className="p-8 space-y-6">
+          {(pendingCount > 0 || openBlock) && (
+            <div className="space-y-2">
+              {pendingCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800">
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">⚠️ Pendências em aberto</p>
+                  <p className="text-[11px] font-bold">Existem {pendingCount} imóveis pendentes de recuperação. Deseja encerrar mesmo assim?</p>
+                </div>
+              )}
+              {openBlock && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800">
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">⚠️ Quarteirão em andamento</p>
+                  <p className="text-[11px] font-bold">O quarteirão {openBlock} ainda está aberto. Deseja encerrar mesmo assim?</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
             <div className="grid grid-cols-2 gap-3">
@@ -425,6 +442,8 @@ export function DailyWorkCloser({
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
               <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
               <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Pend. Geradas" value={pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Recuperadas" value={recoveredCount} icon={CheckCircle2} />
               <SummaryItemSmall label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} icon={Layers} />
               <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
             </div>
