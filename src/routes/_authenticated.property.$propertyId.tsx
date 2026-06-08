@@ -93,6 +93,19 @@ function BooleanButton({ value, onChange, label }: { value: boolean, onChange: (
   );
 }
 
+const DEFAULT_ROUTINE = {
+  treatment: false,
+  treatmentAmount: 0,
+  larvicideUnit: "gramas",
+  treatedDeposits: 0,
+  elimination: false,
+  eliminationAmount: 0,
+  guidance: false,
+  notes: ""
+};
+const DEFAULT_SURVEY = { hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 };
+const DEFAULT_PENDING = { isRecovered: false, notes: "" };
+
 function PropertyVisitPage() {
   const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
@@ -102,18 +115,9 @@ function PropertyVisitPage() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [currentVisitId, setCurrentVisitId] = useState<string | null>(null);
   const [deposits, setDeposits] = useState<any[]>([]);
-  const [routineData, setRoutineData] = useState({ 
-    treatment: false, 
-    treatmentAmount: 0, 
-    larvicideUnit: "gramas",
-    treatedDeposits: 0,
-    elimination: false, 
-    eliminationAmount: 0, 
-    guidance: false, 
-    notes: "" 
-  });
-  const [surveyData, setSurveyData] = useState({ hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 });
-  const [pendingData, setPendingData] = useState({ isRecovered: false, notes: "" });
+  const [routineData, setRoutineData] = useState({ ...DEFAULT_ROUTINE });
+  const [surveyData, setSurveyData] = useState({ ...DEFAULT_SURVEY });
+  const [pendingData, setPendingData] = useState({ ...DEFAULT_PENDING });
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,12 +129,57 @@ function PropertyVisitPage() {
   const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
+  const resetForm = () => {
+    setStatus("visited");
+    setActivity("routine");
+    setCurrentVisitId(null);
+    setRoutineData({ ...DEFAULT_ROUTINE });
+    setSurveyData({ ...DEFAULT_SURVEY });
+    setPendingData({ ...DEFAULT_PENDING });
+    setDeposits([]);
+    setIsDirty(false);
+    setJustSaved(false);
+  };
+
+  // Reset form imediatamente quando o imóvel muda (evita reaproveitar dados)
   useEffect(() => {
+    resetForm();
     fetchData();
     fetchDailyStats();
     fetchAgentData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId]);
+
+  // Marca formulário como sujo quando o usuário edita campos
+  useEffect(() => {
+    if (isLoading || justSaved) return;
+    setIsDirty(true);
+  }, [status, activity, routineData, surveyData, pendingData, deposits]);
+
+  // Ao terminar o carregamento, o estado inicial é considerado limpo
+  useEffect(() => {
+    if (!isLoading) setIsDirty(false);
+  }, [isLoading, propertyId]);
+
+  // Aviso ao fechar/recarregar a aba com dados não salvos
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  const confirmLeaveIfDirty = (): boolean => {
+    if (!isDirty) return true;
+    return window.confirm("⚠️ Existem dados não salvos nesta visita.\n\nDeseja realmente sair?");
+  };
 
   const fetchAdjacentProperties = async () => {
     if (!property) return;
@@ -570,11 +619,14 @@ function PropertyVisitPage() {
         if (depositsError) throw depositsError;
       }
 
-      toast.success("Visita finalizada com sucesso!");
-      
+      setJustSaved(true);
+      setIsDirty(false);
+
       if (nextProperty) {
+        toast.success("✅ Visita salva com sucesso", { description: "Carregando próximo imóvel..." });
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
+        toast.success("✅ Visita salva com sucesso", { description: "Último imóvel do quarteirão." });
         navigate({ to: "/field-work-list" });
       }
     } catch (error: any) {
@@ -700,14 +752,14 @@ function PropertyVisitPage() {
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+            <Button variant="ghost" size="icon" onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/field-work-list" }); }} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
               <ChevronLeft className="h-6 w-6 text-slate-600" />
             </Button>
             {prevProperty && (
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate({ to: `/property/${prevProperty.id}` })} 
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
                 title="Imóvel anterior"
               >
@@ -726,7 +778,7 @@ function PropertyVisitPage() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate({ to: `/property/${nextProperty.id}` })} 
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${nextProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
                 title="Próximo imóvel"
               >
@@ -1185,7 +1237,7 @@ function PropertyVisitPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => navigate({ to: `/property/${prevProperty.id}` })}
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }}
                 className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-500"
                 title="Imóvel anterior"
               >
@@ -1204,7 +1256,7 @@ function PropertyVisitPage() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${nextProperty.id}` }); }}
                 className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-600"
                 title="Próximo imóvel"
               >
@@ -1225,7 +1277,7 @@ function PropertyVisitPage() {
           {/* Linha 2: Ações secundárias */}
           <div className="flex items-center justify-between gap-2 w-full">
             <button
-              onClick={handleEndBlock}
+              onClick={() => { if (confirmLeaveIfDirty()) handleEndBlock(); }}
               className="flex-1 min-w-0 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center justify-center gap-1 truncate"
             >
               <AlertCircle className="h-3 w-3 shrink-0" />
@@ -1233,7 +1285,7 @@ function PropertyVisitPage() {
             </button>
             <span className="h-4 w-px bg-slate-200 shrink-0" />
             <button
-              onClick={() => navigate({ to: "/dashboard" })}
+              onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/dashboard" }); }}
               className="flex-1 min-w-0 text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest py-1 truncate"
             >
               Tela Inicial
