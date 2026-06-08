@@ -115,15 +115,22 @@ export function OperationalHeader() {
         
         if (week) setActiveWeek(week);
 
-        // 5. Get today's stats
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        
+        // 5. Get stats for the operational date (session_date if active, else today)
+        const opDateStr: string = session?.session_date
+          ? session.session_date
+          : new Date().toISOString().split('T')[0];
+        const startOfDay = new Date(`${opDateStr}T00:00:00`);
+        const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+
+        console.log("[OperationalHeader] Data atual:", new Date().toISOString());
+        console.log("[OperationalHeader] Data da jornada:", session?.session_date ?? "(sem jornada)");
+
         const { data: todayVisits } = await supabase
           .from("visits")
           .select("id, status")
           .eq("agent_id", user.id)
-          .gte("visit_date", startOfDay.toISOString());
+          .gte("visit_date", startOfDay.toISOString())
+          .lte("visit_date", endOfDay.toISOString());
         
         if (todayVisits) {
           setTodayStats({
