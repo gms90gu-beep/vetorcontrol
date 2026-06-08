@@ -205,8 +205,9 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     ? [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
         { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
+        { label: "Intelligence", icon: BarChart3, to: "/reports" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
-        { label: "Relatórios", icon: FileText, to: "/reports" },
       ]
     : [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
@@ -215,6 +216,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
       ];
 
   if (userRole === "admin_master") {
