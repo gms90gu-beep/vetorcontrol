@@ -118,7 +118,7 @@ function AgentReports() {
   const [loading, setLoading] = useState(true);
   const [dailies, setDailies] = useState<Daily[]>([]);
   const [cycles, setCycles] = useState<
-    { id: string; cycle_number: number | null; name: string | null }[]
+    { id: string; number: number | null; name: string | null }[]
   >([]);
   const [authId, setAuthId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
@@ -190,8 +190,8 @@ function AgentReports() {
 
       const { data: cs } = await supabase
         .from("cycles")
-        .select("id, cycle_number, name")
-        .order("cycle_number", { ascending: false });
+        .select("id, number, name")
+        .order("number", { ascending: false });
       setCycles(cs || []);
 
       setLoading(false);
@@ -234,7 +234,7 @@ function AgentReports() {
   const cycleMap = useMemo(() => {
     const m = new Map<string, string>();
     cycles.forEach((c) =>
-      m.set(c.id, c.cycle_number != null ? String(c.cycle_number) : c.name || "—")
+      m.set(c.id, c.number != null ? String(c.number) : c.name || "—")
     );
     return m;
   }, [cycles]);
@@ -428,7 +428,7 @@ function AgentReports() {
                 <SelectItem value="all">Todos</SelectItem>
                 {cycles.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    Ciclo {c.cycle_number ?? c.name}
+                    Ciclo {c.number ?? c.name}
                   </SelectItem>
                 ))}
               </SelectContent>
