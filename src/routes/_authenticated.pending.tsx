@@ -535,11 +535,23 @@ function NewAttemptDialog({
         }
       } catch {}
 
+      let finalNotes = notes.trim();
+      if (result === "visited" && treated) {
+        const parts: string[] = [];
+        parts.push(treated === "yes" ? "Tratado: SIM" : "Tratado: NÃO");
+        if (treated === "yes") {
+          if (depositCount) parts.push(`Depósitos tratados: ${depositCount}`);
+          if (larvicideAmount) parts.push(`Larvicida: ${larvicideAmount} ${larvicideUnit}`);
+        }
+        const meta = `[${parts.join(" · ")}]`;
+        finalNotes = finalNotes ? `${finalNotes}\n${meta}` : meta;
+      }
+
       const { error } = await (supabase as any).from("property_recovery_attempts").insert({
         property_id: pendency.property_id,
         agent_id: user.id,
         result,
-        notes: notes.trim() || null,
+        notes: finalNotes || null,
         latitude: lat,
         longitude: lng,
       });
@@ -547,7 +559,11 @@ function NewAttemptDialog({
       toast.success("Tentativa registrada");
       setNotes("");
       setResult("closed");
+      setTreated("");
+      setDepositCount("");
+      setLarvicideAmount("");
       onCreated();
+
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || "Erro ao registrar tentativa");
