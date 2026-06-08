@@ -15,7 +15,8 @@ import {
   Home,
   CheckSquare,
   ShieldCheck,
-  Users
+  Users,
+  BarChart3
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -145,9 +146,9 @@ function BottomNav() {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
         <NavItem to="/supervision" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
-        <NavItem to="/supervision" icon={Users} label="Equipe" />
+        <NavItem to="/relatorios" icon={FileText} label="Relat." />
+        <NavItem to="/reports" icon={BarChart3} label="Intel." />
         <NavItem to="/map" icon={MapIcon} label="Mapa" />
-        <NavItem to="/reports" icon={FileText} label="Relat." />
         <NavItem to="/settings" icon={Settings} label="Ajustes" />
       </div>
     );
@@ -159,7 +160,7 @@ function BottomNav() {
       <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
       <NavItem to="/rg" icon={MapPin} label="RG" />
       <NavItem to="/pending" icon={AlertTriangle} label="Pend." />
-      <NavItem to="/map" icon={MapIcon} label="Mapa" />
+      <NavItem to="/relatorios" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
@@ -204,8 +205,9 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     ? [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
         { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
+        { label: "Intelligence", icon: BarChart3, to: "/reports" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
-        { label: "Relatórios", icon: FileText, to: "/reports" },
       ]
     : [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
@@ -214,6 +216,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
       ];
 
   if (userRole === "admin_master") {

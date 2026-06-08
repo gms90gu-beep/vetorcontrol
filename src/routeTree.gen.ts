@@ -23,6 +23,7 @@ import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
 import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
+import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
 import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authenticated.field-work-list'
@@ -105,6 +106,11 @@ const AuthenticatedRgRoute = AuthenticatedRgRouteImport.update({
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/_authenticated/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
+  '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/rg': typeof AuthenticatedRgRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/field-work-list'
     | '/map'
     | '/pending'
+    | '/relatorios'
     | '/reports'
     | '/rg'
     | '/settings'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/field-work-list'
     | '/map'
     | '/pending'
+    | '/relatorios'
     | '/reports'
     | '/rg'
     | '/settings'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/_authenticated/field-work-list'
     | '/_authenticated/map'
     | '/_authenticated/pending'
+    | '/_authenticated/relatorios'
     | '/_authenticated/reports'
     | '/_authenticated/rg'
     | '/_authenticated/settings'
@@ -462,6 +474,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/relatorios': {
+      id: '/_authenticated/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/pending': {
       id: '/_authenticated/pending'
       path: '/pending'
@@ -581,6 +600,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFieldWorkListRoute: typeof AuthenticatedFieldWorkListRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
+  AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRgRoute: typeof AuthenticatedRgRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -602,6 +622,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFieldWorkListRoute: AuthenticatedFieldWorkListRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
+  AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRgRoute: AuthenticatedRgRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
