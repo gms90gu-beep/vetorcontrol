@@ -15,7 +15,8 @@ import {
   Home,
   CheckSquare,
   ShieldCheck,
-  Users
+  Users,
+  BarChart3
 } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
