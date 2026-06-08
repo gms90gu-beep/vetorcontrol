@@ -132,6 +132,19 @@ export function AgentDashboard() {
 
       setWeekFocos((vWeek || []).filter((v) => v.has_focus).length);
 
+      // Pendências ativas do agente
+      try {
+        const { count } = await (supabase as any)
+          .from("property_pendencies")
+          .select("id", { count: "exact", head: true })
+          .eq("agent_id", user.id)
+          .is("resolved_at", null);
+        if (!cancelled) setPendingCount(count || 0);
+      } catch (e) {
+        console.warn("[Dashboard] pendências:", e);
+      }
+
+
       // Sessão ativa + blocos
       const { data: active } = await supabase
         .from("field_work_sessions")
