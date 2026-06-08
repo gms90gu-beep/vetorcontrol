@@ -115,14 +115,32 @@ export function DailyWorkCloser({
         
         if (week) setActiveWeek(week);
 
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        
+        // Considera a data da jornada ativa (se existir) como referência operacional
+        const { data: activeSession } = await supabase
+          .from("field_work_sessions")
+          .select("session_date")
+          .eq("user_id", user.id)
+          .eq("status", "in_progress")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const opDateStr: string = activeSession?.session_date
+          ? activeSession.session_date
+          : new Date().toISOString().split('T')[0];
+        const startOfDay = new Date(`${opDateStr}T00:00:00`);
+        const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+
+        console.log("[DailyWorkCloser] Data atual:", new Date().toISOString());
+        console.log("[DailyWorkCloser] Data da jornada:", opDateStr);
+
         const { data: todayVisits } = await supabase
           .from("visits")
           .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus")
           .eq("cycle_id", cycle.id)
-          .gte("visit_date", startOfDay.toISOString());
+          .eq("agent_id", user.id)
+          .gte("visit_date", startOfDay.toISOString())
+          .lte("visit_date", endOfDay.toISOString());
         
         if (todayVisits) {
           const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (Number(v.treated_deposits) || 0), 0);
