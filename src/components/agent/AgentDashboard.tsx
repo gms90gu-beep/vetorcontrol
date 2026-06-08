@@ -94,10 +94,13 @@ export function AgentDashboard() {
       // Ciclo ativo: garante consistência com a tela Trabalho / encerramento diário
       const { data: activeCycle } = await supabase
         .from("cycles")
-        .select("id")
+        .select("id, number, year")
         .eq("status", "in_progress")
         .maybeSingle();
       const activeCycleId = activeCycle?.id ?? null;
+      if (!cancelled && activeCycle) {
+        setCycleInfo({ number: activeCycle.number, year: activeCycle.year });
+      }
 
       let qToday = supabase
         .from("visits")
@@ -126,10 +129,23 @@ export function AgentDashboard() {
       if (activeCycleId) qMonth = qMonth.eq("cycle_id", activeCycleId);
       const { data: vMonth } = await qMonth;
 
+      // Produção acumulada do CICLO inteiro (todas as jornadas do agente neste ciclo)
+      let vCycle: any[] | null = null;
+      if (activeCycleId) {
+        const { data } = await supabase
+          .from("visits")
+          .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+          .eq("agent_id", user.id)
+          .eq("cycle_id", activeCycleId)
+          .order("visit_date", { ascending: false });
+        vCycle = data ?? [];
+      }
+
       if (cancelled) return;
       setTodayVisits((vToday as any) || []);
       setWeekVisits((vWeek as any) || []);
       setMonthVisits((vMonth as any) || []);
+      setCycleVisits((vCycle as any) || []);
 
       // Depósitos de hoje
       const todayIds = (vToday || []).map((v) => v.id);
