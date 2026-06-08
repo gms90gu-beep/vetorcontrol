@@ -460,7 +460,7 @@ export function DailyWorkCloser({
             <div className="pt-4 space-y-3">
               <Button 
                 onClick={() => {
-                  onGeneratePDF?.();
+                  handleGeneratePDF();
                   setShowSummary(false);
                 }}
                 className="w-full h-14 rounded-2xl bg-blue-600 text-white hover:bg-blue-700 font-black uppercase tracking-widest text-xs gap-3 shadow-lg shadow-blue-200"
