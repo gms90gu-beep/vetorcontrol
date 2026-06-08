@@ -136,7 +136,19 @@ function FieldWorkListPage() {
       
       if (session) {
         setActiveSession(session);
-        const { data: props, error } = await supabase
+
+        // Resolver ciclo operacional: prioriza o ciclo da sessão; senão, busca o ciclo "in_progress"
+        let operationalCycleId: string | null = session.cycle_id ?? null;
+        if (!operationalCycleId) {
+          const { data: currentCycle } = await supabase
+            .from("cycles")
+            .select("id")
+            .eq("status", "in_progress")
+            .maybeSingle();
+          operationalCycleId = currentCycle?.id ?? null;
+        }
+
+        let query = supabase
           .from("properties")
           .select(`
             *,
@@ -162,12 +174,22 @@ function FieldWorkListPage() {
             )
           `)
           .eq("block_number", session.block_number)
-          .eq("visits.agent_id", user.id)
-          .order("number", { ascending: true });
+          .eq("visits.agent_id", user.id);
+
+        // ISOLAMENTO POR CICLO: cada ciclo é independente.
+        // Visitas de ciclos anteriores ficam apenas no histórico do imóvel,
+        // não devem refletir no status operacional da Tela de Trabalho.
+        if (operationalCycleId) {
+          query = query.eq("visits.cycle_id", operationalCycleId);
+        }
+
+        const { data: props, error } = await query.order("number", { ascending: true });
 
         if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
-        console.log("[FieldWorkList] session:", { id: session.id, block: session.block_number, cycle_id: session.cycle_id, status: session.status });
-        console.log("[FieldWorkList] imóveis retornados:", props?.length, "com visitas:", (props || []).filter((p: any) => p.visits?.length).length);
+        console.log("[FieldWorkList] session:", { id: session.id, block: session.block_number, session_cycle_id: session.cycle_id, operational_cycle_id: operationalCycleId, status: session.status });
+        console.log("[FieldWorkList] imóveis retornados:", props?.length, "com visitas do ciclo atual:", (props || []).filter((p: any) => p.visits?.length).length);
+
+
 
         
         if (props) {
