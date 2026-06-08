@@ -751,7 +751,7 @@ function PropertyVisitPage() {
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/field-work-list" })} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+            <Button variant="ghost" size="icon" onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/field-work-list" }); }} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
               <ChevronLeft className="h-6 w-6 text-slate-600" />
             </Button>
             {prevProperty && (
