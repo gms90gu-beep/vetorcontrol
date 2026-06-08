@@ -292,6 +292,100 @@ export function DailyWorkCloser({
       setIsLoading(false);
     }
   };
+  const defaultGeneratePDF = async () => {
+    console.log("[PDF] Botão clicado");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Você precisa estar autenticado para gerar o PDF.");
+        return;
+      }
+
+      const opDateStr = jornadaDate || new Date().toISOString().split('T')[0];
+      const startOfDay = new Date(`${opDateStr}T00:00:00`);
+      const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+
+      console.log("[PDF] agent_id:", user.id, "cycle_id:", activeCycle?.id, "data:", opDateStr);
+
+      let query = supabase
+        .from("visits")
+        .select(`
+          id, status, visit_date, treatment_amount, treated_deposits,
+          elimination_amount, has_focus, notes,
+          property:properties(number, sequence, complement, type)
+        `)
+        .eq("agent_id", user.id)
+        .gte("visit_date", startOfDay.toISOString())
+        .lte("visit_date", endOfDay.toISOString())
+        .order("visit_date", { ascending: true });
+
+      if (activeCycle?.id) query = query.eq("cycle_id", activeCycle.id);
+
+      const { data: visits, error } = await query;
+      if (error) {
+        console.error("[PDF] Erro na consulta:", error);
+        toast.error(`Erro ao buscar dados: ${error.message}`);
+        return;
+      }
+
+      console.log(`[PDF] Dados encontrados: ${visits?.length || 0} registros`);
+
+      if (!visits || visits.length === 0) {
+        toast.warning("Nenhuma visita encontrada para esta diária.");
+        return;
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(20);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Boletim Diário", 14, 20);
+
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Agente: ${agent?.name || "—"}`, 14, 30);
+      doc.text(`Data: ${new Date(`${opDateStr}T12:00:00`).toLocaleDateString('pt-BR')}`, 14, 36);
+      doc.text(`Ciclo: ${activeCycle?.number || "—"}  |  Semana: ${activeWeek?.number || "—"}`, 14, 42);
+
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Trabalhados: ${stats.worked}    Fechados: ${stats.closed}    Recusados: ${stats.refused}`, 14, 54);
+      doc.text(`Focos (+): ${stats.focus}    Depósitos Tratados: ${stats.treatedDeposits || 0}    Larvicida: ${stats.larvicideUsed || 0}g`, 14, 60);
+
+      const body = visits.map((v: any) => {
+        const num = [v.property?.number, v.property?.sequence, v.property?.complement]
+          .filter(Boolean).join("/");
+        return [
+          num || "—",
+          translate(v.property?.type) || "—",
+          translate(v.status) || v.status,
+          v.has_focus ? "Sim" : "Não",
+          String(v.treated_deposits ?? 0),
+          v.treatment_amount ? `${v.treatment_amount}g` : "—",
+          v.notes || ""
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 68,
+        head: [["Nº", "Tipo", "Situação", "Foco", "Dep. Trat.", "Larvicida", "Obs."]],
+        body,
+        theme: "grid",
+        headStyles: { fillColor: [15, 23, 42], fontSize: 9 },
+        styles: { fontSize: 8 },
+      });
+
+      const filename = `diaria-${opDateStr}.pdf`;
+      doc.save(filename);
+      console.log("[PDF] PDF gerado com sucesso:", filename);
+      toast.success("PDF da diária gerado com sucesso!");
+    } catch (err: any) {
+      console.error("[PDF] Erro inesperado:", err);
+      toast.error(`Erro ao gerar PDF: ${err?.message || "erro desconhecido"}`);
+    }
+  };
+
+  const handleGeneratePDF = onGeneratePDF || defaultGeneratePDF;
+
 
   const canReopen = userRole === 'supervisor' || userRole === 'admin';
 
