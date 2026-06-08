@@ -468,6 +468,13 @@ function FieldWorkPage() {
           <DailyWorkCloser />
         </div>
       </div>
+
+      {/* Sticky mobile: botão sempre acessível para encerrar o dia */}
+      <div className="fixed bottom-[88px] left-0 right-0 px-4 z-40 lg:hidden pointer-events-none pb-[env(safe-area-inset-bottom)]">
+        <div className="pointer-events-auto max-w-md mx-auto">
+          <DailyWorkCloser />
+        </div>
+      </div>
     </div>
   );
 }
