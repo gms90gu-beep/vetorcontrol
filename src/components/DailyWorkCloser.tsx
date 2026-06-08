@@ -200,6 +200,7 @@ export function DailyWorkCloser({
   }, [fetchDailyContext]);
 
   const handleCloseDay = async () => {
+    console.log("[DIÁRIA] Encerramento iniciado");
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
