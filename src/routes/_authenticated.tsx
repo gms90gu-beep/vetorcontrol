@@ -160,7 +160,6 @@ function BottomNav() {
       <NavItem to="/rg" icon={MapPin} label="RG" />
       <NavItem to="/pending" icon={AlertTriangle} label="Pend." />
       <NavItem to="/map" icon={MapIcon} label="Mapa" />
-      <NavItem to="/reports" icon={FileText} label="Relat." />
       <NavItem to="/settings" icon={Settings} label="Ajustes" />
     </div>
   );
@@ -215,7 +214,6 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
-        { label: "Relatórios", icon: FileText, to: "/reports" },
       ];
 
   if (userRole === "admin_master") {
