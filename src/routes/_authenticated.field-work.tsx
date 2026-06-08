@@ -123,14 +123,32 @@ function FieldWorkPage() {
       
       if (weeksData) {
         setWeeks(weeksData);
-        if (weeksData.length > 0) {
-          setSelectedWeekId(weeksData[0].id);
-        }
+        const auto = pickWeekForDate(weeksData, date);
+        if (auto) setSelectedWeekId(auto.id);
+        else if (weeksData.length > 0) setSelectedWeekId(weeksData[0].id);
       }
     } catch (error) {
       console.error("Error fetching weeks:", error);
     }
   }
+
+  function pickWeekForDate(list: any[], d: Date) {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    return list.find((w: any) => {
+      const s = new Date(w.start_date).getTime();
+      const e = new Date(w.end_date).getTime();
+      return t >= s && t <= e;
+    }) || null;
+  }
+
+  // Auto-recompute week whenever the session date or available weeks change
+  useEffect(() => {
+    if (!weeks.length) return;
+    const auto = pickWeekForDate(weeks, date);
+    if (auto && auto.id !== selectedWeekId) setSelectedWeekId(auto.id);
+  }, [date, weeks]);
+
+  const selectedWeek = weeks.find(w => w.id === selectedWeekId);
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
