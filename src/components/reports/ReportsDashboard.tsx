@@ -144,10 +144,11 @@ export function ReportsDashboard() {
 
     toast.info("Gerando Boletim Semanal...");
     const result = await generateWeeklyReportPDF(session.user.id);
-    
+
     if (result) {
-      toast.success("Boletim Semanal gerado!");
-      // Save PDF
+      toast.success(
+        `Boletim Semanal SE ${result.epiWeek}/${result.epiYear} gerado — consolidado de ${result.dailyCount} relatório${result.dailyCount === 1 ? "" : "s"} diário${result.dailyCount === 1 ? "" : "s"}.`
+      );
       result.pdf.save(result.fileName);
     }
   };

@@ -241,6 +241,47 @@ export function DailyWorkCloser({
         .eq("work_date", operationalWorkDate)
         .maybeSingle();
 
+      // Snapshot completo do dia — fonte única para o Relatório Semanal.
+      // Busca depósitos, tubitos, amostras e larvicida das visitas da jornada.
+      const { data: dayVisits } = await supabase
+        .from("visits")
+        .select(`
+          id, status, has_focus, sample_collected, tubitos_coletados,
+          treatment_amount, treated_deposits, elimination_amount, larvicide_unit,
+          deposits:visit_deposits(quantity, is_treated, is_eliminated)
+        `)
+        .eq("agent_id", user.id)
+        .gte("visit_date", `${operationalWorkDate}T00:00:00`)
+        .lte("visit_date", `${operationalWorkDate}T23:59:59.999`);
+
+      let depExisting = 0, depInspected = 0, depTreated = 0, depEliminated = 0;
+      let larvicideAmount = 0, larvicideUnit: string | null = null;
+      let tubitos = 0, samples = 0;
+      (dayVisits || []).forEach((v: any) => {
+        const deps = v.deposits || [];
+        const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        depExisting += q;
+        depInspected += q;
+        depTreated += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        depEliminated += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        larvicideAmount += Number(v.treatment_amount) || 0;
+        if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
+        tubitos += Number(v.tubitos_coletados) || 0;
+        samples += v.sample_collected ? 1 : 0;
+      });
+      if (depTreated === 0 && stats.treatedDeposits) depTreated = stats.treatedDeposits;
+      if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
+      if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
+
+      // Quarteirões concluídos pelo agente na data da jornada
+      const { data: completedSessions } = await supabase
+        .from("field_work_sessions")
+        .select("block_number")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .eq("session_date", operationalWorkDate);
+      const blocksCompleted = new Set((completedSessions || []).map(s => s.block_number)).size;
+
       const recordData = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
@@ -251,10 +292,18 @@ export function DailyWorkCloser({
         properties_worked: stats.worked,
         properties_closed: stats.closed,
         properties_refused: stats.refused,
-        deposits_treated: stats.treatedDeposits || 0,
-        deposits_eliminated: stats.eliminated,
+        properties_recovered: recoveredCount,
+        deposits_existing: depExisting,
+        deposits_inspected: depInspected,
+        deposits_treated: depTreated,
+        deposits_eliminated: depEliminated,
         positive_foci: stats.focus,
-        pending_visits: stats.pending,
+        larvicide_amount: larvicideAmount,
+        larvicide_unit: larvicideUnit,
+        tubitos_collected: tubitos,
+        samples_collected: samples,
+        blocks_completed: blocksCompleted,
+        pending_visits: pendingCount,
         updated_at: new Date().toISOString()
       };
 

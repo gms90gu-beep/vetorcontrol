@@ -285,57 +285,87 @@ export type Database = {
       daily_work_records: {
         Row: {
           agent_id: string
+          blocks_completed: number | null
           created_at: string
           cycle_id: string
           deposits_eliminated: number | null
+          deposits_existing: number | null
+          deposits_inspected: number | null
           deposits_treated: number | null
           end_time: string | null
+          epi_week: number | null
+          epi_year: number | null
           id: string
+          larvicide_amount: number | null
+          larvicide_unit: string | null
           pending_visits: number | null
           positive_foci: number | null
           properties_closed: number | null
+          properties_recovered: number | null
           properties_refused: number | null
           properties_worked: number | null
+          samples_collected: number | null
           start_time: string
           status: string
+          tubitos_collected: number | null
           updated_at: string
           week_id: string | null
           work_date: string
         }
         Insert: {
           agent_id: string
+          blocks_completed?: number | null
           created_at?: string
           cycle_id: string
           deposits_eliminated?: number | null
+          deposits_existing?: number | null
+          deposits_inspected?: number | null
           deposits_treated?: number | null
           end_time?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
           id?: string
+          larvicide_amount?: number | null
+          larvicide_unit?: string | null
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
+          properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
+          samples_collected?: number | null
           start_time?: string
           status: string
+          tubitos_collected?: number | null
           updated_at?: string
           week_id?: string | null
           work_date?: string
         }
         Update: {
           agent_id?: string
+          blocks_completed?: number | null
           created_at?: string
           cycle_id?: string
           deposits_eliminated?: number | null
+          deposits_existing?: number | null
+          deposits_inspected?: number | null
           deposits_treated?: number | null
           end_time?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
           id?: string
+          larvicide_amount?: number | null
+          larvicide_unit?: string | null
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
+          properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
+          samples_collected?: number | null
           start_time?: string
           status?: string
+          tubitos_collected?: number | null
           updated_at?: string
           week_id?: string | null
           work_date?: string
