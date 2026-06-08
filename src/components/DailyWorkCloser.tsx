@@ -76,6 +76,10 @@ export function DailyWorkCloser({
     larvicideUsed: 0,
     progress: 0
   });
+  const [pendingCount, setPendingCount] = useState(0);
+  const [recoveredCount, setRecoveredCount] = useState(0);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const stats = externalStats || localStats;
 
@@ -118,12 +122,15 @@ export function DailyWorkCloser({
         // Considera a data da jornada ativa (se existir) como referência operacional
         const { data: activeSession } = await supabase
           .from("field_work_sessions")
-          .select("session_date")
+          .select("id, session_date, block_number")
           .eq("user_id", user.id)
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        setActiveSessionId(activeSession?.id ?? null);
+        setOpenBlock(activeSession?.block_number ?? null);
 
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
@@ -161,6 +168,22 @@ export function DailyWorkCloser({
             progress: 0 
           });
         }
+
+        // Pendências em aberto + recuperadas hoje
+        const { count: pCount } = await supabase
+          .from("property_pendencies")
+          .select("id", { count: 'exact', head: true })
+          .eq("agent_id", user.id)
+          .is("resolved_at", null);
+        setPendingCount(pCount || 0);
+
+        const { count: rCount } = await supabase
+          .from("property_pendencies")
+          .select("id", { count: 'exact', head: true })
+          .eq("agent_id", user.id)
+          .gte("resolved_at", startOfDay.toISOString())
+          .lte("resolved_at", endOfDay.toISOString());
+        setRecoveredCount(rCount || 0);
       }
     } catch (error) {
       console.error("Error fetching daily context:", error);
@@ -245,6 +268,14 @@ export function DailyWorkCloser({
         .from("agents")
         .update({ work_status: 'work_completed' })
         .eq("id", currentAgent.id);
+
+      // Encerra jornada(s) de campo em andamento
+      await supabase
+        .from("field_work_sessions")
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("status", "in_progress");
+
 
       toast.success("Trabalho do dia encerrado com sucesso!");
       setShowSummary(true);
@@ -387,6 +418,23 @@ export function DailyWorkCloser({
         </div>
 
         <div className="p-8 space-y-6">
+          {(pendingCount > 0 || openBlock) && (
+            <div className="space-y-2">
+              {pendingCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800">
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">⚠️ Pendências em aberto</p>
+                  <p className="text-[11px] font-bold">Existem {pendingCount} imóveis pendentes de recuperação. Deseja encerrar mesmo assim?</p>
+                </div>
+              )}
+              {openBlock && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-800">
+                  <p className="text-xs font-black uppercase tracking-widest mb-1">⚠️ Quarteirão em andamento</p>
+                  <p className="text-[11px] font-bold">O quarteirão {openBlock} ainda está aberto. Deseja encerrar mesmo assim?</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
             <div className="grid grid-cols-2 gap-3">
@@ -394,6 +442,8 @@ export function DailyWorkCloser({
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
               <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
               <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Pend. Geradas" value={pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Recuperadas" value={recoveredCount} icon={CheckCircle2} />
               <SummaryItemSmall label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} icon={Layers} />
               <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
             </div>

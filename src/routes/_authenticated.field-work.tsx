@@ -33,6 +33,7 @@ import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -421,6 +422,16 @@ function FieldWorkPage() {
               Selecione ciclo, semana e quarteirão para liberar
             </p>
           )}
+        </div>
+
+        {/* Encerramento da Produção do Dia */}
+        <div className="pt-2 pb-8 space-y-3">
+          <div className="flex items-center gap-2 ml-1">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fim do Expediente</span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+          <DailyWorkCloser />
         </div>
       </div>
     </div>
