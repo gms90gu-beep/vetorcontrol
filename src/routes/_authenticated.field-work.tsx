@@ -33,6 +33,7 @@ import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
