@@ -1177,65 +1177,68 @@ function PropertyVisitPage() {
       </div>
 
       {/* Fixed Footer: Next Property */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 p-4 pb-8 md:pb-6 flex items-center justify-between shadow-[0_-8px_30px_rgba(0,0,0,0.04)] mb-[env(safe-area-inset-bottom)]">
-        <div className="flex gap-4">
-          {prevProperty && (
-            <div className="flex flex-col items-center">
-              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Anterior</span>
-              <Button 
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 px-3 sm:px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-8px_30px_rgba(0,0,0,0.04)]">
+        <div className="mx-auto w-full max-w-3xl flex flex-col gap-2">
+          {/* Linha 1: Navegação + Concluir */}
+          <div className="flex items-center gap-2 w-full min-w-0">
+            {prevProperty && (
+              <Button
                 variant="outline"
                 size="icon"
                 onClick={() => navigate({ to: `/property/${prevProperty.id}` })}
-                className="h-10 w-10 rounded-xl border-slate-100 bg-slate-50 text-slate-400"
+                className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-500"
+                title="Imóvel anterior"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
+            )}
+
+            <div className="flex flex-col items-center justify-center shrink-0 px-1 leading-none">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                {nextProperty ? "Próximo" : "Fim"}
+              </span>
+              <span className="text-lg font-black text-slate-900">{nextProperty?.number || "--"}</span>
             </div>
-          )}
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {nextProperty ? "Próximo" : "Fim"}
-            </span>
-            <span className="text-xl font-black text-slate-900">{nextProperty?.number || "--"}</span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex gap-2">
-             <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className="h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-8 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2"
-            >
-              {isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}
-              {!isSaving && <CheckCircle2 className="h-5 w-5" />}
-            </Button>
+
             {nextProperty && (
-              <Button 
+              <Button
                 variant="outline"
+                size="icon"
                 onClick={() => navigate({ to: `/property/${nextProperty.id}` })}
-                className="h-14 w-14 rounded-2xl border-slate-200 active:scale-95 transition-all p-0"
-                title="Ir para o próximo"
+                className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-600"
+                title="Próximo imóvel"
               >
-                <ArrowRight className="h-6 w-6 text-slate-600" />
+                <ArrowRight className="h-4 w-4" />
               </Button>
             )}
-          </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={handleEndBlock}
-              className="text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center gap-1"
+
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-1 min-w-0 h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-black px-3 sm:px-6 shadow-lg shadow-emerald-200 active:scale-95 transition-all gap-2 text-xs sm:text-sm truncate"
             >
-              <AlertCircle className="h-3 w-3" />
-              Encerrar Quarteirão
+              <span className="truncate">{isSaving ? "SALVANDO..." : "CONCLUIR VISITA"}</span>
+              {!isSaving && <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />}
+            </Button>
+          </div>
+
+          {/* Linha 2: Ações secundárias */}
+          <div className="flex items-center justify-between gap-2 w-full">
+            <button
+              onClick={handleEndBlock}
+              className="flex-1 min-w-0 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center justify-center gap-1 truncate"
+            >
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span className="truncate">Encerrar Quarteirão</span>
             </button>
-            <button 
+            <span className="h-4 w-px bg-slate-200 shrink-0" />
+            <button
               onClick={() => navigate({ to: "/dashboard" })}
-              className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest mr-2 py-1"
+              className="flex-1 min-w-0 text-[10px] font-black text-slate-400 hover:text-primary transition-colors uppercase tracking-widest py-1 truncate"
             >
               Tela Inicial
             </button>
           </div>
-
         </div>
       </div>
     </div>
