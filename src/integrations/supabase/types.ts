@@ -627,6 +627,94 @@ export type Database = {
           },
         ]
       }
+      property_pendencies: {
+        Row: {
+          agent_id: string
+          attempt_count: number
+          created_at: string
+          current_status: Database["public"]["Enums"]["recovery_result"]
+          id: string
+          last_attempt_at: string | null
+          property_id: string
+          reason: string | null
+          resolved_at: string | null
+          resolved_status: Database["public"]["Enums"]["recovery_result"] | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          attempt_count?: number
+          created_at?: string
+          current_status: Database["public"]["Enums"]["recovery_result"]
+          id?: string
+          last_attempt_at?: string | null
+          property_id: string
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_status?:
+            | Database["public"]["Enums"]["recovery_result"]
+            | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          attempt_count?: number
+          created_at?: string
+          current_status?: Database["public"]["Enums"]["recovery_result"]
+          id?: string
+          last_attempt_at?: string | null
+          property_id?: string
+          reason?: string | null
+          resolved_at?: string | null
+          resolved_status?:
+            | Database["public"]["Enums"]["recovery_result"]
+            | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      property_recovery_attempts: {
+        Row: {
+          agent_id: string
+          attempt_number: number
+          attempted_at: string
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          property_id: string
+          result: Database["public"]["Enums"]["recovery_result"]
+          visit_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          attempt_number?: number
+          attempted_at?: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          property_id: string
+          result: Database["public"]["Enums"]["recovery_result"]
+          visit_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          attempt_number?: number
+          attempted_at?: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          property_id?: string
+          result?: Database["public"]["Enums"]["recovery_result"]
+          visit_id?: string | null
+        }
+        Relationships: []
+      }
       rg_ocr_imports: {
         Row: {
           block_number: string | null
@@ -1217,13 +1305,30 @@ export type Database = {
         | "agente"
       block_status: "not_started" | "in_progress" | "completed"
       cycle_status: "not_started" | "in_progress" | "finished"
-      property_status: "active" | "pending" | "deactivated"
+      property_status:
+        | "active"
+        | "pending"
+        | "deactivated"
+        | "absent"
+        | "not_located"
+        | "unoccupied"
+        | "demolished"
+        | "visited"
       property_type:
         | "residence"
         | "commerce"
         | "vacant_lot"
         | "strategic_point"
         | "others"
+      recovery_result:
+        | "closed"
+        | "refused"
+        | "absent"
+        | "not_located"
+        | "not_done"
+        | "visited"
+        | "unoccupied"
+        | "demolished"
       user_role_type: "admin_master" | "coordenador" | "supervisor" | "agente"
       visit_status: "visited" | "closed" | "refused" | "abandoned"
     }
@@ -1364,13 +1469,32 @@ export const Constants = {
       ],
       block_status: ["not_started", "in_progress", "completed"],
       cycle_status: ["not_started", "in_progress", "finished"],
-      property_status: ["active", "pending", "deactivated"],
+      property_status: [
+        "active",
+        "pending",
+        "deactivated",
+        "absent",
+        "not_located",
+        "unoccupied",
+        "demolished",
+        "visited",
+      ],
       property_type: [
         "residence",
         "commerce",
         "vacant_lot",
         "strategic_point",
         "others",
+      ],
+      recovery_result: [
+        "closed",
+        "refused",
+        "absent",
+        "not_located",
+        "not_done",
+        "visited",
+        "unoccupied",
+        "demolished",
       ],
       user_role_type: ["admin_master", "coordenador", "supervisor", "agente"],
       visit_status: ["visited", "closed", "refused", "abandoned"],

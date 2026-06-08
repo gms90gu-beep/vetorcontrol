@@ -67,6 +67,7 @@ export function AgentDashboard() {
   const [weekFocos, setWeekFocos] = useState(0);
   const [blockStats, setBlockStats] = useState({ atual: "—", concluidos: 0, pendentes: 0 });
   const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     document.title = "Meu Desempenho — VetorControl";
@@ -130,6 +131,19 @@ export function AgentDashboard() {
       }
 
       setWeekFocos((vWeek || []).filter((v) => v.has_focus).length);
+
+      // Pendências ativas do agente
+      try {
+        const { count } = await (supabase as any)
+          .from("property_pendencies")
+          .select("id", { count: "exact", head: true })
+          .eq("agent_id", user.id)
+          .is("resolved_at", null);
+        if (!cancelled) setPendingCount(count || 0);
+      } catch (e) {
+        console.warn("[Dashboard] pendências:", e);
+      }
+
 
       // Sessão ativa + blocos
       const { data: active } = await supabase
@@ -215,6 +229,21 @@ export function AgentDashboard() {
 
       <div className="px-4 py-5 space-y-5 pb-24">
         {/* CTA iniciar jornada */}
+        {pendingCount > 0 && (
+          <button
+            onClick={() => navigate({ to: "/pending" })}
+            className="w-full flex items-center justify-between gap-3 bg-red-600 text-white rounded-xl py-3 px-4 active:scale-[0.98] transition-transform shadow-lg shadow-red-600/30"
+          >
+            <span className="flex items-center gap-2 font-bold text-[13px]">
+              <AlertTriangle className="h-5 w-5" />
+              Pendências para Recuperar
+            </span>
+            <span className="bg-white text-red-700 font-black text-sm px-2.5 py-0.5 rounded-full">
+              {pendingCount}
+            </span>
+          </button>
+        )}
+
         {!hasActiveSession && (
           <button
             onClick={() => navigate({ to: "/field-work" })}
