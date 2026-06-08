@@ -1276,7 +1276,7 @@ function PropertyVisitPage() {
           {/* Linha 2: Ações secundárias */}
           <div className="flex items-center justify-between gap-2 w-full">
             <button
-              onClick={handleEndBlock}
+              onClick={() => { if (confirmLeaveIfDirty()) handleEndBlock(); }}
               className="flex-1 min-w-0 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center justify-center gap-1 truncate"
             >
               <AlertCircle className="h-3 w-3 shrink-0" />
