@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
+import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { getOperationalVisitDate } from "@/lib/operational-date";
 
