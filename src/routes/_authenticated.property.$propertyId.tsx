@@ -183,13 +183,13 @@ function PropertyVisitPage() {
 
   const fetchAdjacentProperties = async () => {
     if (!property) return;
-    
+
     try {
-      // Use block_id if available, fallback to block_number
+      // Buscar TODOS os imóveis do quarteirão (somente colunas necessárias)
       let query = supabase
         .from("properties")
-        .select("id, number");
-      
+        .select("id, number, sequence, status, street_name");
+
       if (property.block_id) {
         query = query.eq("block_id", property.block_id);
       } else if (property.block_number) {
@@ -198,29 +198,72 @@ function PropertyVisitPage() {
         return;
       }
 
-      // Consistent ordering with RG page
-      const { data: allProps } = await query
-        .order("sequence", { ascending: true })
-        .order("street_name", { ascending: true })
-        .order("number", { ascending: true });
-
-      if (allProps && allProps.length > 0) {
-        const currentIndex = allProps.findIndex(p => p.id === propertyId);
-        
-        if (currentIndex !== -1) {
-          setPropertyIndex({
-            current: currentIndex + 1,
-            total: allProps.length
-          });
-
-          setPrevProperty(currentIndex > 0 ? allProps[currentIndex - 1] : null);
-          setNextProperty(currentIndex < allProps.length - 1 ? allProps[currentIndex + 1] : null);
-        }
+      const { data: allPropsRaw, error } = await query;
+      if (error) {
+        console.error("[Navegação] Erro ao buscar imóveis:", error);
+        return;
       }
-    } catch (e) { 
-      console.error("Error fetching adjacent properties:", e); 
+
+      const all = allPropsRaw || [];
+
+      // Ordenação robusta no client: normaliza street_name (trim + lower)
+      // e ordena number como inteiro quando possível.
+      // Isso evita o problema de "RUA DA IGREJA" vir antes de "Rua da igreja"
+      // e de "10" vir antes de "2" na ordenação alfabética.
+      const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+      const numKey = (n: any) => {
+        const v = parseInt(String(n ?? "").replace(/\D/g, ""), 10);
+        return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+      };
+      const seqKey = (s: any) => {
+        if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
+        const v = Number(s);
+        return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+      };
+
+      const sorted = [...all].sort((a, b) => {
+        const sa = seqKey(a.sequence);
+        const sb = seqKey(b.sequence);
+        if (sa !== sb) return sa - sb;
+        const ra = norm(a.street_name);
+        const rb = norm(b.street_name);
+        if (ra !== rb) return ra < rb ? -1 : 1;
+        const na = numKey(a.number);
+        const nb = numKey(b.number);
+        if (na !== nb) return na - nb;
+        // Empate final: ordena por id para estabilidade
+        return String(a.id).localeCompare(String(b.id));
+      });
+
+      const currentIndex = sorted.findIndex((p) => p.id === propertyId);
+
+      // Logs temporários de diagnóstico de navegação
+      console.log("[Navegação] Quarteirão:", property.block_number, "| total imóveis:", sorted.length);
+      console.log("[Navegação] Imóvel atual:", {
+        id: property.id,
+        number: property.number,
+        sequence: property.sequence,
+        street: property.street_name,
+        index: currentIndex + 1,
+      });
+      const prev = currentIndex > 0 ? sorted[currentIndex - 1] : null;
+      const next = currentIndex >= 0 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
+      console.log("[Navegação] Anterior:", prev && { id: prev.id, number: prev.number, street: prev.street_name });
+      console.log("[Navegação] Próximo:", next && { id: next.id, number: next.number, street: next.street_name });
+
+      if (currentIndex !== -1) {
+        setPropertyIndex({
+          current: currentIndex + 1,
+          total: sorted.length,
+        });
+        setPrevProperty(prev);
+        setNextProperty(next);
+      }
+    } catch (e) {
+      console.error("[Navegação] Erro inesperado:", e);
     }
   };
+
 
   useEffect(() => {
     if (property) {
