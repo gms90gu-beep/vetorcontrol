@@ -80,6 +80,7 @@ export function DailyWorkCloser({
   const [recoveredCount, setRecoveredCount] = useState(0);
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [jornadaDate, setJornadaDate] = useState<string | null>(null);
 
   const stats = externalStats || localStats;
 
@@ -135,6 +136,7 @@ export function DailyWorkCloser({
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
           : new Date().toISOString().split('T')[0];
+        setJornadaDate(opDateStr);
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
@@ -395,8 +397,10 @@ export function DailyWorkCloser({
                 <Power className="h-8 w-8 text-white" />
               </div>
               <div className="text-left">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200 mb-0.5">Operacional</p>
-                <h3 className="text-xl font-black tracking-tight uppercase">Encerrar Trabalho do Dia</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-200 mb-0.5">
+                  Operacional · {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : 'Hoje'}
+                </p>
+                <h3 className="text-xl font-black tracking-tight uppercase">Encerrar Jornada do Dia</h3>
               </div>
             </div>
             <ChevronRight className="h-8 w-8 text-white/50 group-hover:translate-x-2 group-hover:text-white transition-all" />
@@ -413,8 +417,14 @@ export function DailyWorkCloser({
             Finalizar o expediente?
           </DialogTitle>
           <DialogDescription className="text-white/80 font-bold text-xs uppercase tracking-widest leading-relaxed">
-            Sua produção será consolidada e os indicadores do ciclo serão atualizados automaticamente.
+            Apenas os dados desta jornada serão consolidados. Os indicadores do ciclo são atualizados automaticamente.
           </DialogDescription>
+          <div className="mt-4 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2">
+            <Calendar className="h-3.5 w-3.5" />
+            <span className="text-[11px] font-black uppercase tracking-widest">
+              Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+            </span>
+          </div>
         </div>
 
         <div className="p-8 space-y-6">
@@ -436,7 +446,7 @@ export function DailyWorkCloser({
           )}
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo da Produção</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo desta Jornada (apenas o dia)</h4>
             <div className="grid grid-cols-2 gap-3">
               <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
