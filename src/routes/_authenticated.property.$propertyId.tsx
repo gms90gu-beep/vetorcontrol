@@ -618,11 +618,14 @@ function PropertyVisitPage() {
         if (depositsError) throw depositsError;
       }
 
-      toast.success("Visita finalizada com sucesso!");
-      
+      setJustSaved(true);
+      setIsDirty(false);
+
       if (nextProperty) {
+        toast.success("✅ Visita salva com sucesso", { description: "Carregando próximo imóvel..." });
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
+        toast.success("✅ Visita salva com sucesso", { description: "Último imóvel do quarteirão." });
         navigate({ to: "/field-work-list" });
       }
     } catch (error: any) {
