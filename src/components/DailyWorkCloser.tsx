@@ -305,14 +305,24 @@ export function DailyWorkCloser({
       const startOfDay = new Date(`${opDateStr}T00:00:00`);
       const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
-      console.log("[PDF] agent_id:", user.id, "cycle_id:", activeCycle?.id, "data:", opDateStr);
+      // EPI week (ISO week) calculation
+      const refDate = new Date(`${opDateStr}T12:00:00`);
+      const epiWeek = (() => {
+        const d = new Date(Date.UTC(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+      })();
 
       let query = supabase
         .from("visits")
         .select(`
           id, status, visit_date, treatment_amount, treated_deposits,
-          elimination_amount, has_focus, notes,
-          property:properties(number, sequence, complement, type)
+          elimination_amount, has_focus, sample_collected, tubitos_coletados,
+          larvicide_unit, treatment_applied, notes, property_id,
+          property:properties(number, sequence, complement, type, status, block_number),
+          deposits:visit_deposits(quantity, is_positive, is_treated, is_eliminated)
         `)
         .eq("agent_id", user.id)
         .gte("visit_date", startOfDay.toISOString())
@@ -328,50 +338,178 @@ export function DailyWorkCloser({
         return;
       }
 
-      console.log(`[PDF] Dados encontrados: ${visits?.length || 0} registros`);
-
       if (!visits || visits.length === 0) {
         toast.warning("Nenhuma visita encontrada para esta diária.");
         return;
       }
 
+      // Quarteirões concluídos hoje (sessions completed today for this user)
+      const { data: completedSessions } = await supabase
+        .from("field_work_sessions")
+        .select("block_number")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .eq("session_date", opDateStr);
+      const blocksCompleted = new Set((completedSessions || []).map(s => s.block_number)).size;
+
+      // LI aggregates
+      let depExistentes = 0;
+      let depInspecionados = 0;
+      let depTratados = 0;
+      let depEliminados = 0;
+      let focos = 0;
+      let larvicida = 0;
+      let amostras = 0;
+      let tubitosTotal = 0;
+      let imoveisComTubito = 0;
+      let larvicideUnit = "g";
+
+      visits.forEach((v: any) => {
+        const deps = v.deposits || [];
+        const qtySum = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        depExistentes += qtySum;
+        depInspecionados += qtySum; // todos os depósitos registrados foram inspecionados
+        depTratados += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        depEliminados += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        focos += v.has_focus ? 1 : 0;
+        larvicida += Number(v.treatment_amount) || 0;
+        if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
+        amostras += v.sample_collected ? 1 : 0;
+        const tub = Number(v.tubitos_coletados) || 0;
+        tubitosTotal += tub;
+        if (tub > 0) imoveisComTubito += 1;
+      });
+
+      // Fallback: usa stats (que já podem trazer depósitos tratados/eliminados a partir do estado)
+      if (depTratados === 0 && stats.treatedDeposits) depTratados = stats.treatedDeposits;
+      if (depEliminados === 0 && stats.eliminated) depEliminados = stats.eliminated;
+      if (larvicida === 0 && stats.larvicideUsed) larvicida = stats.larvicideUsed;
+
       const doc = new jsPDF();
-      doc.setFontSize(20);
+      const pageW = doc.internal.pageSize.getWidth();
+      let y = 16;
+
+      // === HEADER ===
+      doc.setFontSize(16);
       doc.setTextColor(15, 23, 42);
-      doc.text("Boletim Diário", 14, 20);
+      doc.setFont("helvetica", "bold");
+      doc.text("BOLETIM DIÁRIO DE PRODUÇÃO", pageW / 2, y, { align: "center" });
+      y += 8;
 
-      doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Agente: ${agent?.name || "—"}`, 14, 30);
-      doc.text(`Data: ${new Date(`${opDateStr}T12:00:00`).toLocaleDateString('pt-BR')}`, 14, 36);
-      doc.text(`Ciclo: ${activeCycle?.number || "—"}  |  Semana: ${activeWeek?.number || "—"}`, 14, 42);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(60, 60, 60);
+      const emissao = new Date().toLocaleString('pt-BR');
+      const dataJornadaFmt = new Date(`${opDateStr}T12:00:00`).toLocaleDateString('pt-BR');
 
+      const headerRows: [string, string][] = [
+        ["Município", agent?.municipality || "—"],
+        ["Agente", agent?.name || "—"],
+        ["Data da Jornada", dataJornadaFmt],
+        ["Ciclo", activeCycle?.number ? `Ciclo ${activeCycle.number}/${activeCycle.year}` : "—"],
+        ["Semana Epidemiológica", String(epiWeek)],
+        ["Emissão", emissao],
+      ];
+      autoTable(doc, {
+        startY: y,
+        body: headerRows,
+        theme: "plain",
+        styles: { fontSize: 9, cellPadding: 1 },
+        columnStyles: { 0: { fontStyle: "bold", cellWidth: 50 }, 1: { cellWidth: "auto" } },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === RESUMO DA PRODUÇÃO ===
       doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
       doc.setTextColor(15, 23, 42);
-      doc.text(`Trabalhados: ${stats.worked}    Fechados: ${stats.closed}    Recusados: ${stats.refused}`, 14, 54);
-      doc.text(`Focos (+): ${stats.focus}    Depósitos Tratados: ${stats.treatedDeposits || 0}    Larvicida: ${stats.larvicideUsed || 0}g`, 14, 60);
+      doc.text("RESUMO DA PRODUÇÃO", 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y + 1,
+        head: [["Trabalhados", "Fechados", "Recusados", "Recuperados", "Pendências", "Qtr. Concluídos"]],
+        body: [[
+          String(stats.worked),
+          String(stats.closed),
+          String(stats.refused),
+          String(recoveredCount),
+          String(pendingCount),
+          String(blocksCompleted),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 9, halign: "center" },
+        styles: { fontSize: 9, halign: "center" },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === DADOS LI ===
+      doc.setFont("helvetica", "bold");
+      doc.text("DADOS DO LI (LEVANTAMENTO DE ÍNDICE)", 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y + 1,
+        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos", `Larvicida (${larvicideUnit})`, "Amostras"]],
+        body: [[
+          String(depExistentes),
+          String(depInspecionados),
+          String(depTratados),
+          String(depEliminados),
+          String(focos),
+          String(larvicida),
+          String(amostras),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
+        styles: { fontSize: 9, halign: "center" },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === TUBITOS ===
+      doc.setFont("helvetica", "bold");
+      doc.text("TUBITOS COLETADOS", 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y + 1,
+        head: [["Total de Tubitos", "Imóveis com Coleta"]],
+        body: [[String(tubitosTotal), String(imoveisComTubito)]],
+        theme: "grid",
+        headStyles: { fillColor: [5, 150, 105], textColor: 255, fontSize: 9, halign: "center" },
+        styles: { fontSize: 9, halign: "center" },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === TABELA DE VISITAS ===
+      doc.setFont("helvetica", "bold");
+      doc.text("VISITAS REALIZADAS", 14, y);
+      y += 2;
 
       const body = visits.map((v: any) => {
-        const num = [v.property?.number, v.property?.sequence, v.property?.complement]
-          .filter(Boolean).join("/");
+        const deps = v.deposits || [];
+        const depQty = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        const trabalhado = v.status === 'visited' || v.status === 'closed' || v.status === 'refused' ? "Sim" : "Não";
+        const tratado = (v.treatment_applied || (Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) ? "Sim" : "Não";
         return [
-          num || "—",
-          translate(v.property?.type) || "—",
+          v.property?.number || "—",
+          v.property?.sequence ?? "—",
+          v.property?.complement || "—",
           translate(v.status) || v.status,
+          trabalhado,
+          tratado,
+          String(depQty || v.treated_deposits || 0),
           v.has_focus ? "Sim" : "Não",
-          String(v.treated_deposits ?? 0),
-          v.treatment_amount ? `${v.treatment_amount}g` : "—",
-          v.notes || ""
+          v.treatment_amount ? `${v.treatment_amount}${v.larvicide_unit || 'g'}` : "—",
+          (Number(v.tubitos_coletados) || 0) > 0 ? "Sim" : "Não",
         ];
       });
 
       autoTable(doc, {
-        startY: 68,
-        head: [["Nº", "Tipo", "Situação", "Foco", "Dep. Trat.", "Larvicida", "Obs."]],
+        startY: y + 1,
+        head: [["Nº", "Seq.", "Compl.", "Situação", "Trab.", "Trat.", "Dep.", "Focos", "Larvicida", "Tubito"]],
         body,
         theme: "grid",
-        headStyles: { fillColor: [15, 23, 42], fontSize: 9 },
-        styles: { fontSize: 8 },
+        headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
+        styles: { fontSize: 7, halign: "center" },
+        columnStyles: { 2: { halign: "left" }, 3: { halign: "left" } },
       });
 
       const filename = `diaria-${opDateStr}.pdf`;
