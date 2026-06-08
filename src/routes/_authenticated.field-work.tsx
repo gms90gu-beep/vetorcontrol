@@ -150,19 +150,53 @@ function FieldWorkPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // VALIDAÇÃO DE CICLO ATIVO: a jornada só pode ser iniciada no ciclo "in_progress".
+      // Isso garante isolamento total entre ciclos epidemiológicos.
+      const { data: activeCycleRow } = await supabase
+        .from("cycles")
+        .select("id, number, year")
+        .eq("status", "in_progress")
+        .maybeSingle();
+
+      if (!activeCycleRow) {
+        toast.error("Nenhum ciclo ativo no momento. Solicite ao supervisor que abra o ciclo.");
+        return;
+      }
+
+      const cycleIdToUse = activeCycleRow.id;
+
+      if (selectedCycleId && selectedCycleId !== cycleIdToUse) {
+        toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
+      }
+
+      // Encerra sessões anteriores vinculadas a OUTROS ciclos (jornada antiga não pode misturar dados).
+      const { data: staleSessions } = await supabase
+        .from("field_work_sessions")
+        .select("id, cycle_id")
+        .eq("user_id", user.id)
+        .eq("status", "in_progress");
+      const staleIds = (staleSessions || [])
+        .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
+        .map((s: any) => s.id);
+      if (staleIds.length > 0) {
+        await supabase
+          .from("field_work_sessions")
+          .update({ status: "closed" })
+          .in("id", staleIds);
+        console.log("[FieldWork] Sessões de ciclos anteriores encerradas:", staleIds.length);
+      }
+
       const { data: agent } = await supabase.from("agents").select("work_status").eq("profile_id", user.id).maybeSingle();
       if (agent?.work_status === 'work_completed') {
-         // Reset status if starting new session
          await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
       }
 
       const { error } = await supabase.from("field_work_sessions").insert({
         user_id: user.id,
-        cycle_id: selectedCycleId,
+        cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
-
         property_count: selectedBlock?.total_properties || 0,
         session_date: date.toISOString().split('T')[0],
         status: "in_progress"
