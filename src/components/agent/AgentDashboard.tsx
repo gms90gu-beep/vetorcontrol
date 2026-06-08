@@ -89,26 +89,40 @@ export function AgentDashboard() {
       const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
-      const { data: vToday } = await supabase
+      // Ciclo ativo: garante consistência com a tela Trabalho / encerramento diário
+      const { data: activeCycle } = await supabase
+        .from("cycles")
+        .select("id")
+        .eq("status", "in_progress")
+        .maybeSingle();
+      const activeCycleId = activeCycle?.id ?? null;
+
+      let qToday = supabase
         .from("visits")
         .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount, property_id")
         .eq("agent_id", user.id)
         .gte("visit_date", `${todayIso}T00:00:00`)
         .order("visit_date", { ascending: false });
+      if (activeCycleId) qToday = qToday.eq("cycle_id", activeCycleId);
+      const { data: vToday } = await qToday;
 
-      const { data: vWeek } = await supabase
+      let qWeek = supabase
         .from("visits")
         .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
         .eq("agent_id", user.id)
         .gte("visit_date", weekStart)
         .order("visit_date", { ascending: false });
+      if (activeCycleId) qWeek = qWeek.eq("cycle_id", activeCycleId);
+      const { data: vWeek } = await qWeek;
 
-      const { data: vMonth } = await supabase
+      let qMonth = supabase
         .from("visits")
         .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
         .eq("agent_id", user.id)
         .gte("visit_date", monthStart)
         .order("visit_date", { ascending: false });
+      if (activeCycleId) qMonth = qMonth.eq("cycle_id", activeCycleId);
+      const { data: vMonth } = await qMonth;
 
       if (cancelled) return;
       setTodayVisits((vToday as any) || []);
