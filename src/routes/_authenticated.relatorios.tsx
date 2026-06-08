@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,22 @@ function AgentReports() {
   const [dailies, setDailies] = useState<any[]>([]);
   const [generating, setGenerating] = useState(false);
   const [authId, setAuthId] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(null);
   const [fullName, setFullName] = useState<string>("Agente");
+
+  const fetchDailies = useCallback(async (aId: string) => {
+    const { data, error } = await supabase
+      .from("daily_work_records")
+      .select(
+        "id, work_date, epi_week, epi_year, properties_worked, properties_closed, properties_refused, deposits_inspected, focuses_found, tubitos_collected"
+      )
+      .eq("agent_id", aId)
+      .order("work_date", { ascending: false })
+      .limit(30);
+    if (error) console.error("[RELATÓRIOS] erro ao buscar:", error);
+    console.log(`[RELATÓRIOS] ${data?.length ?? 0} diárias encontradas`);
+    setDailies(data || []);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -83,7 +99,10 @@ function AgentReports() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      if (!session?.user) {
+        setLoading(false);
+        return;
+      }
       setAuthId(session.user.id);
 
       const { data: profile } = await supabase
@@ -100,19 +119,45 @@ function AgentReports() {
         .maybeSingle();
 
       if (agent?.id) {
-        const { data } = await supabase
-          .from("daily_work_records")
-          .select(
-            "id, work_date, epi_week, epi_year, properties_worked, properties_closed, properties_refused, deposits_inspected, focuses_found, tubitos_collected"
-          )
-          .eq("agent_id", agent.id)
-          .order("work_date", { ascending: false })
-          .limit(30);
-        setDailies(data || []);
+        setAgentId(agent.id);
+        await fetchDailies(agent.id);
       }
       setLoading(false);
     })();
-  }, []);
+  }, [fetchDailies]);
+
+  // Refetch quando voltar para a aba/janela
+  useEffect(() => {
+    if (!agentId) return;
+    const onFocus = () => fetchDailies(agentId);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [agentId, fetchDailies]);
+
+  // Realtime: novo/atualizado registro do agente aparece na hora
+  useEffect(() => {
+    if (!agentId) return;
+    const channel = supabase
+      .channel(`dwr-${agentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "daily_work_records",
+          filter: `agent_id=eq.${agentId}`,
+        },
+        () => fetchDailies(agentId)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [agentId, fetchDailies]);
 
   const handleWeekly = async () => {
     if (!authId) return;
@@ -189,7 +234,15 @@ function AgentReports() {
               Últimos 30 fechamentos
             </p>
           </div>
-          <FileText className="h-5 w-5 text-slate-300" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => agentId && fetchDailies(agentId)}
+            className="h-8 px-2 rounded-lg text-slate-400 hover:text-slate-700"
+            title="Atualizar"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
 
         {loading ? (

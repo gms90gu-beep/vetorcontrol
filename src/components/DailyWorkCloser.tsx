@@ -200,6 +200,7 @@ export function DailyWorkCloser({
   }, [fetchDailyContext]);
 
   const handleCloseDay = async () => {
+    console.log("[DIÁRIA] Encerramento iniciado");
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -320,15 +321,28 @@ export function DailyWorkCloser({
         updated_at: new Date().toISOString()
       };
 
+      console.log("[DIÁRIA] Snapshot criado", recordData);
       if (existingRecord) {
-        await supabase
+        const { error: upErr } = await supabase
           .from("daily_work_records")
           .update(recordData)
           .eq("id", existingRecord.id);
+        if (upErr) {
+          console.error("[DIÁRIA] Erro ao atualizar registro:", upErr);
+          throw upErr;
+        }
+        console.log("[DIÁRIA] Registro atualizado com sucesso", existingRecord.id);
       } else {
-        await supabase
+        const { data: inserted, error: insErr } = await supabase
           .from("daily_work_records")
-          .insert(recordData);
+          .insert(recordData)
+          .select("id")
+          .single();
+        if (insErr) {
+          console.error("[DIÁRIA] Erro ao inserir registro:", insErr);
+          throw insErr;
+        }
+        console.log("[DIÁRIA] Registro salvo com sucesso", inserted?.id);
       }
 
       await supabase
