@@ -145,9 +145,9 @@ function BottomNav() {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
         <NavItem to="/supervision" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
-        <NavItem to="/supervision" icon={Users} label="Equipe" />
+        <NavItem to="/relatorios" icon={FileText} label="Relat." />
+        <NavItem to="/reports" icon={BarChart3} label="Intel." />
         <NavItem to="/map" icon={MapIcon} label="Mapa" />
-        <NavItem to="/reports" icon={FileText} label="Relat." />
         <NavItem to="/settings" icon={Settings} label="Ajustes" />
       </div>
     );
