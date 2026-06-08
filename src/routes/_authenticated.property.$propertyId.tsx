@@ -489,6 +489,8 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+
       if (!visitId) {
         const { data: visit, error: visitError } = await supabase
           .from("visits")
@@ -499,7 +501,7 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
+            visit_date: operationalVisitDate,
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
@@ -525,7 +527,7 @@ function PropertyVisitPage() {
           .update({ 
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
+            visit_date: operationalVisitDate,
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
