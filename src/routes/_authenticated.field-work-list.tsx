@@ -148,54 +148,80 @@ function FieldWorkListPage() {
           operationalCycleId = currentCycle?.id ?? null;
         }
 
-        let query = supabase
+        const { data: props, error } = await supabase
           .from("properties")
-          .select(`
-            *,
-            visits!left (
-              id,
-              status,
-              activity_type,
-              has_focus,
-              treatment_applied,
-              treatment_amount,
-              larvicide_unit,
-              treated_deposits,
-              elimination_done,
-              elimination_amount,
-              visit_date,
-              agent_id,
-              cycle_id,
-              visit_deposits (
-                id,
-                is_positive,
-                is_treated
-              )
-            )
-          `)
+          .select("*")
           .eq("block_number", session.block_number)
-          .eq("visits.agent_id", user.id);
-
-        // ISOLAMENTO POR CICLO: cada ciclo é independente.
-        // Visitas de ciclos anteriores ficam apenas no histórico do imóvel,
-        // não devem refletir no status operacional da Tela de Trabalho.
-        if (operationalCycleId) {
-          query = query.eq("visits.cycle_id", operationalCycleId);
-        }
-
-        const { data: props, error } = await query.order("number", { ascending: true });
+          .order("number", { ascending: true });
 
         if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
-        console.log("[FieldWorkList] session:", { id: session.id, block: session.block_number, session_cycle_id: session.cycle_id, operational_cycle_id: operationalCycleId, status: session.status });
-        console.log("[FieldWorkList] imóveis retornados:", props?.length, "com visitas do ciclo atual:", (props || []).filter((p: any) => p.visits?.length).length);
 
-
-
-        
         if (props) {
+          const propertyIds = props.map((p: any) => p.id).filter(Boolean);
+          const visitColumns = `
+            id,
+            status,
+            activity_type,
+            has_focus,
+            treatment_applied,
+            treatment_amount,
+            larvicide_unit,
+            treated_deposits,
+            elimination_done,
+            elimination_amount,
+            visit_date,
+            agent_id,
+            cycle_id,
+            property_id,
+            visit_deposits (
+              id,
+              is_positive,
+              is_treated
+            )
+          `;
+
+          let cycleVisitsForAgent: any[] = [];
+          let blockCycleVisits: any[] = [];
+
+          if (propertyIds.length > 0) {
+            let visitsQuery = supabase
+              .from("visits")
+              .select(visitColumns)
+              .eq("agent_id", user.id)
+              .in("property_id", propertyIds)
+              .order("visit_date", { ascending: false });
+
+            if (operationalCycleId) {
+              visitsQuery = visitsQuery.eq("cycle_id", operationalCycleId);
+            }
+
+            const { data: visitsData, error: visitsError } = await visitsQuery;
+            if (visitsError) console.error("[FieldWorkList] erro ao buscar visitas do ciclo:", visitsError);
+            blockCycleVisits = visitsData || [];
+          }
+
+          if (operationalCycleId) {
+            const { data: allCycleVisits, error: cycleVisitsError } = await supabase
+              .from("visits")
+              .select("id, property_id, cycle_id, visit_date, agent_id, status")
+              .eq("agent_id", user.id)
+              .eq("cycle_id", operationalCycleId);
+
+            if (cycleVisitsError) console.error("[FieldWorkList] erro no relatório de visitas do ciclo:", cycleVisitsError);
+            cycleVisitsForAgent = allCycleVisits || [];
+          }
+
+          const visitsByProperty = new Map<string, any[]>();
+          blockCycleVisits.forEach((visit: any) => {
+            const list = visitsByProperty.get(visit.property_id) || [];
+            list.push(visit);
+            visitsByProperty.set(visit.property_id, list);
+          });
+
           const normalizedProps = props.map(p => {
-            const latestVisit = p.visits && p.visits.length > 0 
-              ? p.visits.sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
+            const propertyVisits = visitsByProperty.get(p.id) || [];
+            const latestVisit = propertyVisits.length > 0
+              ? [...propertyVisits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
             
             return {
@@ -207,6 +233,28 @@ function FieldWorkListPage() {
               latest_visit: latestVisit
             };
           });
+
+          const visibleVisitIds = new Set(normalizedProps.map((p: any) => p.latest_visit?.id).filter(Boolean));
+          const ignoredBlockVisits = blockCycleVisits
+            .filter((visit: any) => !visibleVisitIds.has(visit.id))
+            .map((visit: any) => ({
+              property_id: visit.property_id,
+              cycle_id: visit.cycle_id,
+              visit_date: visit.visit_date,
+              agent_id: visit.agent_id,
+              motivo: "visita anterior do mesmo imóvel; a tela mostra o último status válido do ciclo"
+            }));
+
+          console.log("[FieldWorkList] relatório de visitas do ciclo:", {
+            filtro_aplicado: "agent_id + cycle_id + imóveis do quarteirão; sem filtro por session_date, visit_date ou created_at",
+            sessao: { id: session.id, block: session.block_number, cycle_id: operationalCycleId, status: session.status },
+            visitas_existentes_no_ciclo_do_agente: cycleVisitsForAgent.length,
+            visitas_do_ciclo_no_quarteirao: blockCycleVisits.length,
+            visitas_exibidas_no_quarteirao: visibleVisitIds.size,
+            visitas_ignoradas_no_quarteirao: ignoredBlockVisits.length,
+            ignoradas: ignoredBlockVisits
+          });
+
           normalizedProps.sort((a: any, b: any) => {
             const na = parseInt(a.number, 10);
             const nb = parseInt(b.number, 10);
