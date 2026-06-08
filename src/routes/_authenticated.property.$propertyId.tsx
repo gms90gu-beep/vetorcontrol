@@ -32,6 +32,7 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { translate } from "@/lib/translations";
+import { getOperationalVisitDate } from "@/lib/operational-date";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -404,12 +405,14 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+
       if (currentVisitId) {
         const { error: updateError } = await supabase
           .from("visits")
           .update({ 
             status: newStatus as any,
-            visit_date: new Date().toISOString()
+            visit_date: operationalVisitDate
           })
           .eq("id", currentVisitId);
         
@@ -424,7 +427,7 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: newStatus as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString()
+            visit_date: operationalVisitDate
           })
           .select()
           .single();
@@ -486,6 +489,8 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+
       if (!visitId) {
         const { data: visit, error: visitError } = await supabase
           .from("visits")
@@ -496,7 +501,7 @@ function PropertyVisitPage() {
             week_id: activeSession.week_id as string,
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
+            visit_date: operationalVisitDate,
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
@@ -522,7 +527,7 @@ function PropertyVisitPage() {
           .update({ 
             status: status as any,
             activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: new Date().toISOString(),
+            visit_date: operationalVisitDate,
             has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
             sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
             tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
