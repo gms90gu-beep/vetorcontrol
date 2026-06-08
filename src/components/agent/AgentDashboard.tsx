@@ -67,6 +67,7 @@ export function AgentDashboard() {
   const [weekFocos, setWeekFocos] = useState(0);
   const [blockStats, setBlockStats] = useState({ atual: "—", concluidos: 0, pendentes: 0 });
   const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     document.title = "Meu Desempenho — VetorControl";
