@@ -136,6 +136,7 @@ export function DailyWorkCloser({
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
           : new Date().toISOString().split('T')[0];
+        setJornadaDate(opDateStr);
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
