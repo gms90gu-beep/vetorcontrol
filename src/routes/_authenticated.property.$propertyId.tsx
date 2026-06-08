@@ -777,7 +777,7 @@ function PropertyVisitPage() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={() => navigate({ to: `/property/${nextProperty.id}` })} 
+                onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${nextProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
                 title="Próximo imóvel"
               >
