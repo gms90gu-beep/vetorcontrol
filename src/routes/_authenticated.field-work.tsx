@@ -262,18 +262,11 @@ function FieldWorkPage() {
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana</label>
-            <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
-              <SelectTrigger className="h-14 rounded-2xl border-none bg-white shadow-md text-sm font-bold active:scale-95 transition-all">
-                <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
-                <SelectValue placeholder="Semana" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-xl">
-                {weeks.map(w => (
-                  <SelectItem key={w.id} value={w.id} className="rounded-xl font-bold">Semana {w.number}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana Epidemiológica</label>
+            <div className="h-14 rounded-2xl bg-white shadow-md flex items-center px-4 text-sm font-bold text-slate-700">
+              <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
+              {selectedWeek ? `📅 Semana ${selectedWeek.number}` : "Calculando..."}
+            </div>
           </div>
         </div>
 
