@@ -14,7 +14,6 @@ import {
   MapPin,
   Home,
   CheckSquare,
-  Car,
   ShieldCheck,
   Users
 } from "lucide-react";
