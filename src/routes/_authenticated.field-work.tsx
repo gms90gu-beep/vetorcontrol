@@ -123,14 +123,32 @@ function FieldWorkPage() {
       
       if (weeksData) {
         setWeeks(weeksData);
-        if (weeksData.length > 0) {
-          setSelectedWeekId(weeksData[0].id);
-        }
+        const auto = pickWeekForDate(weeksData, date);
+        if (auto) setSelectedWeekId(auto.id);
+        else if (weeksData.length > 0) setSelectedWeekId(weeksData[0].id);
       }
     } catch (error) {
       console.error("Error fetching weeks:", error);
     }
   }
+
+  function pickWeekForDate(list: any[], d: Date) {
+    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    return list.find((w: any) => {
+      const s = new Date(w.start_date).getTime();
+      const e = new Date(w.end_date).getTime();
+      return t >= s && t <= e;
+    }) || null;
+  }
+
+  // Auto-recompute week whenever the session date or available weeks change
+  useEffect(() => {
+    if (!weeks.length) return;
+    const auto = pickWeekForDate(weeks, date);
+    if (auto && auto.id !== selectedWeekId) setSelectedWeekId(auto.id);
+  }, [date, weeks]);
+
+  const selectedWeek = weeks.find(w => w.id === selectedWeekId);
 
   const selectedBlock = blocks.find(b => b.id === selectedBlockId);
 
@@ -244,18 +262,11 @@ function FieldWorkPage() {
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana</label>
-            <Select value={selectedWeekId} onValueChange={setSelectedWeekId}>
-              <SelectTrigger className="h-14 rounded-2xl border-none bg-white shadow-md text-sm font-bold active:scale-95 transition-all">
-                <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
-                <SelectValue placeholder="Semana" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-xl">
-                {weeks.map(w => (
-                  <SelectItem key={w.id} value={w.id} className="rounded-xl font-bold">Semana {w.number}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana Epidemiológica</label>
+            <div className="h-14 rounded-2xl bg-white shadow-md flex items-center px-4 text-sm font-bold text-slate-700">
+              <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
+              {selectedWeek ? `📅 Semana ${selectedWeek.number}` : "Calculando..."}
+            </div>
           </div>
         </div>
 
