@@ -288,17 +288,22 @@ export function AgentDashboard() {
 
         {/* Meta Operacional */}
         <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Target className="h-4 w-4 text-emerald-600" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
-              Meta Operacional do Dia
-            </h2>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-emerald-600" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                Meta Operacional do Dia
+              </h2>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+              📅 Hoje
+            </span>
           </div>
           <div className="flex items-end justify-between mb-2">
             <div>
               <p className="text-3xl font-black text-slate-900 leading-none">{trabalhados}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">
-                de {DAILY_GOAL} imóveis
+                de {DAILY_GOAL} imóveis · hoje
               </p>
             </div>
             <div className="text-right">
@@ -311,37 +316,70 @@ export function AgentDashboard() {
           <Progress value={goalPct} className="h-2" indicatorClassName="bg-emerald-500" />
         </section>
 
-        {/* Meu Desempenho — Hoje */}
+        {/* Produção de Hoje */}
         <section>
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="h-4 w-4 text-slate-600" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
-              Produção de Hoje
-            </h2>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-slate-600" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                📅 Produção Hoje
+              </h2>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+              Hoje
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <MetricBox icon={Home} label="Trabalhados" value={trabalhados} color="#185fa5" />
-            <MetricBox icon={CheckCircle2} label="Fechados" value={fechados} color="#3b6d11" />
-            <MetricBox icon={XCircle} label="Recusas" value={recusas} color="#a32d2d" />
-            <MetricBox icon={Bug} label="Focos" value={focos} color="#dc2626" />
-            <MetricBox icon={CheckCircle2} label="Dep. Tratados" value={todayDeposits.tratados} color="#0d7a5f" />
-            <MetricBox icon={Droplets} label="Larvicida (mL)" value={larvicidasMl} color="#854f0b" />
+            <MetricBox icon={Home} label="Trabalhados (hoje)" value={trabalhados} color="#185fa5" />
+            <MetricBox icon={CheckCircle2} label="Fechados (hoje)" value={fechados} color="#3b6d11" />
+            <MetricBox icon={XCircle} label="Recusas (hoje)" value={recusas} color="#a32d2d" />
+            <MetricBox icon={Bug} label="Focos (hoje)" value={focos} color="#dc2626" />
+            <MetricBox icon={CheckCircle2} label="Dep. Trat. (hoje)" value={todayDeposits.tratados} color="#0d7a5f" />
+            <MetricBox icon={Droplets} label="Larvicida mL (hoje)" value={larvicidasMl} color="#854f0b" />
+          </div>
+        </section>
+
+        {/* Produção do Ciclo (acumulado) */}
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                🏆 Produção do Ciclo{cycleInfo ? ` ${cycleInfo.number}/${cycleInfo.year}` : ""}
+              </h2>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              No ciclo
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <MetricBox icon={Home} label="Trabalhados (ciclo)" value={cycleVisits.length} color="#185fa5" />
+            <MetricBox icon={CheckCircle2} label="Fechados (ciclo)" value={cycleVisits.filter(v => v.status === "closed").length} color="#3b6d11" />
+            <MetricBox icon={XCircle} label="Recusas (ciclo)" value={cycleVisits.filter(v => v.status === "refused").length} color="#a32d2d" />
+            <MetricBox icon={Bug} label="Focos (ciclo)" value={cycleVisits.filter(v => v.has_focus).length} color="#dc2626" />
+            <MetricBox icon={Droplets} label="Larvicida mL (ciclo)" value={Math.round(cycleVisits.reduce((s, v) => s + Number(v.treatment_amount || 0), 0))} color="#854f0b" />
+            <MetricBox icon={MapPin} label="Quart. concl. (ciclo)" value={blockStats.concluidos} color="#0d7a5f" />
           </div>
         </section>
 
         {/* Produção da Semana */}
         <section>
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="h-4 w-4 text-slate-600" />
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
-              Produção da Semana
-            </h2>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-slate-600" />
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                Produção da Semana
+              </h2>
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+              Semana atual
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <MetricBox icon={Home} label="Imóveis visitados" value={semVisitados} color="#185fa5" />
-            <MetricBox icon={Bug} label="Focos" value={weekFocos} color="#dc2626" />
-            <MetricBox icon={XCircle} label="Recusas" value={semRecusas} color="#a32d2d" />
-            <MetricBox icon={MapPin} label="Quart. concluídos" value={blockStats.concluidos} color="#3b6d11" />
+            <MetricBox icon={Home} label="Visitados (semana)" value={semVisitados} color="#185fa5" />
+            <MetricBox icon={Bug} label="Focos (semana)" value={weekFocos} color="#dc2626" />
+            <MetricBox icon={XCircle} label="Recusas (semana)" value={semRecusas} color="#a32d2d" />
+            <MetricBox icon={MapPin} label="Quart. concl. (semana)" value={blockStats.concluidos} color="#3b6d11" />
           </div>
         </section>
 
