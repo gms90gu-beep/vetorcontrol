@@ -98,8 +98,8 @@ export function AgentDashboard() {
         .eq("status", "in_progress")
         .maybeSingle();
       const activeCycleId = activeCycle?.id ?? null;
-      if (!cancelled && activeCycle) {
-        setCycleInfo({ number: activeCycle.number, year: activeCycle.year });
+      if (!cancelled && activeCycle && activeCycle.number != null && activeCycle.year != null) {
+        setCycleInfo({ number: activeCycle.number as number, year: activeCycle.year as number });
       }
 
       let qToday = supabase
