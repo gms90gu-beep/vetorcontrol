@@ -507,6 +507,11 @@ function NewAttemptDialog({
   const [result, setResult] = useState<RecoveryResult>("closed");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [treated, setTreated] = useState<"yes" | "no" | "">("");
+  const [depositCount, setDepositCount] = useState<string>("");
+  const [larvicideAmount, setLarvicideAmount] = useState<string>("");
+  const [larvicideUnit, setLarvicideUnit] = useState<string>("g");
+
 
   const submit = async () => {
     if (!user) return;
