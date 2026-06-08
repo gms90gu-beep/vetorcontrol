@@ -141,6 +141,7 @@ function PropertyVisitPage() {
     setPendingData({ ...DEFAULT_PENDING });
     setDeposits([]);
     setIsDirty(false);
+    setJustSaved(false);
   };
 
   // Reset form imediatamente quando o imóvel muda (evita reaproveitar dados)
