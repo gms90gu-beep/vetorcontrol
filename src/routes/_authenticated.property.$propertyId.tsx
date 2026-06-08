@@ -32,6 +32,7 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { translate } from "@/lib/translations";
+import { getOperationalVisitDate } from "@/lib/operational-date";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
