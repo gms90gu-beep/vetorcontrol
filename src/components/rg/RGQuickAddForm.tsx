@@ -132,8 +132,10 @@ export function RGQuickAddForm({ onAdd, lastSequence, defaultStreet, defaultSide
           <Label className="text-[8px] font-black uppercase text-slate-200">Hab.</Label>
           <Input 
             type="number"
-            value={inhabitants} 
-            onChange={(e) => setInhabitants(parseInt(e.target.value) || 0)}
+            min="0"
+            inputMode="numeric"
+            value={inhabitants === 0 ? "" : inhabitants} 
+            onChange={(e) => setInhabitants(e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value) || 0))}
             className="h-10 bg-slate-800 border-none text-base font-black focus-visible:ring-emerald-500 text-center placeholder:text-slate-400"
             placeholder="0"
           />
