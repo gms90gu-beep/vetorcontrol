@@ -171,16 +171,22 @@ function EditarBoletim() {
   }
 
   function addImovel() {
+    // Copia dados do último imóvel visível e incrementa apenas o número
+    const visiveis = imoveis.filter((i) => !i._deleted);
+    const last = visiveis[visiveis.length - 1];
+    const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
+    const nextNumber = Number.isFinite(parsed) ? String(parsed + 1) : "";
     setImoveis((arr) => [
       ...arr,
       {
         _new: true,
-        street_name: blockLoc.address || "",
-        side: form.side || "",
-        number: "",
+        block_id: last?.block_id ?? null,
+        street_name: last?.street_name || blockLoc.address || "",
+        side: last?.side || form.side || "",
+        number: nextNumber,
         sequence: null,
         complement: "",
-        type: "residence",
+        type: last?.type || "residence",
         inhabitants: 0,
       },
     ]);
