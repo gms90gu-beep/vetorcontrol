@@ -108,6 +108,24 @@ export async function upsertOffline(
   await enqueueMutation({ table: name, op: "upsert", payload: row, on_conflict: opts.onConflict });
   return row;
 }
+/** Update por filtro arbitrário (offline → atualiza linhas locais que casarem; enfileira update remoto). */
+export async function updateWhereOffline(
+  name: DexieTableName,
+  match: Record<string, any>,
+  patch: any,
+) {
+  const all = await (db as any)[name].toArray();
+  const keys = Object.keys(match);
+  const toUpdate = all.filter((r: CachedRow) =>
+    keys.every((k) => String(r.data?.[k]) === String(match[k])),
+  );
+  for (const r of toUpdate) {
+    const merged = { ...r.data, ...patch };
+    await (db as any)[name].put({ id: r.id, data: merged, updatedAt: patch.updated_at });
+  }
+  await enqueueMutation({ table: name, op: "update_where", payload: patch, match });
+}
+
 
 /** Delete por filtro arbitrário (offline → apaga localmente, enfileira delete remoto). */
 export async function deleteWhereOffline(name: DexieTableName, match: Record<string, any>) {
