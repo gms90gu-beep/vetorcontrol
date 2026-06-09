@@ -322,12 +322,21 @@ export function DailyWorkCloser({
         larvicide_unit: larvicideUnit,
         tubitos_collected: tubitos,
         samples_collected: samples,
+        blocks_worked: blocksWorked,
         blocks_completed: blocksCompleted,
+        deposits_a1: depByType.A1,
+        deposits_a2: depByType.A2,
+        deposits_b: depByType.B,
+        deposits_c: depByType.C,
+        deposits_d1: depByType.D1,
+        deposits_d2: depByType.D2,
+        deposits_e: depByType.E,
         pending_visits: pendingCount,
         epi_week: epi.week,
         epi_year: epi.year,
         updated_at: new Date().toISOString()
       };
+
 
       console.log("[DIÁRIA] Snapshot criado", recordData);
       if (existingRecord) {
