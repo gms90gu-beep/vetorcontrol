@@ -21,28 +21,56 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isNetErr(e: any) {
+  const msg = String(e?.message || e || "");
+  return /Failed to fetch|NetworkError|fetch failed|AuthRetryableFetchError/i.test(msg) || e?.name === "AuthRetryableFetchError";
+}
+
 async function getVerifiedAuthState() {
   console.debug("[Auth] Restaurando sessão persistida...");
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    console.error("[Auth] Erro ao restaurar sessão:", sessionError);
+  let sessionData: any = null;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) console.error("[Auth] Erro ao restaurar sessão:", error);
+    sessionData = data;
+  } catch (e) {
+    console.warn("[Auth] getSession falhou:", e);
   }
 
-  if (!sessionData.session) {
+  if (!sessionData?.session) {
     console.debug("[Auth] Nenhuma sessão persistida encontrada.");
     return { session: null, user: null };
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-
-  if (userError || !userData.user) {
-    console.warn("[Auth] Sessão encontrada, mas o usuário não foi validado:", userError);
-    return { session: null, user: null };
+  // CRÍTICO offline: se já temos sessão local, usar o user dela.
+  // getUser() faz rede e quebra offline → derruba sessão e expulsa para /login.
+  const sessionUser = sessionData.session.user ?? null;
+  const online = typeof navigator === "undefined" ? true : navigator.onLine !== false;
+  if (!online) {
+    console.log("[OFFLINE] useAuth — usando user da sessão local (sem rede)");
+    return { session: sessionData.session, user: sessionUser };
   }
 
-  console.debug("[Auth] Sessão validada para:", userData.user.email ?? userData.user.id);
-  return { session: sessionData.session, user: userData.user };
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      if (isNetErr(userError)) {
+        console.log("[OFFLINE] useAuth — getUser falhou por rede, mantendo sessão local");
+        return { session: sessionData.session, user: sessionUser };
+      }
+      console.warn("[Auth] Sessão encontrada, mas o usuário não foi validado:", userError);
+      return { session: null, user: null };
+    }
+    console.debug("[Auth] Sessão validada para:", userData.user.email ?? userData.user.id);
+    return { session: sessionData.session, user: userData.user };
+  } catch (e) {
+    if (isNetErr(e)) {
+      console.log("[OFFLINE] useAuth — getUser exception por rede, mantendo sessão local");
+      return { session: sessionData.session, user: sessionUser };
+    }
+    console.warn("[Auth] getUser falhou:", e);
+    return { session: null, user: null };
+  }
 }
 
 async function getRoleForUser(userId: string) {
