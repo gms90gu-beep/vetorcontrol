@@ -425,9 +425,12 @@ function EditarBoletim() {
 
       toast.dismiss(tid);
       toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.");
-      await load();
+      setSaving(false);
+      // Recarrega em background — não bloqueia o estado de "salvando".
+      load().catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
+      return;
     } catch (e: any) {
-      console.log("Erro", e);
+      console.error("[RG Editar] Erro ao salvar:", e);
       toast.dismiss(tid);
       toast.error("Erro ao salvar alterações: " + (e?.message || "desconhecido"));
     } finally {
