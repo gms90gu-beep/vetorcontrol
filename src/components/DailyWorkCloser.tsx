@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  listLocal,
+  upsertOffline,
+  updateOffline,
+  enqueueRpcOffline,
+  safeSupabaseRead,
+} from "@/lib/offline/repos";
+import { isOnline } from "@/lib/offline/safe-fetch";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
