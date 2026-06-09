@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
+import { resolveCycleWeek, getEpiWeek } from "@/lib/cycle-week";
 import { useState, useEffect } from "react";
 import { 
   Search, 
