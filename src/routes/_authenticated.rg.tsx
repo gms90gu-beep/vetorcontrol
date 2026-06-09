@@ -245,7 +245,7 @@ function RGPage() {
       return;
     }
     setEditBusy(b.id);
-    toast.loading("Abrindo editor...", { id: `edit-${b.id}`, duration: 1500 });
+    toast.dismiss(`edit-${b.id}`);
     navigate({ to: "/rg/editar/$id", params: { id: b.id } });
   }
 
