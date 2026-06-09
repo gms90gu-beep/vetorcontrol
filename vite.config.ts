@@ -24,16 +24,10 @@ export default defineConfig({
         workbox: {
           globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
           navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/assets\//, /\.[a-z0-9]+$/i],
           runtimeCaching: [
-            {
-              urlPattern: ({ request }) => request.mode === "navigate",
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "html-nav",
-                networkTimeoutSeconds: 4,
-              },
-            },
+            // NÃO interceptar navegações aqui — deixar o navigateFallback servir
+            // /index.html (precacheado) para qualquer rota SPA offline.
             {
               urlPattern: ({ url, sameOrigin }) =>
                 sameOrigin && /\.(?:js|css|woff2|png|svg|ico)$/.test(url.pathname),
