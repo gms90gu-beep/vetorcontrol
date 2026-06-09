@@ -4,7 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Loader2, MapPin, Pencil, Plus, Save, Trash2, X, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocoding.functions";
@@ -81,6 +88,9 @@ function EditarBoletim() {
   const lastItemRef = useRef<HTMLDivElement | null>(null);
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchQty, setBatchQty] = useState<number>(10);
+  const [batchSaving, setBatchSaving] = useState(false);
 
   useEffect(() => {
     toast.dismiss();
@@ -462,6 +472,104 @@ function EditarBoletim() {
     }
   }
 
+  async function addBatchProperties(qty: number) {
+    if (!boletimId) {
+      toast.error("Boletim ainda não carregado.");
+      return;
+    }
+    if (qty < 1 || qty > 100) {
+      toast.error("Quantidade deve ser entre 1 e 100.");
+      return;
+    }
+    setBatchSaving(true);
+    const toastId = `rg-batch-${boletimId}`;
+    toast.loading(`Criando ${qty} imóveis...`, { id: toastId });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      const effectiveAgentId = agentId || user.id;
+
+      let effectiveBlockId = blockId || null;
+      if (effectiveBlockId) {
+        const { data: existsBlock } = await supabase
+          .from("blocks")
+          .select("id")
+          .eq("id", effectiveBlockId)
+          .maybeSingle();
+        if (!existsBlock?.id) {
+          effectiveBlockId = null;
+          setBlockId(null);
+        }
+      }
+
+      if (!effectiveBlockId && form.block_number.trim()) {
+        const { data: existingBlock, error: existingBlockError } = await supabase
+          .from("blocks")
+          .select("id, number, total_properties")
+          .eq("number", form.block_number.trim())
+          .maybeSingle();
+        if (existingBlockError) throw existingBlockError;
+
+        if (existingBlock?.id) {
+          effectiveBlockId = existingBlock.id;
+        } else {
+          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
+          const { data: createdBlock, error: blockError } = await supabase
+            .from("blocks")
+            .insert({ number: form.block_number.trim(), total_properties: 0, subarea_id: subarea.id })
+            .select("id, number, total_properties")
+            .single();
+          if (blockError) throw blockError;
+          effectiveBlockId = createdBlock.id;
+        }
+        setBlockId(effectiveBlockId);
+      }
+
+      if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para criar imóveis.");
+
+      const { data: lastProps } = await supabase
+        .from("properties")
+        .select("number, street_name, side, type, block_id")
+        .eq("boletim_id", boletimId)
+        .order("sequence", { ascending: false })
+        .limit(1);
+
+      const last = lastProps?.[0];
+      const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
+      let nextNum = Number.isFinite(parsed) ? parsed + 1 : 1;
+
+      const payload: any[] = [];
+      for (let i = 0; i < qty; i++) {
+        payload.push({
+          street_name: last?.street_name || blockLoc.address || form.locality || null,
+          side: last?.side || form.side || null,
+          number: String(nextNum + i),
+          sequence: null,
+          complement: null,
+          type: last?.type || "residence",
+          inhabitants: 0,
+          boletim_id: boletimId,
+          block_id: effectiveBlockId,
+          block_number: form.block_number || null,
+          user_id: effectiveAgentId,
+        });
+      }
+
+      const { error: insertError } = await supabase.from("properties").insert(payload);
+      if (insertError) throw insertError;
+
+      toast.success(`${qty} imóveis criados com sucesso.`, { id: toastId });
+      await load(false);
+      setShowBatchModal(false);
+    } catch (e: any) {
+      console.error("[RG Batch] erro", e);
+      toast.error("Erro ao criar em lote: " + (e?.message || "desconhecido"), { id: toastId });
+    } finally {
+      setBatchSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -629,9 +737,14 @@ function EditarBoletim() {
             <h2 className="font-bold text-sm uppercase tracking-wider text-slate-700">
               Imóveis ({visiveis.length})
             </h2>
-            <Button size="sm" variant="outline" onClick={addImovel}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={addImovel}>
+                <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}>
+                <Layers className="h-4 w-4 mr-1" /> Adicionar em Lote
+              </Button>
+            </div>
           </div>
 
 
@@ -703,9 +816,12 @@ function EditarBoletim() {
             })}
           </div>
 
-          <div ref={addBtnRef} className="mt-4 flex justify-center scroll-mt-24">
+          <div ref={addBtnRef} className="mt-4 flex justify-center scroll-mt-24 gap-2 flex-wrap">
             <Button size="sm" variant="outline" onClick={addImovel}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}>
+              <Layers className="h-4 w-4 mr-1" /> Adicionar em Lote
             </Button>
           </div>
 
@@ -719,6 +835,55 @@ function EditarBoletim() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base">Adicionar Imóveis em Lote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                Quantidade de imóveis
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={batchQty}
+                onChange={(e) => setBatchQty(Math.min(100, Math.max(1, Number(e.target.value) || 0)))}
+                className="h-10 mt-1"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Máximo: 100 imóveis por operação.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[5, 10, 20, 50].map((n) => (
+                <Button
+                  key={n}
+                  type="button"
+                  size="sm"
+                  variant={batchQty === n ? "default" : "outline"}
+                  onClick={() => setBatchQty(n)}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowBatchModal(false)} disabled={batchSaving}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => addBatchProperties(batchQty)}
+              disabled={batchSaving || batchQty < 1 || batchQty > 100}
+            >
+              {batchSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Layers className="h-4 w-4 mr-1" />}
+              Criar Imóveis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
