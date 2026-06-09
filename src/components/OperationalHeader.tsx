@@ -31,6 +31,7 @@ import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { Button } from "@/components/ui/button";
+import { ConnectivityBadge } from "@/components/ConnectivityBadge";
 
 function getPanelTitle(role: string | null) {
   switch (role) {
@@ -177,9 +178,13 @@ export function OperationalHeader() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-             <div className="hidden sm:flex flex-col items-end mr-2">
+             <div className="hidden sm:flex flex-col items-end mr-2 gap-1">
+               <ConnectivityBadge />
                <span className="text-[9px] font-black text-slate-300 uppercase">Ciclo {activeCycle?.number || "-"} • Semana {activeWeek?.number || "-"}</span>
                <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
+             </div>
+             <div className="sm:hidden">
+               <ConnectivityBadge />
              </div>
              
              <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-full border border-white/5">
