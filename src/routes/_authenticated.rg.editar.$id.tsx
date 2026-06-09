@@ -333,7 +333,8 @@ function EditarBoletim() {
         setBlockId(effectiveBlockId);
       }
 
-      const { error: bErr } = await supabase
+      // --- Paraleliza tudo que não depende um do outro para reduzir latência ---
+      const boletimUpdate = supabase
         .from("boletins_rg")
         .update({
           uf: form.uf || null,
@@ -349,34 +350,30 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
         })
         .eq("id", boletimId);
-      if (bErr) { console.error("[RG Editar] Erro update boletim:", bErr); throw bErr; }
 
-      // Persist hybrid location on the block
-      if (effectiveBlockId) {
-        const blockUpdate = {
-          address: blockLoc.address || null,
-          neighborhood: blockLoc.neighborhood || null,
-          city: blockLoc.city || form.municipality || null,
-          latitude: blockLoc.latitude,
-          longitude: blockLoc.longitude,
-          location_source: blockLoc.location_source,
-        };
-        const { error: locErr } = await supabase
-          .from("blocks").update(blockUpdate).eq("id", effectiveBlockId);
-        if (locErr) console.warn("[RG Editar] Falha ao salvar localização do quarteirão:", locErr);
-      }
+      const blockUpdatePromise = effectiveBlockId
+        ? supabase
+            .from("blocks")
+            .update({
+              address: blockLoc.address || null,
+              neighborhood: blockLoc.neighborhood || null,
+              city: blockLoc.city || form.municipality || null,
+              latitude: blockLoc.latitude,
+              longitude: blockLoc.longitude,
+              location_source: blockLoc.location_source,
+            })
+            .eq("id", effectiveBlockId)
+        : Promise.resolve({ error: null } as any);
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
-      if (toDelete.length > 0) {
-        console.log("[RG Editar] Deletando imóveis:", toDelete);
-        const { error } = await supabase.from("properties").delete().in("id", toDelete);
-        if (error) { console.error("[RG Editar] Erro delete:", error); throw error; }
-      }
+      const deletePromise = toDelete.length > 0
+        ? supabase.from("properties").delete().in("id", toDelete)
+        : Promise.resolve({ error: null } as any);
 
-      for (const im of sortedImoveis) {
-        if (im._deleted || im._new || !im.id || !im._dirty) continue;
+      const dirtyUpdates = sortedImoveis.filter((im) => !im._deleted && !im._new && im.id && im._dirty);
+      const updatePromises = dirtyUpdates.map((im) => {
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
-        const { data: updatedProperty, error } = await supabase.from("properties").update({
+        return supabase.from("properties").update({
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number,
@@ -388,15 +385,11 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           block_number: form.block_number || null,
           user_id: effectiveAgentId,
-        }).eq("id", im.id).select("id").maybeSingle();
-        if (error) { console.error("[RG Editar] Erro update imóvel", im.id, error); throw error; }
-        if (!updatedProperty?.id) throw new Error("Um imóvel existente não foi encontrado para atualização. Recarregue o boletim e tente novamente.");
-      }
+        }).eq("id", im.id!).select("id").maybeSingle();
+      });
 
-      // Inserts — um por um para identificar exatamente qual falha
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
-      console.log("[RG Editar] Imóveis a inserir:", toInsert.length);
-      for (const im of toInsert) {
+      const insertPromises = toInsert.map((im) => {
         const numero = (im.number || "").trim() || "S/N";
         if (!im.type) throw new Error("Tipo do imóvel é obrigatório.");
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
@@ -413,29 +406,45 @@ function EditarBoletim() {
           block_number: form.block_number || null,
           user_id: effectiveAgentId,
         };
-        console.log("[RG Editar] Dados do imóvel:", payload);
-        console.log("[RG Editar] Quarteirão:", { id: effectiveBlockId, number: form.block_number });
-        console.log("[RG Editar] Usuário:", user);
-        const { data, error } = await supabase
+        return supabase
           .from("properties")
           .insert(payload)
           .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
-          .single();
-        console.log("Imóvel salvo:", data);
-        console.log("Número:", data?.number);
-        console.log("SEQ:", data?.sequence);
-        console.log("[RG Editar] Erro:", error);
-        if (error) {
-          console.error("[RG Editar] Erro INSERT imóvel:", error);
+          .single()
+          .then((res) => ({ res, im }));
+      });
+
+      const [bRes, locRes, delRes, updResults, insResults] = await Promise.all([
+        boletimUpdate,
+        blockUpdatePromise,
+        deletePromise,
+        Promise.all(updatePromises),
+        Promise.all(insertPromises),
+      ]);
+
+      if ((bRes as any).error) throw (bRes as any).error;
+      if ((locRes as any).error) console.warn("[RG Editar] Falha ao salvar localização:", (locRes as any).error);
+      if ((delRes as any).error) throw (delRes as any).error;
+      for (const u of updResults) {
+        if ((u as any).error) throw (u as any).error;
+      }
+      for (const { res } of insResults) {
+        if (res.error) {
+          const error = res.error;
           const msg = `${error.message}${error.hint ? ` — ${error.hint}` : ""}${error.details ? ` (${error.details})` : ""}`;
           throw new Error(msg);
         }
-        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false, _dirty: false } : item)));
+      }
+
+      if (insResults.length > 0) {
+        setImoveis((arr) => arr.map((item) => {
+          const hit = insResults.find((r) => r.im === item);
+          return hit ? { ...(hit.res.data as Imovel), _new: false, _dirty: false } : item;
+        }));
       }
 
       toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.", { id: toastId });
       setSaving(false);
-      // Recarrega em background — não bloqueia o estado de "salvando".
       load(false).catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
       return;
     } catch (e: any) {
