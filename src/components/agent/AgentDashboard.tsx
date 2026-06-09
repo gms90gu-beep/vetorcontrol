@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { useAuth } from "@/hooks/useAuth";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,13 +92,10 @@ export function AgentDashboard() {
       const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
-      // Ciclo ativo: garante consistência com a tela Trabalho / encerramento diário
-      const { data: activeCycle } = await supabase
-        .from("cycles")
-        .select("id, number, year")
-        .eq("status", "in_progress")
-        .maybeSingle();
+      // Ciclo ativo: prioriza a sessão do agente, senão usa cycles.in_progress.
+      const activeCycle = await getActiveCycleForUser(user.id);
       const activeCycleId = activeCycle?.id ?? null;
+      console.log(`[CICLO] Dashboard usando ciclo ${activeCycle?.name || activeCycleId || "—"}`);
       if (!cancelled && activeCycle && activeCycle.number != null && activeCycle.year != null) {
         setCycleInfo({ number: activeCycle.number as number, year: activeCycle.year as number });
       }
@@ -139,6 +137,7 @@ export function AgentDashboard() {
           .eq("cycle_id", activeCycleId)
           .order("visit_date", { ascending: false });
         vCycle = data ?? [];
+        console.log(`[CICLO] Consulta visits (ciclo) retornou ${vCycle.length} registros`);
       }
 
       if (cancelled) return;
