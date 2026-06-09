@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { Button } from "@/components/ui/button";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
+import { CycleWeekBadge } from "@/components/CycleWeekBadge";
 
 function getPanelTitle(role: string | null) {
   switch (role) {
