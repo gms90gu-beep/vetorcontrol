@@ -387,6 +387,22 @@ export function DailyWorkCloser({
         console.error("[ENCERRAMENTO] Falha ao consolidar pendências:", e);
       }
 
+      // Reconta pendências reais após o encerramento e atualiza o snapshot diário.
+      try {
+        const { count: realPending } = await supabase
+          .from("property_pendencies")
+          .select("id", { count: 'exact', head: true })
+          .eq("agent_id", user.id)
+          .is("resolved_at", null);
+        await supabase
+          .from("daily_work_records")
+          .update({ pending_visits: realPending || 0, updated_at: new Date().toISOString() })
+          .eq("agent_id", currentAgent.id)
+          .eq("work_date", operationalWorkDate);
+      } catch (e) {
+        console.error("[ENCERRAMENTO] Falha ao atualizar contagem de pendências:", e);
+      }
+
       // Encerra jornada(s) de campo em andamento
       await supabase
         .from("field_work_sessions")
