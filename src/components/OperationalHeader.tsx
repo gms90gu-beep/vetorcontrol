@@ -93,17 +93,12 @@ export function OperationalHeader() {
         setActiveSession(session);
       }
 
-      // 3. Get current cycle
-      const { data: cycle } = await supabase
-        .from("cycles")
-        .select("*")
-        .eq("status", "in_progress")
-        .eq("year", new Date().getFullYear())
-        .limit(1)
-        .maybeSingle();
+      // 3. Get current cycle (sessão do usuário > in_progress)
+      const cycle = await getActiveCycleForUser(user.id);
       
       if (cycle) {
         setActiveCycle(cycle);
+        console.log(`[CICLO] OperationalHeader usando ciclo ${cycle.name || cycle.id}`);
 
         // 4. Get current week
         const { data: week } = await supabase
@@ -123,16 +118,16 @@ export function OperationalHeader() {
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
-        console.log("[OperationalHeader] Data atual:", new Date().toISOString());
-        console.log("[OperationalHeader] Data da jornada:", session?.session_date ?? "(sem jornada)");
-
         const { data: todayVisits } = await supabase
           .from("visits")
           .select("id, status")
           .eq("agent_id", user.id)
+          .eq("cycle_id", cycle.id)
           .gte("visit_date", startOfDay.toISOString())
           .lte("visit_date", endOfDay.toISOString());
         
+        console.log(`[CICLO] OperationalHeader consulta visits retornou ${todayVisits?.length || 0} registros do ciclo ${cycle.name}`);
+
         if (todayVisits) {
           setTodayStats({
             worked: todayVisits.length,
