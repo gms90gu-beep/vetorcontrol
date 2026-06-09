@@ -835,6 +835,55 @@ function EditarBoletim() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={showBatchModal} onOpenChange={setShowBatchModal}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base">Adicionar Imóveis em Lote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                Quantidade de imóveis
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={batchQty}
+                onChange={(e) => setBatchQty(Math.min(100, Math.max(1, Number(e.target.value) || 0)))}
+                className="h-10 mt-1"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Máximo: 100 imóveis por operação.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[5, 10, 20, 50].map((n) => (
+                <Button
+                  key={n}
+                  type="button"
+                  size="sm"
+                  variant={batchQty === n ? "default" : "outline"}
+                  onClick={() => setBatchQty(n)}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowBatchModal(false)} disabled={batchSaving}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => addBatchProperties(batchQty)}
+              disabled={batchSaving || batchQty < 1 || batchQty > 100}
+            >
+              {batchSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Layers className="h-4 w-4 mr-1" />}
+              Criar Imóveis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
