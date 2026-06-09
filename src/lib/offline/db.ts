@@ -1,15 +1,18 @@
 // IndexedDB local (Dexie) — espelho mínimo do Supabase para modo offline.
 import Dexie, { type Table } from "dexie";
 
-export type MutationOp = "insert" | "update" | "delete";
+export type MutationOp = "insert" | "update" | "delete" | "upsert" | "delete_where" | "rpc";
 export type MutationStatus = "pending" | "syncing" | "error";
 
 export interface Mutation {
   id?: number;
-  table: string;
+  table: string;            // tabela alvo (para op=rpc, usar string vazia ou nome lógico)
   op: MutationOp;
   payload: Record<string, any>;
-  pk?: string;
+  pk?: string;              // chave primária para update/delete
+  rpc_name?: string;        // nome da RPC quando op === "rpc"
+  on_conflict?: string;     // para upsert (ex.: "agent_id,work_date")
+  match?: Record<string, any>; // para delete_where
   createdAt: number;
   tries: number;
   status: MutationStatus;
@@ -98,4 +101,3 @@ export async function clearOfflineDB() {
     db.meta.clear(),
   ]);
 }
-

@@ -26,7 +26,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { listRemoteOrCache, safeSupabaseRead } from "@/lib/offline/repos";
+import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
+import { saveVisitOffline } from "@/lib/offline/repos/visits";
+import { isOnline } from "@/lib/offline/safe-fetch";
 import { db } from "@/lib/offline/db";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
@@ -513,7 +515,7 @@ function PropertyVisitPage() {
       if (!activeSession) toast.error("Inicie uma jornada de trabalho primeiro.");
       return;
     }
-    
+
 
     const previousStatus = status;
     setStatus(newStatus);
@@ -531,35 +533,23 @@ function PropertyVisitPage() {
 
       const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
 
+      const visitPayload = {
+        property_id: propertyId as string,
+        agent_id: user.id,
+        cycle_id: activeSession.cycle_id as string,
+        week_id: activeSession.week_id as string,
+        status: newStatus as any,
+        activity_type: (activityMap[activity] || "routine") as any,
+        visit_date: operationalVisitDate,
+      };
+
       if (currentVisitId) {
-        const { error: updateError } = await supabase
-          .from("visits")
-          .update({ 
-            status: newStatus as any,
-            visit_date: operationalVisitDate
-          })
-          .eq("id", currentVisitId);
-        
-        if (updateError) throw updateError;
+        await updateOffline("visits", currentVisitId, visitPayload);
       } else {
-        const { data: newVisit, error: insertError } = await supabase
-          .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: newStatus as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: operationalVisitDate
-          })
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-        setCurrentVisitId(newVisit.id);
+        const id = await saveVisitOffline(null, visitPayload as any, []);
+        setCurrentVisitId(id);
       }
-      
+
       toast.success("Status atualizado", {
         description: `Imóvel marcado como ${translate(newStatus)}`,
       });
@@ -605,8 +595,6 @@ function PropertyVisitPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      let visitId = currentVisitId;
-
       const activityMap: Record<string, string> = {
         "routine": "routine",
         "survey": "infestation_survey",
@@ -615,93 +603,55 @@ function PropertyVisitPage() {
 
       const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
 
-      if (!visitId) {
-        const { data: visit, error: visitError } = await supabase
-          .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: status as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: operationalVisitDate,
-            has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
-            sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
-            tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
-            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
-            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
-            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
-            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
-            elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
-            elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
-            guidance_given: (status === 'visited' && activity === 'routine'),
-            is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
-            notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
-          })
-          .select()
-          .single();
+      const visitPayload = {
+        property_id: propertyId as string,
+        agent_id: user.id,
+        cycle_id: activeSession.cycle_id as string,
+        week_id: activeSession.week_id as string,
+        status: status as any,
+        activity_type: (activityMap[activity] || "routine") as any,
+        visit_date: operationalVisitDate,
+        has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
+        sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+        tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
+        treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
+        treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
+        larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
+        treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
+        elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
+        elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
+        guidance_given: (status === 'visited' && activity === 'routine'),
+        is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
+        notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
+      };
 
-        if (visitError) throw visitError;
-        visitId = visit.id;
-      } else {
-        // Update activity type in case it changed
-        const { error: updateError } = await supabase
-          .from("visits")
-          .update({ 
-            status: status as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: operationalVisitDate,
-            has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
-            sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
-            tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
-            treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
-            treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
-            larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
-            treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
-            elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
-            elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
-            guidance_given: (status === 'visited' && activity === 'routine'),
-            is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
-            notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
-          })
-          .eq("id", visitId);
-          
-        if (updateError) throw updateError;
-      }
+      const selectedDeposits = (status === 'visited' && activity === 'survey')
+        ? deposits.filter(d => d.selected).map(d => ({
+            visit_id: "",
+            type_code: d.type,
+            description: d.description,
+            quantity: d.quantity,
+            is_positive: d.positive,
+            is_treated: d.treated,
+            is_eliminated: d.eliminated,
+          }))
+        : [];
 
-      // Sync deposits
-      // First clear old ones
-      await supabase.from("visit_deposits").delete().eq("visit_id", visitId);
-
-      const selectedDeposits = deposits.filter(d => d.selected);
-
-      if (selectedDeposits.length > 0 && status === 'visited' && activity === 'survey') {
-        const depositsToSave = selectedDeposits.map(d => ({
-          visit_id: visitId as string,
-          type_code: d.type,
-          description: d.description,
-          quantity: d.quantity,
-          is_positive: d.positive,
-          is_treated: d.treated,
-          is_eliminated: d.eliminated
-        }));
-
-        const { error: depositsError } = await supabase
-          .from("visit_deposits")
-          .insert(depositsToSave);
-        
-        if (depositsError) throw depositsError;
-      }
+      const visitId = await saveVisitOffline(currentVisitId, visitPayload as any, selectedDeposits as any);
+      setCurrentVisitId(visitId);
 
       setJustSaved(true);
       setIsDirty(false);
 
+      const offlineHint = !isOnline()
+        ? "Visita salva localmente. Aguardando sincronização."
+        : "Visita salva com sucesso";
+
       if (nextProperty) {
-        toast.success("✅ Visita salva com sucesso", { description: "Carregando próximo imóvel..." });
+        toast.success(`✅ ${offlineHint}`, { description: "Carregando próximo imóvel..." });
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
-        toast.success("✅ Visita salva com sucesso", { description: "Último imóvel do quarteirão." });
+        toast.success(`✅ ${offlineHint}`, { description: "Último imóvel do quarteirão." });
         navigate({ to: "/field-work-list" });
       }
     } catch (error: any) {
