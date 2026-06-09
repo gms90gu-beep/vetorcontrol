@@ -18,6 +18,7 @@ type PropertyType = "residence" | "commerce" | "vacant_lot" | "strategic_point" 
 type Imovel = {
   id?: string;
   _new?: boolean;
+  _dirty?: boolean;
   _deleted?: boolean;
   block_id?: string | null;
   street_name: string | null;
@@ -80,10 +81,14 @@ function EditarBoletim() {
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => {
+    toast.dismiss();
+    load();
+    /* eslint-disable-next-line */
+  }, [id]);
 
-  async function load() {
-    setLoading(true);
+  async function load(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     setError(null);
     try {
       const { data, error: err } = await supabase
@@ -142,7 +147,7 @@ function EditarBoletim() {
       console.log("Erro", e);
       setError(e?.message || "Erro ao carregar boletim.");
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
@@ -151,7 +156,7 @@ function EditarBoletim() {
   }
 
   function updateImovel(i: number, patch: Partial<Imovel>) {
-    setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch } : im)));
+    setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch, _dirty: true } : im)));
   }
 
   function removeImovel(i: number) {
@@ -264,9 +269,14 @@ function EditarBoletim() {
   }
 
   async function save() {
-    if (!boletimId) return;
+    if (!boletimId) {
+      toast.error("Boletim ainda não carregado. Aguarde e tente novamente.");
+      return;
+    }
     setSaving(true);
-    const tid = toast.loading("Salvando...");
+    const toastId = `rg-edit-save-${boletimId}`;
+    toast.dismiss();
+    toast.loading("Salvando...", { id: toastId });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       console.log("[RG Editar] Usuário:", user);
@@ -364,7 +374,7 @@ function EditarBoletim() {
       }
 
       for (const im of sortedImoveis) {
-        if (im._deleted || im._new || !im.id) continue;
+        if (im._deleted || im._new || !im.id || !im._dirty) continue;
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const { data: updatedProperty, error } = await supabase.from("properties").update({
           street_name: im.street_name || null,
@@ -420,19 +430,17 @@ function EditarBoletim() {
           const msg = `${error.message}${error.hint ? ` — ${error.hint}` : ""}${error.details ? ` (${error.details})` : ""}`;
           throw new Error(msg);
         }
-        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false } : item)));
+        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false, _dirty: false } : item)));
       }
 
-      toast.dismiss(tid);
-      toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.");
+      toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.", { id: toastId });
       setSaving(false);
       // Recarrega em background — não bloqueia o estado de "salvando".
-      load().catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
+      load(false).catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
       return;
     } catch (e: any) {
       console.error("[RG Editar] Erro ao salvar:", e);
-      toast.dismiss(tid);
-      toast.error("Erro ao salvar alterações: " + (e?.message || "desconhecido"));
+      toast.error("Erro ao salvar alterações: " + (e?.message || "desconhecido"), { id: toastId });
     } finally {
       setSaving(false);
     }
@@ -452,7 +460,7 @@ function EditarBoletim() {
         <p className="font-bold text-slate-700">{error}</p>
         <p className="text-xs text-slate-400">ID: {id}</p>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={load}>Tentar novamente</Button>
+          <Button variant="outline" onClick={() => load()}>Tentar novamente</Button>
           <Button onClick={() => navigate({ to: "/rg" })}>Voltar</Button>
         </div>
       </div>
