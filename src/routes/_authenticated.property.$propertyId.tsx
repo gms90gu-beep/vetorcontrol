@@ -1026,11 +1026,8 @@ function PropertyVisitPage() {
                       </div>
                     )}
 
-                    <BooleanButton 
-                      label="Orientação realizada?" 
-                      value={routineData.guidance} 
-                      onChange={(v) => setRoutineData({...routineData, guidance: v})} 
-                    />
+                    {/* Orientação removida: toda visita trabalhada já pressupõe orientação ao morador */}
+
 
                     <div className="space-y-2">
                       <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Observação</Label>
