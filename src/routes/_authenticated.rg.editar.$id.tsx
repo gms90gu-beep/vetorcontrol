@@ -18,6 +18,7 @@ type PropertyType = "residence" | "commerce" | "vacant_lot" | "strategic_point" 
 type Imovel = {
   id?: string;
   _new?: boolean;
+  _dirty?: boolean;
   _deleted?: boolean;
   block_id?: string | null;
   street_name: string | null;
@@ -155,7 +156,7 @@ function EditarBoletim() {
   }
 
   function updateImovel(i: number, patch: Partial<Imovel>) {
-    setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch } : im)));
+    setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch, _dirty: true } : im)));
   }
 
   function removeImovel(i: number) {
@@ -373,7 +374,7 @@ function EditarBoletim() {
       }
 
       for (const im of sortedImoveis) {
-        if (im._deleted || im._new || !im.id) continue;
+        if (im._deleted || im._new || !im.id || !im._dirty) continue;
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const { data: updatedProperty, error } = await supabase.from("properties").update({
           street_name: im.street_name || null,
@@ -429,7 +430,7 @@ function EditarBoletim() {
           const msg = `${error.message}${error.hint ? ` — ${error.hint}` : ""}${error.details ? ` (${error.details})` : ""}`;
           throw new Error(msg);
         }
-        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false } : item)));
+        setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false, _dirty: false } : item)));
       }
 
       toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.", { id: toastId });
