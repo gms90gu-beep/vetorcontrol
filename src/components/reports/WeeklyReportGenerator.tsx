@@ -97,8 +97,18 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       larvicide: sum("larvicide_amount"),
       tubitos: sum("tubitos_collected"),
       samples: sum("samples_collected"),
-      blocks: sum("blocks_completed"),
+      blocksWorked: sum("blocks_worked"),
+      blocksCompleted: sum("blocks_completed"),
+      a1: sum("deposits_a1"),
+      a2: sum("deposits_a2"),
+      b:  sum("deposits_b"),
+      c:  sum("deposits_c"),
+      d1: sum("deposits_d1"),
+      d2: sum("deposits_d2"),
+      e:  sum("deposits_e"),
     };
+    const depTypesTotal = t.a1 + t.a2 + t.b + t.c + t.d1 + t.d2 + t.e;
+
     const larvicideUnit = (records.find((r: any) => r.larvicide_unit)?.larvicide_unit) || "g";
 
     const totalVisitable = t.worked + t.pending;
