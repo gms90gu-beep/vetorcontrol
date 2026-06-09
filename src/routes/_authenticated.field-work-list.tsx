@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { updateWhereOffline } from "@/lib/offline/repos";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
