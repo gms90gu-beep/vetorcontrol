@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
 import { isOnline } from "@/lib/offline/safe-fetch";
@@ -278,7 +279,7 @@ function PropertyVisitPage() {
 
   async function fetchAgentData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
       const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
       if (data) setAgent(data);
@@ -287,7 +288,7 @@ function PropertyVisitPage() {
 
   async function fetchDailyStats() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const today = new Date();
@@ -367,7 +368,7 @@ function PropertyVisitPage() {
 
 
       // Get current active session
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (user) {
         const { data: session } = await supabase
           .from("field_work_sessions")
@@ -522,7 +523,7 @@ function PropertyVisitPage() {
     setIsUpdatingStatus(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Usuário não autenticado");
 
       const activityMap: Record<string, string> = {
@@ -592,7 +593,7 @@ function PropertyVisitPage() {
 
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const activityMap: Record<string, string> = {

@@ -8,6 +8,7 @@ import {
   resolveCycleWeek,
 } from "@/lib/cycle-week";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 
 interface Props {
   userId?: string | null;
@@ -32,8 +33,8 @@ export function CycleWeekBadge({ userId, className, date, audit = true }: Props)
       const ref = date ?? new Date();
       let uid = userId ?? null;
       if (!uid) {
-        const { data } = await supabase.auth.getUser();
-        uid = data.user?.id ?? null;
+        const { data } = await safeGetUser();
+        uid = data?.user?.id ?? null;
       }
       const cycle = await getActiveCycleForUser(uid);
       const cycleWeek = cycle?.id ? await resolveCycleWeek(cycle.id, ref) : null;

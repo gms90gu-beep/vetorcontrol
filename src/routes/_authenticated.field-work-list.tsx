@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { updateWhereOffline } from "@/lib/offline/repos";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
@@ -82,7 +83,7 @@ function FieldWorkListPage() {
 
   const fetchAgentAndPeriod = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const { data: agentData } = await supabase
@@ -122,7 +123,7 @@ function FieldWorkListPage() {
   const fetchSessionAndProperties = async () => {
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const { data: session } = await supabase
@@ -413,7 +414,7 @@ function FieldWorkListPage() {
             userRole={userRole}
             onReopen={async () => {
               try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await safeGetUser();
                 if (!user) return;
                 await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                 setIsLocked(false);
@@ -596,7 +597,7 @@ function FieldWorkListPage() {
                     userRole={userRole}
                     onReopen={async () => {
                       try {
-                        const { data: { user } } = await supabase.auth.getUser();
+                        const { data: { user } } = await safeGetUser();
                         if (!user) return;
                         await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                         setIsLocked(false);
@@ -732,7 +733,7 @@ function FieldWorkListPage() {
               userRole={userRole}
               onReopen={async () => {
                 try {
-                  const { data: { user } } = await supabase.auth.getUser();
+                  const { data: { user } } = await safeGetUser();
                   if (!user) return;
                   await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                   setIsLocked(false);

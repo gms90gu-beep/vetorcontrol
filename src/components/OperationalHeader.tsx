@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { 
   User, 
   MapPin, 
@@ -66,7 +67,7 @@ export function OperationalHeader() {
 
   const fetchHeaderData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       // 1. Get agent profile

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -295,7 +296,7 @@ function EditarBoletim() {
     toast.dismiss();
     toast.loading("Salvando...", { id: toastId });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       console.log("[RG Editar] Usuário:", user);
       console.log("[RG Editar] Boletim ID:", boletimId, "Block ID:", blockId);
       console.log("[RG Editar] Form:", form);
@@ -485,7 +486,7 @@ function EditarBoletim() {
     const toastId = `rg-batch-${boletimId}`;
     toast.loading(`Criando ${qty} imóveis...`, { id: toastId });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
       const effectiveAgentId = agentId || user.id;
 

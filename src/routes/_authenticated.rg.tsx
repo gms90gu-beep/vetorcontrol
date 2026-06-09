@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/rea
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import {
   Plus,
   Search,
@@ -121,7 +122,7 @@ function RGPage() {
   async function fetchAll() {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
 
       const { data: agentData } = await supabase
@@ -185,7 +186,7 @@ function RGPage() {
 
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
 
       const insert = {
