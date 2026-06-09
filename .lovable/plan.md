@@ -1,83 +1,75 @@
-# Offline First — VetorControl
+# Fase 2 — Modo Offline Real (Pattern Repository)
 
-Objetivo: permitir que o ACE trabalhe sem internet (RG, visitas, depósitos, focos, larvicida, tubitos, pendências e jornada), com sincronização automática quando voltar online e indicador 🟢/🔴 no cabeçalho.
+## Problema atual
 
-## Arquitetura
+A infraestrutura existe (Dexie + SyncEngine + Badge), mas as telas continuam chamando `supabase.from(...)` diretamente. Sem internet, essas chamadas falham com **"Failed to fetch"** e a tela quebra.
 
-```text
-UI (componentes existentes)
-   │
-   ▼
-Repositórios (src/lib/offline/repos/*)
-   │  read: IndexedDB primeiro, fallback Supabase
-   │  write: IndexedDB + fila de mutações
-   ▼
-Dexie (IndexedDB)  ──►  SyncEngine  ──►  Supabase
-                          ▲
-                          │ window.online / intervalo / boot
+## Estratégia
+
+Criar uma camada de **repositórios** com o pattern:
+
+```
+online  → busca Supabase, hidrata Dexie, retorna dado fresco
+offline → lê apenas Dexie, retorna dado em cache
+write   → grava Dexie + enfileira mutação (independente do estado de rede)
 ```
 
-## Pacotes
-- `dexie` (IndexedDB tipado)
-- `vite-plugin-pwa` + `workbox-window` (Service Worker conforme skill PWA: `generateSW`, `NetworkFirst` para navegações, registro só em produção fora do preview)
+E envolver toda chamada Supabase remanescente num helper `safeFetch()` que:
+- Detecta offline (`navigator.onLine === false` ou `TypeError: Failed to fetch`)
+- Loga `[OFFLINE] ...` em vez de quebrar
+- Mostra toast "Modo Offline Ativo — dados do armazenamento local"
+- Nunca propaga "Failed to fetch" para o usuário
 
-## Banco local (Dexie — `src/lib/offline/db.ts`)
-Tabelas espelhando o Supabase apenas no necessário:
-- `properties`, `blocks`, `boletins_rg`, `visits`, `visit_deposits`, `property_pendencies`, `field_work_sessions`, `daily_work_records`
-- `mutations`: fila `{ id, table, op: 'insert'|'update'|'delete', payload, createdAt, tries, lastError, status }`
-- `meta`: chaves de versão / `lastSyncAt` por tabela
+## Entregas
 
-IDs gerados localmente com `crypto.randomUUID()` para permitir criação offline (já é o padrão das tabelas — `gen_random_uuid()`).
+### 1. Helpers base
+- `src/lib/offline/safe-fetch.ts` — wrapper `safeFetch<T>(remoteFn, fallbackFn)`:
+  - se `navigator.onLine` → tenta remoto; em erro de rede, cai no fallback
+  - se offline → vai direto no fallback
+  - logs `[OFFLINE] Lendo Dexie`, `[OFFLINE] Acesso Supabase bloqueado`, `[SYNC] ...`
+- `src/lib/offline/toast-offline.ts` — utilitário para mostrar 1x a cada N segundos "Modo Offline Ativo".
 
-## Repositórios (`src/lib/offline/repos/`)
-Um por domínio: `properties.ts`, `visits.ts`, `deposits.ts`, `pendencies.ts`, `sessions.ts`, `boletins.ts`.
-API uniforme:
-```ts
-list(filter) // lê Dexie; se online e cache velho, refetch Supabase em background
-get(id)
-create(data)  // grava Dexie + enfileira insert
-update(id, patch) // grava Dexie + enfileira update
-remove(id) // grava Dexie + enfileira delete
-```
-Substituir progressivamente as chamadas diretas a `supabase.from(...)` nas telas envolvidas (RG editar, property detail, DailyWorkCloser, pending, field-work).
+### 2. Repositórios (por domínio)
+`src/lib/offline/repos/`:
+- `properties.repo.ts` — list por bloco, get por id, create/update/delete
+- `blocks.repo.ts`
+- `boletins.repo.ts`
+- `visits.repo.ts` + `visit-deposits.repo.ts`
+- `pendencies.repo.ts`
+- `sessions.repo.ts` (field_work_sessions, daily_work_records)
 
-## Sync Engine (`src/lib/offline/sync.ts`)
-- Dispara em: boot do app, `window.addEventListener('online')`, intervalo 30s, após cada mutação se online.
-- Processa `mutations` em ordem FIFO, agrupando por tabela. Em sucesso remove da fila; em falha incrementa `tries` e mantém com `lastError`.
-- Pull incremental por tabela usando `updated_at > lastSyncAt` (já existem `updated_at` nas tabelas).
-- Conflitos: last-write-wins do servidor no pull; mutações locais pendentes nunca são sobrescritas até serem aplicadas.
+Cada repo expõe: `list(filter?)`, `get(id)`, `create(p)`, `update(id,p)`, `remove(id)`.
+Reads = `safeFetch(supabase, dexie)`; writes = Dexie + `enqueueMutation`.
 
-## PWA / Service Worker
-- Adicionar `vite-plugin-pwa` em `vite.config.ts` (via `vite:` passthrough do preset Lovable).
-- `registerType: 'autoUpdate'`, `injectRegister: null`, `devOptions.enabled: false`.
-- Manifest: nome "VetorControl", `display: standalone`, theme `#0f172a`, ícones em `public/icons/`.
-- Wrapper `src/lib/pwa/register.ts` com guardas (skill PWA): não registra em dev, iframe, `id-preview--*`, `preview--*`, `*.lovableproject.com`, `?sw=off`.
-- Runtime caching: `NetworkFirst` para navegações HTML; `CacheFirst` para assets hashados; excluir `/~oauth` e chamadas Supabase do fallback.
+### 3. Telas migradas para usar repos / safeFetch
+- `src/routes/_authenticated.dashboard.tsx`
+- `src/routes/_authenticated.field-work.tsx`
+- `src/routes/_authenticated.field-work-list.tsx`
+- `src/routes/_authenticated.property.$propertyId.tsx`
+- `src/routes/_authenticated.rg.tsx` + `_authenticated.rg.editar.$id.tsx` + `_authenticated.rg.boletim.$id.tsx`
+- `src/routes/_authenticated.pending.tsx`
+- `src/routes/_authenticated.relatorios.tsx` (read-only — só fallback Dexie + aviso)
+- `src/components/DailyWorkCloser.tsx`
 
-## Indicador Online/Offline
-- Hook `useOnlineStatus()` (`navigator.onLine` + listeners).
-- Componente `<ConnectivityBadge />` exibido no `OperationalHeader` (🟢 Online / 🔴 Offline + contador de mutações pendentes via Dexie `liveQuery`).
+### 4. Tratamento global de erro de rede
+- `src/lib/error-capture.ts` — interceptar `TypeError: Failed to fetch` e mostrar toast amigável; nunca crashar.
 
-## Telas afetadas (apenas troca da camada de dados)
-- `src/routes/_authenticated.rg.editar.$id.tsx` — usa `repos/properties` e `repos/boletins`.
-- `src/routes/_authenticated.property.$propertyId.tsx` — `repos/visits`, `repos/deposits`, `repos/pendencies`.
-- `src/components/DailyWorkCloser.tsx` — `repos/sessions` + geração de pendências local.
-- `src/routes/_authenticated.pending.tsx` — `repos/pendencies`.
-- `src/routes/_authenticated.field-work.tsx` — `repos/sessions`.
-- `src/components/OperationalHeader.tsx` — adicionar badge.
+### 5. Logs temporários
+Console-only, prefixos:
+- `[OFFLINE] Lendo Dexie (<tabela>)`
+- `[OFFLINE] Acesso Supabase bloqueado`
+- `[SYNC] Pendências locais: <n>`
+- `[SYNC] Sincronização concluída — <n> ok, <n> falhou`
 
-## Segurança
-- Nada é descartado: toda escrita vai para Dexie antes de tentar rede.
-- Mutações com erro permanecem na fila com `lastError` visível em tela de diagnóstico simples (`/settings` → "Sincronização").
-- Limpeza do IndexedDB no logout para não vazar dados entre usuários.
+## Fora de escopo
 
-## Fora deste escopo (próximas etapas, conforme pedido)
-GPS de visitas, geolocalização dos imóveis, mapa operacional, cobertura territorial.
+- PWA / Service Worker (Fase 3)
+- Conflict resolution avançada (mantém last-write-wins)
+- GPS / mapas
 
-## Entrega faseada
-1. Infra: Dexie + repos + SyncEngine + badge (sem PWA).
-2. Migração das telas RG e Visita para os repos.
-3. PWA (`vite-plugin-pwa`) + manifest + ícones + wrapper guardado.
-4. Tela de diagnóstico de sincronização em `/settings`.
+## Resultado esperado
 
-Confirma para eu começar pela Fase 1?
+- Com rede: comportamento idêntico ao atual, com hidratação extra do Dexie.
+- Sem rede: telas listadas continuam funcionando lendo Dexie; nenhuma exibe "Failed to fetch"; mutações ficam na fila e sincronizam quando voltar.
+
+Quer que eu siga implementando tudo de uma vez, ou prefere começar pelas telas críticas (Trabalho + Visita + RG) e expandir depois?
