@@ -46,16 +46,24 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
 
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
 
-    const { data: dailies, error } = await supabase
+    // Ciclo ativo do usuário — boletim NUNCA mistura ciclos
+    const activeCycle = await getActiveCycleForUser(agentAuthId);
+    console.log(`[CICLO] WeeklyReport usando ciclo ${activeCycle?.name || activeCycle?.id || "—"}`);
+
+    let dailiesQuery = supabase
       .from("daily_work_records")
       .select("*")
       .eq("agent_id", agentRow.id)
       .eq("epi_week", epiWeek)
       .eq("epi_year", epiYear)
       .order("work_date", { ascending: true });
+    if (activeCycle?.id) dailiesQuery = dailiesQuery.eq("cycle_id", activeCycle.id);
+
+    const { data: dailies, error } = await dailiesQuery;
 
     if (error) throw error;
     const records = dailies || [];
+    console.log(`[CICLO] WeeklyReport consulta daily_work_records retornou ${records.length} registros do ciclo ${activeCycle?.name || "—"}`);
 
     // Regra de integridade: bloquear se houver diária aberta/inconsistente
     const inconsistentes = records.filter(
