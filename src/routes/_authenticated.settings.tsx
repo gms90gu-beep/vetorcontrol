@@ -34,6 +34,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Calendar as CalendarLucide } from "lucide-react";
+import { InstallAppButton, RunningAsAppBadge } from "@/components/InstallAppButton";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+
+const APP_VERSION = "2.1.0";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -201,6 +206,9 @@ function SettingsPage() {
         </Card>
       </section>
 
+      {/* Aplicativo (PWA) */}
+      <AppSection />
+
       {/* Security & Maintenance */}
       <section className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Segurança e Manutenção</h3>
@@ -230,6 +238,47 @@ function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function AppSection() {
+  const { installed, canInstall } = usePwaInstall();
+  const { lastSync } = useSyncStatus();
+  const lastSyncStr = lastSync
+    ? new Date(lastSync).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+    : "—";
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Aplicativo</h3>
+      <Card className="border-none shadow-xl rounded-[2.5rem] overflow-hidden bg-white">
+        <CardContent className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status</span>
+            <span className="text-sm font-black text-slate-900">
+              {installed ? "📱 Instalado" : "🌐 Navegador"}
+            </span>
+          </div>
+          <Separator className="bg-slate-100" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Versão</span>
+            <span className="text-sm font-black text-slate-900">{APP_VERSION}</span>
+          </div>
+          <Separator className="bg-slate-100" />
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Última sincronização</span>
+            <span className="text-sm font-black text-slate-900">{lastSyncStr}</span>
+          </div>
+          {installed && (
+            <div className="pt-2"><RunningAsAppBadge /></div>
+          )}
+          {(canInstall || installed) && (
+            <div className="pt-2">
+              <InstallAppButton />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </section>
   );
 }
 
