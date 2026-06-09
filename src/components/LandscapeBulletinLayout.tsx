@@ -109,6 +109,9 @@ export function LandscapeBulletinLayout({
               <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[8px] uppercase tracking-widest">
                 Semana {agentInfo.week}
               </Badge>
+              <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[8px] uppercase tracking-widest">
+                SE {(() => { const d=new Date(); const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const dn=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-dn); const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1)); const w=Math.ceil((((dt.getTime()-ys.getTime())/86400000)+1)/7); return `${String(w).padStart(2,'0')}/${dt.getUTCFullYear()}`; })()}
+              </Badge>
             </div>
           </CardContent>
         </Card>
