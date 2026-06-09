@@ -29,6 +29,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { listRemoteOrCache } from "@/lib/offline/repos";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -61,16 +62,22 @@ function FieldWorkPage() {
   async function fetchInitialData() {
     setIsLoading(true);
     try {
-      // Fetch cycles
-      const { data: cyclesData } = await supabase
-        .from("cycles")
-        .select("*")
-        .eq("year", new Date().getFullYear())
-        .order("number", { ascending: true });
-      
-      if (cyclesData) {
-        setCycles(cyclesData);
-        const activeCycle = cyclesData.find(c => c.status === "in_progress") || cyclesData[0];
+      // Fetch cycles (offline-first)
+      const cyclesData = await listRemoteOrCache<any>({
+        name: "cycles",
+        remote: () =>
+          supabase
+            .from("cycles")
+            .select("*")
+            .eq("year", new Date().getFullYear())
+            .order("number", { ascending: true }) as any,
+        filter: (c) => c.year === new Date().getFullYear(),
+      });
+
+      if (cyclesData?.length) {
+        const sorted = [...cyclesData].sort((a, b) => (a.number || 0) - (b.number || 0));
+        setCycles(sorted);
+        const activeCycle = sorted.find((c: any) => c.status === "in_progress") || sorted[0];
         if (activeCycle) {
           setSelectedCycleId(activeCycle.id);
           fetchWeeks(activeCycle.id);
@@ -78,29 +85,35 @@ function FieldWorkPage() {
       }
 
       // Only show blocks that have properties linked to a boletim RG
-      // belonging to the CURRENT agent. Each agent only sees their own
-      // RG-registered blocks — new agents start empty until they fill an RG.
+      // belonging to the CURRENT agent.
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (currentUser) {
-        const { data: myBoletins } = await supabase
-          .from("boletins_rg")
-          .select("id")
-          .eq("agent_id", currentUser.id);
+        const myBoletins = await listRemoteOrCache<any>({
+          name: "boletins_rg",
+          remote: () =>
+            supabase.from("boletins_rg").select("id, agent_id").eq("agent_id", currentUser.id) as any,
+          filter: (b) => b.agent_id === currentUser.id,
+        });
 
         const boletimIds = (myBoletins ?? []).map((b: any) => b.id);
 
         if (boletimIds.length === 0) {
           setBlocks([]);
         } else {
-          const { data: blocksData } = await supabase
-            .from("blocks")
-            .select(`*, properties!inner(id, boletim_id)`)
-            .in("properties.boletim_id", boletimIds)
-            .order("number", { ascending: true });
+          const blocksData = await listRemoteOrCache<any>({
+            name: "blocks",
+            remote: () =>
+              supabase
+                .from("blocks")
+                .select(`*, properties!inner(id, boletim_id)`)
+                .in("properties.boletim_id", boletimIds)
+                .order("number", { ascending: true }) as any,
+          });
 
           if (blocksData) {
             const seen = new Set<string>();
             const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+            uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
             setBlocks(uniq);
           }
         }
@@ -115,22 +128,29 @@ function FieldWorkPage() {
 
   async function fetchWeeks(cycleId: string) {
     try {
-      const { data: weeksData } = await supabase
-        .from("weeks")
-        .select("*")
-        .eq("cycle_id", cycleId)
-        .order("number", { ascending: true });
-      
-      if (weeksData) {
-        setWeeks(weeksData);
-        const auto = pickWeekForDate(weeksData, date);
+      const weeksData = await listRemoteOrCache<any>({
+        name: "weeks",
+        remote: () =>
+          supabase
+            .from("weeks")
+            .select("*")
+            .eq("cycle_id", cycleId)
+            .order("number", { ascending: true }) as any,
+        filter: (w) => w.cycle_id === cycleId,
+      });
+
+      if (weeksData?.length) {
+        const sorted = [...weeksData].sort((a, b) => (a.number || 0) - (b.number || 0));
+        setWeeks(sorted);
+        const auto = pickWeekForDate(sorted, date);
         if (auto) setSelectedWeekId(auto.id);
-        else if (weeksData.length > 0) setSelectedWeekId(weeksData[0].id);
+        else if (sorted.length > 0) setSelectedWeekId(sorted[0].id);
       }
     } catch (error) {
       console.error("Error fetching weeks:", error);
     }
   }
+
 
   function pickWeekForDate(list: any[], d: Date) {
     const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();

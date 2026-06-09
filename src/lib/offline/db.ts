@@ -35,8 +35,13 @@ class VetorDB extends Dexie {
   visits!: Table<CachedRow, string>;
   visit_deposits!: Table<CachedRow, string>;
   property_pendencies!: Table<CachedRow, string>;
+  property_recovery_attempts!: Table<CachedRow, string>;
   field_work_sessions!: Table<CachedRow, string>;
   daily_work_records!: Table<CachedRow, string>;
+  cycles!: Table<CachedRow, string>;
+  weeks!: Table<CachedRow, string>;
+  profiles!: Table<CachedRow, string>;
+  agents!: Table<CachedRow, string>;
   meta!: Table<MetaRow, string>;
 
   constructor() {
@@ -52,6 +57,13 @@ class VetorDB extends Dexie {
       field_work_sessions: "id, updatedAt",
       daily_work_records: "id, updatedAt",
       meta: "key",
+    });
+    this.version(2).stores({
+      property_recovery_attempts: "id, updatedAt",
+      cycles: "id, updatedAt",
+      weeks: "id, updatedAt",
+      profiles: "id, updatedAt",
+      agents: "id, updatedAt",
     });
   }
 }
@@ -76,8 +88,14 @@ export async function clearOfflineDB() {
     db.visits.clear(),
     db.visit_deposits.clear(),
     db.property_pendencies.clear(),
+    db.property_recovery_attempts.clear(),
     db.field_work_sessions.clear(),
     db.daily_work_records.clear(),
+    db.cycles.clear(),
+    db.weeks.clear(),
+    db.profiles.clear(),
+    db.agents.clear(),
     db.meta.clear(),
   ]);
 }
+

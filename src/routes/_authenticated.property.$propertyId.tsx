@@ -26,6 +26,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { listRemoteOrCache, safeSupabaseRead } from "@/lib/offline/repos";
+import { db } from "@/lib/offline/db";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
@@ -314,30 +316,53 @@ function PropertyVisitPage() {
     setIsLoading(true);
     setError(null);
     try {
-      // Get property details
-      const { data: propData, error: propError } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("id", propertyId as string)
-        .maybeSingle();
-      
-      if (propError) throw propError;
+      // Get property details (offline-first)
+      const propData = await safeSupabaseRead<any>(
+        () =>
+          supabase
+            .from("properties")
+            .select("*")
+            .eq("id", propertyId as string)
+            .maybeSingle() as any,
+        null,
+        "property",
+      ).catch(async () => {
+        const cached = await db.properties.get(propertyId as string);
+        return cached?.data ?? null;
+      });
+
       if (!propData) {
-        setError("Imóvel não encontrado.");
-        return;
+        // try Dexie even if no error
+        const cached = await db.properties.get(propertyId as string);
+        if (!cached?.data) {
+          setError("Imóvel não encontrado.");
+          return;
+        }
+        setProperty(cached.data);
+      } else {
+        setProperty(propData);
+        try { await db.properties.put({ id: propData.id, data: propData, updatedAt: propData.updated_at }); } catch {}
       }
-      setProperty(propData);
-      
+      const prop = propData || (await db.properties.get(propertyId as string))?.data;
+
       // Fetch all properties in the block for landscape table
-      if (propData.block_id) {
-        const { data: allProps } = await supabase
-          .from("properties")
-          .select("*")
-          .eq("block_id", propData.block_id)
-          .order("number", { ascending: true });
-        
-        if (allProps) setBlockProperties(allProps);
+      if (prop?.block_id) {
+        const allProps = await listRemoteOrCache<any>({
+          name: "properties",
+          remote: () =>
+            supabase
+              .from("properties")
+              .select("*")
+              .eq("block_id", prop.block_id)
+              .order("number", { ascending: true }) as any,
+          filter: (p) => p.block_id === prop.block_id,
+        });
+        if (allProps) {
+          allProps.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
+          setBlockProperties(allProps);
+        }
       }
+
 
       // Get current active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -402,11 +427,17 @@ function PropertyVisitPage() {
               notes: existingVisit.notes || ""
             });
 
-            // Load deposits
-            const { data: existingDeposits } = await supabase
-              .from("visit_deposits")
-              .select("*")
-              .eq("visit_id", existingVisit.id);
+            // Load deposits (offline-first)
+            const existingDeposits = await listRemoteOrCache<any>({
+              name: "visit_deposits",
+              remote: () =>
+                supabase
+                  .from("visit_deposits")
+                  .select("*")
+                  .eq("visit_id", existingVisit.id) as any,
+              filter: (d) => d.visit_id === existingVisit.id,
+            });
+
             
             if (existingDeposits) {
               const dbDeposits = existingDeposits.map(d => ({

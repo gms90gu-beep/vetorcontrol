@@ -13,8 +13,14 @@ type DexieTableName =
   | "visits"
   | "visit_deposits"
   | "property_pendencies"
+  | "property_recovery_attempts"
   | "field_work_sessions"
-  | "daily_work_records";
+  | "daily_work_records"
+  | "cycles"
+  | "weeks"
+  | "profiles"
+  | "agents";
+
 
 function table(name: DexieTableName) {
   return (db as any)[name] as ReturnType<typeof db["properties"]["toArray"] extends () => infer _ ? any : any>;
