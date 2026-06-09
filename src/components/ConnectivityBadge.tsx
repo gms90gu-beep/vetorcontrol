@@ -1,54 +1,75 @@
 import { useEffect, useState } from "react";
-import { Wifi, WifiOff, RefreshCw, CloudUpload } from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, CloudCheck, CloudUpload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { db } from "@/lib/offline/db";
-import { flushMutations, onSyncChange } from "@/lib/offline/sync";
+import { flushMutations } from "@/lib/offline/sync";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { SyncStatusModal } from "@/components/SyncStatusModal";
 
 export function ConnectivityBadge({ className }: { className?: string }) {
-  const online = useOnlineStatus();
-  const [pending, setPending] = useState(0);
-  const [syncing, setSyncing] = useState(false);
+  const { state, online, pending } = useSyncStatus();
+  const [open, setOpen] = useState(false);
+  const [manualSyncing, setManualSyncing] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    const refresh = async () => {
-      const n = await db.mutations.count();
-      if (active) setPending(n);
-    };
-    refresh();
-    const off = onSyncChange(refresh);
-    const t = setInterval(refresh, 5000);
-    return () => { active = false; off(); clearInterval(t); };
-  }, []);
-
-  const handleSync = async () => {
-    if (!online || syncing) return;
-    setSyncing(true);
-    try { await flushMutations(); } finally { setSyncing(false); }
+  const handleClick = async () => {
+    setOpen(true);
   };
 
+  // Auto-resync attempt when a click triggers it externally
+  useEffect(() => { /* no-op */ }, []);
+
+  const tone =
+    state === "offline" ? "bg-red-500/10 border-red-500/30 text-red-300"
+    : state === "syncing" ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+    : state === "synced" ? "bg-sky-500/10 border-sky-500/30 text-sky-300"
+    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300";
+
+  const icon =
+    state === "offline" ? <WifiOff className="h-3 w-3" />
+    : state === "syncing" ? <RefreshCw className="h-3 w-3 animate-spin" />
+    : state === "synced" ? <CloudCheck className="h-3 w-3" />
+    : <Wifi className="h-3 w-3" />;
+
+  const label =
+    state === "offline" ? "Offline"
+    : state === "syncing" ? "Sincronizando"
+    : state === "synced" ? "Sincronizado"
+    : "Online";
+
   return (
-    <button
-      type="button"
-      onClick={handleSync}
-      title={online ? "Online — clique para sincronizar agora" : "Offline — trabalho salvo localmente"}
-      className={cn(
-        "flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-tight transition-colors",
-        online
-          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
-          : "bg-red-500/10 border-red-500/30 text-red-300",
-        className
-      )}
-    >
-      {online ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-      <span>{online ? "Online" : "Offline"}</span>
-      {pending > 0 && (
-        <span className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-          {syncing ? <RefreshCw className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />}
-          {pending}
-        </span>
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        title={
+          state === "offline" ? "Offline — trabalho salvo localmente"
+          : state === "syncing" ? "Enviando registros para o servidor..."
+          : state === "synced" ? "Tudo sincronizado"
+          : "Online — clique para ver o status"
+        }
+        className={cn(
+          "flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-tight transition-colors hover:brightness-110",
+          tone,
+          className,
+        )}
+      >
+        {icon}
+        <span>{label}</span>
+        {pending > 0 && state !== "syncing" && (
+          <span className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <CloudUpload className="h-3 w-3" />
+            {pending}
+          </span>
+        )}
+      </button>
+      <SyncStatusModal
+        open={open}
+        onOpenChange={setOpen}
+        onSyncNow={async () => {
+          if (!online || manualSyncing) return;
+          setManualSyncing(true);
+          try { await flushMutations(); } finally { setManualSyncing(false); }
+        }}
+      />
+    </>
   );
 }
