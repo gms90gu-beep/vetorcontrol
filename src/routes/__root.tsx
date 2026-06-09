@@ -130,6 +130,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  if (typeof window !== "undefined") {
+    // Boot da camada offline (Dexie + fila de sincronização)
+    import("@/lib/offline/sync").then((m) => m.bootSyncEngine());
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
