@@ -472,6 +472,104 @@ function EditarBoletim() {
     }
   }
 
+  async function addBatchProperties(qty: number) {
+    if (!boletimId) {
+      toast.error("Boletim ainda não carregado.");
+      return;
+    }
+    if (qty < 1 || qty > 100) {
+      toast.error("Quantidade deve ser entre 1 e 100.");
+      return;
+    }
+    setBatchSaving(true);
+    const toastId = `rg-batch-${boletimId}`;
+    toast.loading(`Criando ${qty} imóveis...`, { id: toastId });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      const effectiveAgentId = agentId || user.id;
+
+      let effectiveBlockId = blockId || null;
+      if (effectiveBlockId) {
+        const { data: existsBlock } = await supabase
+          .from("blocks")
+          .select("id")
+          .eq("id", effectiveBlockId)
+          .maybeSingle();
+        if (!existsBlock?.id) {
+          effectiveBlockId = null;
+          setBlockId(null);
+        }
+      }
+
+      if (!effectiveBlockId && form.block_number.trim()) {
+        const { data: existingBlock, error: existingBlockError } = await supabase
+          .from("blocks")
+          .select("id, number, total_properties")
+          .eq("number", form.block_number.trim())
+          .maybeSingle();
+        if (existingBlockError) throw existingBlockError;
+
+        if (existingBlock?.id) {
+          effectiveBlockId = existingBlock.id;
+        } else {
+          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
+          const { data: createdBlock, error: blockError } = await supabase
+            .from("blocks")
+            .insert({ number: form.block_number.trim(), total_properties: 0, subarea_id: subarea.id })
+            .select("id, number, total_properties")
+            .single();
+          if (blockError) throw blockError;
+          effectiveBlockId = createdBlock.id;
+        }
+        setBlockId(effectiveBlockId);
+      }
+
+      if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para criar imóveis.");
+
+      const { data: lastProps } = await supabase
+        .from("properties")
+        .select("number, street_name, side, type, block_id")
+        .eq("boletim_id", boletimId)
+        .order("sequence", { ascending: false })
+        .limit(1);
+
+      const last = lastProps?.[0];
+      const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
+      let nextNum = Number.isFinite(parsed) ? parsed + 1 : 1;
+
+      const payload: any[] = [];
+      for (let i = 0; i < qty; i++) {
+        payload.push({
+          street_name: last?.street_name || blockLoc.address || form.locality || null,
+          side: last?.side || form.side || null,
+          number: String(nextNum + i),
+          sequence: null,
+          complement: null,
+          type: last?.type || "residence",
+          inhabitants: 0,
+          boletim_id: boletimId,
+          block_id: effectiveBlockId,
+          block_number: form.block_number || null,
+          user_id: effectiveAgentId,
+        });
+      }
+
+      const { error: insertError } = await supabase.from("properties").insert(payload);
+      if (insertError) throw insertError;
+
+      toast.success(`${qty} imóveis criados com sucesso.`, { id: toastId });
+      await load(false);
+      setShowBatchModal(false);
+    } catch (e: any) {
+      console.error("[RG Batch] erro", e);
+      toast.error("Erro ao criar em lote: " + (e?.message || "desconhecido"), { id: toastId });
+    } finally {
+      setBatchSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
