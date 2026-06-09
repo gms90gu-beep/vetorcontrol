@@ -515,7 +515,7 @@ function PropertyVisitPage() {
       if (!activeSession) toast.error("Inicie uma jornada de trabalho primeiro.");
       return;
     }
-    
+
 
     const previousStatus = status;
     setStatus(newStatus);
@@ -533,35 +533,23 @@ function PropertyVisitPage() {
 
       const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
 
+      const visitPayload = {
+        property_id: propertyId as string,
+        agent_id: user.id,
+        cycle_id: activeSession.cycle_id as string,
+        week_id: activeSession.week_id as string,
+        status: newStatus as any,
+        activity_type: (activityMap[activity] || "routine") as any,
+        visit_date: operationalVisitDate,
+      };
+
       if (currentVisitId) {
-        const { error: updateError } = await supabase
-          .from("visits")
-          .update({ 
-            status: newStatus as any,
-            visit_date: operationalVisitDate
-          })
-          .eq("id", currentVisitId);
-        
-        if (updateError) throw updateError;
+        await updateOffline("visits", currentVisitId, visitPayload);
       } else {
-        const { data: newVisit, error: insertError } = await supabase
-          .from("visits")
-          .insert({
-            property_id: propertyId as string,
-            agent_id: user.id,
-            cycle_id: activeSession.cycle_id as string,
-            week_id: activeSession.week_id as string,
-            status: newStatus as any,
-            activity_type: (activityMap[activity] || "routine") as any,
-            visit_date: operationalVisitDate
-          })
-          .select()
-          .single();
-        
-        if (insertError) throw insertError;
-        setCurrentVisitId(newVisit.id);
+        const id = await saveVisitOffline(null, visitPayload as any, []);
+        setCurrentVisitId(id);
       }
-      
+
       toast.success("Status atualizado", {
         description: `Imóvel marcado como ${translate(newStatus)}`,
       });
