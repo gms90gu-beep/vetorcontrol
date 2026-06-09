@@ -21,6 +21,8 @@ import {
   Droplets,
   Home,
 } from "lucide-react";
+import { InstallPromoCard } from "@/components/InstallPromoCard";
+import { RunningAsAppBadge } from "@/components/InstallAppButton";
 
 const DAILY_GOAL = 30;
 
