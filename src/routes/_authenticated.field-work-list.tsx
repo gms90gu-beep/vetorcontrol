@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
+import { resolveCycleWeek, getEpiWeek } from "@/lib/cycle-week";
 import { useState, useEffect } from "react";
 import { 
   Search, 
@@ -108,14 +109,12 @@ function FieldWorkListPage() {
         .maybeSingle();
       if (cycle) {
         setActiveCycle(cycle);
-        const { data: week } = await supabase
-          .from("weeks")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .order("number", { ascending: true })
-          .limit(1)
-          .maybeSingle();
+        const week = await resolveCycleWeek(cycle.id, new Date());
         if (week) setActiveWeek(week);
+        console.log("[CICLO]", { cycle_id: cycle.id, cycle_number: (cycle as any).number });
+        console.log("[SEMANA_CICLO]", { week_id: week?.id ?? null, week_number: week?.number ?? null });
+        const se = getEpiWeek(new Date());
+        console.log("[SE]", { epi_week: se.week, epi_year: se.year });
       }
     } catch (e) { console.error(e); }
   };
