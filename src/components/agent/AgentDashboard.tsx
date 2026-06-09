@@ -137,6 +137,7 @@ export function AgentDashboard() {
           .eq("cycle_id", activeCycleId)
           .order("visit_date", { ascending: false });
         vCycle = data ?? [];
+        console.log(`[CICLO] Consulta visits (ciclo) retornou ${vCycle.length} registros`);
       }
 
       if (cancelled) return;
