@@ -459,7 +459,7 @@ function EditarBoletim() {
         <p className="font-bold text-slate-700">{error}</p>
         <p className="text-xs text-slate-400">ID: {id}</p>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={load}>Tentar novamente</Button>
+          <Button variant="outline" onClick={() => load()}>Tentar novamente</Button>
           <Button onClick={() => navigate({ to: "/rg" })}>Voltar</Button>
         </div>
       </div>
