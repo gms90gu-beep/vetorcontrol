@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { Button } from "@/components/ui/button";
 
 function getPanelTitle(role: string | null) {
