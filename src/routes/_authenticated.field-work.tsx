@@ -29,6 +29,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -87,7 +88,7 @@ function FieldWorkPage() {
 
       // Only show blocks that have properties linked to a boletim RG
       // belonging to the CURRENT agent.
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const { data: { user: currentUser } } = await safeGetUser();
       if (currentUser) {
         const myBoletins = await listRemoteOrCache<any>({
           name: "boletins_rg",
@@ -186,7 +187,7 @@ function FieldWorkPage() {
     // Weekends are now operational days
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       // VALIDAÇÃO DE CICLO ATIVO: a jornada só pode ser iniciada no ciclo "in_progress".

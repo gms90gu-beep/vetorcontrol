@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { Button } from "@/components/ui/button";
 import { Printer, Download, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -118,7 +119,7 @@ function BoletimView() {
           b = byBlock as Boletim;
         } else {
           // create on the fly using context from block + agent
-          const { data: { user } } = await supabase.auth.getUser();
+          const { data: { user } } = await safeGetUser();
           if (!user) throw new Error("Não autenticado");
 
           const { data: blockRow } = await supabase
