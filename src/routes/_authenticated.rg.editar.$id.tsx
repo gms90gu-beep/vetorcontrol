@@ -80,10 +80,15 @@ function EditarBoletim() {
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => {
+    toast.dismiss(`edit-${id}`);
+    toast.dismiss(`rg-edit-save-${id}`);
+    load();
+    /* eslint-disable-next-line */
+  }, [id]);
 
-  async function load() {
-    setLoading(true);
+  async function load(showSpinner = true) {
+    if (showSpinner) setLoading(true);
     setError(null);
     try {
       const { data, error: err } = await supabase
@@ -142,7 +147,7 @@ function EditarBoletim() {
       console.log("Erro", e);
       setError(e?.message || "Erro ao carregar boletim.");
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }
 
@@ -264,9 +269,13 @@ function EditarBoletim() {
   }
 
   async function save() {
-    if (!boletimId) return;
+    if (!boletimId) {
+      toast.error("Boletim ainda não carregado. Aguarde e tente novamente.");
+      return;
+    }
     setSaving(true);
-    const tid = toast.loading("Salvando...");
+    const toastId = `rg-edit-save-${boletimId}`;
+    toast.loading("Salvando...", { id: toastId });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       console.log("[RG Editar] Usuário:", user);
@@ -423,16 +432,14 @@ function EditarBoletim() {
         setImoveis((arr) => arr.map((item) => (item === im ? { ...(data as Imovel), _new: false } : item)));
       }
 
-      toast.dismiss(tid);
-      toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.");
+      toast.success(toInsert.length > 0 ? "Imóvel cadastrado com sucesso." : "Boletim atualizado com sucesso.", { id: toastId });
       setSaving(false);
       // Recarrega em background — não bloqueia o estado de "salvando".
-      load().catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
+      load(false).catch((e) => console.warn("[RG Editar] Falha ao recarregar pós-save:", e));
       return;
     } catch (e: any) {
       console.error("[RG Editar] Erro ao salvar:", e);
-      toast.dismiss(tid);
-      toast.error("Erro ao salvar alterações: " + (e?.message || "desconhecido"));
+      toast.error("Erro ao salvar alterações: " + (e?.message || "desconhecido"), { id: toastId });
     } finally {
       setSaving(false);
     }
