@@ -737,9 +737,14 @@ function EditarBoletim() {
             <h2 className="font-bold text-sm uppercase tracking-wider text-slate-700">
               Imóveis ({visiveis.length})
             </h2>
-            <Button size="sm" variant="outline" onClick={addImovel}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={addImovel}>
+                <Plus className="h-4 w-4 mr-1" /> Adicionar Imóvel
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowBatchModal(true)}>
+                <Layers className="h-4 w-4 mr-1" /> Adicionar em Lote
+              </Button>
+            </div>
           </div>
 
 
