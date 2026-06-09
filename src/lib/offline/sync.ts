@@ -46,6 +46,8 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
       .anyOf("pending", "error")
       .sortBy("createdAt");
 
+    if (pending.length > 0) console.log(`[SYNC] Pendências locais: ${pending.length}`);
+
     for (const m of pending) {
       if (typeof navigator !== "undefined" && !navigator.onLine) break;
       try {
@@ -67,6 +69,7 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     running = false;
     notify();
   }
+  if (ok > 0 || failed > 0) console.log(`[SYNC] Sincronização concluída — ${ok} ok, ${failed} falhou`);
   return { ok, failed };
 }
 
