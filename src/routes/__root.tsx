@@ -91,6 +91,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/icon-512.png" },
+      { rel: "icon", type: "image/png", href: "/icon-512.png" },
       {
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
@@ -134,6 +137,8 @@ function RootComponent() {
     // Boot da camada offline (Dexie + fila de sincronização + guarda de rede)
     import("@/lib/offline/sync").then((m) => m.bootSyncEngine());
     import("@/lib/offline/network-guard").then((m) => m.installNetworkGuard());
+    // PWA: registro guardado (não roda em dev/preview/iframe)
+    import("@/lib/pwa/register").then((m) => m.registerPwa());
   }
 
   return (

@@ -1,7 +1,7 @@
 // IndexedDB local (Dexie) — espelho mínimo do Supabase para modo offline.
 import Dexie, { type Table } from "dexie";
 
-export type MutationOp = "insert" | "update" | "delete" | "upsert" | "delete_where" | "rpc";
+export type MutationOp = "insert" | "update" | "delete" | "upsert" | "delete_where" | "update_where" | "rpc";
 export type MutationStatus = "pending" | "syncing" | "error";
 
 export interface Mutation {

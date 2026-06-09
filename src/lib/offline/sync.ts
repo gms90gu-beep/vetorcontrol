@@ -65,6 +65,13 @@ async function applyMutation(m: Mutation): Promise<void> {
     if (error) throw error;
     return;
   }
+  if (m.op === "update_where") {
+    const match = m.match || {};
+    if (!Object.keys(match).length) throw new Error("update_where sem match");
+    const { error } = await supabase.from(table).update(m.payload).match(match);
+    if (error) throw error;
+    return;
+  }
   throw new Error(`op desconhecida: ${m.op}`);
 }
 
