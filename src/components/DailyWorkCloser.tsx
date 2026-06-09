@@ -249,7 +249,7 @@ export function DailyWorkCloser({
         .select(`
           id, status, has_focus, sample_collected, tubitos_coletados,
           treatment_amount, treated_deposits, elimination_amount, larvicide_unit,
-          deposits:visit_deposits(quantity, is_treated, is_eliminated)
+          deposits:visit_deposits(type_code, quantity, is_treated, is_eliminated)
         `)
         .eq("agent_id", user.id)
         .gte("visit_date", `${operationalWorkDate}T00:00:00`)
@@ -258,6 +258,7 @@ export function DailyWorkCloser({
       let depExisting = 0, depInspected = 0, depTreated = 0, depEliminated = 0;
       let larvicideAmount = 0, larvicideUnit: string | null = null;
       let tubitos = 0, samples = 0;
+      const depByType: Record<string, number> = { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 };
       (dayVisits || []).forEach((v: any) => {
         const deps = v.deposits || [];
         const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
@@ -265,6 +266,10 @@ export function DailyWorkCloser({
         depInspected += q;
         depTreated += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depEliminated += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+        deps.forEach((d: any) => {
+          const code = String(d.type_code || "").toUpperCase().trim();
+          if (code in depByType) depByType[code] += Number(d.quantity) || 0;
+        });
         larvicideAmount += Number(v.treatment_amount) || 0;
         if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
         tubitos += Number(v.tubitos_coletados) || 0;
@@ -274,14 +279,17 @@ export function DailyWorkCloser({
       if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
       if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
 
-      // Quarteirões concluídos pelo agente na data da jornada
-      const { data: completedSessions } = await supabase
+      // Quarteirões: trabalhados (qualquer sessão na data) e concluídos (status=completed informado pelo agente)
+      const { data: daySessions } = await supabase
         .from("field_work_sessions")
-        .select("block_number")
+        .select("block_number, status")
         .eq("user_id", user.id)
-        .eq("status", "completed")
         .eq("session_date", operationalWorkDate);
-      const blocksCompleted = new Set((completedSessions || []).map(s => s.block_number)).size;
+      const blocksWorked = new Set((daySessions || []).map(s => s.block_number)).size;
+      const blocksCompleted = new Set(
+        (daySessions || []).filter(s => s.status === "completed").map(s => s.block_number)
+      ).size;
+
 
       // Semana epidemiológica (ISO) da data da jornada — chave para consolidar o Relatório Semanal
       const epi = (() => {
