@@ -26,6 +26,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { listRemoteOrCache, safeSupabaseRead } from "@/lib/offline/repos";
+import { db } from "@/lib/offline/db";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
 import { useOrientation } from "@/hooks/useOrientation";
