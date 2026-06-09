@@ -14,14 +14,18 @@ function epiWeekOf(date: Date): { week: number; year: number } {
   return { week, year: d.getUTCFullYear() };
 }
 
+function pct(n: number, d: number) {
+  if (!d) return "0,0%";
+  return `${((n / d) * 100).toFixed(1).replace(".", ",")}%`;
+}
+
 /**
- * Gera o Relatório/Boletim Semanal somando os Relatórios Diários (daily_work_records)
- * pertencentes à semana epidemiológica corrente do agente. Esta é a ÚNICA fonte
- * oficial — não recalcula a partir de visits para evitar divergências.
+ * BOLETIM SEMANAL OFICIAL — consolidado a partir de daily_work_records
+ * da semana epidemiológica do agente. Fonte única; não recalcula de visits.
+ * Bloqueia geração se houver diárias inconsistentes (status != completed).
  */
 export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate: Date = new Date()) {
   try {
-    // 1. Perfil + agents.id (daily_work_records.agent_id refere-se a agents.id)
     const { data: profile } = await supabase
       .from("profiles")
       .select("full_name, registration_number, city")
@@ -39,10 +43,8 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       return null;
     }
 
-    // 2. Semana epidemiológica atual (calculada pelo sistema)
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
 
-    // 3. Consolidar SOMENTE a partir dos diários da semana epi
     const { data: dailies, error } = await supabase
       .from("daily_work_records")
       .select("*")
@@ -54,12 +56,39 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     if (error) throw error;
     const records = dailies || [];
 
+    // Regra de integridade: bloquear se houver diária aberta/inconsistente
+    const inconsistentes = records.filter(
+      (r: any) => r.status !== "completed" || r.end_time == null
+    );
+    if (inconsistentes.length > 0) {
+      const lista = inconsistentes
+        .map((r: any) => format(new Date(`${r.work_date}T12:00:00`), "dd/MM"))
+        .join(", ");
+      toast.error(
+        `Boletim bloqueado: existem diárias inconsistentes (${lista}). Encerre-as antes de gerar.`
+      );
+      return null;
+    }
+
+    // Ciclo (do último registro)
+    let cycleName = "—";
+    const lastCycleId = records.length > 0 ? (records[records.length - 1] as any).cycle_id : null;
+    if (lastCycleId) {
+      const { data: cyc } = await supabase
+        .from("cycles")
+        .select("name, number, year")
+        .eq("id", lastCycleId)
+        .maybeSingle();
+      if (cyc) cycleName = cyc.name || `Ciclo ${cyc.number}/${cyc.year}`;
+    }
+
     const sum = (k: string) => records.reduce((a, r: any) => a + (Number(r[k]) || 0), 0);
-    const totals = {
+    const t = {
       worked: sum("properties_worked"),
       closed: sum("properties_closed"),
       refused: sum("properties_refused"),
       recovered: sum("properties_recovered"),
+      pending: sum("pending_visits"),
       depExisting: sum("deposits_existing"),
       depInspected: sum("deposits_inspected"),
       depTreated: sum("deposits_treated"),
@@ -69,114 +98,175 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       tubitos: sum("tubitos_collected"),
       samples: sum("samples_collected"),
       blocks: sum("blocks_completed"),
-      pending: sum("pending_visits"),
     };
     const larvicideUnit = (records.find((r: any) => r.larvicide_unit)?.larvicide_unit) || "g";
 
-    // 4. PDF
+    const totalVisitable = t.worked + t.pending;
+    const coverage = pct(t.worked, totalVisitable);
+    const positivity = pct(t.focos, t.depInspected || t.worked);
+    const pendOpen = Math.max(0, t.pending - t.recovered);
+
+    // ===== PDF =====
     const pdf = new jsPDF();
     const pageW = pdf.internal.pageSize.getWidth();
-    let y = 16;
+    const pageH = pdf.internal.pageSize.getHeight();
+    let y = 14;
 
-    pdf.setFontSize(16);
+    // Cabeçalho institucional
+    pdf.setFillColor(15, 23, 42);
+    pdf.rect(0, 0, pageW, 18, "F");
+    pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(15, 23, 42);
-    pdf.text("BOLETIM SEMANAL DE PRODUTIVIDADE", pageW / 2, y, { align: "center" });
-    y += 8;
-
-    pdf.setFontSize(9);
+    pdf.setFontSize(13);
+    pdf.text("BOLETIM SEMANAL OFICIAL — ACE", pageW / 2, 11, { align: "center" });
+    pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
+    pdf.text("Vigilância Ambiental em Saúde — Controle Vetorial", pageW / 2, 16, { align: "center" });
+    pdf.setTextColor(15, 23, 42);
+    y = 24;
+
+    // 1. Identificação
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("1. IDENTIFICAÇÃO", 14, y);
+    y += 1;
     autoTable(pdf, {
-      startY: y,
+      startY: y + 1,
       body: [
-        ["Município", agentRow.municipality || profile?.city || "—"],
-        ["Agente", agentRow.name || profile?.full_name || "—"],
-        ["Matrícula", agentRow.registration_id || profile?.registration_number || "—"],
-        ["Semana Epidemiológica", `SE ${epiWeek} / ${epiYear}`],
-        ["Emissão", new Date().toLocaleString("pt-BR")],
+        ["Município", agentRow.municipality || profile?.city || "—", "Ciclo", cycleName],
+        ["Agente", agentRow.name || profile?.full_name || "—", "Semana Epi.", `SE ${epiWeek}`],
+        ["Matrícula", agentRow.registration_id || profile?.registration_number || "—", "Ano", String(epiYear)],
+        ["Emissão", new Date().toLocaleString("pt-BR"), "Diárias", String(records.length)],
       ],
-      theme: "plain",
-      styles: { fontSize: 9, cellPadding: 1 },
-      columnStyles: { 0: { fontStyle: "bold", cellWidth: 50 } },
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 1.5 },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 28, fillColor: [241, 245, 249] },
+        2: { fontStyle: "bold", cellWidth: 28, fillColor: [241, 245, 249] },
+      },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
-    // Banner de rastreabilidade — pré-requisito do boletim oficial
-    pdf.setFillColor(239, 246, 255);
-    pdf.rect(14, y, pageW - 28, 9, "F");
+    // 2. Produção Imobiliária
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.setTextColor(30, 64, 175);
-    pdf.text(
-      `Consolidado de ${records.length} relatório${records.length === 1 ? "" : "s"} diário${records.length === 1 ? "" : "s"} — soma oficial da semana epidemiológica.`,
-      pageW / 2, y + 6, { align: "center" }
-    );
-    y += 12;
-    pdf.setTextColor(15, 23, 42);
-
-    // Resumo da produção (soma dos diários)
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text("RESUMO DA PRODUÇÃO (Σ Diários)", 14, y);
-    y += 2;
+    pdf.setFontSize(10);
+    pdf.text("2. PRODUÇÃO IMOBILIÁRIA", 14, y);
     autoTable(pdf, {
-      startY: y + 1,
-      head: [["Trabalhados", "Fechados", "Recusados", "Recuperados", "Pendências", "Qtr. Concluídos"]],
-      body: [[totals.worked, totals.closed, totals.refused, totals.recovered, totals.pending, totals.blocks].map(String)],
+      startY: y + 2,
+      head: [["Trabalhados", "Fechados", "Recusas", "Recuperados", "Pendências", "Cobertura"]],
+      body: [[t.worked, t.closed, t.refused, t.recovered, t.pending, coverage].map(String)],
       theme: "grid",
-      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 9, halign: "center" },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
       styles: { fontSize: 9, halign: "center" },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
-    // LI
-    pdf.text("DADOS DO LI (Σ Diários)", 14, y);
-    y += 2;
+    // 3. Levantamento de Índice (LI)
+    pdf.text("3. LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
     autoTable(pdf, {
-      startY: y + 1,
-      head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos", `Larvicida (${larvicideUnit})`, "Amostras", "Tubitos"]],
-      body: [[totals.depExisting, totals.depInspected, totals.depTreated, totals.depEliminated, totals.focos, totals.larvicide, totals.samples, totals.tubitos].map(String)],
+      startY: y + 2,
+      head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos", "Amostras"]],
+      body: [[t.depExisting, t.depInspected, t.depTreated, t.depEliminated, t.focos, t.samples].map(String)],
       theme: "grid",
       headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
       styles: { fontSize: 9, halign: "center" },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
-    // Auditoria: detalhamento dia a dia
-    pdf.text("DETALHAMENTO POR DIÁRIA", 14, y);
-    y += 2;
+    // 4. Larvicida + Tubitos
+    pdf.text("4. LARVICIDA E TUBITOS", 14, y);
     autoTable(pdf, {
-      startY: y + 1,
-      head: [["Data", "Trab.", "Fech.", "Rec.", "Recup.", "Dep.Exist.", "Dep.Trat.", "Dep.Elim.", "Focos", "Larv.", "Tub.", "Pend."]],
-      body: records.length === 0
-        ? [["—", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—", "—"]]
-        : records.map((r: any) => [
-            format(new Date(`${r.work_date}T12:00:00`), "dd/MM"),
-            r.properties_worked ?? 0,
-            r.properties_closed ?? 0,
-            r.properties_refused ?? 0,
-            r.properties_recovered ?? 0,
-            r.deposits_existing ?? 0,
-            r.deposits_treated ?? 0,
-            r.deposits_eliminated ?? 0,
-            r.positive_foci ?? 0,
-            r.larvicide_amount ?? 0,
-            r.tubitos_collected ?? 0,
-            r.pending_visits ?? 0,
-          ].map(String)),
+      startY: y + 2,
+      head: [["Larvicida (quantidade)", "Unidade", "Tubitos coletados"]],
+      body: [[String(t.larvicide), larvicideUnit, String(t.tubitos)]],
       theme: "grid",
-      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 7, halign: "center" },
-      styles: { fontSize: 7, halign: "center" },
+      headStyles: { fillColor: [22, 101, 52], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
     });
+    y = (pdf as any).lastAutoTable.finalY + 4;
 
+    // 5. Controle de Pendências
+    pdf.text("5. CONTROLE DE PENDÊNCIAS", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Geradas", "Recuperadas", "Em aberto"]],
+      body: [[String(t.pending), String(t.recovered), String(pendOpen)]],
+      theme: "grid",
+      headStyles: { fillColor: [180, 83, 9], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+
+    // 6. Quarteirões
+    pdf.text("6. QUARTEIRÕES", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Trabalhados", "Concluídos", "Pendentes"]],
+      body: [[
+        String(Math.max(t.blocks, 0)),
+        String(t.blocks),
+        String(Math.max(0, t.blocks - t.blocks)),
+      ]],
+      theme: "grid",
+      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+
+    // 7. Resumo Epidemiológico
+    pdf.text("7. RESUMO EPIDEMIOLÓGICO", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Total de Focos", "Imóveis Positivos", "Positividade", "Cobertura da Semana"]],
+      body: [[String(t.focos), String(t.focos), positivity, coverage]],
+      theme: "grid",
+      headStyles: { fillColor: [127, 29, 29], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+
+    // 8. Auditoria
+    if (y > pageH - 70) { pdf.addPage(); y = 14; }
+    pdf.text(`8. AUDITORIA — Consolidado de ${records.length} relatório${records.length === 1 ? "" : "s"} diário${records.length === 1 ? "" : "s"}`, 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Data", "Trabalhados", "Fechados", "Recusas", "Focos", "PDF"]],
+      body: records.length === 0
+        ? [["—", "—", "—", "—", "—", "—"]]
+        : records.map((r: any) => [
+            format(new Date(`${r.work_date}T12:00:00`), "dd/MM/yyyy"),
+            String(r.properties_worked ?? 0),
+            String(r.properties_closed ?? 0),
+            String(r.properties_refused ?? 0),
+            String(r.positive_foci ?? 0),
+            "✓",
+          ]),
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 8, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 12;
+
+    // Assinatura do Agente
+    if (y > pageH - 30) { pdf.addPage(); y = 30; }
+    pdf.setDrawColor(15, 23, 42);
+    pdf.line(pageW / 2 - 45, y, pageW / 2 + 45, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.text("Assinatura do Agente", pageW / 2, y + 4, { align: "center" });
+    pdf.setFont("helvetica", "bold");
+    pdf.text(agentRow.name || profile?.full_name || "—", pageW / 2, y + 9, { align: "center" });
+
+    // Rodapé
+    pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7);
     pdf.setTextColor(120, 120, 120);
     pdf.text(
-      "Fonte oficial: soma dos Relatórios Diários da semana epidemiológica. Não recalculado a partir das visitas.",
-      14, pdf.internal.pageSize.getHeight() - 8
+      "Fonte oficial: soma dos Relatórios Diários da semana epidemiológica (daily_work_records). Não recalculado a partir das visitas.",
+      14, pageH - 6
     );
 
-    const fileName = `Boletim_Semanal_SE${epiWeek}_${epiYear}_${agentRow.registration_id || agentRow.id}.pdf`;
+    const fileName = `Boletim_Semanal_Oficial_SE${epiWeek}_${epiYear}_${agentRow.registration_id || agentRow.id}.pdf`;
     const blob = pdf.output("blob");
 
     if (records.length === 0) {
@@ -184,14 +274,16 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     }
 
     return { pdf, blob, fileName, dailyCount: records.length, epiWeek, epiYear };
-  } catch (error: any) {
-    console.error("Error generating weekly report:", error);
-    toast.error(`Erro ao gerar boletim semanal: ${error?.message || "erro desconhecido"}`);
+  } catch (err: any) {
+    console.error("Error generating weekly bulletin:", err);
+    toast.error(`Erro ao gerar boletim semanal: ${err?.message || "erro desconhecido"}`);
     return null;
   }
 }
 
 export function openWhatsAppShare(fileName: string, agentName: string) {
-  const text = encodeURIComponent(`Olá Supervisor, segue meu Boletim Semanal do VetorControl (${agentName}). Arquivo: ${fileName}`);
+  const text = encodeURIComponent(
+    `Olá Supervisor, segue meu Boletim Semanal Oficial do VetorControl (${agentName}). Arquivo: ${fileName}`
+  );
   window.open(`https://wa.me/?text=${text}`, "_blank");
 }
