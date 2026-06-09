@@ -427,11 +427,17 @@ function PropertyVisitPage() {
               notes: existingVisit.notes || ""
             });
 
-            // Load deposits
-            const { data: existingDeposits } = await supabase
-              .from("visit_deposits")
-              .select("*")
-              .eq("visit_id", existingVisit.id);
+            // Load deposits (offline-first)
+            const existingDeposits = await listRemoteOrCache<any>({
+              name: "visit_deposits",
+              remote: () =>
+                supabase
+                  .from("visit_deposits")
+                  .select("*")
+                  .eq("visit_id", existingVisit.id) as any,
+              filter: (d) => d.visit_id === existingVisit.id,
+            });
+
             
             if (existingDeposits) {
               const dbDeposits = existingDeposits.map(d => ({
