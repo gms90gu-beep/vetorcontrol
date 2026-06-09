@@ -367,6 +367,26 @@ export function DailyWorkCloser({
         .update({ work_status: 'work_completed' })
         .eq("id", currentAgent.id);
 
+      // Consolida pendências: imóveis fechados/recusados no dia, sem recuperação,
+      // são transformados em pendências oficiais.
+      try {
+        const { data: finalizeResult, error: finalizeError } = await supabase.rpc(
+          "finalize_shift_pendencies" as any,
+          {
+            p_agent_id: user.id,
+            p_cycle_id: activeCycle?.id,
+            p_date: operationalWorkDate,
+          }
+        );
+        if (finalizeError) {
+          console.error("[ENCERRAMENTO] Erro ao consolidar pendências:", finalizeError);
+        } else {
+          console.log("[ENCERRAMENTO] Pendências consolidadas:", finalizeResult);
+        }
+      } catch (e) {
+        console.error("[ENCERRAMENTO] Falha ao consolidar pendências:", e);
+      }
+
       // Encerra jornada(s) de campo em andamento
       await supabase
         .from("field_work_sessions")
