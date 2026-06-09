@@ -44,24 +44,24 @@ export const Route = createFileRoute("/_authenticated")({
       return;
     }
 
-    console.debug("[Protected Guard] Verificando sessão protegida...");
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) console.error("[Protected Guard] Erro ao restaurar sessão:", sessionError);
-    
-    if (!session) {
-      console.warn("[Protected Guard] Sem sessão, redirecionando para login.");
-      throw redirect({
-        to: "/login",
-      });
+    console.debug("[OFFLINE_ROUTE] _authenticated guard");
+    // CRÍTICO: usar APENAS getSession() (localStorage) no guard — getUser() faz rede
+    // e quebra navegação offline. A revalidação remota ocorre quando voltar a rede.
+    let session: any = null;
+    try {
+      const { data } = await supabase.auth.getSession();
+      session = data?.session ?? null;
+    } catch (e) {
+      console.warn("[Protected Guard] getSession falhou (offline?)", e);
     }
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      console.warn("[Protected Guard] Sessão inválida ou expirada:", userError);
+    if (!session) {
+      // Sem sessão local: só redireciona se realmente estiver online (offline pode ser
+      // transitório no boot do PWA). Em PWA offline sem sessão, mostra login normal.
+      console.warn("[Protected Guard] Sem sessão local, redirecionando para login.");
       throw redirect({ to: "/login" });
     }
-    
+
     return { session };
   },
   component: AuthenticatedLayout,
