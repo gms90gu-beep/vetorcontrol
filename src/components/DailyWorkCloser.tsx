@@ -216,59 +216,58 @@ export function DailyWorkCloser({
 
       let currentAgent = agent;
       if (!currentAgent) {
-        const { data: agentData } = await supabase
-          .from("agents")
-          .select("*")
-          .eq("profile_id", user.id)
-          .maybeSingle();
-        currentAgent = agentData;
+        currentAgent = await safeSupabaseRead<any>(
+          () => supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle() as any,
+          null,
+          "agents",
+        );
+        if (!currentAgent) {
+          const local = await listLocal<any>("agents", (a) => a.profile_id === user.id);
+          currentAgent = local[0] || null;
+        }
       }
-
       if (!currentAgent) throw new Error("Agent not found");
 
-      // Usa a data da jornada ativa como work_date
-      const { data: activeSessionForClose } = await supabase
-        .from("field_work_sessions")
-        .select("session_date")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Sessão ativa — preferir Dexie (sempre fresca: foi criada via createOffline)
+      const localSessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.status === "in_progress",
+      );
+      const activeSessionForClose = localSessions
+        .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
 
       const operationalWorkDate: string = activeSessionForClose?.session_date
         ? activeSessionForClose.session_date
         : new Date().toISOString().split('T')[0];
 
-      console.log("[DailyWorkCloser:close] Data atual:", new Date().toISOString().split('T')[0]);
       console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
 
-      const { data: existingRecord } = await supabase
-        .from("daily_work_records")
-        .select("id")
-        .eq("agent_id", currentAgent.id)
-        .eq("work_date", operationalWorkDate)
-        .maybeSingle();
-
-      // Snapshot completo do dia — fonte única para o Relatório Semanal.
-      // Busca depósitos, tubitos, amostras e larvicida das visitas da jornada.
-      const { data: dayVisits } = await supabase
-        .from("visits")
-        .select(`
-          id, status, has_focus, sample_collected, tubitos_coletados,
-          treatment_amount, treated_deposits, elimination_amount, larvicide_unit,
-          deposits:visit_deposits(type_code, quantity, is_treated, is_eliminated)
-        `)
-        .eq("agent_id", user.id)
-        .gte("visit_date", `${operationalWorkDate}T00:00:00`)
-        .lte("visit_date", `${operationalWorkDate}T23:59:59.999`);
+      // Lê visitas do Dexie (fonte autoritativa local — gravadas via saveVisitOffline)
+      const allVisits = await listLocal<any>(
+        "visits",
+        (v) =>
+          v.agent_id === user.id &&
+          String(v.visit_date || "").slice(0, 10) === operationalWorkDate,
+      );
+      const allDeposits = await listLocal<any>("visit_deposits");
+      const depByVisit = new Map<string, any[]>();
+      for (const d of allDeposits) {
+        const arr = depByVisit.get(d.visit_id) || [];
+        arr.push(d);
+        depByVisit.set(d.visit_id, arr);
+      }
 
       let depExisting = 0, depInspected = 0, depTreated = 0, depEliminated = 0;
       let larvicideAmount = 0, larvicideUnit: string | null = null;
       let tubitos = 0, samples = 0;
       const depByType: Record<string, number> = { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 };
-      (dayVisits || []).forEach((v: any) => {
-        const deps = v.deposits || [];
+      let workedCount = 0, closedCount = 0, refusedCount = 0, focusCount = 0;
+      allVisits.forEach((v: any) => {
+        workedCount++;
+        if (v.status === "closed") closedCount++;
+        if (v.status === "refused") refusedCount++;
+        if (v.has_focus) focusCount++;
+        const deps = depByVisit.get(v.id) || [];
         const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depExisting += q;
         depInspected += q;
@@ -287,19 +286,15 @@ export function DailyWorkCloser({
       if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
       if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
 
-      // Quarteirões: trabalhados (qualquer sessão na data) e concluídos (status=completed informado pelo agente)
-      const { data: daySessions } = await supabase
-        .from("field_work_sessions")
-        .select("block_number, status")
-        .eq("user_id", user.id)
-        .eq("session_date", operationalWorkDate);
-      const blocksWorked = new Set((daySessions || []).map(s => s.block_number)).size;
+      const daySessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.session_date === operationalWorkDate,
+      );
+      const blocksWorked = new Set(daySessions.map((s) => s.block_number)).size;
       const blocksCompleted = new Set(
-        (daySessions || []).filter(s => s.status === "completed").map(s => s.block_number)
+        daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
       ).size;
 
-
-      // Semana epidemiológica (ISO) da data da jornada — chave para consolidar o Relatório Semanal
       const epi = (() => {
         const ref = new Date(`${operationalWorkDate}T12:00:00`);
         const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
@@ -310,22 +305,35 @@ export function DailyWorkCloser({
         return { week, year: d.getUTCFullYear() };
       })();
 
-      const recordData = {
+      // Pendências computadas localmente: imóveis fechados/recusados na data sem visita posterior "visited"
+      const byProperty = new Map<string, any[]>();
+      for (const v of allVisits) {
+        const arr = byProperty.get(v.property_id) || [];
+        arr.push(v);
+        byProperty.set(v.property_id, arr);
+      }
+      let pendingLocal = 0;
+      for (const [, list] of byProperty) {
+        const last = list.sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)))[0];
+        if (last && (last.status === "closed" || last.status === "refused")) pendingLocal++;
+      }
+
+      const recordData: any = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
         week_id: activeWeek?.id,
         work_date: operationalWorkDate,
         status: 'completed',
         end_time: new Date().toISOString(),
-        properties_worked: stats.worked,
-        properties_closed: stats.closed,
-        properties_refused: stats.refused,
+        properties_worked: workedCount || stats.worked,
+        properties_closed: closedCount || stats.closed,
+        properties_refused: refusedCount || stats.refused,
         properties_recovered: recoveredCount,
         deposits_existing: depExisting,
         deposits_inspected: depInspected,
         deposits_treated: depTreated,
         deposits_eliminated: depEliminated,
-        positive_foci: stats.focus,
+        positive_foci: focusCount || stats.focus,
         larvicide_amount: larvicideAmount,
         larvicide_unit: larvicideUnit,
         tubitos_collected: tubitos,
@@ -339,87 +347,43 @@ export function DailyWorkCloser({
         deposits_d1: depByType.D1,
         deposits_d2: depByType.D2,
         deposits_e: depByType.E,
-        pending_visits: pendingCount,
+        pending_visits: pendingLocal || pendingCount,
         epi_week: epi.week,
         epi_year: epi.year,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
 
-
       console.log("[DIÁRIA] Snapshot criado", recordData);
-      if (existingRecord) {
-        const { error: upErr } = await supabase
-          .from("daily_work_records")
-          .update(recordData)
-          .eq("id", existingRecord.id);
-        if (upErr) {
-          console.error("[DIÁRIA] Erro ao atualizar registro:", upErr);
-          throw upErr;
-        }
-        console.log("[DIÁRIA] Registro atualizado com sucesso", existingRecord.id);
-      } else {
-        const { data: inserted, error: insErr } = await supabase
-          .from("daily_work_records")
-          .insert(recordData)
-          .select("id")
-          .single();
-        if (insErr) {
-          console.error("[DIÁRIA] Erro ao inserir registro:", insErr);
-          throw insErr;
-        }
-        console.log("[DIÁRIA] Registro salvo com sucesso", inserted?.id);
+
+      // 1) Upsert do daily_work_records — local + fila
+      await upsertOffline("daily_work_records", recordData, { onConflict: "agent_id,work_date" });
+
+      // 2) Marca agente como work_completed — local + fila
+      try { await updateOffline("agents", currentAgent.id, { work_status: 'work_completed' }); } catch {}
+
+      // 3) Enfileira a RPC de consolidação de pendências (executa quando voltar a rede)
+      await enqueueRpcOffline("finalize_shift_pendencies", {
+        p_agent_id: user.id,
+        p_cycle_id: activeCycle?.id,
+        p_date: operationalWorkDate,
+      });
+
+      // 4) Encerra todas as sessões em andamento (local + fila)
+      const sessionsToClose = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.status === "in_progress",
+      );
+      for (const s of sessionsToClose) {
+        await updateOffline("field_work_sessions", s.id, {
+          status: "completed",
+          updated_at: new Date().toISOString(),
+        });
       }
 
-      await supabase
-        .from("agents")
-        .update({ work_status: 'work_completed' })
-        .eq("id", currentAgent.id);
-
-      // Consolida pendências: imóveis fechados/recusados no dia, sem recuperação,
-      // são transformados em pendências oficiais.
-      try {
-        const { data: finalizeResult, error: finalizeError } = await supabase.rpc(
-          "finalize_shift_pendencies" as any,
-          {
-            p_agent_id: user.id,
-            p_cycle_id: activeCycle?.id,
-            p_date: operationalWorkDate,
-          }
-        );
-        if (finalizeError) {
-          console.error("[ENCERRAMENTO] Erro ao consolidar pendências:", finalizeError);
-        } else {
-          console.log("[ENCERRAMENTO] Pendências consolidadas:", finalizeResult);
-        }
-      } catch (e) {
-        console.error("[ENCERRAMENTO] Falha ao consolidar pendências:", e);
-      }
-
-      // Reconta pendências reais após o encerramento e atualiza o snapshot diário.
-      try {
-        const { count: realPending } = await supabase
-          .from("property_pendencies")
-          .select("id", { count: 'exact', head: true })
-          .eq("agent_id", user.id)
-          .is("resolved_at", null);
-        await supabase
-          .from("daily_work_records")
-          .update({ pending_visits: realPending || 0, updated_at: new Date().toISOString() })
-          .eq("agent_id", currentAgent.id)
-          .eq("work_date", operationalWorkDate);
-      } catch (e) {
-        console.error("[ENCERRAMENTO] Falha ao atualizar contagem de pendências:", e);
-      }
-
-      // Encerra jornada(s) de campo em andamento
-      await supabase
-        .from("field_work_sessions")
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .eq("user_id", user.id)
-        .eq("status", "in_progress");
-
-
-      toast.success("Trabalho do dia encerrado com sucesso!");
+      const msg = isOnline()
+        ? "Trabalho do dia encerrado com sucesso!"
+        : "Jornada encerrada localmente. Será sincronizada quando houver conexão.";
+      toast.success(msg);
       setShowSummary(true);
       setIsOpen(false);
     } catch (error) {
@@ -429,6 +393,7 @@ export function DailyWorkCloser({
       setIsLoading(false);
     }
   };
+
   const defaultGeneratePDF = async () => {
     console.log("[PDF] Botão clicado");
     try {
