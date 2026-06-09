@@ -88,6 +88,9 @@ function EditarBoletim() {
   const lastItemRef = useRef<HTMLDivElement | null>(null);
   const [locationMode, setLocationMode] = useState<"gps" | "manual">("manual");
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchQty, setBatchQty] = useState<number>(10);
+  const [batchSaving, setBatchSaving] = useState(false);
 
   useEffect(() => {
     toast.dismiss();
