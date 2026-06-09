@@ -81,8 +81,7 @@ function EditarBoletim() {
   const [blockLoc, setBlockLoc] = useState<BlockLoc>(EMPTY_BLOCK_LOC);
 
   useEffect(() => {
-    toast.dismiss(`edit-${id}`);
-    toast.dismiss(`rg-edit-save-${id}`);
+    toast.dismiss();
     load();
     /* eslint-disable-next-line */
   }, [id]);
@@ -275,6 +274,7 @@ function EditarBoletim() {
     }
     setSaving(true);
     const toastId = `rg-edit-save-${boletimId}`;
+    toast.dismiss();
     toast.loading("Salvando...", { id: toastId });
     try {
       const { data: { user } } = await supabase.auth.getUser();
