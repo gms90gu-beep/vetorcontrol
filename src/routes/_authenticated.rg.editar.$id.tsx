@@ -646,7 +646,14 @@ function EditarBoletim() {
                   ref={isLast ? lastItemRef : undefined}
                   className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-8 gap-2 items-end"
                 >
-                  <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
+                  <StreetAutocomplete
+                    label="Logradouro"
+                    value={im.street_name || ""}
+                    onChange={(v) => updateImovel(i, { street_name: v })}
+                    bias={blockLoc.latitude != null && blockLoc.longitude != null ? { lat: blockLoc.latitude, lng: blockLoc.longitude } : null}
+                    onSelect={(r) => updateImovel(i, { street_name: r.address || im.street_name || "" })}
+                    className="md:col-span-2"
+                  />
                   <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
