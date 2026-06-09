@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import {
   listLocal,
   upsertOffline,
@@ -99,7 +100,7 @@ export function DailyWorkCloser({
     if (externalStats) return;
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const { data: agentData } = await supabase
@@ -211,7 +212,7 @@ export function DailyWorkCloser({
     console.log("[DIÁRIA] Encerramento iniciado");
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       let currentAgent = agent;
@@ -397,7 +398,7 @@ export function DailyWorkCloser({
   const defaultGeneratePDF = async () => {
     console.log("[PDF] Botão clicado");
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) {
         toast.error("Você precisa estar autenticado para gerar o PDF.");
         return;

@@ -41,6 +41,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { cn } from "@/lib/utils";
 
 interface RGImportByPhotoProps {
@@ -82,7 +83,7 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
     setStep("processing");
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Usuário não autenticado");
 
       const fileExt = file.name.split('.').pop();
@@ -150,7 +151,7 @@ export function RGImportByPhoto({ onImportComplete }: RGImportByPhotoProps) {
     try {
       toast.loading("Importando registros...");
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Usuário não autenticado");
 
       // Prepare properties for batch insertion
