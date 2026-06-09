@@ -181,7 +181,34 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
       styles: { fontSize: 9, halign: "center" },
     });
-    y = (pdf as any).lastAutoTable.finalY + 4;
+    y = (pdf as any).lastAutoTable.finalY + 3;
+
+    // 3.1 Detalhamento de depósitos por tipo (A1, A2, B, C, D1, D2, E)
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.text("Detalhamento por tipo de depósito", 14, y);
+    autoTable(pdf, {
+      startY: y + 1,
+      head: [["A1", "A2", "B", "C", "D1", "D2", "E", "Total"]],
+      body: [[t.a1, t.a2, t.b, t.c, t.d1, t.d2, t.e, depTypesTotal].map(String)],
+      theme: "grid",
+      headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 1;
+    if (depTypesTotal !== t.depInspected) {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180, 83, 9);
+      pdf.text(
+        `Atenção: soma por tipo (${depTypesTotal}) difere do total de inspecionados (${t.depInspected}).`,
+        14, y + 3
+      );
+      pdf.setTextColor(15, 23, 42);
+      y += 4;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    y += 3;
 
     // 4. Larvicida + Tubitos
     pdf.text("4. LARVICIDA E TUBITOS", 14, y);
@@ -207,21 +234,19 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
-    // 6. Quarteirões
+    // 6. Quarteirões — Concluídos só conta quando o agente marcou explicitamente
     pdf.text("6. QUARTEIRÕES", 14, y);
+    const blocksPending = Math.max(0, t.blocksWorked - t.blocksCompleted);
     autoTable(pdf, {
       startY: y + 2,
       head: [["Trabalhados", "Concluídos", "Pendentes"]],
-      body: [[
-        String(Math.max(t.blocks, 0)),
-        String(t.blocks),
-        String(Math.max(0, t.blocks - t.blocks)),
-      ]],
+      body: [[String(t.blocksWorked), String(t.blocksCompleted), String(blocksPending)]],
       theme: "grid",
       headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 8, halign: "center" },
       styles: { fontSize: 9, halign: "center" },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
+
 
     // 7. Resumo Epidemiológico
     pdf.text("7. RESUMO EPIDEMIOLÓGICO", 14, y);
