@@ -11,6 +11,7 @@ import { generateOperationalPDF } from "./PDFReportGenerator";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Badge } from "@/components/ui/badge";
 import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +22,7 @@ export function ReportsDashboard() {
     area: "all",
     week: "all"
   });
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
 
   const [kpiData, setKpiData] = useState({
     worked: 0,
@@ -44,6 +46,19 @@ export function ReportsDashboard() {
     pendencies: []
   });
 
+  // Carrega o ciclo ativo e força como filtro padrão (evita misturar ciclos)
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const cycle = await getActiveCycleForUser(session?.user?.id);
+      if (cycle?.id) {
+        setActiveCycleId(cycle.id);
+        setFilters(prev => prev.cycle === "all" ? { ...prev, cycle: cycle.id } : prev);
+        console.log(`[CICLO] ReportsDashboard usando ciclo ${cycle.name || cycle.id}`);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     fetchDashboardData();
   }, [filters]);
@@ -51,19 +66,21 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      // Base query for visits
+      // Base query for visits — SEMPRE filtra por ciclo (não mistura ciclos)
       let query = supabase.from("visits").select(`
         *,
         visit_deposits(*)
       `);
 
+      const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
       if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
-      if (filters.cycle !== "all") query = query.eq("cycle_id", filters.cycle);
+      if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
       if (filters.week !== "all") query = query.eq("week_number", parseInt(filters.week));
 
       const { data: visits, error } = await query;
 
       if (error) throw error;
+      console.log(`[CICLO] ReportsDashboard consulta visits retornou ${visits?.length || 0} registros (ciclo ${cycleFilter || "—"})`);
 
       // Process KPIs
       const worked = visits.length;
