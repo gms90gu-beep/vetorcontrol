@@ -35,6 +35,7 @@ export function CycleWeekBadge({ userId, className, date, audit = true }: Props)
       if (!uid) {
         const { data } = await safeGetUser();
         uid = data?.user?.id ?? null;
+      }
       const cycle = await getActiveCycleForUser(uid);
       const cycleWeek = cycle?.id ? await resolveCycleWeek(cycle.id, ref) : null;
       const se = getEpiWeek(ref);
