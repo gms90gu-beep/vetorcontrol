@@ -8,6 +8,7 @@ import { Loader2, MapPin, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocoding.functions";
+import { StreetAutocomplete } from "@/components/rg/StreetAutocomplete";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
   component: EditarBoletim,
@@ -170,16 +171,22 @@ function EditarBoletim() {
   }
 
   function addImovel() {
+    // Copia dados do último imóvel visível e incrementa apenas o número
+    const visiveis = imoveis.filter((i) => !i._deleted);
+    const last = visiveis[visiveis.length - 1];
+    const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
+    const nextNumber = Number.isFinite(parsed) ? String(parsed + 1) : "";
     setImoveis((arr) => [
       ...arr,
       {
         _new: true,
-        street_name: blockLoc.address || "",
-        side: form.side || "",
-        number: "",
+        block_id: last?.block_id ?? null,
+        street_name: last?.street_name || blockLoc.address || "",
+        side: last?.side || form.side || "",
+        number: nextNumber,
         sequence: null,
         complement: "",
-        type: "residence",
+        type: last?.type || "residence",
         inhabitants: 0,
       },
     ]);
@@ -540,7 +547,7 @@ function EditarBoletim() {
                 disabled={capturing}
               >
                 {capturing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
-                Capturar Localização
+                📍 Usar Minha Localização
               </Button>
               {blockLoc.latitude != null && blockLoc.longitude != null && (
                 <div className="mt-2 text-xs text-slate-600">
@@ -556,7 +563,38 @@ function EditarBoletim() {
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Field label="Logradouro" value={blockLoc.address} onChange={(v) => setBlockLoc((b) => ({ ...b, address: v, location_source: b.location_source ?? "manual" }))} className="md:col-span-3" />
+            <StreetAutocomplete
+              label="Logradouro"
+              value={blockLoc.address}
+              onChange={(v) => setBlockLoc((b) => ({ ...b, address: v, location_source: b.location_source ?? "manual" }))}
+              bias={blockLoc.latitude != null && blockLoc.longitude != null ? { lat: blockLoc.latitude, lng: blockLoc.longitude } : null}
+              onSelect={(r) => {
+                setBlockLoc((b) => ({
+                  ...b,
+                  address: r.address || b.address,
+                  neighborhood: r.neighborhood || b.neighborhood,
+                  city: r.city || b.city,
+                  latitude: r.latitude ?? b.latitude,
+                  longitude: r.longitude ?? b.longitude,
+                  location_source: r.latitude != null ? "gps" : (b.location_source ?? "manual"),
+                }));
+                if (r.city) update("municipality", r.city);
+                if (r.state) update("uf", r.state);
+                if (r.address) update("locality", r.address);
+                if (r.neighborhood) update("sublocality", r.neighborhood);
+                if (r.address) {
+                  setImoveis((arr) =>
+                    arr.map((im) =>
+                      im._deleted || (im.street_name && im.street_name.trim())
+                        ? im
+                        : { ...im, street_name: r.address },
+                    ),
+                  );
+                }
+                toast.success(`Endereço selecionado: ${r.formatted || r.address}`);
+              }}
+              className="md:col-span-3"
+            />
             <Field label="Bairro" value={blockLoc.neighborhood} onChange={(v) => setBlockLoc((b) => ({ ...b, neighborhood: v, location_source: b.location_source ?? "manual" }))} />
             <Field label="Município" value={blockLoc.city} onChange={(v) => setBlockLoc((b) => ({ ...b, city: v, location_source: b.location_source ?? "manual" }))} />
             <div className="flex items-end">
@@ -608,7 +646,14 @@ function EditarBoletim() {
                   ref={isLast ? lastItemRef : undefined}
                   className="border rounded-md p-3 grid grid-cols-2 md:grid-cols-8 gap-2 items-end"
                 >
-                  <Field label="Logradouro" value={im.street_name || ""} onChange={(v) => updateImovel(i, { street_name: v })} className="md:col-span-2" />
+                  <StreetAutocomplete
+                    label="Logradouro"
+                    value={im.street_name || ""}
+                    onChange={(v) => updateImovel(i, { street_name: v })}
+                    bias={blockLoc.latitude != null && blockLoc.longitude != null ? { lat: blockLoc.latitude, lng: blockLoc.longitude } : null}
+                    onSelect={(r) => updateImovel(i, { street_name: r.address || im.street_name || "" })}
+                    className="md:col-span-2"
+                  />
                   <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
                   <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
