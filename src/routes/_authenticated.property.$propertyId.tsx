@@ -604,7 +604,7 @@ function PropertyVisitPage() {
             treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
-            guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
+            guidance_given: (status === 'visited' && activity === 'routine'),
             is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
             notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
           })
@@ -630,7 +630,7 @@ function PropertyVisitPage() {
             treated_deposits: (status === 'visited' && activity === 'routine') ? routineData.treatedDeposits : (status === 'visited' && activity === 'survey') ? surveyData.treatedDeposits : 0,
             elimination_done: (status === 'visited' && activity === 'routine') ? routineData.elimination : false,
             elimination_amount: (status === 'visited' && activity === 'routine') ? routineData.eliminationAmount : 0,
-            guidance_given: (status === 'visited' && activity === 'routine') ? routineData.guidance : false,
+            guidance_given: (status === 'visited' && activity === 'routine'),
             is_recovered: (status === 'visited' && activity === 'pending') ? pendingData.isRecovered : false,
             notes: activity === 'routine' ? routineData.notes : activity === 'pending' ? pendingData.notes : ""
           })
@@ -1026,11 +1026,8 @@ function PropertyVisitPage() {
                       </div>
                     )}
 
-                    <BooleanButton 
-                      label="Orientação realizada?" 
-                      value={routineData.guidance} 
-                      onChange={(v) => setRoutineData({...routineData, guidance: v})} 
-                    />
+                    {/* Orientação removida: toda visita trabalhada já pressupõe orientação ao morador */}
+
 
                     <div className="space-y-2">
                       <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground ml-1">Observação</Label>

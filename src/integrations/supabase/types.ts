@@ -1338,6 +1338,10 @@ export type Database = {
         Args: { target_year: number }
         Returns: undefined
       }
+      finalize_shift_pendencies: {
+        Args: { p_agent_id: string; p_cycle_id: string; p_date: string }
+        Returns: Json
+      }
       get_epi_week: { Args: { d: string }; Returns: number }
       get_user_role: { Args: { u_id: string }; Returns: string }
       has_role: {
