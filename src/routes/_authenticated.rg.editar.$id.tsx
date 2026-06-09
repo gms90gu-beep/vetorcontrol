@@ -547,7 +547,7 @@ function EditarBoletim() {
                 disabled={capturing}
               >
                 {capturing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MapPin className="h-4 w-4 mr-1" />}
-                Capturar Localização
+                📍 Usar Minha Localização
               </Button>
               {blockLoc.latitude != null && blockLoc.longitude != null && (
                 <div className="mt-2 text-xs text-slate-600">
