@@ -417,27 +417,52 @@ export function DailyWorkCloser({
         return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
       })();
 
-      let query = supabase
-        .from("visits")
-        .select(`
-          id, status, visit_date, treatment_amount, treated_deposits,
-          elimination_amount, has_focus, sample_collected, tubitos_coletados,
-          larvicide_unit, treatment_applied, notes, property_id,
-          property:properties(number, sequence, complement, type, status, block_number),
-          deposits:visit_deposits(quantity, is_positive, is_treated, is_eliminated)
-        `)
-        .eq("agent_id", user.id)
-        .gte("visit_date", startOfDay.toISOString())
-        .lte("visit_date", endOfDay.toISOString())
-        .order("visit_date", { ascending: true });
-
-      if (activeCycle?.id) query = query.eq("cycle_id", activeCycle.id);
-
-      const { data: visits, error } = await query;
-      if (error) {
-        console.error("[PDF] Erro na consulta:", error);
-        toast.error(`Erro ao buscar dados: ${error.message}`);
-        return;
+      let visits: any[] | null = null;
+      if (isOnline()) {
+        let query = supabase
+          .from("visits")
+          .select(`
+            id, status, visit_date, treatment_amount, treated_deposits,
+            elimination_amount, has_focus, sample_collected, tubitos_coletados,
+            larvicide_unit, treatment_applied, notes, property_id,
+            property:properties(number, sequence, complement, type, status, block_number),
+            deposits:visit_deposits(quantity, is_positive, is_treated, is_eliminated)
+          `)
+          .eq("agent_id", user.id)
+          .gte("visit_date", startOfDay.toISOString())
+          .lte("visit_date", endOfDay.toISOString())
+          .order("visit_date", { ascending: true });
+        if (activeCycle?.id) query = query.eq("cycle_id", activeCycle.id);
+        try {
+          const { data, error } = await query;
+          if (error) throw error;
+          visits = data || [];
+        } catch (e) {
+          console.warn("[PDF] Falha online, usando Dexie:", e);
+          visits = null;
+        }
+      }
+      if (!visits) {
+        // Fallback offline — monta a partir do Dexie
+        const localVisits = await listLocal<any>(
+          "visits",
+          (v) => v.agent_id === user.id && String(v.visit_date || "").slice(0, 10) === opDateStr,
+        );
+        const localDeposits = await listLocal<any>("visit_deposits");
+        const localProps = await listLocal<any>("properties");
+        const propMap = new Map(localProps.map((p: any) => [p.id, p]));
+        const depMap = new Map<string, any[]>();
+        for (const d of localDeposits) {
+          const arr = depMap.get(d.visit_id) || [];
+          arr.push(d);
+          depMap.set(d.visit_id, arr);
+        }
+        visits = localVisits.map((v: any) => ({
+          ...v,
+          property: propMap.get(v.property_id) || null,
+          deposits: depMap.get(v.id) || [],
+        }));
+        console.log("[OFFLINE] PDF — usando", visits.length, "visitas do Dexie");
       }
 
       if (!visits || visits.length === 0) {
@@ -445,14 +470,12 @@ export function DailyWorkCloser({
         return;
       }
 
-      // Quarteirões concluídos hoje (sessions completed today for this user)
-      const { data: completedSessions } = await supabase
-        .from("field_work_sessions")
-        .select("block_number")
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .eq("session_date", opDateStr);
-      const blocksCompleted = new Set((completedSessions || []).map(s => s.block_number)).size;
+      // Quarteirões concluídos hoje
+      const completedSessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.status === "completed" && s.session_date === opDateStr,
+      );
+      const blocksCompleted = new Set(completedSessions.map((s: any) => s.block_number)).size;
 
       // LI aggregates
       let depExistentes = 0;
