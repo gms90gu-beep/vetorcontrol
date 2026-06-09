@@ -29,7 +29,8 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { listRemoteOrCache } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
+import { isOnline } from "@/lib/offline/safe-fetch";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -208,28 +209,31 @@ function FieldWorkPage() {
       }
 
       // Encerra sessões anteriores vinculadas a OUTROS ciclos (jornada antiga não pode misturar dados).
-      const { data: staleSessions } = await supabase
-        .from("field_work_sessions")
-        .select("id, cycle_id")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress");
-      const staleIds = (staleSessions || [])
-        .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
-        .map((s: any) => s.id);
-      if (staleIds.length > 0) {
-        await supabase
+      try {
+        const { data: staleSessions } = await supabase
           .from("field_work_sessions")
-          .update({ status: "closed" })
-          .in("id", staleIds);
-        console.log("[FieldWork] Sessões de ciclos anteriores encerradas:", staleIds.length);
+          .select("id, cycle_id")
+          .eq("user_id", user.id)
+          .eq("status", "in_progress");
+        const staleIds = (staleSessions || [])
+          .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
+          .map((s: any) => s.id);
+        for (const sid of staleIds) {
+          await updateOffline("field_work_sessions", sid, { status: "closed", updated_at: new Date().toISOString() });
+        }
+        if (staleIds.length > 0) console.log("[FieldWork] Sessões de ciclos anteriores encerradas:", staleIds.length);
+      } catch (e) {
+        console.warn("[FieldWork] Não foi possível verificar sessões antigas (provável offline):", e);
       }
 
-      const { data: agent } = await supabase.from("agents").select("work_status").eq("profile_id", user.id).maybeSingle();
-      if (agent?.work_status === 'work_completed') {
-         await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
-      }
+      try {
+        const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
+        if (agent?.work_status === 'work_completed' && agent?.id) {
+          await updateOffline("agents", agent.id, { work_status: 'in_work' });
+        }
+      } catch {}
 
-      const { error } = await supabase.from("field_work_sessions").insert({
+      await createOffline("field_work_sessions", {
         user_id: user.id,
         cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
@@ -237,12 +241,11 @@ function FieldWorkPage() {
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
         session_date: date.toISOString().split('T')[0],
-        status: "in_progress"
+        status: "in_progress",
+        updated_at: new Date().toISOString(),
       });
 
-      if (error) throw error;
-
-      toast.success("Trabalho iniciado com sucesso!");
+      toast.success(isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.");
       navigate({ to: `/field-work-list` });
     } catch (error: any) {
       toast.error("Erro ao iniciar trabalho: " + error.message);
