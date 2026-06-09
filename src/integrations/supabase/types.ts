@@ -286,8 +286,16 @@ export type Database = {
         Row: {
           agent_id: string
           blocks_completed: number | null
+          blocks_worked: number | null
           created_at: string
           cycle_id: string
+          deposits_a1: number | null
+          deposits_a2: number | null
+          deposits_b: number | null
+          deposits_c: number | null
+          deposits_d1: number | null
+          deposits_d2: number | null
+          deposits_e: number | null
           deposits_eliminated: number | null
           deposits_existing: number | null
           deposits_inspected: number | null
@@ -315,8 +323,16 @@ export type Database = {
         Insert: {
           agent_id: string
           blocks_completed?: number | null
+          blocks_worked?: number | null
           created_at?: string
           cycle_id: string
+          deposits_a1?: number | null
+          deposits_a2?: number | null
+          deposits_b?: number | null
+          deposits_c?: number | null
+          deposits_d1?: number | null
+          deposits_d2?: number | null
+          deposits_e?: number | null
           deposits_eliminated?: number | null
           deposits_existing?: number | null
           deposits_inspected?: number | null
@@ -344,8 +360,16 @@ export type Database = {
         Update: {
           agent_id?: string
           blocks_completed?: number | null
+          blocks_worked?: number | null
           created_at?: string
           cycle_id?: string
+          deposits_a1?: number | null
+          deposits_a2?: number | null
+          deposits_b?: number | null
+          deposits_c?: number | null
+          deposits_d1?: number | null
+          deposits_d2?: number | null
+          deposits_e?: number | null
           deposits_eliminated?: number | null
           deposits_existing?: number | null
           deposits_inspected?: number | null
