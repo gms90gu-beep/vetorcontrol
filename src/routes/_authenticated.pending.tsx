@@ -140,30 +140,54 @@ function PendingPage() {
     if (!user) return;
     setLoading(true);
     try {
-      const { data: pends, error } = await (supabase as any)
-        .from("property_pendencies")
-        .select("*")
-        .order("last_attempt_at", { ascending: false });
+      const pends = await listRemoteOrCache<any>({
+        name: "property_pendencies",
+        remote: () =>
+          (supabase as any)
+            .from("property_pendencies")
+            .select("*")
+            .order("last_attempt_at", { ascending: false }),
+      });
 
-      if (error) throw error;
+      const sorted = [...(pends || [])].sort((a, b) => {
+        const ta = a.last_attempt_at ? new Date(a.last_attempt_at).getTime() : 0;
+        const tb = b.last_attempt_at ? new Date(b.last_attempt_at).getTime() : 0;
+        return tb - ta;
+      });
 
-      const propIds = (pends || []).map((p: any) => p.property_id);
-      const agentIds = Array.from(new Set((pends || []).map((p: any) => p.agent_id)));
+      const propIds = sorted.map((p: any) => p.property_id);
+      const agentIds = Array.from(new Set(sorted.map((p: any) => p.agent_id)));
 
-      const [{ data: props }, { data: profs }] = await Promise.all([
+      const [props, profs] = await Promise.all([
         propIds.length
-          ? supabase.from("properties").select("id, number, street_name, block_number, neighborhood, latitude, longitude").in("id", propIds)
-          : Promise.resolve({ data: [] as any[] }),
+          ? listRemoteOrCache<any>({
+              name: "properties",
+              remote: () =>
+                supabase
+                  .from("properties")
+                  .select("id, number, street_name, block_number, neighborhood, latitude, longitude")
+                  .in("id", propIds) as any,
+              filter: (p) => propIds.includes(p.id),
+            })
+          : Promise.resolve([] as any[]),
         agentIds.length
-          ? supabase.from("profiles").select("id, full_name").in("id", agentIds as string[])
-          : Promise.resolve({ data: [] as any[] }),
+          ? listRemoteOrCache<any>({
+              name: "profiles",
+              remote: () =>
+                supabase
+                  .from("profiles")
+                  .select("id, full_name")
+                  .in("id", agentIds as string[]) as any,
+              filter: (p) => (agentIds as string[]).includes(p.id),
+            })
+          : Promise.resolve([] as any[]),
       ]);
 
       const propMap = new Map((props || []).map((p: any) => [p.id, p]));
       const agentMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
 
       setPendencies(
-        (pends || []).map((p: any) => ({
+        sorted.map((p: any) => ({
           ...p,
           property: propMap.get(p.property_id),
           agent_name: agentMap.get(p.agent_id) || "—",
@@ -183,17 +207,28 @@ function PendingPage() {
   }, [user?.id]);
 
   const loadAttempts = async (propertyId: string) => {
-    const { data, error } = await (supabase as any)
-      .from("property_recovery_attempts")
-      .select("*")
-      .eq("property_id", propertyId)
-      .order("attempted_at", { ascending: true });
-    if (error) {
-      console.error(error);
-      return;
+    try {
+      const data = await listRemoteOrCache<any>({
+        name: "property_recovery_attempts",
+        remote: () =>
+          (supabase as any)
+            .from("property_recovery_attempts")
+            .select("*")
+            .eq("property_id", propertyId)
+            .order("attempted_at", { ascending: true }),
+        filter: (a) => a.property_id === propertyId,
+      });
+      const sorted = [...(data || [])].sort((a, b) => {
+        const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;
+        const tb = b.attempted_at ? new Date(b.attempted_at).getTime() : 0;
+        return ta - tb;
+      });
+      setAttempts(sorted as any[]);
+    } catch (e) {
+      console.error(e);
     }
-    setAttempts((data as any[]) || []);
   };
+
 
   const openDetails = async (p: EnrichedPendency) => {
     setSelected(p);
