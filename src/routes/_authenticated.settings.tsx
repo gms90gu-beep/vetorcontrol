@@ -34,6 +34,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Calendar as CalendarLucide } from "lucide-react";
+import { InstallAppButton, RunningAsAppBadge } from "@/components/InstallAppButton";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+
+const APP_VERSION = "2.1.0";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
