@@ -416,7 +416,7 @@ function FieldWorkListPage() {
               try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
-                await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                 setIsLocked(false);
                 toast.success("Boletim reaberto com sucesso!");
               } catch (e) {
@@ -599,7 +599,7 @@ function FieldWorkListPage() {
                       try {
                         const { data: { user } } = await supabase.auth.getUser();
                         if (!user) return;
-                        await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                        await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                         setIsLocked(false);
                         toast.success("Boletim reaberto com sucesso!");
                       } catch (e) {
@@ -735,7 +735,7 @@ function FieldWorkListPage() {
                 try {
                   const { data: { user } } = await supabase.auth.getUser();
                   if (!user) return;
-                  await supabase.from("agents").update({ work_status: 'in_work' }).eq("profile_id", user.id);
+                  await updateWhereOffline("agents", { profile_id: user.id }, { work_status: "in_work" });
                   setIsLocked(false);
                   toast.success("Boletim reaberto com sucesso!");
                 } catch (e) {
