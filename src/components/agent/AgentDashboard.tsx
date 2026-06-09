@@ -261,6 +261,9 @@ export function AgentDashboard() {
       </header>
 
       <div className="px-4 py-5 space-y-5 pb-24">
+        <div className="flex justify-end"><RunningAsAppBadge /></div>
+        <InstallPromoCard />
+
         {/* CTA iniciar jornada */}
         {pendingCount > 0 && (
           <button
