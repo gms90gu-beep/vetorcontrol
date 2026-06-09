@@ -91,13 +91,10 @@ export function AgentDashboard() {
       const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
-      // Ciclo ativo: garante consistência com a tela Trabalho / encerramento diário
-      const { data: activeCycle } = await supabase
-        .from("cycles")
-        .select("id, number, year")
-        .eq("status", "in_progress")
-        .maybeSingle();
+      // Ciclo ativo: prioriza a sessão do agente, senão usa cycles.in_progress.
+      const activeCycle = await getActiveCycleForUser(user.id);
       const activeCycleId = activeCycle?.id ?? null;
+      console.log(`[CICLO] Dashboard usando ciclo ${activeCycle?.name || activeCycleId || "—"}`);
       if (!cancelled && activeCycle && activeCycle.number != null && activeCycle.year != null) {
         setCycleInfo({ number: activeCycle.number as number, year: activeCycle.year as number });
       }
