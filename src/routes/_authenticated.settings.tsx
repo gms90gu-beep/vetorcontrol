@@ -206,6 +206,9 @@ function SettingsPage() {
         </Card>
       </section>
 
+      {/* Aplicativo (PWA) */}
+      <AppSection />
+
       {/* Security & Maintenance */}
       <section className="space-y-3">
         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Segurança e Manutenção</h3>
