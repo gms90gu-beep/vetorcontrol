@@ -563,7 +563,38 @@ function EditarBoletim() {
           )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Field label="Logradouro" value={blockLoc.address} onChange={(v) => setBlockLoc((b) => ({ ...b, address: v, location_source: b.location_source ?? "manual" }))} className="md:col-span-3" />
+            <StreetAutocomplete
+              label="Logradouro"
+              value={blockLoc.address}
+              onChange={(v) => setBlockLoc((b) => ({ ...b, address: v, location_source: b.location_source ?? "manual" }))}
+              bias={blockLoc.latitude != null && blockLoc.longitude != null ? { lat: blockLoc.latitude, lng: blockLoc.longitude } : null}
+              onSelect={(r) => {
+                setBlockLoc((b) => ({
+                  ...b,
+                  address: r.address || b.address,
+                  neighborhood: r.neighborhood || b.neighborhood,
+                  city: r.city || b.city,
+                  latitude: r.latitude ?? b.latitude,
+                  longitude: r.longitude ?? b.longitude,
+                  location_source: r.latitude != null ? "gps" : (b.location_source ?? "manual"),
+                }));
+                if (r.city) update("municipality", r.city);
+                if (r.state) update("uf", r.state);
+                if (r.address) update("locality", r.address);
+                if (r.neighborhood) update("sublocality", r.neighborhood);
+                if (r.address) {
+                  setImoveis((arr) =>
+                    arr.map((im) =>
+                      im._deleted || (im.street_name && im.street_name.trim())
+                        ? im
+                        : { ...im, street_name: r.address },
+                    ),
+                  );
+                }
+                toast.success(`Endereço selecionado: ${r.formatted || r.address}`);
+              }}
+              className="md:col-span-3"
+            />
             <Field label="Bairro" value={blockLoc.neighborhood} onChange={(v) => setBlockLoc((b) => ({ ...b, neighborhood: v, location_source: b.location_source ?? "manual" }))} />
             <Field label="Município" value={blockLoc.city} onChange={(v) => setBlockLoc((b) => ({ ...b, city: v, location_source: b.location_source ?? "manual" }))} />
             <div className="flex items-end">
