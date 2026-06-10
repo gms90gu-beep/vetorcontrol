@@ -196,6 +196,46 @@ export async function pendingByTable(): Promise<Record<string, number>> {
   return out;
 }
 
+export interface FailedMutationInfo {
+  id: number;
+  table: string;
+  op: string;
+  tries: number;
+  lastError?: string;
+  createdAt: number;
+}
+
+export async function listFailedMutations(): Promise<FailedMutationInfo[]> {
+  const all = await db.mutations.where("status").equals("error").toArray();
+  return all
+    .filter((m) => (m.tries || 0) >= MAX_RETRIES)
+    .map((m) => ({
+      id: m.id!,
+      table: m.op === "rpc" ? `rpc:${m.rpc_name}` : m.table,
+      op: m.op,
+      tries: m.tries || 0,
+      lastError: m.lastError,
+      createdAt: m.createdAt,
+    }));
+}
+
+/** Reseta contador de tentativas para reenviar mutações que esgotaram retries. */
+export async function retryFailedMutations(): Promise<number> {
+  const n = await db.mutations
+    .where("status").equals("error")
+    .modify({ status: "pending", tries: 0, lastError: undefined });
+  notify();
+  void flushMutations();
+  return n;
+}
+
+/** Remove definitivamente mutações que não querem ser sincronizadas. */
+export async function discardFailedMutation(id: number): Promise<void> {
+  await db.mutations.delete(id);
+  notify();
+}
+
+
 let booted = false;
 export function bootSyncEngine() {
   if (booted || typeof window === "undefined") return;
