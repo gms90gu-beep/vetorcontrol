@@ -389,6 +389,14 @@ export function AgentDashboard() {
           </div>
         </section>
 
+        {/* Consolidado Semanal + Prévia do Boletim (fonte: daily_work_records) */}
+        {user && (
+          <>
+            <MyWeeklyConsolidation userId={user.id} />
+            <BulletinPreview userId={user.id} />
+          </>
+        )}
+
         {/* Minha Área */}
         <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
