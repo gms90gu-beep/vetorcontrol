@@ -27,6 +27,18 @@ function notify() {
   });
 }
 
+function isDuplicateKey(e: any): boolean {
+  const code = e?.code || e?.details?.code;
+  if (code === "23505") return true;
+  const msg = String(e?.message || "").toLowerCase();
+  return msg.includes("duplicate key") || msg.includes("already exists");
+}
+
+function isInvalidUuid(e: any): boolean {
+  const msg = String(e?.message || "").toLowerCase();
+  return msg.includes("invalid input syntax for type uuid");
+}
+
 async function applyMutation(m: Mutation): Promise<void> {
   const table = m.table as any;
   if (m.op === "rpc") {
@@ -37,7 +49,15 @@ async function applyMutation(m: Mutation): Promise<void> {
   }
   if (m.op === "insert") {
     const { error } = await supabase.from(table).insert(m.payload);
-    if (error) throw error;
+    if (error) {
+      // Linha já existe no servidor (re-tentativa). Considera sucesso para
+      // não travar a fila eternamente.
+      if (isDuplicateKey(error)) {
+        console.warn(`[SYNC] insert ${table} já existia no servidor — tratando como sucesso.`);
+        return;
+      }
+      throw error;
+    }
     return;
   }
   if (m.op === "upsert") {
@@ -75,6 +95,33 @@ async function applyMutation(m: Mutation): Promise<void> {
   throw new Error(`op desconhecida: ${m.op}`);
 }
 
+/**
+ * Migra mutações antigas que possuem IDs inválidos (prefixo "tmp_" de uma versão
+ * anterior do gerador). Sem isso, ficam presas para sempre com
+ * "invalid input syntax for type uuid".
+ */
+async function purgeInvalidTmpMutations(): Promise<number> {
+  const all = await db.mutations.toArray();
+  let removed = 0;
+  const hasTmp = (v: any): boolean => {
+    if (typeof v === "string") return v.startsWith("tmp_");
+    if (v && typeof v === "object") return Object.values(v).some(hasTmp);
+    return false;
+  };
+  for (const m of all) {
+    if (
+      (typeof m.pk === "string" && m.pk.startsWith("tmp_")) ||
+      hasTmp(m.payload) ||
+      hasTmp(m.match)
+    ) {
+      await db.mutations.delete(m.id!);
+      removed++;
+    }
+  }
+  if (removed > 0) console.warn(`[SYNC] Removidas ${removed} mutações antigas com IDs inválidos (tmp_).`);
+  return removed;
+}
+
 export async function flushMutations(): Promise<{ ok: number; failed: number }> {
   if (running) return { ok: 0, failed: 0 };
   if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: 0, failed: 0 };
@@ -84,6 +131,9 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
   let ok = 0;
   let failed = 0;
   try {
+    // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
+    await purgeInvalidTmpMutations();
+
     // FIFO
     const pending = await db.mutations
       .where("status")
