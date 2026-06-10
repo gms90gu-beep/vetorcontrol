@@ -643,19 +643,20 @@ export function DailyWorkCloser({
 
       // === DADOS LI ===
       doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO LI (LEVANTAMENTO DE ÍNDICE)", 14, y);
+      doc.text("LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
       y += 2;
       autoTable(doc, {
         startY: y + 1,
-        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos", `Larvicida (${larvicideUnit})`, "Amostras"]],
+        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos (+)", "Imóveis (+)", `Larvicida (${larvicideUnit})`, "Imóveis Trat."]],
         body: [[
           String(depExistentes),
           String(depInspecionados),
           String(depTratados),
           String(depEliminados),
           String(focos),
+          String(imoveisPositivos),
           String(larvicida),
-          String(amostras),
+          String(imoveisTratados),
         ]],
         theme: "grid",
         headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
@@ -663,19 +664,49 @@ export function DailyWorkCloser({
       });
       y = (doc as any).lastAutoTable.finalY + 4;
 
-      // === TUBITOS ===
+      // === DEPÓSITOS POR TIPO ===
+      const totalPorTipo = depByType.A1 + depByType.A2 + depByType.B + depByType.C + depByType.D1 + depByType.D2 + depByType.E;
       doc.setFont("helvetica", "bold");
-      doc.text("TUBITOS COLETADOS", 14, y);
+      doc.text("DEPÓSITOS POR TIPO", 14, y);
       y += 2;
       autoTable(doc, {
         startY: y + 1,
-        head: [["Total de Tubitos", "Imóveis com Coleta"]],
-        body: [[String(tubitosTotal), String(imoveisComTubito)]],
+        head: [["A1", "A2", "B", "C", "D1", "D2", "E", "Total"]],
+        body: [[
+          String(depByType.A1), String(depByType.A2), String(depByType.B),
+          String(depByType.C), String(depByType.D1), String(depByType.D2),
+          String(depByType.E), String(totalPorTipo),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [99, 102, 241], textColor: 255, fontSize: 9, halign: "center" },
+        styles: { fontSize: 9, halign: "center" },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === TUBITOS E AMOSTRAS (sempre exibido) ===
+      doc.setFont("helvetica", "bold");
+      doc.text("TUBITOS E AMOSTRAS", 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y + 1,
+        head: [["Tubitos Coletados", "Imóveis c/ Tubito", "Amostras Coletadas"]],
+        body: [[String(tubitosTotal), String(imoveisComTubito), String(amostras)]],
         theme: "grid",
         headStyles: { fillColor: [5, 150, 105], textColor: 255, fontSize: 9, halign: "center" },
         styles: { fontSize: 9, halign: "center" },
       });
+      if (tubitosTotal === 0 && amostras === 0) {
+        y = (doc as any).lastAutoTable.finalY + 3;
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.text("Nenhuma coleta de tubito ou amostra realizada nesta jornada.", 14, y);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(11);
+      }
       y = (doc as any).lastAutoTable.finalY + 4;
+
+
 
       // === TABELA DE VISITAS ===
       doc.setFont("helvetica", "bold");
