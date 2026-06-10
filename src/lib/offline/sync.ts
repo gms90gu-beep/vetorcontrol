@@ -40,8 +40,28 @@ function isInvalidUuid(e: any): boolean {
   return msg.includes("invalid input syntax for type uuid");
 }
 
+// Tabelas que NÃO possuem coluna updated_at no servidor.
+// Enviar esse campo causa: "Could not find the 'updated_at' column ... in the schema cache".
+const TABLES_WITHOUT_UPDATED_AT = new Set([
+  "visits",
+  "visit_deposits",
+  "properties",
+  "blocks",
+  "property_recovery_attempts",
+  "weeks",
+]);
+
+function stripUpdatedAt(table: string, payload: any): any {
+  if (!payload || typeof payload !== "object") return payload;
+  if (!TABLES_WITHOUT_UPDATED_AT.has(table)) return payload;
+  if (Array.isArray(payload)) return payload.map((p) => { const { updated_at, ...rest } = p || {}; return rest; });
+  const { updated_at, ...rest } = payload;
+  return rest;
+}
+
 async function applyMutation(m: Mutation): Promise<void> {
   const table = m.table as any;
+  const payload = stripUpdatedAt(m.table, m.payload);
   if (m.op === "rpc") {
     if (!m.rpc_name) throw new Error("rpc sem rpc_name");
     const { error } = await supabase.rpc(m.rpc_name as any, m.payload as any);
