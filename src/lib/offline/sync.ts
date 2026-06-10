@@ -134,10 +134,18 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
     await purgeInvalidTmpMutations();
 
-    // FIFO
+    // Reseta itens travados em "syncing" (crash/refresh) e zera "error"
+    // para que voltem a ser tentados a cada nova rodada.
+    await db.mutations
+      .where("status").equals("syncing")
+      .modify({ status: "pending" });
+    await db.mutations
+      .where("status").equals("error")
+      .modify({ status: "pending" });
+
+    // FIFO — apenas pending agora
     const pending = await db.mutations
-      .where("status")
-      .anyOf("pending", "error")
+      .where("status").equals("pending")
       .sortBy("createdAt");
 
     if (pending.length > 0) console.log(`[SYNC] Pendências locais: ${pending.length}`);
