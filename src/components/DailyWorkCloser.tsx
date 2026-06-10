@@ -43,6 +43,110 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 
+type DailySnapshot = {
+  workedCount: number;
+  closedCount: number;
+  refusedCount: number;
+  visitedCount: number;
+  focusCount: number;
+  positiveProps: number;
+  treatedPropsCount: number;
+  depExisting: number;
+  depInspected: number;
+  depTreated: number;
+  depEliminated: number;
+  depByType: Record<"A1" | "A2" | "B" | "C" | "D1" | "D2" | "E", number>;
+  larvicideAmount: number;
+  larvicideUnit: string | null;
+  tubitos: number;
+  tubitosProps: number;
+  samples: number;
+  pendingLocal: number;
+  blocksWorked: number;
+  blocksCompleted: number;
+  blocksInProgress: number;
+};
+
+const EMPTY_SNAPSHOT: DailySnapshot = {
+  workedCount: 0, closedCount: 0, refusedCount: 0, visitedCount: 0,
+  focusCount: 0, positiveProps: 0, treatedPropsCount: 0,
+  depExisting: 0, depInspected: 0, depTreated: 0, depEliminated: 0,
+  depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+  larvicideAmount: 0, larvicideUnit: null,
+  tubitos: 0, tubitosProps: 0, samples: 0,
+  pendingLocal: 0, blocksWorked: 0, blocksCompleted: 0, blocksInProgress: 0,
+};
+
+async function buildDailySnapshot(userId: string, opDateStr: string): Promise<DailySnapshot> {
+  const allVisits = await listLocal<any>(
+    "visits",
+    (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === opDateStr,
+  );
+  const allDeposits = await listLocal<any>("visit_deposits");
+  const depByVisit = new Map<string, any[]>();
+  for (const d of allDeposits) {
+    const arr = depByVisit.get(d.visit_id) || [];
+    arr.push(d);
+    depByVisit.set(d.visit_id, arr);
+  }
+  const snap: DailySnapshot = {
+    ...EMPTY_SNAPSHOT,
+    depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+  };
+  for (const v of allVisits) {
+    snap.workedCount++;
+    if (v.status === "closed") snap.closedCount++;
+    if (v.status === "refused") snap.refusedCount++;
+    if (v.status === "visited") snap.visitedCount++;
+    if (v.has_focus) { snap.focusCount++; snap.positiveProps++; }
+    const deps = depByVisit.get(v.id) || [];
+    const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    snap.depExisting += q;
+    snap.depInspected += q;
+    snap.depTreated += deps.filter((d: any) => d.is_treated)
+      .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    snap.depEliminated += deps.filter((d: any) => d.is_eliminated)
+      .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    for (const d of deps) {
+      const code = String(d.type_code || "").toUpperCase().trim() as keyof DailySnapshot["depByType"];
+      if (code in snap.depByType) snap.depByType[code] += Number(d.quantity) || 0;
+    }
+    snap.larvicideAmount += Number(v.treatment_amount) || 0;
+    if (v.larvicide_unit) snap.larvicideUnit = v.larvicide_unit;
+    const tub = Number(v.tubitos_coletados) || 0;
+    snap.tubitos += tub;
+    if (tub > 0) snap.tubitosProps++;
+    if (v.sample_collected) snap.samples++;
+    if ((Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) {
+      snap.treatedPropsCount++;
+    }
+  }
+  const byProperty = new Map<string, any[]>();
+  for (const v of allVisits) {
+    const arr = byProperty.get(v.property_id) || [];
+    arr.push(v);
+    byProperty.set(v.property_id, arr);
+  }
+  for (const [, list] of byProperty) {
+    const last = list.sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)))[0];
+    if (last && (last.status === "closed" || last.status === "refused")) snap.pendingLocal++;
+  }
+  const daySessions = await listLocal<any>(
+    "field_work_sessions",
+    (s) => s.user_id === userId && s.session_date === opDateStr,
+  );
+  snap.blocksWorked = new Set(daySessions.map((s) => s.block_number)).size;
+  snap.blocksCompleted = new Set(
+    daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
+  ).size;
+  snap.blocksInProgress = new Set(
+    daySessions.filter((s) => s.status === "in_progress").map((s) => s.block_number),
+  ).size;
+  return snap;
+}
+
+
+
 
 interface DailyWorkCloserProps {
   stats?: {
