@@ -269,25 +269,23 @@ export function DailyWorkCloser({
           .gte("visit_date", startOfDay.toISOString())
           .lte("visit_date", endOfDay.toISOString());
         
-        if (todayVisits) {
-          const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (Number(v.treated_deposits) || 0), 0);
-          const totalLarvicide = todayVisits.reduce((acc, v) => acc + (Number(v.treatment_amount) || 0), 0);
-          const totalEliminated = todayVisits.reduce((acc, v) => acc + (Number(v.elimination_amount) || 0), 0);
-          const totalFocus = todayVisits.filter(v => v.has_focus).length;
+        // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
+        const snap = await buildDailySnapshot(user.id, opDateStr);
+        setSnapshot(snap);
 
-          setLocalStats({
-            worked: todayVisits.length,
-            closed: todayVisits.filter(v => v.status === 'closed').length,
-            refused: todayVisits.filter(v => v.status === 'refused').length,
-            eliminated: totalEliminated,
-            treated: todayVisits.filter(v => v.status === 'visited' && ((Number(v.treated_deposits) || 0) > 0 || (Number(v.treatment_amount) || 0) > 0)).length,
-            focus: totalFocus,
-            pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
-            treatedDeposits: totalTreatedDeposits,
-            larvicideUsed: totalLarvicide,
-            progress: 0 
-          });
-        }
+        setLocalStats({
+          worked: snap.workedCount || (todayVisits?.length ?? 0),
+          closed: snap.closedCount,
+          refused: snap.refusedCount,
+          eliminated: snap.depEliminated,
+          treated: snap.treatedPropsCount,
+          focus: snap.focusCount,
+          pending: snap.pendingLocal,
+          treatedDeposits: snap.depTreated,
+          larvicideUsed: snap.larvicideAmount,
+          progress: 0,
+        });
+
 
         // Pendências em aberto + recuperadas hoje
         const { count: pCount } = await supabase
