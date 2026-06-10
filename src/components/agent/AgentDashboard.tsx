@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { InstallPromoCard } from "@/components/InstallPromoCard";
 import { RunningAsAppBadge } from "@/components/InstallAppButton";
+import { MyWeeklyConsolidation } from "@/components/agent/MyWeeklyConsolidation";
+import { BulletinPreview } from "@/components/agent/BulletinPreview";
 
 const DAILY_GOAL = 30;
 
