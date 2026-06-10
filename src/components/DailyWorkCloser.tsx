@@ -43,6 +43,110 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 
+type DailySnapshot = {
+  workedCount: number;
+  closedCount: number;
+  refusedCount: number;
+  visitedCount: number;
+  focusCount: number;
+  positiveProps: number;
+  treatedPropsCount: number;
+  depExisting: number;
+  depInspected: number;
+  depTreated: number;
+  depEliminated: number;
+  depByType: Record<"A1" | "A2" | "B" | "C" | "D1" | "D2" | "E", number>;
+  larvicideAmount: number;
+  larvicideUnit: string | null;
+  tubitos: number;
+  tubitosProps: number;
+  samples: number;
+  pendingLocal: number;
+  blocksWorked: number;
+  blocksCompleted: number;
+  blocksInProgress: number;
+};
+
+const EMPTY_SNAPSHOT: DailySnapshot = {
+  workedCount: 0, closedCount: 0, refusedCount: 0, visitedCount: 0,
+  focusCount: 0, positiveProps: 0, treatedPropsCount: 0,
+  depExisting: 0, depInspected: 0, depTreated: 0, depEliminated: 0,
+  depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+  larvicideAmount: 0, larvicideUnit: null,
+  tubitos: 0, tubitosProps: 0, samples: 0,
+  pendingLocal: 0, blocksWorked: 0, blocksCompleted: 0, blocksInProgress: 0,
+};
+
+async function buildDailySnapshot(userId: string, opDateStr: string): Promise<DailySnapshot> {
+  const allVisits = await listLocal<any>(
+    "visits",
+    (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === opDateStr,
+  );
+  const allDeposits = await listLocal<any>("visit_deposits");
+  const depByVisit = new Map<string, any[]>();
+  for (const d of allDeposits) {
+    const arr = depByVisit.get(d.visit_id) || [];
+    arr.push(d);
+    depByVisit.set(d.visit_id, arr);
+  }
+  const snap: DailySnapshot = {
+    ...EMPTY_SNAPSHOT,
+    depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+  };
+  for (const v of allVisits) {
+    snap.workedCount++;
+    if (v.status === "closed") snap.closedCount++;
+    if (v.status === "refused") snap.refusedCount++;
+    if (v.status === "visited") snap.visitedCount++;
+    if (v.has_focus) { snap.focusCount++; snap.positiveProps++; }
+    const deps = depByVisit.get(v.id) || [];
+    const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    snap.depExisting += q;
+    snap.depInspected += q;
+    snap.depTreated += deps.filter((d: any) => d.is_treated)
+      .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    snap.depEliminated += deps.filter((d: any) => d.is_eliminated)
+      .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    for (const d of deps) {
+      const code = String(d.type_code || "").toUpperCase().trim() as keyof DailySnapshot["depByType"];
+      if (code in snap.depByType) snap.depByType[code] += Number(d.quantity) || 0;
+    }
+    snap.larvicideAmount += Number(v.treatment_amount) || 0;
+    if (v.larvicide_unit) snap.larvicideUnit = v.larvicide_unit;
+    const tub = Number(v.tubitos_coletados) || 0;
+    snap.tubitos += tub;
+    if (tub > 0) snap.tubitosProps++;
+    if (v.sample_collected) snap.samples++;
+    if ((Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) {
+      snap.treatedPropsCount++;
+    }
+  }
+  const byProperty = new Map<string, any[]>();
+  for (const v of allVisits) {
+    const arr = byProperty.get(v.property_id) || [];
+    arr.push(v);
+    byProperty.set(v.property_id, arr);
+  }
+  for (const [, list] of byProperty) {
+    const last = list.sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)))[0];
+    if (last && (last.status === "closed" || last.status === "refused")) snap.pendingLocal++;
+  }
+  const daySessions = await listLocal<any>(
+    "field_work_sessions",
+    (s) => s.user_id === userId && s.session_date === opDateStr,
+  );
+  snap.blocksWorked = new Set(daySessions.map((s) => s.block_number)).size;
+  snap.blocksCompleted = new Set(
+    daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
+  ).size;
+  snap.blocksInProgress = new Set(
+    daySessions.filter((s) => s.status === "in_progress").map((s) => s.block_number),
+  ).size;
+  return snap;
+}
+
+
+
 
 interface DailyWorkCloserProps {
   stats?: {
@@ -90,6 +194,8 @@ export function DailyWorkCloser({
   });
   const [pendingCount, setPendingCount] = useState(0);
   const [recoveredCount, setRecoveredCount] = useState(0);
+  const [snapshot, setSnapshot] = useState<DailySnapshot>(EMPTY_SNAPSHOT);
+
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [jornadaDate, setJornadaDate] = useState<string | null>(null);
@@ -163,25 +269,23 @@ export function DailyWorkCloser({
           .gte("visit_date", startOfDay.toISOString())
           .lte("visit_date", endOfDay.toISOString());
         
-        if (todayVisits) {
-          const totalTreatedDeposits = todayVisits.reduce((acc, v) => acc + (Number(v.treated_deposits) || 0), 0);
-          const totalLarvicide = todayVisits.reduce((acc, v) => acc + (Number(v.treatment_amount) || 0), 0);
-          const totalEliminated = todayVisits.reduce((acc, v) => acc + (Number(v.elimination_amount) || 0), 0);
-          const totalFocus = todayVisits.filter(v => v.has_focus).length;
+        // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
+        const snap = await buildDailySnapshot(user.id, opDateStr);
+        setSnapshot(snap);
 
-          setLocalStats({
-            worked: todayVisits.length,
-            closed: todayVisits.filter(v => v.status === 'closed').length,
-            refused: todayVisits.filter(v => v.status === 'refused').length,
-            eliminated: totalEliminated,
-            treated: todayVisits.filter(v => v.status === 'visited' && ((Number(v.treated_deposits) || 0) > 0 || (Number(v.treatment_amount) || 0) > 0)).length,
-            focus: totalFocus,
-            pending: todayVisits.filter(v => v.status === 'closed' || v.status === 'refused').length,
-            treatedDeposits: totalTreatedDeposits,
-            larvicideUsed: totalLarvicide,
-            progress: 0 
-          });
-        }
+        setLocalStats({
+          worked: snap.workedCount || (todayVisits?.length ?? 0),
+          closed: snap.closedCount,
+          refused: snap.refusedCount,
+          eliminated: snap.depEliminated,
+          treated: snap.treatedPropsCount,
+          focus: snap.focusCount,
+          pending: snap.pendingLocal,
+          treatedDeposits: snap.depTreated,
+          larvicideUsed: snap.larvicideAmount,
+          progress: 0,
+        });
+
 
         // Pendências em aberto + recuperadas hoje
         const { count: pCount } = await supabase
@@ -249,58 +353,14 @@ export function DailyWorkCloser({
 
       console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
 
-      // Lê visitas do Dexie (fonte autoritativa local — gravadas via saveVisitOffline)
-      const allVisits = await listLocal<any>(
-        "visits",
-        (v) =>
-          v.agent_id === user.id &&
-          String(v.visit_date || "").slice(0, 10) === operationalWorkDate,
-      );
-      const allDeposits = await listLocal<any>("visit_deposits");
-      const depByVisit = new Map<string, any[]>();
-      for (const d of allDeposits) {
-        const arr = depByVisit.get(d.visit_id) || [];
-        arr.push(d);
-        depByVisit.set(d.visit_id, arr);
-      }
+      // Snapshot único — Dexie é fonte autoritativa local
+      const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+      setSnapshot(snap);
 
-      let depExisting = 0, depInspected = 0, depTreated = 0, depEliminated = 0;
-      let larvicideAmount = 0, larvicideUnit: string | null = null;
-      let tubitos = 0, samples = 0;
-      const depByType: Record<string, number> = { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 };
-      let workedCount = 0, closedCount = 0, refusedCount = 0, focusCount = 0;
-      allVisits.forEach((v: any) => {
-        workedCount++;
-        if (v.status === "closed") closedCount++;
-        if (v.status === "refused") refusedCount++;
-        if (v.has_focus) focusCount++;
-        const deps = depByVisit.get(v.id) || [];
-        const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
-        depExisting += q;
-        depInspected += q;
-        depTreated += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
-        depEliminated += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
-        deps.forEach((d: any) => {
-          const code = String(d.type_code || "").toUpperCase().trim();
-          if (code in depByType) depByType[code] += Number(d.quantity) || 0;
-        });
-        larvicideAmount += Number(v.treatment_amount) || 0;
-        if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
-        tubitos += Number(v.tubitos_coletados) || 0;
-        samples += v.sample_collected ? 1 : 0;
-      });
+      let { depTreated, depEliminated, larvicideAmount } = snap;
       if (depTreated === 0 && stats.treatedDeposits) depTreated = stats.treatedDeposits;
       if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
       if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
-
-      const daySessions = await listLocal<any>(
-        "field_work_sessions",
-        (s) => s.user_id === user.id && s.session_date === operationalWorkDate,
-      );
-      const blocksWorked = new Set(daySessions.map((s) => s.block_number)).size;
-      const blocksCompleted = new Set(
-        daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
-      ).size;
 
       const epi = (() => {
         const ref = new Date(`${operationalWorkDate}T12:00:00`);
@@ -312,19 +372,6 @@ export function DailyWorkCloser({
         return { week, year: d.getUTCFullYear() };
       })();
 
-      // Pendências computadas localmente: imóveis fechados/recusados na data sem visita posterior "visited"
-      const byProperty = new Map<string, any[]>();
-      for (const v of allVisits) {
-        const arr = byProperty.get(v.property_id) || [];
-        arr.push(v);
-        byProperty.set(v.property_id, arr);
-      }
-      let pendingLocal = 0;
-      for (const [, list] of byProperty) {
-        const last = list.sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)))[0];
-        if (last && (last.status === "closed" || last.status === "refused")) pendingLocal++;
-      }
-
       const recordData: any = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
@@ -332,35 +379,39 @@ export function DailyWorkCloser({
         work_date: operationalWorkDate,
         status: 'completed',
         end_time: new Date().toISOString(),
-        properties_worked: workedCount || stats.worked,
-        properties_closed: closedCount || stats.closed,
-        properties_refused: refusedCount || stats.refused,
+        properties_worked: snap.workedCount || stats.worked,
+        properties_closed: snap.closedCount || stats.closed,
+        properties_refused: snap.refusedCount || stats.refused,
         properties_recovered: recoveredCount,
-        deposits_existing: depExisting,
-        deposits_inspected: depInspected,
+        properties_positive: snap.positiveProps,
+        deposits_existing: snap.depExisting,
+        deposits_inspected: snap.depInspected,
         deposits_treated: depTreated,
         deposits_eliminated: depEliminated,
-        positive_foci: focusCount || stats.focus,
+        positive_foci: snap.focusCount || stats.focus,
         larvicide_amount: larvicideAmount,
-        larvicide_unit: larvicideUnit,
-        tubitos_collected: tubitos,
-        samples_collected: samples,
-        blocks_worked: blocksWorked,
-        blocks_completed: blocksCompleted,
-        deposits_a1: depByType.A1,
-        deposits_a2: depByType.A2,
-        deposits_b: depByType.B,
-        deposits_c: depByType.C,
-        deposits_d1: depByType.D1,
-        deposits_d2: depByType.D2,
-        deposits_e: depByType.E,
-        pending_visits: pendingLocal || pendingCount,
+        larvicide_unit: snap.larvicideUnit,
+        tubitos_collected: snap.tubitos,
+        tubitos_properties: snap.tubitosProps,
+        samples_collected: snap.samples,
+        samples_total: snap.samples,
+        blocks_worked: snap.blocksWorked,
+        blocks_completed: snap.blocksCompleted,
+        deposits_a1: snap.depByType.A1,
+        deposits_a2: snap.depByType.A2,
+        deposits_b: snap.depByType.B,
+        deposits_c: snap.depByType.C,
+        deposits_d1: snap.depByType.D1,
+        deposits_d2: snap.depByType.D2,
+        deposits_e: snap.depByType.E,
+        pending_visits: snap.pendingLocal || pendingCount,
         epi_week: epi.week,
         epi_year: epi.year,
         updated_at: new Date().toISOString(),
       };
 
       console.log("[DIÁRIA] Snapshot criado", recordData);
+
 
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
@@ -502,22 +553,31 @@ export function DailyWorkCloser({
       let tubitosTotal = 0;
       let imoveisComTubito = 0;
       let larvicideUnit = "g";
+      let imoveisPositivos = 0;
+      let imoveisTratados = 0;
+      const depByType: Record<"A1"|"A2"|"B"|"C"|"D1"|"D2"|"E", number> = { A1:0, A2:0, B:0, C:0, D1:0, D2:0, E:0 };
 
       visits.forEach((v: any) => {
         const deps = v.deposits || [];
         const qtySum = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depExistentes += qtySum;
-        depInspecionados += qtySum; // todos os depósitos registrados foram inspecionados
+        depInspecionados += qtySum;
         depTratados += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depEliminados += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
-        focos += v.has_focus ? 1 : 0;
+        for (const d of deps) {
+          const code = String(d.type_code || "").toUpperCase().trim() as keyof typeof depByType;
+          if (code in depByType) depByType[code] += Number(d.quantity) || 0;
+        }
+        if (v.has_focus) { focos += 1; imoveisPositivos += 1; }
         larvicida += Number(v.treatment_amount) || 0;
         if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
+        if ((Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) imoveisTratados += 1;
         amostras += v.sample_collected ? 1 : 0;
         const tub = Number(v.tubitos_coletados) || 0;
         tubitosTotal += tub;
         if (tub > 0) imoveisComTubito += 1;
       });
+
 
       // Fallback: usa stats (que já podem trazer depósitos tratados/eliminados a partir do estado)
       if (depTratados === 0 && stats.treatedDeposits) depTratados = stats.treatedDeposits;
@@ -583,19 +643,20 @@ export function DailyWorkCloser({
 
       // === DADOS LI ===
       doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO LI (LEVANTAMENTO DE ÍNDICE)", 14, y);
+      doc.text("LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
       y += 2;
       autoTable(doc, {
         startY: y + 1,
-        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos", `Larvicida (${larvicideUnit})`, "Amostras"]],
+        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos (+)", "Imóveis (+)", `Larvicida (${larvicideUnit})`, "Imóveis Trat."]],
         body: [[
           String(depExistentes),
           String(depInspecionados),
           String(depTratados),
           String(depEliminados),
           String(focos),
+          String(imoveisPositivos),
           String(larvicida),
-          String(amostras),
+          String(imoveisTratados),
         ]],
         theme: "grid",
         headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
@@ -603,19 +664,49 @@ export function DailyWorkCloser({
       });
       y = (doc as any).lastAutoTable.finalY + 4;
 
-      // === TUBITOS ===
+      // === DEPÓSITOS POR TIPO ===
+      const totalPorTipo = depByType.A1 + depByType.A2 + depByType.B + depByType.C + depByType.D1 + depByType.D2 + depByType.E;
       doc.setFont("helvetica", "bold");
-      doc.text("TUBITOS COLETADOS", 14, y);
+      doc.text("DEPÓSITOS POR TIPO", 14, y);
       y += 2;
       autoTable(doc, {
         startY: y + 1,
-        head: [["Total de Tubitos", "Imóveis com Coleta"]],
-        body: [[String(tubitosTotal), String(imoveisComTubito)]],
+        head: [["A1", "A2", "B", "C", "D1", "D2", "E", "Total"]],
+        body: [[
+          String(depByType.A1), String(depByType.A2), String(depByType.B),
+          String(depByType.C), String(depByType.D1), String(depByType.D2),
+          String(depByType.E), String(totalPorTipo),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [99, 102, 241], textColor: 255, fontSize: 9, halign: "center" },
+        styles: { fontSize: 9, halign: "center" },
+      });
+      y = (doc as any).lastAutoTable.finalY + 4;
+
+      // === TUBITOS E AMOSTRAS (sempre exibido) ===
+      doc.setFont("helvetica", "bold");
+      doc.text("TUBITOS E AMOSTRAS", 14, y);
+      y += 2;
+      autoTable(doc, {
+        startY: y + 1,
+        head: [["Tubitos Coletados", "Imóveis c/ Tubito", "Amostras Coletadas"]],
+        body: [[String(tubitosTotal), String(imoveisComTubito), String(amostras)]],
         theme: "grid",
         headStyles: { fillColor: [5, 150, 105], textColor: 255, fontSize: 9, halign: "center" },
         styles: { fontSize: 9, halign: "center" },
       });
+      if (tubitosTotal === 0 && amostras === 0) {
+        y = (doc as any).lastAutoTable.finalY + 3;
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.text("Nenhuma coleta de tubito ou amostra realizada nesta jornada.", 14, y);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(11);
+      }
       y = (doc as any).lastAutoTable.finalY + 4;
+
+
 
       // === TABELA DE VISITAS ===
       doc.setFont("helvetica", "bold");
@@ -704,7 +795,7 @@ export function DailyWorkCloser({
   if (showSummary) {
     return (
       <Dialog open={showSummary} onOpenChange={setShowSummary}>
-        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl bg-slate-50">
+        <DialogContent className="max-w-md rounded-[2.5rem] p-0 border-none shadow-2xl max-h-[92vh] overflow-y-auto bg-slate-50">
           <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <CheckCircle2 className="h-24 w-24" />
@@ -718,21 +809,81 @@ export function DailyWorkCloser({
             </p>
           </div>
           
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <SummaryItem icon={Target} label={translate("worked")} value={stats.worked} color="text-slate-800" />
-              <SummaryItem icon={XCircle} label={translate("CLOSED")} value={stats.closed} color="text-blue-600" />
-              <SummaryItem icon={XCircle} label={translate("REFUSED")} value={stats.refused} color="text-red-500" />
-              <SummaryItem icon={BarChart3} label="Eliminados" value={stats.eliminated} color="text-emerald-500" />
-              <SummaryItem icon={Layers} label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} color="text-indigo-600" />
-              <SummaryItem icon={CheckCircle2} label="Focos Pos." value={stats.focus} color="text-orange-500" />
-              <div className="col-span-2 md:col-span-1">
-                 <SummaryItem icon={Droplets} label="Larvicida" value={`${stats.larvicideUsed || 0}g`} color="text-cyan-600" />
-              </div>
-              <div className="col-span-2">
-                 <SummaryItem icon={BarChart3} label="Cobertura" value={`${stats.progress || 0}%`} color="text-blue-700" />
+          <div className="p-6 space-y-5">
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Produção Imobiliária</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={Target} label="Trabalhados" value={snapshot.workedCount || stats.worked} color="text-slate-800" />
+                <SummaryItem icon={XCircle} label="Fechados" value={snapshot.closedCount || stats.closed} color="text-blue-600" />
+                <SummaryItem icon={XCircle} label="Recusas" value={snapshot.refusedCount || stats.refused} color="text-red-500" />
+                <SummaryItem icon={CheckCircle2} label="Recuperados" value={recoveredCount} color="text-emerald-500" />
+                <SummaryItem icon={Clock} label="Pendências" value={snapshot.pendingLocal || pendingCount} color="text-amber-600" />
+                <SummaryItem icon={Target} label="Imóveis (+)" value={snapshot.positiveProps} color="text-orange-600" />
               </div>
             </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Depósitos</h4>
+              <div className="grid grid-cols-4 gap-2">
+                <SummaryItem icon={Layers} label="Exist." value={snapshot.depExisting} color="text-slate-800" />
+                <SummaryItem icon={Layers} label="Inspec." value={snapshot.depInspected} color="text-blue-600" />
+                <SummaryItem icon={Layers} label="Tratad." value={snapshot.depTreated || stats.treatedDeposits} color="text-indigo-600" />
+                <SummaryItem icon={Layers} label="Elimin." value={snapshot.depEliminated || stats.eliminated} color="text-emerald-500" />
+              </div>
+              <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Por tipo</p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {(["A1","A2","B","C","D1","D2","E"] as const).map((k) => (
+                    <div key={k} className="bg-white rounded-xl py-2">
+                      <p className="text-[9px] font-black text-slate-400 uppercase">{k}</p>
+                      <p className="text-sm font-black text-slate-800">{snapshot.depByType[k]}</p>
+                    </div>
+                  ))}
+                  <div className="bg-indigo-600 text-white rounded-xl py-2">
+                    <p className="text-[9px] font-black uppercase">Total</p>
+                    <p className="text-sm font-black">
+                      {snapshot.depByType.A1 + snapshot.depByType.A2 + snapshot.depByType.B + snapshot.depByType.C + snapshot.depByType.D1 + snapshot.depByType.D2 + snapshot.depByType.E}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Focos · Larvicida · Coletas</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={CheckCircle2} label="Focos (+)" value={snapshot.focusCount || stats.focus} color="text-orange-500" />
+                <SummaryItem
+                  icon={Droplets}
+                  label="Larvicida"
+                  value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                  color="text-cyan-600"
+                />
+                <SummaryItem icon={Layers} label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} color="text-indigo-600" />
+              </div>
+              {snapshot.tubitos > 0 || snapshot.samples > 0 ? (
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <SummaryItem icon={Layers} label="Tubitos" value={snapshot.tubitos} color="text-emerald-600" />
+                  <SummaryItem icon={Target} label="Imóv. c/ Tubito" value={snapshot.tubitosProps} color="text-emerald-600" />
+                  <SummaryItem icon={Layers} label="Amostras" value={snapshot.samples} color="text-emerald-600" />
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold text-slate-500 mt-3 text-center bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                  Tubitos coletados: 0 — nenhuma coleta realizada nesta jornada.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Quarteirões</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={Target} label="Trabalhados" value={snapshot.blocksWorked} color="text-slate-800" />
+                <SummaryItem icon={CheckCircle2} label="Concluídos" value={snapshot.blocksCompleted} color="text-emerald-500" />
+                <SummaryItem icon={Clock} label="Em andamento" value={snapshot.blocksInProgress} color="text-amber-600" />
+              </div>
+            </div>
+
+
 
             <div className="pt-4 space-y-3">
               <Button 
@@ -782,7 +933,7 @@ export function DailyWorkCloser({
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="max-w-md rounded-[2.5rem] p-0 border-none shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="bg-gradient-to-br from-red-600 to-red-700 p-8 text-white">
           <div className="bg-white/20 p-4 rounded-2xl w-fit mb-4">
             <Power className="h-10 w-10" />
@@ -820,18 +971,75 @@ export function DailyWorkCloser({
           )}
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo desta Jornada (apenas o dia)</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produção Imobiliária</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
+              <SummaryItemSmall label="Trabalhados" value={stats.worked} icon={Target} />
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
               <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
-              <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
-              <SummaryItemSmall label="Pend. Geradas" value={pendingCount} icon={Clock} />
-              <SummaryItemSmall label="Recuperadas" value={recoveredCount} icon={CheckCircle2} />
-              <SummaryItemSmall label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} icon={Layers} />
-              <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
+              <SummaryItemSmall label="Recuperados" value={recoveredCount} icon={CheckCircle2} />
+              <SummaryItemSmall label="Pend. Geradas" value={snapshot.pendingLocal || pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Depósitos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <SummaryItemSmall label="Existentes" value={snapshot.depExisting} icon={Layers} />
+              <SummaryItemSmall label="Inspecionados" value={snapshot.depInspected} icon={Layers} />
+              <SummaryItemSmall label="Tratados" value={snapshot.depTreated || stats.treatedDeposits || stats.treated} icon={Layers} />
+              <SummaryItemSmall label="Eliminados" value={snapshot.depEliminated || stats.eliminated} icon={Layers} />
+            </div>
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Detalhamento por tipo</p>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {(["A1","A2","B","C","D1","D2","E"] as const).map((k) => (
+                  <div key={k} className="bg-white rounded-xl py-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">{k}</p>
+                    <p className="text-sm font-black text-slate-800">{snapshot.depByType[k]}</p>
+                  </div>
+                ))}
+                <div className="bg-indigo-600 text-white rounded-xl py-2">
+                  <p className="text-[9px] font-black uppercase">Total</p>
+                  <p className="text-sm font-black">
+                    {snapshot.depByType.A1 + snapshot.depByType.A2 + snapshot.depByType.B + snapshot.depByType.C + snapshot.depByType.D1 + snapshot.depByType.D2 + snapshot.depByType.E}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Focos & Larvicida</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <SummaryItemSmall label="Focos (+)" value={snapshot.focusCount || stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
+              <SummaryItemSmall
+                label="Larvicida"
+                value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                icon={Droplets}
+              />
+              <SummaryItemSmall label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} icon={Layers} />
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Tubitos & Amostras</h4>
+            {snapshot.tubitos > 0 || snapshot.samples > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItemSmall label="Tubitos" value={snapshot.tubitos} icon={Layers} />
+                <SummaryItemSmall label="Imóveis c/ Tubito" value={snapshot.tubitosProps} icon={Target} />
+                <SummaryItemSmall label="Amostras" value={snapshot.samples} icon={Layers} />
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                <p className="text-[10px] font-bold text-slate-500">Nenhuma coleta de tubito ou amostra nesta jornada.</p>
+              </div>
+            )}
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Quarteirões</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <SummaryItemSmall label="Trabalhados" value={snapshot.blocksWorked} icon={Target} />
+              <SummaryItemSmall label="Concluídos" value={snapshot.blocksCompleted} icon={CheckCircle2} />
+              <SummaryItemSmall label="Em andamento" value={snapshot.blocksInProgress} icon={Clock} />
             </div>
           </div>
+
+
 
           <div className="pt-4 flex flex-col gap-3">
             <Button 

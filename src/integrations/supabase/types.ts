@@ -309,13 +309,16 @@ export type Database = {
           pending_visits: number | null
           positive_foci: number | null
           properties_closed: number | null
+          properties_positive: number
           properties_recovered: number | null
           properties_refused: number | null
           properties_worked: number | null
           samples_collected: number | null
+          samples_total: number
           start_time: string
           status: string
           tubitos_collected: number | null
+          tubitos_properties: number
           updated_at: string
           week_id: string | null
           work_date: string
@@ -346,13 +349,16 @@ export type Database = {
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
+          properties_positive?: number
           properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
           samples_collected?: number | null
+          samples_total?: number
           start_time?: string
           status: string
           tubitos_collected?: number | null
+          tubitos_properties?: number
           updated_at?: string
           week_id?: string | null
           work_date?: string
@@ -383,13 +389,16 @@ export type Database = {
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
+          properties_positive?: number
           properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
           samples_collected?: number | null
+          samples_total?: number
           start_time?: string
           status?: string
           tubitos_collected?: number | null
+          tubitos_properties?: number
           updated_at?: string
           week_id?: string | null
           work_date?: string
