@@ -69,10 +69,8 @@ async function applyMutation(m: Mutation): Promise<void> {
     return;
   }
   if (m.op === "insert") {
-    const { error } = await supabase.from(table).insert(m.payload);
+    const { error } = await supabase.from(table).insert(payload);
     if (error) {
-      // Linha já existe no servidor (re-tentativa). Considera sucesso para
-      // não travar a fila eternamente.
       if (isDuplicateKey(error)) {
         console.warn(`[SYNC] insert ${table} já existia no servidor — tratando como sucesso.`);
         return;
@@ -83,13 +81,13 @@ async function applyMutation(m: Mutation): Promise<void> {
   }
   if (m.op === "upsert") {
     const opts = m.on_conflict ? { onConflict: m.on_conflict } : undefined;
-    const { error } = await supabase.from(table).upsert(m.payload, opts as any);
+    const { error } = await supabase.from(table).upsert(payload, opts as any);
     if (error) throw error;
     return;
   }
   if (m.op === "update") {
     if (!m.pk) throw new Error("update sem pk");
-    const { error } = await supabase.from(table).update(m.payload).eq("id", m.pk);
+    const { error } = await supabase.from(table).update(payload).eq("id", m.pk);
     if (error) throw error;
     return;
   }
@@ -109,7 +107,7 @@ async function applyMutation(m: Mutation): Promise<void> {
   if (m.op === "update_where") {
     const match = m.match || {};
     if (!Object.keys(match).length) throw new Error("update_where sem match");
-    const { error } = await supabase.from(table).update(m.payload).match(match);
+    const { error } = await supabase.from(table).update(payload).match(match);
     if (error) throw error;
     return;
   }
