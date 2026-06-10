@@ -194,6 +194,8 @@ export function DailyWorkCloser({
   });
   const [pendingCount, setPendingCount] = useState(0);
   const [recoveredCount, setRecoveredCount] = useState(0);
+  const [snapshot, setSnapshot] = useState<DailySnapshot>(EMPTY_SNAPSHOT);
+
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [jornadaDate, setJornadaDate] = useState<string | null>(null);
