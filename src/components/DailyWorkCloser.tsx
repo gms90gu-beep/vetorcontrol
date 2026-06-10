@@ -911,18 +911,75 @@ export function DailyWorkCloser({
           )}
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Resumo desta Jornada (apenas o dia)</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produção Imobiliária</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Imóveis" value={stats.worked} icon={Target} />
+              <SummaryItemSmall label="Trabalhados" value={stats.worked} icon={Target} />
               <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
               <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
-              <SummaryItemSmall label="Focos (+)" value={stats.focus} icon={CheckCircle2} />
-              <SummaryItemSmall label="Pend. Geradas" value={pendingCount} icon={Clock} />
-              <SummaryItemSmall label="Recuperadas" value={recoveredCount} icon={CheckCircle2} />
-              <SummaryItemSmall label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} icon={Layers} />
-              <SummaryItemSmall label="Larvicida" value={`${stats.larvicideUsed || 0}g`} icon={Droplets} />
+              <SummaryItemSmall label="Recuperados" value={recoveredCount} icon={CheckCircle2} />
+              <SummaryItemSmall label="Pend. Geradas" value={snapshot.pendingLocal || pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Depósitos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <SummaryItemSmall label="Existentes" value={snapshot.depExisting} icon={Layers} />
+              <SummaryItemSmall label="Inspecionados" value={snapshot.depInspected} icon={Layers} />
+              <SummaryItemSmall label="Tratados" value={snapshot.depTreated || stats.treatedDeposits || stats.treated} icon={Layers} />
+              <SummaryItemSmall label="Eliminados" value={snapshot.depEliminated || stats.eliminated} icon={Layers} />
+            </div>
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Detalhamento por tipo</p>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {(["A1","A2","B","C","D1","D2","E"] as const).map((k) => (
+                  <div key={k} className="bg-white rounded-xl py-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase">{k}</p>
+                    <p className="text-sm font-black text-slate-800">{snapshot.depByType[k]}</p>
+                  </div>
+                ))}
+                <div className="bg-indigo-600 text-white rounded-xl py-2">
+                  <p className="text-[9px] font-black uppercase">Total</p>
+                  <p className="text-sm font-black">
+                    {snapshot.depByType.A1 + snapshot.depByType.A2 + snapshot.depByType.B + snapshot.depByType.C + snapshot.depByType.D1 + snapshot.depByType.D2 + snapshot.depByType.E}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Focos & Larvicida</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <SummaryItemSmall label="Focos (+)" value={snapshot.focusCount || stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
+              <SummaryItemSmall
+                label="Larvicida"
+                value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                icon={Droplets}
+              />
+              <SummaryItemSmall label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} icon={Layers} />
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Tubitos & Amostras</h4>
+            {snapshot.tubitos > 0 || snapshot.samples > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItemSmall label="Tubitos" value={snapshot.tubitos} icon={Layers} />
+                <SummaryItemSmall label="Imóveis c/ Tubito" value={snapshot.tubitosProps} icon={Target} />
+                <SummaryItemSmall label="Amostras" value={snapshot.samples} icon={Layers} />
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center">
+                <p className="text-[10px] font-bold text-slate-500">Nenhuma coleta de tubito ou amostra nesta jornada.</p>
+              </div>
+            )}
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Quarteirões</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <SummaryItemSmall label="Trabalhados" value={snapshot.blocksWorked} icon={Target} />
+              <SummaryItemSmall label="Concluídos" value={snapshot.blocksCompleted} icon={CheckCircle2} />
+              <SummaryItemSmall label="Em andamento" value={snapshot.blocksInProgress} icon={Clock} />
             </div>
           </div>
+
+
 
           <div className="pt-4 flex flex-col gap-3">
             <Button 
