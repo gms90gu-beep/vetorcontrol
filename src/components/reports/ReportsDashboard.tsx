@@ -213,7 +213,74 @@ export function ReportsDashboard() {
         pendencyData={chartData.pendencies}
       />
 
-      {/* Ranking de Produtividade (Preview) */}
+      {/* Relatórios Diários do Ciclo — fonte única do Boletim Semanal */}
+      <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tighter text-slate-800">
+              Relatórios Diários do Ciclo
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Fonte oficial · usada no Boletim Semanal
+            </p>
+          </div>
+          <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 rounded-lg">
+            {dailies.length}
+          </Badge>
+        </div>
+
+        {dailies.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+            <FileText className="h-10 w-10 mb-2 opacity-30" />
+            <p className="text-xs font-black uppercase tracking-widest">Nenhuma diária consolidada neste ciclo</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>SE</TableHead>
+                  <TableHead className="text-right">Imóveis</TableHead>
+                  <TableHead className="text-right">Fechados</TableHead>
+                  <TableHead className="text-right">Recusas</TableHead>
+                  <TableHead className="text-right">Focos</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dailies.map((d: any) => {
+                  const epi = d.epi_week ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).week;
+                  const epiYear = d.epi_year ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).year;
+                  const isCompleted = d.status === "completed";
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-bold text-slate-800">
+                        {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-slate-600">{String(epi).padStart(2, "0")}/{epiYear}</TableCell>
+                      <TableCell className="text-right font-bold">{d.properties_worked ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.properties_closed ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.properties_refused ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.positive_foci ?? 0}</TableCell>
+                      <TableCell className="text-center">
+                        {isCompleted ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Consolidada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">Em aberto</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
