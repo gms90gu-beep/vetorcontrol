@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { db, type Mutation } from "./db";
 
 let running = false;
+const MAX_RETRIES = 5;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let syncingFlag = false;
 let lastSyncAt: number | null = null;
