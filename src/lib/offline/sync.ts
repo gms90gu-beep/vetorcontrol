@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { db, type Mutation } from "./db";
 
 let running = false;
+const MAX_RETRIES = 5;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let syncingFlag = false;
 let lastSyncAt: number | null = null;
@@ -134,13 +135,16 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
     await purgeInvalidTmpMutations();
 
-    // Reseta itens travados em "syncing" (crash/refresh) e zera "error"
-    // para que voltem a ser tentados a cada nova rodada.
+    // Reseta itens travados em "syncing" (crash/refresh) — esses NÃO consumiram
+    // tentativa. Itens em "error" só voltam a "pending" se ainda tiverem retries
+    // disponíveis (caso contrário ficam parados, com lastError visível no modal,
+    // até o operador resolver a causa raiz — evita loop infinito de retentativa).
     await db.mutations
       .where("status").equals("syncing")
       .modify({ status: "pending" });
     await db.mutations
       .where("status").equals("error")
+      .and((m) => (m.tries || 0) < MAX_RETRIES)
       .modify({ status: "pending" });
 
     // FIFO — apenas pending agora
@@ -191,6 +195,46 @@ export async function pendingByTable(): Promise<Record<string, number>> {
   }
   return out;
 }
+
+export interface FailedMutationInfo {
+  id: number;
+  table: string;
+  op: string;
+  tries: number;
+  lastError?: string;
+  createdAt: number;
+}
+
+export async function listFailedMutations(): Promise<FailedMutationInfo[]> {
+  const all = await db.mutations.where("status").equals("error").toArray();
+  return all
+    .filter((m) => (m.tries || 0) >= MAX_RETRIES)
+    .map((m) => ({
+      id: m.id!,
+      table: m.op === "rpc" ? `rpc:${m.rpc_name}` : m.table,
+      op: m.op,
+      tries: m.tries || 0,
+      lastError: m.lastError,
+      createdAt: m.createdAt,
+    }));
+}
+
+/** Reseta contador de tentativas para reenviar mutações que esgotaram retries. */
+export async function retryFailedMutations(): Promise<number> {
+  const n = await db.mutations
+    .where("status").equals("error")
+    .modify({ status: "pending", tries: 0, lastError: undefined });
+  notify();
+  void flushMutations();
+  return n;
+}
+
+/** Remove definitivamente mutações que não querem ser sincronizadas. */
+export async function discardFailedMutation(id: number): Promise<void> {
+  await db.mutations.delete(id);
+  notify();
+}
+
 
 let booted = false;
 export function bootSyncEngine() {
