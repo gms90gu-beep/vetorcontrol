@@ -809,21 +809,81 @@ export function DailyWorkCloser({
             </p>
           </div>
           
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <SummaryItem icon={Target} label={translate("worked")} value={stats.worked} color="text-slate-800" />
-              <SummaryItem icon={XCircle} label={translate("CLOSED")} value={stats.closed} color="text-blue-600" />
-              <SummaryItem icon={XCircle} label={translate("REFUSED")} value={stats.refused} color="text-red-500" />
-              <SummaryItem icon={BarChart3} label="Eliminados" value={stats.eliminated} color="text-emerald-500" />
-              <SummaryItem icon={Layers} label={translate("TREATED")} value={stats.treatedDeposits || stats.treated} color="text-indigo-600" />
-              <SummaryItem icon={CheckCircle2} label="Focos Pos." value={stats.focus} color="text-orange-500" />
-              <div className="col-span-2 md:col-span-1">
-                 <SummaryItem icon={Droplets} label="Larvicida" value={`${stats.larvicideUsed || 0}g`} color="text-cyan-600" />
-              </div>
-              <div className="col-span-2">
-                 <SummaryItem icon={BarChart3} label="Cobertura" value={`${stats.progress || 0}%`} color="text-blue-700" />
+          <div className="p-6 space-y-5">
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Produção Imobiliária</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={Target} label="Trabalhados" value={snapshot.workedCount || stats.worked} color="text-slate-800" />
+                <SummaryItem icon={XCircle} label="Fechados" value={snapshot.closedCount || stats.closed} color="text-blue-600" />
+                <SummaryItem icon={XCircle} label="Recusas" value={snapshot.refusedCount || stats.refused} color="text-red-500" />
+                <SummaryItem icon={CheckCircle2} label="Recuperados" value={recoveredCount} color="text-emerald-500" />
+                <SummaryItem icon={Clock} label="Pendências" value={snapshot.pendingLocal || pendingCount} color="text-amber-600" />
+                <SummaryItem icon={Target} label="Imóveis (+)" value={snapshot.positiveProps} color="text-orange-600" />
               </div>
             </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Depósitos</h4>
+              <div className="grid grid-cols-4 gap-2">
+                <SummaryItem icon={Layers} label="Exist." value={snapshot.depExisting} color="text-slate-800" />
+                <SummaryItem icon={Layers} label="Inspec." value={snapshot.depInspected} color="text-blue-600" />
+                <SummaryItem icon={Layers} label="Tratad." value={snapshot.depTreated || stats.treatedDeposits} color="text-indigo-600" />
+                <SummaryItem icon={Layers} label="Elimin." value={snapshot.depEliminated || stats.eliminated} color="text-emerald-500" />
+              </div>
+              <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
+                <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Por tipo</p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {(["A1","A2","B","C","D1","D2","E"] as const).map((k) => (
+                    <div key={k} className="bg-white rounded-xl py-2">
+                      <p className="text-[9px] font-black text-slate-400 uppercase">{k}</p>
+                      <p className="text-sm font-black text-slate-800">{snapshot.depByType[k]}</p>
+                    </div>
+                  ))}
+                  <div className="bg-indigo-600 text-white rounded-xl py-2">
+                    <p className="text-[9px] font-black uppercase">Total</p>
+                    <p className="text-sm font-black">
+                      {snapshot.depByType.A1 + snapshot.depByType.A2 + snapshot.depByType.B + snapshot.depByType.C + snapshot.depByType.D1 + snapshot.depByType.D2 + snapshot.depByType.E}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Focos · Larvicida · Coletas</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={CheckCircle2} label="Focos (+)" value={snapshot.focusCount || stats.focus} color="text-orange-500" />
+                <SummaryItem
+                  icon={Droplets}
+                  label="Larvicida"
+                  value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                  color="text-cyan-600"
+                />
+                <SummaryItem icon={Layers} label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} color="text-indigo-600" />
+              </div>
+              {snapshot.tubitos > 0 || snapshot.samples > 0 ? (
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <SummaryItem icon={Layers} label="Tubitos" value={snapshot.tubitos} color="text-emerald-600" />
+                  <SummaryItem icon={Target} label="Imóv. c/ Tubito" value={snapshot.tubitosProps} color="text-emerald-600" />
+                  <SummaryItem icon={Layers} label="Amostras" value={snapshot.samples} color="text-emerald-600" />
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold text-slate-500 mt-3 text-center bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                  Tubitos coletados: 0 — nenhuma coleta realizada nesta jornada.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Quarteirões</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <SummaryItem icon={Target} label="Trabalhados" value={snapshot.blocksWorked} color="text-slate-800" />
+                <SummaryItem icon={CheckCircle2} label="Concluídos" value={snapshot.blocksCompleted} color="text-emerald-500" />
+                <SummaryItem icon={Clock} label="Em andamento" value={snapshot.blocksInProgress} color="text-amber-600" />
+              </div>
+            </div>
+
+
 
             <div className="pt-4 space-y-3">
               <Button 
