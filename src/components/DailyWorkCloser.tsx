@@ -553,22 +553,31 @@ export function DailyWorkCloser({
       let tubitosTotal = 0;
       let imoveisComTubito = 0;
       let larvicideUnit = "g";
+      let imoveisPositivos = 0;
+      let imoveisTratados = 0;
+      const depByType: Record<"A1"|"A2"|"B"|"C"|"D1"|"D2"|"E", number> = { A1:0, A2:0, B:0, C:0, D1:0, D2:0, E:0 };
 
       visits.forEach((v: any) => {
         const deps = v.deposits || [];
         const qtySum = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depExistentes += qtySum;
-        depInspecionados += qtySum; // todos os depósitos registrados foram inspecionados
+        depInspecionados += qtySum;
         depTratados += deps.filter((d: any) => d.is_treated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
         depEliminados += deps.filter((d: any) => d.is_eliminated).reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
-        focos += v.has_focus ? 1 : 0;
+        for (const d of deps) {
+          const code = String(d.type_code || "").toUpperCase().trim() as keyof typeof depByType;
+          if (code in depByType) depByType[code] += Number(d.quantity) || 0;
+        }
+        if (v.has_focus) { focos += 1; imoveisPositivos += 1; }
         larvicida += Number(v.treatment_amount) || 0;
         if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
+        if ((Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) imoveisTratados += 1;
         amostras += v.sample_collected ? 1 : 0;
         const tub = Number(v.tubitos_coletados) || 0;
         tubitosTotal += tub;
         if (tub > 0) imoveisComTubito += 1;
       });
+
 
       // Fallback: usa stats (que já podem trazer depósitos tratados/eliminados a partir do estado)
       if (depTratados === 0 && stats.treatedDeposits) depTratados = stats.treatedDeposits;
