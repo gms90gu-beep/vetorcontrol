@@ -194,7 +194,7 @@ function PropertyVisitPage() {
       // Buscar TODOS os imóveis do quarteirão (somente colunas necessárias)
       let query = supabase
         .from("properties")
-        .select("id, number, sequence, status, street_name");
+        .select("id, number, complement, sequence, status, street_name");
 
       if (property.block_id) {
         query = query.eq("block_id", property.block_id);
@@ -212,10 +212,6 @@ function PropertyVisitPage() {
 
       const all = allPropsRaw || [];
 
-      // Ordenação robusta no client: normaliza street_name (trim + lower)
-      // e ordena number como inteiro quando possível.
-      // Isso evita o problema de "RUA DA IGREJA" vir antes de "Rua da igreja"
-      // e de "10" vir antes de "2" na ordenação alfabética.
       const norm = (s: any) => String(s ?? "").trim().toLowerCase();
       const numKey = (n: any) => {
         const v = parseInt(String(n ?? "").replace(/\D/g, ""), 10);
@@ -237,7 +233,9 @@ function PropertyVisitPage() {
         const na = numKey(a.number);
         const nb = numKey(b.number);
         if (na !== nb) return na - nb;
-        // Empate final: ordena por id para estabilidade
+        const ca = norm(a.complement);
+        const cb = norm(b.complement);
+        if (ca !== cb) return ca < cb ? -1 : 1;
         return String(a.id).localeCompare(String(b.id));
       });
 
