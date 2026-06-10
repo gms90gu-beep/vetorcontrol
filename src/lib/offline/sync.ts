@@ -40,8 +40,28 @@ function isInvalidUuid(e: any): boolean {
   return msg.includes("invalid input syntax for type uuid");
 }
 
+// Tabelas que NÃO possuem coluna updated_at no servidor.
+// Enviar esse campo causa: "Could not find the 'updated_at' column ... in the schema cache".
+const TABLES_WITHOUT_UPDATED_AT = new Set([
+  "visits",
+  "visit_deposits",
+  "properties",
+  "blocks",
+  "property_recovery_attempts",
+  "weeks",
+]);
+
+function stripUpdatedAt(table: string, payload: any): any {
+  if (!payload || typeof payload !== "object") return payload;
+  if (!TABLES_WITHOUT_UPDATED_AT.has(table)) return payload;
+  if (Array.isArray(payload)) return payload.map((p) => { const { updated_at, ...rest } = p || {}; return rest; });
+  const { updated_at, ...rest } = payload;
+  return rest;
+}
+
 async function applyMutation(m: Mutation): Promise<void> {
   const table = m.table as any;
+  const payload = stripUpdatedAt(m.table, m.payload);
   if (m.op === "rpc") {
     if (!m.rpc_name) throw new Error("rpc sem rpc_name");
     const { error } = await supabase.rpc(m.rpc_name as any, m.payload as any);
@@ -49,10 +69,8 @@ async function applyMutation(m: Mutation): Promise<void> {
     return;
   }
   if (m.op === "insert") {
-    const { error } = await supabase.from(table).insert(m.payload);
+    const { error } = await supabase.from(table).insert(payload);
     if (error) {
-      // Linha já existe no servidor (re-tentativa). Considera sucesso para
-      // não travar a fila eternamente.
       if (isDuplicateKey(error)) {
         console.warn(`[SYNC] insert ${table} já existia no servidor — tratando como sucesso.`);
         return;
@@ -63,13 +81,13 @@ async function applyMutation(m: Mutation): Promise<void> {
   }
   if (m.op === "upsert") {
     const opts = m.on_conflict ? { onConflict: m.on_conflict } : undefined;
-    const { error } = await supabase.from(table).upsert(m.payload, opts as any);
+    const { error } = await supabase.from(table).upsert(payload, opts as any);
     if (error) throw error;
     return;
   }
   if (m.op === "update") {
     if (!m.pk) throw new Error("update sem pk");
-    const { error } = await supabase.from(table).update(m.payload).eq("id", m.pk);
+    const { error } = await supabase.from(table).update(payload).eq("id", m.pk);
     if (error) throw error;
     return;
   }
@@ -89,7 +107,7 @@ async function applyMutation(m: Mutation): Promise<void> {
   if (m.op === "update_where") {
     const match = m.match || {};
     if (!Object.keys(match).length) throw new Error("update_where sem match");
-    const { error } = await supabase.from(table).update(m.payload).match(match);
+    const { error } = await supabase.from(table).update(payload).match(match);
     if (error) throw error;
     return;
   }
