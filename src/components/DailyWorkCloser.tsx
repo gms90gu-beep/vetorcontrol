@@ -415,7 +415,19 @@ export function DailyWorkCloser({
 
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
-      await upsertOffline("daily_work_records", recordData, { onConflict: "agent_id,work_date" });
+      const savedDaily: any = await upsertOffline(
+        "daily_work_records",
+        recordData,
+        { onConflict: "agent_id,work_date" },
+      );
+      console.log("[DIARIA_SALVA]", {
+        id: savedDaily?.id ?? null,
+        agent_id: recordData.agent_id,
+        work_date: recordData.work_date,
+        cycle_id: recordData.cycle_id,
+        epi_week: recordData.epi_week,
+        epi_year: recordData.epi_year,
+      });
 
       // 2) Marca agente como work_completed — local + fila
       console.log("[ENCERRAR] atualizando agents");

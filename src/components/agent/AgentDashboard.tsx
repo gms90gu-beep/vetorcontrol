@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { InstallPromoCard } from "@/components/InstallPromoCard";
 import { RunningAsAppBadge } from "@/components/InstallAppButton";
+import { MyWeeklyConsolidation } from "@/components/agent/MyWeeklyConsolidation";
+import { BulletinPreview } from "@/components/agent/BulletinPreview";
 
 const DAILY_GOAL = 30;
 
@@ -386,6 +388,14 @@ export function AgentDashboard() {
             <MetricBox icon={MapPin} label="Quart. concl. (semana)" value={blockStats.concluidos} color="#3b6d11" />
           </div>
         </section>
+
+        {/* Consolidado Semanal + Prévia do Boletim (fonte: daily_work_records) */}
+        {user && (
+          <>
+            <MyWeeklyConsolidation userId={user.id} />
+            <BulletinPreview userId={user.id} />
+          </>
+        )}
 
         {/* Minha Área */}
         <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">

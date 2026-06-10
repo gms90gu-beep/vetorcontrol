@@ -63,6 +63,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
 
     if (error) throw error;
     const records = dailies || [];
+    console.log(`[BOLETIM_FONTE] daily_work_records count=${records.length} SE=${epiWeek}/${epiYear} ciclo=${activeCycle?.name || "—"}`);
     console.log(`[CICLO] WeeklyReport consulta daily_work_records retornou ${records.length} registros do ciclo ${activeCycle?.name || "—"}`);
 
     // Regra de integridade: bloquear se houver diária aberta/inconsistente

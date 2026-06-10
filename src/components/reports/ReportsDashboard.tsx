@@ -4,14 +4,16 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, Filter, BarChart3 } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Badge } from "@/components/ui/badge";
 import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getEpiWeek } from "@/lib/cycle-week";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -23,6 +25,7 @@ export function ReportsDashboard() {
     week: "all"
   });
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+  const [dailies, setDailies] = useState<any[]>([]);
 
   const [kpiData, setKpiData] = useState({
     worked: 0,
@@ -66,77 +69,64 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      // Base query for visits — SEMPRE filtra por ciclo (não mistura ciclos)
-      let query = supabase.from("visits").select(`
-        *,
-        visit_deposits(*)
-      `);
+      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
+      let query = supabase.from("daily_work_records").select("*");
 
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
-      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
       if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
-      if (filters.week !== "all") query = query.eq("week_number", parseInt(filters.week));
+      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
 
-      const { data: visits, error } = await query;
-
+      const { data: records, error } = await query.order("work_date", { ascending: false });
       if (error) throw error;
-      console.log(`[CICLO] ReportsDashboard consulta visits retornou ${visits?.length || 0} registros (ciclo ${cycleFilter || "—"})`);
+      const rows = (records as any[]) || [];
+      console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
 
-      // Process KPIs
-      const worked = visits.length;
-      const treated = visits.filter(v => v.treatment_applied).length;
-      const focus = visits.filter(v => v.has_focus).length;
-      
-      // Mock coverage and productivity for now, but in real app we'd calculate vs total properties
-      const coverage = worked > 0 ? Math.min(100, Math.round((worked / 500) * 100)) : 0;
-      const productivity = worked > 0 ? Math.round(worked / 5) : 0; // average per day
+      setDailies(rows);
+
+      const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      const worked = sum("properties_worked");
+      const treated = sum("deposits_treated");
+      const focus = sum("positive_foci");
+      const pending = sum("pending_visits");
+
+      const visitable = worked + pending;
+      const coverage = visitable > 0 ? Math.round((worked / visitable) * 100) : 0;
+      const productivity = rows.length > 0 ? Math.round(worked / rows.length) : 0;
 
       setKpiData({ worked, coverage, focus, treated, productivity });
 
-      // Process Production Chart (by status)
-      // Real implementation would group visits by week
-      const productionByWeek: any[] = [];
+      // Depósitos por tipo (soma de todas as diárias)
+      const deposits = [
+        { name: "A1", value: sum("deposits_a1") },
+        { name: "A2", value: sum("deposits_a2") },
+        { name: "B",  value: sum("deposits_b")  },
+        { name: "C",  value: sum("deposits_c")  },
+        { name: "D1", value: sum("deposits_d1") },
+        { name: "D2", value: sum("deposits_d2") },
+        { name: "E",  value: sum("deposits_e")  },
+      ].filter(d => d.value > 0);
 
-      // Process Deposits
-      const depositCounts: Record<string, number> = {};
-      visits.forEach(v => {
-        v.visit_deposits?.forEach((d: any) => {
-          depositCounts[d.type_code] = (depositCounts[d.type_code] || 0) + 1;
-        });
-      });
-
-      const deposits = Object.entries(depositCounts).map(([name, value]) => ({ name, value }));
-
-      // Process Coverage
       const coverageMock = [
-        { name: 'Visitados', value: coverage },
-        { name: 'Pendente', value: Math.max(0, 100 - coverage) }
+        { name: "Visitados", value: coverage },
+        { name: "Pendente", value: Math.max(0, 100 - coverage) },
       ];
 
-      // Process Evolution
-      const evolution: any[] = [];
-      // If we have visits, we could group them by day
-      if (visits.length > 0) {
-        const visitsByDate: Record<string, number> = {};
-        visits.forEach(v => {
-          const date = format(new Date(v.visit_date), 'dd/MM');
-          visitsByDate[date] = (visitsByDate[date] || 0) + 1;
-        });
-        
-        Object.entries(visitsByDate).forEach(([date, count]) => {
-          evolution.push({ date, visitas: count });
-        });
-        evolution.sort((a, b) => a.date.localeCompare(b.date));
-      }
+      // Evolução por dia (a partir das diárias)
+      const evolution = rows
+        .slice()
+        .sort((a: any, b: any) => String(a.work_date).localeCompare(String(b.work_date)))
+        .map((r: any) => ({
+          date: format(new Date(`${r.work_date}T12:00:00`), "dd/MM"),
+          visitas: Number(r.properties_worked) || 0,
+        }));
 
       setChartData({
-        production: productionByWeek,
+        production: [],
         deposits,
         coverage: coverageMock,
         evolution,
-        pendencies: []
+        pendencies: [],
       });
-
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Erro ao carregar dados do dashboard");
@@ -223,7 +213,74 @@ export function ReportsDashboard() {
         pendencyData={chartData.pendencies}
       />
 
-      {/* Ranking de Produtividade (Preview) */}
+      {/* Relatórios Diários do Ciclo — fonte única do Boletim Semanal */}
+      <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-100 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-tighter text-slate-800">
+              Relatórios Diários do Ciclo
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Fonte oficial · usada no Boletim Semanal
+            </p>
+          </div>
+          <Badge className="bg-emerald-600 text-white font-black text-xs px-3 py-1.5 rounded-lg">
+            {dailies.length}
+          </Badge>
+        </div>
+
+        {dailies.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+            <FileText className="h-10 w-10 mb-2 opacity-30" />
+            <p className="text-xs font-black uppercase tracking-widest">Nenhuma diária consolidada neste ciclo</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>SE</TableHead>
+                  <TableHead className="text-right">Imóveis</TableHead>
+                  <TableHead className="text-right">Fechados</TableHead>
+                  <TableHead className="text-right">Recusas</TableHead>
+                  <TableHead className="text-right">Focos</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dailies.map((d: any) => {
+                  const epi = d.epi_week ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).week;
+                  const epiYear = d.epi_year ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).year;
+                  const isCompleted = d.status === "completed";
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-bold text-slate-800">
+                        {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-slate-600">{String(epi).padStart(2, "0")}/{epiYear}</TableCell>
+                      <TableCell className="text-right font-bold">{d.properties_worked ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.properties_closed ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.properties_refused ?? 0}</TableCell>
+                      <TableCell className="text-right">{d.positive_foci ?? 0}</TableCell>
+                      <TableCell className="text-center">
+                        {isCompleted ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Consolidada
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">Em aberto</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <div>
