@@ -1,75 +1,77 @@
-# Fase 2 — Modo Offline Real (Pattern Repository)
+# Auditoria do Fluxo de Relatórios
 
-## Problema atual
+Vou executar a auditoria em 5 etapas, com mudanças cirúrgicas para garantir que a **diária** seja a única fonte de verdade do **Boletim Semanal**.
 
-A infraestrutura existe (Dexie + SyncEngine + Badge), mas as telas continuam chamando `supabase.from(...)` diretamente. Sem internet, essas chamadas falham com **"Failed to fetch"** e a tela quebra.
+---
 
-## Estratégia
+## ETAPA 1 — Encerramento da Jornada (`DailyWorkCloser`)
 
-Criar uma camada de **repositórios** com o pattern:
+**Estado atual:** já grava ~20 campos em `daily_work_records` (snapshot completo) na refatoração anterior.
 
-```
-online  → busca Supabase, hidrata Dexie, retorna dado fresco
-offline → lê apenas Dexie, retorna dado em cache
-write   → grava Dexie + enfileira mutação (independente do estado de rede)
-```
+**Ajustes:**
+- Adicionar log `[DIARIA_SALVA] { id, agent_id, work_date, cycle_id }` após o upsert retornar.
+- Validar que TODOS os campos da auditoria estão sendo gravados (worked, closed, refused, recovered, pending, LI, A1/A2/B/C/D1/D2/E, focos, tubitos, amostras, larvicida, quarteirões).
+- Migration leve: garantir colunas que faltam em `daily_work_records` (ex.: `depositos_por_tipo` JSON, ou colunas planas `dep_a1..dep_e` se ainda não existirem).
 
-E envolver toda chamada Supabase remanescente num helper `safeFetch()` que:
-- Detecta offline (`navigator.onLine === false` ou `TypeError: Failed to fetch`)
-- Loga `[OFFLINE] ...` em vez de quebrar
-- Mostra toast "Modo Offline Ativo — dados do armazenamento local"
-- Nunca propaga "Failed to fetch" para o usuário
+---
 
-## Entregas
+## ETAPA 2 — Área Relatórios (`/relatorios`)
 
-### 1. Helpers base
-- `src/lib/offline/safe-fetch.ts` — wrapper `safeFetch<T>(remoteFn, fallbackFn)`:
-  - se `navigator.onLine` → tenta remoto; em erro de rede, cai no fallback
-  - se offline → vai direto no fallback
-  - logs `[OFFLINE] Lendo Dexie`, `[OFFLINE] Acesso Supabase bloqueado`, `[SYNC] ...`
-- `src/lib/offline/toast-offline.ts` — utilitário para mostrar 1x a cada N segundos "Modo Offline Ativo".
+**Problema:** `ReportsDashboard` hoje consulta `visits` direto — mistura origem de dados.
 
-### 2. Repositórios (por domínio)
-`src/lib/offline/repos/`:
-- `properties.repo.ts` — list por bloco, get por id, create/update/delete
-- `blocks.repo.ts`
-- `boletins.repo.ts`
-- `visits.repo.ts` + `visit-deposits.repo.ts`
-- `pendencies.repo.ts`
-- `sessions.repo.ts` (field_work_sessions, daily_work_records)
+**Mudanças em `src/components/reports/ReportsDashboard.tsx`:**
+- Trocar query base de `visits` por `daily_work_records` (filtrado por `agent_id` + `cycle_id` ativo).
+- Nova seção **"Relatórios Diários do Ciclo: X"** com tabela:
+  Data · Ciclo · Semana do Ciclo · SE · Imóveis · Fechados · Recusas · Focos · Status (✓ Consolidada).
+- KPIs passam a ser somatório das diárias, não contagem de visits.
 
-Cada repo expõe: `list(filter?)`, `get(id)`, `create(p)`, `update(id,p)`, `remove(id)`.
-Reads = `safeFetch(supabase, dexie)`; writes = Dexie + `enqueueMutation`.
+---
 
-### 3. Telas migradas para usar repos / safeFetch
-- `src/routes/_authenticated.dashboard.tsx`
-- `src/routes/_authenticated.field-work.tsx`
-- `src/routes/_authenticated.field-work-list.tsx`
-- `src/routes/_authenticated.property.$propertyId.tsx`
-- `src/routes/_authenticated.rg.tsx` + `_authenticated.rg.editar.$id.tsx` + `_authenticated.rg.boletim.$id.tsx`
-- `src/routes/_authenticated.pending.tsx`
-- `src/routes/_authenticated.relatorios.tsx` (read-only — só fallback Dexie + aviso)
-- `src/components/DailyWorkCloser.tsx`
+## ETAPA 3 — Painel "Meu Consolidado Semanal" (Agente)
 
-### 4. Tratamento global de erro de rede
-- `src/lib/error-capture.ts` — interceptar `TypeError: Failed to fetch` e mostrar toast amigável; nunca crashar.
+**Novo componente:** `src/components/agent/MyWeeklyConsolidation.tsx`
+- Buscar `daily_work_records` da SE atual (epi_week/epi_year) do agente logado.
+- Exibir: SE atual, "Diárias: X de 5", Imóveis, Fechados, Recusas, Focos, Tubitos, Larvicida (g), Cobertura %.
+- Inserir no `AgentDashboard`.
 
-### 5. Logs temporários
-Console-only, prefixos:
-- `[OFFLINE] Lendo Dexie (<tabela>)`
-- `[OFFLINE] Acesso Supabase bloqueado`
-- `[SYNC] Pendências locais: <n>`
-- `[SYNC] Sincronização concluída — <n> ok, <n> falhou`
+---
 
-## Fora de escopo
+## ETAPA 4 — Boletim Semanal vira soma das diárias
 
-- PWA / Service Worker (Fase 3)
-- Conflict resolution avançada (mantém last-write-wins)
-- GPS / mapas
+**Em `src/components/reports/WeeklyReportGenerator.tsx`:**
+- Refatorar para somar `daily_work_records` da SE em vez de recalcular a partir de `visits`.
+- Adicionar **validador de integridade**: se Σ(diárias) divergir de uma checagem cruzada (ou se houver dia útil sem diária consolidada), abortar com toast explicando o motivo.
+- Log `[BOLETIM_FONTE] daily_work_records count=N`.
 
-## Resultado esperado
+---
 
-- Com rede: comportamento idêntico ao atual, com hidratação extra do Dexie.
-- Sem rede: telas listadas continuam funcionando lendo Dexie; nenhuma exibe "Failed to fetch"; mutações ficam na fila e sincronizam quando voltar.
+## ETAPA 5 — Aba "Prévia do Boletim" (Agente)
 
-Quer que eu siga implementando tudo de uma vez, ou prefere começar pelas telas críticas (Trabalho + Visita + RG) e expandir depois?
+**Novo componente:** `src/components/agent/BulletinPreview.tsx`
+- Mesmos totais do boletim oficial, calculados ao vivo a partir das diárias já consolidadas da semana.
+- Tabela com: totais acumulados, depósitos por tipo (A1–E), focos, tubitos, larvicida, cobertura.
+- Adicionar como nova aba/cartão dentro do `AgentDashboard`.
+
+---
+
+## Detalhes Técnicos
+
+- **Fonte única:** `daily_work_records` para tudo que for relatório/boletim. `visits` continua sendo a fonte operacional do dia, mas relatórios não a leem mais.
+- **Filtro de ciclo:** já existe `getActiveCycleForUser` — reaproveitar.
+- **SE:** já existe `getEpiWeek` em `src/lib/cycle-week.ts`.
+- **Migration:** adicionar colunas faltantes em `daily_work_records` se necessário (verificar primeiro com `read_query`).
+- **Offline:** o upsert de `daily_work_records` já passa pela fila offline; sem mudança.
+
+---
+
+## Arquivos Afetados
+
+- `src/components/DailyWorkCloser.tsx` (log + verificação de campos)
+- `src/components/reports/ReportsDashboard.tsx` (refatoração da fonte de dados + tabela de diárias)
+- `src/components/reports/WeeklyReportGenerator.tsx` (somatório de diárias + validação)
+- `src/components/agent/AgentDashboard.tsx` (inclusão dos novos painéis)
+- `src/components/agent/MyWeeklyConsolidation.tsx` (novo)
+- `src/components/agent/BulletinPreview.tsx` (novo)
+- Migration Supabase, se faltar coluna em `daily_work_records`
+
+Posso prosseguir com a implementação?
