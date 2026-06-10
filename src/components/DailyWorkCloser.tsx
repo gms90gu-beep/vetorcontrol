@@ -795,7 +795,7 @@ export function DailyWorkCloser({
   if (showSummary) {
     return (
       <Dialog open={showSummary} onOpenChange={setShowSummary}>
-        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl bg-slate-50">
+        <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl max-h-[92vh] overflow-y-auto bg-slate-50">
           <div className="bg-slate-900 p-8 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <CheckCircle2 className="h-24 w-24" />
@@ -873,7 +873,7 @@ export function DailyWorkCloser({
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="max-w-md rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="bg-gradient-to-br from-red-600 to-red-700 p-8 text-white">
           <div className="bg-white/20 p-4 rounded-2xl w-fit mb-4">
             <Power className="h-10 w-10" />
