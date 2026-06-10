@@ -103,9 +103,17 @@ async function applyMutation(m: Mutation): Promise<void> {
 async function purgeInvalidTmpMutations(): Promise<number> {
   const all = await db.mutations.toArray();
   let removed = 0;
+  const hasTmp = (v: any): boolean => {
+    if (typeof v === "string") return v.startsWith("tmp_");
+    if (v && typeof v === "object") return Object.values(v).some(hasTmp);
+    return false;
+  };
   for (const m of all) {
-    const idVal = m.pk || m.payload?.id || m.payload?.visit_id;
-    if (typeof idVal === "string" && idVal.startsWith("tmp_")) {
+    if (
+      (typeof m.pk === "string" && m.pk.startsWith("tmp_")) ||
+      hasTmp(m.payload) ||
+      hasTmp(m.match)
+    ) {
       await db.mutations.delete(m.id!);
       removed++;
     }
