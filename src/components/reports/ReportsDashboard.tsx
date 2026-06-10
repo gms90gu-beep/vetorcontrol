@@ -4,14 +4,16 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, Filter, BarChart3 } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Badge } from "@/components/ui/badge";
 import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getEpiWeek } from "@/lib/cycle-week";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
