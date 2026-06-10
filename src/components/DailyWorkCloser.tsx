@@ -209,11 +209,17 @@ export function DailyWorkCloser({
   }, [fetchDailyContext]);
 
   const handleCloseDay = async () => {
+    console.log("[ENCERRAR] botão clicado");
+    console.log("[ENCERRAR] pendências", pendingCount);
+    console.log("[ENCERRAR] quarteirão aberto", openBlock);
     console.log("[DIÁRIA] Encerramento iniciado");
     setIsLoading(true);
     try {
       const { data: { user } } = await safeGetUser();
-      if (!user) return;
+      if (!user) {
+        toast.error("Usuário não autenticado.");
+        return;
+      }
 
       let currentAgent = agent;
       if (!currentAgent) {
@@ -357,12 +363,17 @@ export function DailyWorkCloser({
       console.log("[DIÁRIA] Snapshot criado", recordData);
 
       // 1) Upsert do daily_work_records — local + fila
+      console.log("[ENCERRAR] salvando daily_work_records");
       await upsertOffline("daily_work_records", recordData, { onConflict: "agent_id,work_date" });
 
       // 2) Marca agente como work_completed — local + fila
-      try { await updateOffline("agents", currentAgent.id, { work_status: 'work_completed' }); } catch {}
+      console.log("[ENCERRAR] atualizando agents");
+      try { await updateOffline("agents", currentAgent.id, { work_status: 'work_completed' }); } catch (e) {
+        console.warn("[ENCERRAR] falha ao atualizar agents", e);
+      }
 
       // 3) Enfileira a RPC de consolidação de pendências (executa quando voltar a rede)
+      console.log("[ENCERRAR] executando/enfileirando finalize_shift_pendencies");
       await enqueueRpcOffline("finalize_shift_pendencies", {
         p_agent_id: user.id,
         p_cycle_id: activeCycle?.id,
@@ -370,6 +381,7 @@ export function DailyWorkCloser({
       });
 
       // 4) Encerra todas as sessões em andamento (local + fila)
+      console.log("[ENCERRAR] atualizando field_work_sessions");
       const sessionsToClose = await listLocal<any>(
         "field_work_sessions",
         (s) => s.user_id === user.id && s.status === "in_progress",
@@ -381,15 +393,16 @@ export function DailyWorkCloser({
         });
       }
 
+      console.log("[ENCERRAR] concluído");
       const msg = isOnline()
         ? "Trabalho do dia encerrado com sucesso!"
         : "Jornada encerrada localmente. Será sincronizada quando houver conexão.";
       toast.success(msg);
       setShowSummary(true);
       setIsOpen(false);
-    } catch (error) {
-      console.error("Error closing work day:", error);
-      toast.error("Erro ao encerrar trabalho. Tente novamente.");
+    } catch (error: any) {
+      console.error("[ENCERRAR] erro:", error);
+      toast.error(error?.message || "Erro ao encerrar trabalho. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
