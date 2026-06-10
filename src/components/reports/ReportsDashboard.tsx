@@ -25,6 +25,7 @@ export function ReportsDashboard() {
     week: "all"
   });
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
+  const [dailies, setDailies] = useState<any[]>([]);
 
   const [kpiData, setKpiData] = useState({
     worked: 0,
@@ -68,77 +69,64 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      // Base query for visits — SEMPRE filtra por ciclo (não mistura ciclos)
-      let query = supabase.from("visits").select(`
-        *,
-        visit_deposits(*)
-      `);
+      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
+      let query = supabase.from("daily_work_records").select("*");
 
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
-      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
       if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
-      if (filters.week !== "all") query = query.eq("week_number", parseInt(filters.week));
+      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
 
-      const { data: visits, error } = await query;
-
+      const { data: records, error } = await query.order("work_date", { ascending: false });
       if (error) throw error;
-      console.log(`[CICLO] ReportsDashboard consulta visits retornou ${visits?.length || 0} registros (ciclo ${cycleFilter || "—"})`);
+      const rows = (records as any[]) || [];
+      console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
 
-      // Process KPIs
-      const worked = visits.length;
-      const treated = visits.filter(v => v.treatment_applied).length;
-      const focus = visits.filter(v => v.has_focus).length;
-      
-      // Mock coverage and productivity for now, but in real app we'd calculate vs total properties
-      const coverage = worked > 0 ? Math.min(100, Math.round((worked / 500) * 100)) : 0;
-      const productivity = worked > 0 ? Math.round(worked / 5) : 0; // average per day
+      setDailies(rows);
+
+      const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      const worked = sum("properties_worked");
+      const treated = sum("deposits_treated");
+      const focus = sum("positive_foci");
+      const pending = sum("pending_visits");
+
+      const visitable = worked + pending;
+      const coverage = visitable > 0 ? Math.round((worked / visitable) * 100) : 0;
+      const productivity = rows.length > 0 ? Math.round(worked / rows.length) : 0;
 
       setKpiData({ worked, coverage, focus, treated, productivity });
 
-      // Process Production Chart (by status)
-      // Real implementation would group visits by week
-      const productionByWeek: any[] = [];
+      // Depósitos por tipo (soma de todas as diárias)
+      const deposits = [
+        { name: "A1", value: sum("deposits_a1") },
+        { name: "A2", value: sum("deposits_a2") },
+        { name: "B",  value: sum("deposits_b")  },
+        { name: "C",  value: sum("deposits_c")  },
+        { name: "D1", value: sum("deposits_d1") },
+        { name: "D2", value: sum("deposits_d2") },
+        { name: "E",  value: sum("deposits_e")  },
+      ].filter(d => d.value > 0);
 
-      // Process Deposits
-      const depositCounts: Record<string, number> = {};
-      visits.forEach(v => {
-        v.visit_deposits?.forEach((d: any) => {
-          depositCounts[d.type_code] = (depositCounts[d.type_code] || 0) + 1;
-        });
-      });
-
-      const deposits = Object.entries(depositCounts).map(([name, value]) => ({ name, value }));
-
-      // Process Coverage
       const coverageMock = [
-        { name: 'Visitados', value: coverage },
-        { name: 'Pendente', value: Math.max(0, 100 - coverage) }
+        { name: "Visitados", value: coverage },
+        { name: "Pendente", value: Math.max(0, 100 - coverage) },
       ];
 
-      // Process Evolution
-      const evolution: any[] = [];
-      // If we have visits, we could group them by day
-      if (visits.length > 0) {
-        const visitsByDate: Record<string, number> = {};
-        visits.forEach(v => {
-          const date = format(new Date(v.visit_date), 'dd/MM');
-          visitsByDate[date] = (visitsByDate[date] || 0) + 1;
-        });
-        
-        Object.entries(visitsByDate).forEach(([date, count]) => {
-          evolution.push({ date, visitas: count });
-        });
-        evolution.sort((a, b) => a.date.localeCompare(b.date));
-      }
+      // Evolução por dia (a partir das diárias)
+      const evolution = rows
+        .slice()
+        .sort((a: any, b: any) => String(a.work_date).localeCompare(String(b.work_date)))
+        .map((r: any) => ({
+          date: format(new Date(`${r.work_date}T12:00:00`), "dd/MM"),
+          visitas: Number(r.properties_worked) || 0,
+        }));
 
       setChartData({
-        production: productionByWeek,
+        production: [],
         deposits,
         coverage: coverageMock,
         evolution,
-        pendencies: []
+        pendencies: [],
       });
-
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Erro ao carregar dados do dashboard");
