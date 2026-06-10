@@ -134,13 +134,16 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
     await purgeInvalidTmpMutations();
 
-    // Reseta itens travados em "syncing" (crash/refresh) e zera "error"
-    // para que voltem a ser tentados a cada nova rodada.
+    // Reseta itens travados em "syncing" (crash/refresh) — esses NÃO consumiram
+    // tentativa. Itens em "error" só voltam a "pending" se ainda tiverem retries
+    // disponíveis (caso contrário ficam parados, com lastError visível no modal,
+    // até o operador resolver a causa raiz — evita loop infinito de retentativa).
     await db.mutations
       .where("status").equals("syncing")
       .modify({ status: "pending" });
     await db.mutations
       .where("status").equals("error")
+      .and((m) => (m.tries || 0) < MAX_RETRIES)
       .modify({ status: "pending" });
 
     // FIFO — apenas pending agora
