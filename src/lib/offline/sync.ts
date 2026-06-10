@@ -200,10 +200,14 @@ export function bootSyncEngine() {
   const tryFlush = () => { void flushMutations(); };
 
   window.addEventListener("online", tryFlush);
+  window.addEventListener("focus", tryFlush);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") tryFlush();
+  });
   // Boot inicial
   setTimeout(tryFlush, 1500);
   // Polling defensivo
-  intervalId = setInterval(tryFlush, 30_000);
+  intervalId = setInterval(tryFlush, 15_000);
 }
 
 export function stopSyncEngine() {
