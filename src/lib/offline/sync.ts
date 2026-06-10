@@ -123,6 +123,9 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
   let ok = 0;
   let failed = 0;
   try {
+    // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
+    await purgeInvalidTmpMutations();
+
     // FIFO
     const pending = await db.mutations
       .where("status")
