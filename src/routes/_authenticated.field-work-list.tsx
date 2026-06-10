@@ -149,13 +149,40 @@ function FieldWorkListPage() {
           operationalCycleId = currentCycle?.id ?? null;
         }
 
-        const { data: props, error } = await supabase
+        const { data: propsRaw, error } = await supabase
           .from("properties")
           .select("*")
           .eq("block_number", session.block_number)
-          .order("number", { ascending: true });
+          .order("sequence", { ascending: true, nullsFirst: false });
 
         if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
+
+        // Ordenação robusta: respeita a SEQUÊNCIA do RG (porta-a-porta).
+        // Empates: rua → número → complemento → id. Garante que imóveis com
+        // complemento (ex.: 100, 100A, 100B) e mesma sequência não sejam pulados.
+        const seqKey = (s: any) => {
+          if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
+          const v = Number(s);
+          return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+        };
+        const numKey = (n: any) => {
+          const v = parseInt(String(n ?? "").replace(/\D/g, ""), 10);
+          return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+        };
+        const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+        const props = [...(propsRaw || [])].sort((a: any, b: any) => {
+          const sa = seqKey(a.sequence); const sb = seqKey(b.sequence);
+          if (sa !== sb) return sa - sb;
+          const ra = norm(a.street_name); const rb = norm(b.street_name);
+          if (ra !== rb) return ra < rb ? -1 : 1;
+          const na = numKey(a.number); const nb = numKey(b.number);
+          if (na !== nb) return na - nb;
+          const ca = norm(a.complement); const cb = norm(b.complement);
+          if (ca !== cb) return ca < cb ? -1 : 1;
+          return String(a.id).localeCompare(String(b.id));
+        });
+        console.log("[FIELD_WORK_LIST] imóveis ordenados por sequência:", props.length,
+          props.slice(0, 5).map((p: any) => ({ seq: p.sequence, n: p.number, c: p.complement })));
 
         if (props) {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
