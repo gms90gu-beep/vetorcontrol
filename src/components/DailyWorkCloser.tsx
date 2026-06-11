@@ -199,6 +199,7 @@ export function DailyWorkCloser({
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [jornadaDate, setJornadaDate] = useState<string | null>(null);
+  const [sessionRetro, setSessionRetro] = useState<{ retro: boolean; reason: string | null; createdAt: string | null }>({ retro: false, reason: null, createdAt: null });
 
   const stats = externalStats || localStats;
 
