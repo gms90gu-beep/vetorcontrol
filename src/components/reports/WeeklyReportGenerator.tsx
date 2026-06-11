@@ -41,9 +41,13 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     }
 
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
+    console.log("[SE]", { work_date: referenceDate.toISOString().split("T")[0], epi_week: epiWeek, epi_year: epiYear });
 
     // Ciclo ativo do usuário — boletim NUNCA mistura ciclos
     const activeCycle = await getActiveCycleForUser(agentAuthId);
+    console.log("[CICLO]", { work_date: referenceDate.toISOString().split("T")[0], cycle_id: activeCycle?.id ?? null });
+    const refCycleWeek = activeCycle?.id ? await resolveCycleWeek(activeCycle.id, referenceDate) : null;
+    console.log("[SEMANA_CICLO]", { work_date: referenceDate.toISOString().split("T")[0], cycle_id: activeCycle?.id ?? null, cycle_week: refCycleWeek?.number ?? null });
     console.log(`[CICLO] WeeklyReport usando ciclo ${activeCycle?.name || activeCycle?.id || "—"}`);
 
     let dailiesQuery = supabase
