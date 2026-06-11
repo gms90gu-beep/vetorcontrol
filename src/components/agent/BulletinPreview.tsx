@@ -33,7 +33,9 @@ export function BulletinPreview({ userId }: Props) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const epi = getEpiWeek();
+      const today = new Date();
+      const epi = getEpiWeek(today);
+      console.log("[SE]", { work_date: today.toISOString().split("T")[0], epi_week: epi.week, epi_year: epi.year });
       if (!cancel) setSe(epi);
 
       const { data: agentRow } = await supabase
