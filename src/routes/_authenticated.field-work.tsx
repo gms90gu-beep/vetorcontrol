@@ -34,9 +34,12 @@ import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/r
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -54,6 +57,13 @@ function FieldWorkPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  // Jornada Retroativa
+  const [retroOpen, setRetroOpen] = useState(false);
+  const [retroDate, setRetroDate] = useState<Date | undefined>(undefined);
+  const [retroReason, setRetroReason] = useState<string>("");
+  const [retroOtherText, setRetroOtherText] = useState<string>("");
+  const [isRetroactive, setIsRetroactive] = useState(false);
+  const [retroactiveReason, setRetroactiveReason] = useState<string | null>(null);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
@@ -184,14 +194,54 @@ function FieldWorkPage() {
       return;
     }
 
-    // Weekends are now operational days
-    
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
 
-      // VALIDAÇÃO DE CICLO ATIVO: a jornada só pode ser iniciada no ciclo "in_progress".
-      // Isso garante isolamento total entre ciclos epidemiológicos.
+      const sessionDateStr = date.toISOString().split('T')[0];
+
+      // ── Limites de data ──────────────────────────────────────────
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
+      if (diffDays < 0) {
+        toast.error("Não é permitido registrar jornadas em datas futuras.");
+        return;
+      }
+      if (diffDays > 7) {
+        toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+        return;
+      }
+
+      // ── Validação: já existe jornada para esta data? ────────────
+      try {
+        const { data: existing } = await supabase
+          .from("field_work_sessions")
+          .select("id, status, session_date")
+          .eq("user_id", user.id)
+          .eq("session_date", sessionDateStr)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing && existing.status === "in_progress") {
+          const cont = window.confirm(
+            "Já existe uma jornada para esta data. Deseja continuar a jornada existente?"
+          );
+          if (cont) {
+            navigate({ to: `/field-work-list` });
+            return;
+          }
+          // se não quer continuar, encerra a anterior antes de abrir a nova
+          await updateOffline("field_work_sessions", existing.id, {
+            status: "closed",
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.warn("[FieldWork] Verificação de duplicidade falhou (provável offline):", e);
+      }
+
+      // VALIDAÇÃO DE CICLO ATIVO
       const { data: activeCycleRow } = await supabase
         .from("cycles")
         .select("id, number, year")
@@ -209,7 +259,7 @@ function FieldWorkPage() {
         toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
       }
 
-      // Encerra sessões anteriores vinculadas a OUTROS ciclos (jornada antiga não pode misturar dados).
+      // Encerra sessões anteriores vinculadas a OUTROS ciclos
       try {
         const { data: staleSessions } = await supabase
           .from("field_work_sessions")
@@ -234,6 +284,16 @@ function FieldWorkPage() {
         }
       } catch {}
 
+      const epi = (() => {
+        const ref = new Date(`${sessionDateStr}T12:00:00`);
+        const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        return { week, year: d.getUTCFullYear() };
+      })();
+
       await createOffline("field_work_sessions", {
         user_id: user.id,
         cycle_id: cycleIdToUse,
@@ -241,16 +301,64 @@ function FieldWorkPage() {
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
-        session_date: date.toISOString().split('T')[0],
+        session_date: sessionDateStr,
         status: "in_progress",
+        is_retroactive: isRetroactive,
+        retroactive_reason: isRetroactive ? retroactiveReason : null,
         updated_at: new Date().toISOString(),
       });
 
-      toast.success(isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.");
+      console.log("[JORNADA]", {
+        agent_id: user.id,
+        work_date: sessionDateStr,
+        cycle_id: cycleIdToUse,
+        week_id: selectedWeekId,
+        epi_week: epi.week,
+        epi_year: epi.year,
+      });
+      if (isRetroactive) {
+        console.log("[RETROATIVO]", {
+          agent_id: user.id,
+          work_date: sessionDateStr,
+          created_at: new Date().toISOString(),
+          reason: retroactiveReason,
+        });
+      }
+
+      toast.success(
+        isRetroactive
+          ? `Jornada retroativa de ${format(date, "dd/MM/yyyy")} registrada.`
+          : (isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.")
+      );
       navigate({ to: `/field-work-list` });
     } catch (error: any) {
       toast.error("Erro ao iniciar trabalho: " + error.message);
     }
+  };
+
+  const confirmRetroactive = () => {
+    if (!retroDate) { toast.error("Selecione a data da produção."); return; }
+    if (!retroReason) { toast.error("Selecione o motivo."); return; }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const chosen = new Date(retroDate); chosen.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
+    if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
+    if (diffDays > 7) {
+      toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+      return;
+    }
+    const reasonFinal = retroReason === "Outro" ? (retroOtherText.trim() || "Outro") : retroReason;
+    setDate(retroDate);
+    setIsRetroactive(true);
+    setRetroactiveReason(reasonFinal);
+    setRetroOpen(false);
+    toast.info(`Modo retroativo ativado para ${format(retroDate, "dd/MM/yyyy")}. Toque em INICIAR JORNADA.`);
+  };
+
+  const cancelRetroactive = () => {
+    setIsRetroactive(false);
+    setRetroactiveReason(null);
+    setDate(new Date());
   };
 
   return (
@@ -294,34 +402,44 @@ function FieldWorkPage() {
           </div>
         </div>
 
-        {/* Date Selection */}
+        {/* Data da Atividade — automática (hoje) ou retroativa explícita */}
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Data da Atividade</label>
-          <Popover>
-            <PopoverTrigger asChild>
+          <div
+            className={cn(
+              "w-full h-16 rounded-2xl shadow-md flex items-center justify-between px-5",
+              isRetroactive ? "bg-amber-50 border-2 border-amber-300" : "bg-white"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <CalendarIcon className={cn("h-6 w-6", isRetroactive ? "text-amber-600" : "text-blue-500")} />
+              <div className="flex flex-col">
+                <span className="text-base font-black text-slate-800">
+                  {format(date, "PPP", { locale: ptBR })}
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                  {isRetroactive ? "Produção retroativa" : "Hoje · automático"}
+                </span>
+              </div>
+            </div>
+            {isRetroactive && (
               <Button
-                variant="outline"
-                className={cn(
-                  "w-full h-16 rounded-2xl border-none bg-white shadow-md text-left font-bold text-lg justify-start px-5 active:scale-95 transition-all",
-                  !date && "text-muted-foreground"
-                )}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancelRetroactive}
+                className="text-[10px] font-black text-amber-700 hover:text-amber-900"
               >
-                <CalendarIcon className="mr-3 h-6 w-6 text-blue-500" />
-                {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                Cancelar
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 rounded-3xl overflow-hidden border-none shadow-2xl" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                initialFocus
-                locale={ptBR}
-                className="bg-white"
-                disabled={undefined}
-              />
-            </PopoverContent>
-          </Popover>
+            )}
+          </div>
+          {isRetroactive && retroactiveReason && (
+            <p className="text-[10px] font-bold text-amber-700 ml-1">
+              <AlertTriangle className="inline h-3 w-3 mr-1" />
+              Motivo: {retroactiveReason}
+            </p>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -491,6 +609,91 @@ function FieldWorkPage() {
               Selecione ciclo, semana e quarteirão para liberar
             </p>
           )}
+
+          {/* Link discreto para Jornada Retroativa */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => { setRetroDate(undefined); setRetroReason(""); setRetroOtherText(""); setRetroOpen(true); }}
+              className="text-[11px] font-bold text-slate-500 hover:text-amber-700 underline underline-offset-4 decoration-dotted"
+            >
+              Registrar produção de outra data
+            </button>
+          </div>
+
+          {/* Modal — Jornada Retroativa */}
+          <Dialog open={retroOpen} onOpenChange={setRetroOpen}>
+            <DialogContent className="sm:max-w-md rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Jornada Retroativa
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Registre uma produção de até <b>7 dias anteriores</b>. Para datas mais antigas, procure seu supervisor.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                    Data da Produção
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-bold">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-amber-600" />
+                        {retroDate ? format(retroDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={retroDate}
+                        onSelect={setRetroDate}
+                        locale={ptBR}
+                        disabled={(d) => {
+                          const today = new Date(); today.setHours(0,0,0,0);
+                          const min = new Date(today); min.setDate(min.getDate() - 7);
+                          const t = new Date(d); t.setHours(0,0,0,0);
+                          return t > today || t < min;
+                        }}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">Motivo</Label>
+                  <RadioGroup value={retroReason} onValueChange={setRetroReason} className="space-y-1.5">
+                    {["Chuva", "Falta de internet", "Produção não lançada no dia", "Problema no aparelho", "Outro"].map((m) => (
+                      <div key={m} className="flex items-center gap-2">
+                        <RadioGroupItem id={`retro-${m}`} value={m} />
+                        <Label htmlFor={`retro-${m}`} className="text-sm font-medium cursor-pointer">{m}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  {retroReason === "Outro" && (
+                    <Input
+                      placeholder="Descreva o motivo"
+                      value={retroOtherText}
+                      onChange={(e) => setRetroOtherText(e.target.value)}
+                      maxLength={120}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" onClick={() => setRetroOpen(false)}>Cancelar</Button>
+                <Button onClick={confirmRetroactive} className="bg-amber-600 hover:bg-amber-700 text-white font-black">
+                  Confirmar Jornada Retroativa
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Encerramento da Produção do Dia */}

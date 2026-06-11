@@ -256,7 +256,17 @@ export function ReportsDashboard() {
                   return (
                     <TableRow key={d.id}>
                       <TableCell className="font-bold text-slate-800">
-                        {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")}
+                        <div className="flex items-center gap-2">
+                          {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")}
+                          {d.is_retroactive && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-800"
+                              title={d.retroactive_reason ? `Retroativa — ${d.retroactive_reason}` : "Produção retroativa"}
+                            >
+                              ⚠ Retroativa
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-slate-600">{String(epi).padStart(2, "0")}/{epiYear}</TableCell>
                       <TableCell className="text-right font-bold">{d.properties_worked ?? 0}</TableCell>

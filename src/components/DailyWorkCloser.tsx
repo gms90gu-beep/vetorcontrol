@@ -199,6 +199,7 @@ export function DailyWorkCloser({
   const [openBlock, setOpenBlock] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [jornadaDate, setJornadaDate] = useState<string | null>(null);
+  const [sessionRetro, setSessionRetro] = useState<{ retro: boolean; reason: string | null; createdAt: string | null }>({ retro: false, reason: null, createdAt: null });
 
   const stats = externalStats || localStats;
 
@@ -241,7 +242,7 @@ export function DailyWorkCloser({
         // Considera a data da jornada ativa (se existir) como referência operacional
         const { data: activeSession } = await supabase
           .from("field_work_sessions")
-          .select("id, session_date, block_number")
+          .select("id, session_date, block_number, is_retroactive, retroactive_reason, created_at")
           .eq("user_id", user.id)
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
@@ -250,6 +251,11 @@ export function DailyWorkCloser({
 
         setActiveSessionId(activeSession?.id ?? null);
         setOpenBlock(activeSession?.block_number ?? null);
+        setSessionRetro({
+          retro: !!(activeSession as any)?.is_retroactive,
+          reason: (activeSession as any)?.retroactive_reason ?? null,
+          createdAt: (activeSession as any)?.created_at ?? null,
+        });
 
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
@@ -350,8 +356,13 @@ export function DailyWorkCloser({
       const operationalWorkDate: string = activeSessionForClose?.session_date
         ? activeSessionForClose.session_date
         : new Date().toISOString().split('T')[0];
+      const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
+      const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
       console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
+      if (sessionIsRetro) {
+        console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });
+      }
 
       // Snapshot único — Dexie é fonte autoritativa local
       const snap = await buildDailySnapshot(user.id, operationalWorkDate);
@@ -407,6 +418,8 @@ export function DailyWorkCloser({
         pending_visits: snap.pendingLocal || pendingCount,
         epi_week: epi.week,
         epi_year: epi.year,
+        is_retroactive: sessionIsRetro,
+        retroactive_reason: sessionRetroReason,
         updated_at: new Date().toISOString(),
       };
 
@@ -962,6 +975,13 @@ export function DailyWorkCloser({
               Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
             </span>
           </div>
+          {sessionRetro.retro && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2">
+              <span className="text-[11px] font-black uppercase tracking-widest">
+                ⚠ Produção Retroativa{sessionRetro.reason ? ` · ${sessionRetro.reason}` : ""}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="p-8 space-y-6">
