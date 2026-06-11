@@ -242,7 +242,7 @@ export function DailyWorkCloser({
         // Considera a data da jornada ativa (se existir) como referência operacional
         const { data: activeSession } = await supabase
           .from("field_work_sessions")
-          .select("id, session_date, block_number")
+          .select("id, session_date, block_number, is_retroactive, retroactive_reason, created_at")
           .eq("user_id", user.id)
           .eq("status", "in_progress")
           .order("created_at", { ascending: false })
@@ -251,6 +251,11 @@ export function DailyWorkCloser({
 
         setActiveSessionId(activeSession?.id ?? null);
         setOpenBlock(activeSession?.block_number ?? null);
+        setSessionRetro({
+          retro: !!(activeSession as any)?.is_retroactive,
+          reason: (activeSession as any)?.retroactive_reason ?? null,
+          createdAt: (activeSession as any)?.created_at ?? null,
+        });
 
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
