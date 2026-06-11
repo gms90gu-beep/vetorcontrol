@@ -144,11 +144,24 @@ function RootComponent() {
     import("@/lib/pwa/register").then((m) => m.registerPwa());
   }
 
+  useEffect(() => {
+    initNetworkMonitor();
+    const unsub = onConnectivityChange(() => {});
+    return unsub;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Outlet />
+        <SyncStatusBadge />
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+  });
 }
