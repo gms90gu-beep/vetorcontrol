@@ -37,35 +37,20 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
+import { hasValidLocalSession } from "@/lib/auth";
+
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
-    if (typeof window === "undefined") {
-      console.debug("[Protected Guard] SSR detectado; validação será feita no cliente.");
-      return;
-    }
-
-    console.debug("[OFFLINE_ROUTE] _authenticated guard");
-    // CRÍTICO: usar APENAS getSession() (localStorage) no guard — getUser() faz rede
-    // e quebra navegação offline. A revalidação remota ocorre quando voltar a rede.
-    let session: any = null;
-    try {
-      const { data } = await supabase.auth.getSession();
-      session = data?.session ?? null;
-    } catch (e) {
-      console.warn("[Protected Guard] getSession falhou (offline?)", e);
-    }
-
-    if (!session) {
-      // Sem sessão local: só redireciona se realmente estiver online (offline pode ser
-      // transitório no boot do PWA). Em PWA offline sem sessão, mostra login normal.
-      console.warn("[Protected Guard] Sem sessão local, redirecionando para login.");
+    if (typeof window === "undefined") return;
+    const valid = await hasValidLocalSession();
+    if (!valid) {
+      console.warn("[Protected Guard] Sem sessão local válida, redirecionando para login.");
       throw redirect({ to: "/login" });
     }
-
-    return { session };
   },
   component: AuthenticatedLayout,
 });
+
 
 function AuthenticatedLayout() {
   const router = useRouter();
