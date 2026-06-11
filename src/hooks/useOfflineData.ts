@@ -233,3 +233,5 @@ export function useOfflineSyncStatus() {
     isSyncing: pendingCount > 0 && isOnline(),
   };
 }
+
+export { useOfflineSyncStatus as useSyncStatus };
