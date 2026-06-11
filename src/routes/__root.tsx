@@ -9,6 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor";
+import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 
 import appCss from "../styles.css?url";
 
