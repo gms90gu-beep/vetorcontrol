@@ -412,6 +412,8 @@ export function DailyWorkCloser({
         pending_visits: snap.pendingLocal || pendingCount,
         epi_week: epi.week,
         epi_year: epi.year,
+        is_retroactive: sessionIsRetro,
+        retroactive_reason: sessionRetroReason,
         updated_at: new Date().toISOString(),
       };
 
