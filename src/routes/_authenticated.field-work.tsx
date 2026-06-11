@@ -57,6 +57,13 @@ function FieldWorkPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  // Jornada Retroativa
+  const [retroOpen, setRetroOpen] = useState(false);
+  const [retroDate, setRetroDate] = useState<Date | undefined>(undefined);
+  const [retroReason, setRetroReason] = useState<string>("");
+  const [retroOtherText, setRetroOtherText] = useState<string>("");
+  const [isRetroactive, setIsRetroactive] = useState(false);
+  const [retroactiveReason, setRetroactiveReason] = useState<string | null>(null);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
