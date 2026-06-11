@@ -275,7 +275,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     pdf.text(`8. AUDITORIA — Consolidado de ${records.length} relatório${records.length === 1 ? "" : "s"} diário${records.length === 1 ? "" : "s"}`, 14, y);
     autoTable(pdf, {
       startY: y + 2,
-      head: [["Data", "Trabalhados", "Fechados", "Recusas", "Focos", "PDF"]],
+      head: [["Data", "Trabalhados", "Fechados", "Recusas", "Focos", "Tipo"]],
       body: records.length === 0
         ? [["—", "—", "—", "—", "—", "—"]]
         : records.map((r: any) => [
@@ -284,7 +284,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
             String(r.properties_closed ?? 0),
             String(r.properties_refused ?? 0),
             String(r.positive_foci ?? 0),
-            "✓",
+            r.is_retroactive ? `Retroativa${r.retroactive_reason ? ` (${r.retroactive_reason})` : ""}` : "Normal",
           ]),
       theme: "grid",
       headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
