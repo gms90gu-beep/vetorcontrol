@@ -107,8 +107,7 @@ async function markEntitySynced(entity: SyncEntity, payload: { id: string }): Pr
   } as const;
   const table = tableMap[entity];
   if (table && payload.id) {
-    // @ts-expect-error generic table update
-    await table.update(payload.id, { _synced: true });
+    await (table as any).update(payload.id, { _synced: true });
   }
 }
 
