@@ -93,7 +93,7 @@ export function BulletinPreview({ userId }: Props) {
           </h2>
         </div>
         <span className="text-[9px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-          SE {String(se.week).padStart(2, "0")}/{se.year} · {t.count} diária{t.count === 1 ? "" : "s"}
+          SE {String(se.week).padStart(2, "0")}/{se.year} · {t.count} diária{t.count === 1 ? "" : "s"}{t.retroCount > 0 ? ` · ${t.retroCount} ⚠ retro` : ""}
         </span>
       </div>
 
