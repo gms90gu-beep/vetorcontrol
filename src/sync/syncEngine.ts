@@ -135,10 +135,10 @@ async function pullEntity(entity: SyncEntity, userId: string): Promise<void> {
     'property': db.properties,
   } as const;
 
-  await tableMap[entity].bulkPut(
+  await (tableMap[entity] as any).bulkPut(
     data.map((row: Record<string, unknown>) => ({
       ...row, _synced: true, _deletedAt: undefined,
-    })) as never[]
+    }))
   );
 }
 
