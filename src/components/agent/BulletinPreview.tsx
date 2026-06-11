@@ -72,6 +72,7 @@ export function BulletinPreview({ userId }: Props) {
         samples: sum("samples_collected"),
         larvicide: sum("larvicide_amount"),
         larvicideUnit: unit,
+        retroCount: rows.filter((r: any) => r.is_retroactive).length,
       };
       if (!cancel) { setT(totals); setLoading(false); }
     })();
