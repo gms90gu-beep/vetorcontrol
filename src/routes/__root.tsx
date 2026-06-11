@@ -9,6 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor";
+import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 
 import appCss from "../styles.css?url";
 
@@ -141,11 +144,24 @@ function RootComponent() {
     import("@/lib/pwa/register").then((m) => m.registerPwa());
   }
 
+  useEffect(() => {
+    initNetworkMonitor();
+    const unsub = onConnectivityChange(() => {});
+    return unsub;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Outlet />
+        <SyncStatusBadge />
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+  });
 }
