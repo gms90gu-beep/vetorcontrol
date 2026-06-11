@@ -609,6 +609,91 @@ function FieldWorkPage() {
               Selecione ciclo, semana e quarteirão para liberar
             </p>
           )}
+
+          {/* Link discreto para Jornada Retroativa */}
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => { setRetroDate(undefined); setRetroReason(""); setRetroOtherText(""); setRetroOpen(true); }}
+              className="text-[11px] font-bold text-slate-500 hover:text-amber-700 underline underline-offset-4 decoration-dotted"
+            >
+              Registrar produção de outra data
+            </button>
+          </div>
+
+          {/* Modal — Jornada Retroativa */}
+          <Dialog open={retroOpen} onOpenChange={setRetroOpen}>
+            <DialogContent className="sm:max-w-md rounded-3xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Jornada Retroativa
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Registre uma produção de até <b>7 dias anteriores</b>. Para datas mais antigas, procure seu supervisor.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                    Data da Produção
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-bold">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-amber-600" />
+                        {retroDate ? format(retroDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={retroDate}
+                        onSelect={setRetroDate}
+                        locale={ptBR}
+                        disabled={(d) => {
+                          const today = new Date(); today.setHours(0,0,0,0);
+                          const min = new Date(today); min.setDate(min.getDate() - 7);
+                          const t = new Date(d); t.setHours(0,0,0,0);
+                          return t > today || t < min;
+                        }}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">Motivo</Label>
+                  <RadioGroup value={retroReason} onValueChange={setRetroReason} className="space-y-1.5">
+                    {["Chuva", "Falta de internet", "Produção não lançada no dia", "Problema no aparelho", "Outro"].map((m) => (
+                      <div key={m} className="flex items-center gap-2">
+                        <RadioGroupItem id={`retro-${m}`} value={m} />
+                        <Label htmlFor={`retro-${m}`} className="text-sm font-medium cursor-pointer">{m}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                  {retroReason === "Outro" && (
+                    <Input
+                      placeholder="Descreva o motivo"
+                      value={retroOtherText}
+                      onChange={(e) => setRetroOtherText(e.target.value)}
+                      maxLength={120}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" onClick={() => setRetroOpen(false)}>Cancelar</Button>
+                <Button onClick={confirmRetroactive} className="bg-amber-600 hover:bg-amber-700 text-white font-black">
+                  Confirmar Jornada Retroativa
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Encerramento da Produção do Dia */}
