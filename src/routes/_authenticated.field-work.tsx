@@ -194,14 +194,54 @@ function FieldWorkPage() {
       return;
     }
 
-    // Weekends are now operational days
-    
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
 
-      // VALIDAÇÃO DE CICLO ATIVO: a jornada só pode ser iniciada no ciclo "in_progress".
-      // Isso garante isolamento total entre ciclos epidemiológicos.
+      const sessionDateStr = date.toISOString().split('T')[0];
+
+      // ── Limites de data ──────────────────────────────────────────
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
+      if (diffDays < 0) {
+        toast.error("Não é permitido registrar jornadas em datas futuras.");
+        return;
+      }
+      if (diffDays > 7) {
+        toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+        return;
+      }
+
+      // ── Validação: já existe jornada para esta data? ────────────
+      try {
+        const { data: existing } = await supabase
+          .from("field_work_sessions")
+          .select("id, status, session_date")
+          .eq("user_id", user.id)
+          .eq("session_date", sessionDateStr)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing && existing.status === "in_progress") {
+          const cont = window.confirm(
+            "Já existe uma jornada para esta data. Deseja continuar a jornada existente?"
+          );
+          if (cont) {
+            navigate({ to: `/field-work-list` });
+            return;
+          }
+          // se não quer continuar, encerra a anterior antes de abrir a nova
+          await updateOffline("field_work_sessions", existing.id, {
+            status: "closed",
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.warn("[FieldWork] Verificação de duplicidade falhou (provável offline):", e);
+      }
+
+      // VALIDAÇÃO DE CICLO ATIVO
       const { data: activeCycleRow } = await supabase
         .from("cycles")
         .select("id, number, year")
@@ -219,7 +259,7 @@ function FieldWorkPage() {
         toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
       }
 
-      // Encerra sessões anteriores vinculadas a OUTROS ciclos (jornada antiga não pode misturar dados).
+      // Encerra sessões anteriores vinculadas a OUTROS ciclos
       try {
         const { data: staleSessions } = await supabase
           .from("field_work_sessions")
@@ -244,6 +284,16 @@ function FieldWorkPage() {
         }
       } catch {}
 
+      const epi = (() => {
+        const ref = new Date(`${sessionDateStr}T12:00:00`);
+        const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        return { week, year: d.getUTCFullYear() };
+      })();
+
       await createOffline("field_work_sessions", {
         user_id: user.id,
         cycle_id: cycleIdToUse,
@@ -251,16 +301,64 @@ function FieldWorkPage() {
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
-        session_date: date.toISOString().split('T')[0],
+        session_date: sessionDateStr,
         status: "in_progress",
+        is_retroactive: isRetroactive,
+        retroactive_reason: isRetroactive ? retroactiveReason : null,
         updated_at: new Date().toISOString(),
       });
 
-      toast.success(isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.");
+      console.log("[JORNADA]", {
+        agent_id: user.id,
+        work_date: sessionDateStr,
+        cycle_id: cycleIdToUse,
+        week_id: selectedWeekId,
+        epi_week: epi.week,
+        epi_year: epi.year,
+      });
+      if (isRetroactive) {
+        console.log("[RETROATIVO]", {
+          agent_id: user.id,
+          work_date: sessionDateStr,
+          created_at: new Date().toISOString(),
+          reason: retroactiveReason,
+        });
+      }
+
+      toast.success(
+        isRetroactive
+          ? `Jornada retroativa de ${format(date, "dd/MM/yyyy")} registrada.`
+          : (isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.")
+      );
       navigate({ to: `/field-work-list` });
     } catch (error: any) {
       toast.error("Erro ao iniciar trabalho: " + error.message);
     }
+  };
+
+  const confirmRetroactive = () => {
+    if (!retroDate) { toast.error("Selecione a data da produção."); return; }
+    if (!retroReason) { toast.error("Selecione o motivo."); return; }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const chosen = new Date(retroDate); chosen.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
+    if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
+    if (diffDays > 7) {
+      toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+      return;
+    }
+    const reasonFinal = retroReason === "Outro" ? (retroOtherText.trim() || "Outro") : retroReason;
+    setDate(retroDate);
+    setIsRetroactive(true);
+    setRetroactiveReason(reasonFinal);
+    setRetroOpen(false);
+    toast.info(`Modo retroativo ativado para ${format(retroDate, "dd/MM/yyyy")}. Toque em INICIAR JORNADA.`);
+  };
+
+  const cancelRetroactive = () => {
+    setIsRetroactive(false);
+    setRetroactiveReason(null);
+    setDate(new Date());
   };
 
   return (
