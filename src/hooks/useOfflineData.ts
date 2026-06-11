@@ -11,15 +11,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import {
-  db,
-  type RGRecord,
-  type FieldWorkRecord,
-  type PendingRecord,
-  type PropertyRecord,
-} from '../db/database';
-import { supabase } from '@/lib/auth';
-import { isOnline } from '@/lib/offline/safe-fetch';
+import { db, type RGRecord, type FieldWorkRecord, type PendingRecord, type PropertyRecord } from '@/db/database';
+import { supabase } from '@/auth/auth';
+import { isOnline } from '@/sync/networkMonitor';
 
 interface UseOfflineDataResult<T> {
   data: T[];
