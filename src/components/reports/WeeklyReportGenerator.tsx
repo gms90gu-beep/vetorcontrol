@@ -4,15 +4,11 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
 
-// ISO/epidemiological week from a Date
+// ISO/epidemiological week from a Date — delegates to canonical helper.
 function epiWeekOf(date: Date): { week: number; year: number } {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return { week, year: d.getUTCFullYear() };
+  return getEpiWeek(date);
 }
 
 function pct(n: number, d: number) {
