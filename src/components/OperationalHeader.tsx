@@ -186,8 +186,15 @@ export function OperationalHeader() {
           <div className="flex items-center gap-2 sm:gap-3">
              <div className="hidden sm:flex flex-col items-end mr-2 gap-1">
                <ConnectivityBadge />
-               <CycleWeekBadge className="text-[9px] font-black text-slate-300 uppercase" />
-               <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
+               <CycleWeekBadge
+                 className="text-[9px] font-black text-slate-300 uppercase"
+                 date={activeSession?.session_date ? new Date(`${activeSession.session_date}T12:00:00`) : undefined}
+               />
+               <span className="text-[10px] font-bold text-slate-300">
+                 {activeSession?.session_date
+                   ? new Date(`${activeSession.session_date}T12:00:00`).toLocaleDateString('pt-BR')
+                   : new Date().toLocaleDateString('pt-BR')}
+               </span>
              </div>
              <div className="sm:hidden">
                <ConnectivityBadge />
