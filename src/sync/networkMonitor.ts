@@ -3,8 +3,8 @@
  * Monitora conectividade e dispara sync automaticamente.
  */
 
-import { processQueue, pullFromServer } from '../sync/syncEngine';
-import { syncSessionInBackground, getLocalSession } from '../auth/auth';
+import { processQueue, pullFromServer } from './syncEngine';
+import { syncSessionInBackground, getLocalSession } from '@/lib/auth';
 
 type ConnectivityListener = (online: boolean) => void;
 
