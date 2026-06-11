@@ -975,6 +975,13 @@ export function DailyWorkCloser({
               Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
             </span>
           </div>
+          {sessionRetro.retro && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2">
+              <span className="text-[11px] font-black uppercase tracking-widest">
+                ⚠ Produção Retroativa{sessionRetro.reason ? ` · ${sessionRetro.reason}` : ""}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="p-8 space-y-6">
