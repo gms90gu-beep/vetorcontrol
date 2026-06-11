@@ -284,15 +284,11 @@ function FieldWorkPage() {
         }
       } catch {}
 
-      const epi = (() => {
-        const ref = new Date(`${sessionDateStr}T12:00:00`);
-        const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { week, year: d.getUTCFullYear() };
-      })();
+      const { getEpiWeek } = await import("@/lib/cycle-week");
+      const epi = getEpiWeek(new Date(`${sessionDateStr}T12:00:00`));
+      console.log("[SE]", { work_date: sessionDateStr, epi_week: epi.week, epi_year: epi.year });
+      console.log("[CICLO]", { work_date: sessionDateStr, cycle_id: cycleIdToUse });
+      console.log("[SEMANA_CICLO]", { work_date: sessionDateStr, cycle_id: cycleIdToUse, week_id: selectedWeekId });
 
       await createOffline("field_work_sessions", {
         user_id: user.id,

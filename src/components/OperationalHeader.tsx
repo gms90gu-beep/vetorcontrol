@@ -103,21 +103,25 @@ export function OperationalHeader() {
         setActiveCycle(cycle);
         console.log(`[CICLO] OperationalHeader usando ciclo ${cycle.name || cycle.id}`);
 
-        // 4. Get current week
+        // Data operacional: se há sessão (mesmo retroativa), usa session_date; senão, hoje.
+        const opDateStr: string = session?.session_date
+          ? session.session_date
+          : new Date().toISOString().split('T')[0];
+        console.log("[CICLO]", { work_date: opDateStr, cycle_id: cycle.id });
+
+        // 4. Get cycle week using operational date (work_date), not today.
         const { data: week } = await supabase
           .from("weeks")
           .select("*")
           .eq("cycle_id", cycle.id)
-          .lte("start_date", new Date().toISOString().split('T')[0])
-          .gte("end_date", new Date().toISOString().split('T')[0])
+          .lte("start_date", opDateStr)
+          .gte("end_date", opDateStr)
           .maybeSingle();
-        
-        if (week) setActiveWeek(week);
 
-        // 5. Get stats for the operational date (session_date if active, else today)
-        const opDateStr: string = session?.session_date
-          ? session.session_date
-          : new Date().toISOString().split('T')[0];
+        if (week) setActiveWeek(week);
+        console.log("[SEMANA_CICLO]", { work_date: opDateStr, cycle_id: cycle.id, cycle_week: (week as any)?.number ?? null });
+
+        // 5. Get stats for the operational date
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
@@ -182,8 +186,15 @@ export function OperationalHeader() {
           <div className="flex items-center gap-2 sm:gap-3">
              <div className="hidden sm:flex flex-col items-end mr-2 gap-1">
                <ConnectivityBadge />
-               <CycleWeekBadge className="text-[9px] font-black text-slate-300 uppercase" />
-               <span className="text-[10px] font-bold text-slate-300">{new Date().toLocaleDateString('pt-BR')}</span>
+               <CycleWeekBadge
+                 className="text-[9px] font-black text-slate-300 uppercase"
+                 date={activeSession?.session_date ? new Date(`${activeSession.session_date}T12:00:00`) : undefined}
+               />
+               <span className="text-[10px] font-bold text-slate-300">
+                 {activeSession?.session_date
+                   ? new Date(`${activeSession.session_date}T12:00:00`).toLocaleDateString('pt-BR')
+                   : new Date().toLocaleDateString('pt-BR')}
+               </span>
              </div>
              <div className="sm:hidden">
                <ConnectivityBadge />

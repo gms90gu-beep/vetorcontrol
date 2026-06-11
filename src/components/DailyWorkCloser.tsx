@@ -373,20 +373,19 @@ export function DailyWorkCloser({
       if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
       if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
 
-      const epi = (() => {
-        const ref = new Date(`${operationalWorkDate}T12:00:00`);
-        const d = new Date(Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const week = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-        return { week, year: d.getUTCFullYear() };
-      })();
+      const { getEpiWeek, resolveCycleWeek } = await import("@/lib/cycle-week");
+      const epi = getEpiWeek(new Date(`${operationalWorkDate}T12:00:00`));
+      const resolvedCycleWeek = activeCycle?.id
+        ? await resolveCycleWeek(activeCycle.id, new Date(`${operationalWorkDate}T12:00:00`))
+        : null;
+      console.log("[SE]", { work_date: operationalWorkDate, epi_week: epi.week, epi_year: epi.year });
+      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null });
+      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null, cycle_week: resolvedCycleWeek?.number ?? null });
 
       const recordData: any = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
-        week_id: activeWeek?.id,
+        week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
         status: 'completed',
         end_time: new Date().toISOString(),

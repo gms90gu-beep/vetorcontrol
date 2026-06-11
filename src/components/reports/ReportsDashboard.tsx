@@ -250,8 +250,10 @@ export function ReportsDashboard() {
               </TableHeader>
               <TableBody>
                 {dailies.map((d: any) => {
-                  const epi = d.epi_week ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).week;
-                  const epiYear = d.epi_year ?? getEpiWeek(new Date(`${d.work_date}T12:00:00`)).year;
+                  const epiFromDate = getEpiWeek(new Date(`${d.work_date}T12:00:00`));
+                  const epi = d.epi_week ?? epiFromDate.week;
+                  const epiYear = d.epi_year ?? epiFromDate.year;
+                  console.log("[SE]", { work_date: d.work_date, epi_week: epi, epi_year: epiYear });
                   const isCompleted = d.status === "completed";
                   return (
                     <TableRow key={d.id}>
