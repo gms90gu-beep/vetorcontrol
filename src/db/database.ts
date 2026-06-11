@@ -118,14 +118,12 @@ export const db = new AppDatabase();
 
 // ─── Helpers de acesso ────────────────────────────────────────────────────────
 
-/** Retorna todos os registros não deletados de uma tabela */
 export async function getActiveRecords<T extends { _deletedAt?: string }>(
   table: Table<T>
 ): Promise<T[]> {
   return table.filter((r) => !r._deletedAt).toArray();
 }
 
-/** Upsert seguro — atualiza se existir, cria se não */
 export async function upsert<T extends { id: string }>(
   table: Table<T>,
   record: T
@@ -133,7 +131,6 @@ export async function upsert<T extends { id: string }>(
   await table.put(record);
 }
 
-/** Marca registro como deletado (soft-delete) + enfileira sync */
 export async function softDelete(
   table: Table<{ id: string; _deletedAt?: string; _synced: boolean }>,
   id: string
