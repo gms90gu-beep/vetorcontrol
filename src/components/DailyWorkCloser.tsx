@@ -385,7 +385,7 @@ export function DailyWorkCloser({
       const recordData: any = {
         agent_id: currentAgent.id,
         cycle_id: activeCycle?.id,
-        week_id: activeWeek?.id,
+        week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
         status: 'completed',
         end_time: new Date().toISOString(),
