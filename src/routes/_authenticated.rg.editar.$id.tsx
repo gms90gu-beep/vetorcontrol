@@ -887,10 +887,10 @@ function EditarBoletim() {
             </Button>
             <Button
               onClick={() => addBatchProperties(batchQty)}
-              disabled={batchSaving || batchQty < 1 || batchQty > 100}
+              disabled={batchSaving || batchQty < 1 || batchQty > 500}
             >
               {batchSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Layers className="h-4 w-4 mr-1" />}
-              Criar Imóveis
+              Criar {batchQty > 0 ? batchQty : ""} Imóveis
             </Button>
           </DialogFooter>
         </DialogContent>
