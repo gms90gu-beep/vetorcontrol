@@ -850,15 +850,25 @@ function EditarBoletim() {
               <Input
                 type="number"
                 min={1}
-                max={100}
-                value={batchQty}
-                onChange={(e) => setBatchQty(Math.min(100, Math.max(1, Number(e.target.value) || 0)))}
-                className="h-10 mt-1"
+                max={500}
+                inputMode="numeric"
+                value={batchQty === 0 ? "" : batchQty}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") { setBatchQty(0); return; }
+                  const n = parseInt(raw, 10);
+                  if (Number.isFinite(n)) setBatchQty(Math.max(0, Math.min(500, n)));
+                }}
+                className="h-10 mt-1 text-base font-bold"
+                placeholder="Digite a quantidade"
+                autoFocus
               />
-              <p className="text-[10px] text-slate-400 mt-1">Máximo: 100 imóveis por operação.</p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Informe quantos imóveis deseja criar (1 a 500).
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {[5, 10, 20, 50].map((n) => (
+              {[5, 10, 20, 50, 100, 200].map((n) => (
                 <Button
                   key={n}
                   type="button"
@@ -877,10 +887,10 @@ function EditarBoletim() {
             </Button>
             <Button
               onClick={() => addBatchProperties(batchQty)}
-              disabled={batchSaving || batchQty < 1 || batchQty > 100}
+              disabled={batchSaving || batchQty < 1 || batchQty > 500}
             >
               {batchSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Layers className="h-4 w-4 mr-1" />}
-              Criar Imóveis
+              Criar {batchQty > 0 ? batchQty : ""} Imóveis
             </Button>
           </DialogFooter>
         </DialogContent>
