@@ -1,10 +1,12 @@
 /**
  * syncEngine.ts
  * Motor de sincronização offline-first.
+ * Offline  → ações gravadas em syncQueue (IndexedDB)
+ * Online   → processQueue() processa automaticamente
  */
 
 import { db, type SyncQueueItem, type SyncEntity, type SyncActionType } from '../db/database';
-import { supabase } from '@/lib/auth';
+import { supabase } from '../auth/auth';
 import { v4 as uuidv4 } from 'uuid';
 
 const MAX_RETRIES = 5;
@@ -16,6 +18,8 @@ const ENTITY_TABLE: Record<SyncEntity, string> = {
   'pending': 'pending_records',
   'property': 'properties',
 };
+
+// ─── Enfileiramento ───────────────────────────────────────────────────────────
 
 export async function enqueue(
   entity: SyncEntity,
@@ -34,6 +38,8 @@ export async function enqueue(
   });
   return tempId;
 }
+
+// ─── Processamento da fila ────────────────────────────────────────────────────
 
 let isProcessing = false;
 
@@ -65,18 +71,17 @@ async function processItem(item: SyncQueueItem): Promise<void> {
   try {
     const tableName = ENTITY_TABLE[item.entity];
     let error: unknown = null;
-    const sb = supabase as any;
 
     if (item.type === 'CREATE') {
-      const result = await sb.from(tableName).insert(item.payload);
+      const result = await supabase.from(tableName).insert(item.payload);
       error = result.error;
     } else if (item.type === 'UPDATE') {
       const { id, ...rest } = item.payload as { id: string; [k: string]: unknown };
-      const result = await sb.from(tableName).update(rest).eq('id', id);
+      const result = await supabase.from(tableName).update(rest).eq('id', id);
       error = result.error;
     } else if (item.type === 'DELETE') {
       const { id } = item.payload as { id: string };
-      const result = await sb.from(tableName).delete().eq('id', id);
+      const result = await supabase.from(tableName).delete().eq('id', id);
       error = result.error;
     }
 
@@ -107,9 +112,12 @@ async function markEntitySynced(entity: SyncEntity, payload: { id: string }): Pr
   } as const;
   const table = tableMap[entity];
   if (table && payload.id) {
-    await (table as any).update(payload.id, { _synced: true });
+    // @ts-expect-error generic table update
+    await table.update(payload.id, { _synced: true });
   }
 }
+
+// ─── Pull do servidor ─────────────────────────────────────────────────────────
 
 export async function pullFromServer(userId: string): Promise<void> {
   if (!navigator.onLine) return;
@@ -123,7 +131,7 @@ export async function pullFromServer(userId: string): Promise<void> {
 
 async function pullEntity(entity: SyncEntity, userId: string): Promise<void> {
   const tableName = ENTITY_TABLE[entity];
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from(tableName).select('*').eq('user_id', userId)
     .order('updated_at', { ascending: false });
   if (error || !data) return;
@@ -135,12 +143,14 @@ async function pullEntity(entity: SyncEntity, userId: string): Promise<void> {
     'property': db.properties,
   } as const;
 
-  await (tableMap[entity] as any).bulkPut(
+  await tableMap[entity].bulkPut(
     data.map((row: Record<string, unknown>) => ({
       ...row, _synced: true, _deletedAt: undefined,
-    }))
+    })) as never[]
   );
 }
+
+// ─── Status ───────────────────────────────────────────────────────────────────
 
 export async function getQueueStats() {
   const all = await db.syncQueue.toArray();
