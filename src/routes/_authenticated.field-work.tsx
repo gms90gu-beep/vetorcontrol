@@ -402,34 +402,44 @@ function FieldWorkPage() {
           </div>
         </div>
 
-        {/* Date Selection */}
+        {/* Data da Atividade — automática (hoje) ou retroativa explícita */}
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Data da Atividade</label>
-          <Popover>
-            <PopoverTrigger asChild>
+          <div
+            className={cn(
+              "w-full h-16 rounded-2xl shadow-md flex items-center justify-between px-5",
+              isRetroactive ? "bg-amber-50 border-2 border-amber-300" : "bg-white"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <CalendarIcon className={cn("h-6 w-6", isRetroactive ? "text-amber-600" : "text-blue-500")} />
+              <div className="flex flex-col">
+                <span className="text-base font-black text-slate-800">
+                  {format(date, "PPP", { locale: ptBR })}
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                  {isRetroactive ? "Produção retroativa" : "Hoje · automático"}
+                </span>
+              </div>
+            </div>
+            {isRetroactive && (
               <Button
-                variant="outline"
-                className={cn(
-                  "w-full h-16 rounded-2xl border-none bg-white shadow-md text-left font-bold text-lg justify-start px-5 active:scale-95 transition-all",
-                  !date && "text-muted-foreground"
-                )}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancelRetroactive}
+                className="text-[10px] font-black text-amber-700 hover:text-amber-900"
               >
-                <CalendarIcon className="mr-3 h-6 w-6 text-blue-500" />
-                {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                Cancelar
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 rounded-3xl overflow-hidden border-none shadow-2xl" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                initialFocus
-                locale={ptBR}
-                className="bg-white"
-                disabled={undefined}
-              />
-            </PopoverContent>
-          </Popover>
+            )}
+          </div>
+          {isRetroactive && retroactiveReason && (
+            <p className="text-[10px] font-bold text-amber-700 ml-1">
+              <AlertTriangle className="inline h-3 w-3 mr-1" />
+              Motivo: {retroactiveReason}
+            </p>
+          )}
         </div>
 
         <div className="space-y-4">
