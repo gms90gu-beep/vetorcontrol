@@ -304,6 +304,7 @@ export type Database = {
           epi_week: number | null
           epi_year: number | null
           id: string
+          is_retroactive: boolean
           larvicide_amount: number | null
           larvicide_unit: string | null
           pending_visits: number | null
@@ -313,6 +314,7 @@ export type Database = {
           properties_recovered: number | null
           properties_refused: number | null
           properties_worked: number | null
+          retroactive_reason: string | null
           samples_collected: number | null
           samples_total: number
           start_time: string
@@ -344,6 +346,7 @@ export type Database = {
           epi_week?: number | null
           epi_year?: number | null
           id?: string
+          is_retroactive?: boolean
           larvicide_amount?: number | null
           larvicide_unit?: string | null
           pending_visits?: number | null
@@ -353,6 +356,7 @@ export type Database = {
           properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
+          retroactive_reason?: string | null
           samples_collected?: number | null
           samples_total?: number
           start_time?: string
@@ -384,6 +388,7 @@ export type Database = {
           epi_week?: number | null
           epi_year?: number | null
           id?: string
+          is_retroactive?: boolean
           larvicide_amount?: number | null
           larvicide_unit?: string | null
           pending_visits?: number | null
@@ -393,6 +398,7 @@ export type Database = {
           properties_recovered?: number | null
           properties_refused?: number | null
           properties_worked?: number | null
+          retroactive_reason?: string | null
           samples_collected?: number | null
           samples_total?: number
           start_time?: string
@@ -440,7 +446,9 @@ export type Database = {
           created_at: string
           cycle_id: string | null
           id: string
+          is_retroactive: boolean
           property_count: number
+          retroactive_reason: string | null
           session_date: string
           status: string
           street_name: string
@@ -453,7 +461,9 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          is_retroactive?: boolean
           property_count: number
+          retroactive_reason?: string | null
           session_date?: string
           status?: string
           street_name: string
@@ -466,7 +476,9 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          is_retroactive?: boolean
           property_count?: number
+          retroactive_reason?: string | null
           session_date?: string
           status?: string
           street_name?: string
