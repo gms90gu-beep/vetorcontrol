@@ -350,8 +350,13 @@ export function DailyWorkCloser({
       const operationalWorkDate: string = activeSessionForClose?.session_date
         ? activeSessionForClose.session_date
         : new Date().toISOString().split('T')[0];
+      const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
+      const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
       console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
+      if (sessionIsRetro) {
+        console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });
+      }
 
       // Snapshot único — Dexie é fonte autoritativa local
       const snap = await buildDailySnapshot(user.id, operationalWorkDate);
