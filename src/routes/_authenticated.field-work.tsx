@@ -34,9 +34,12 @@ import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/r
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { translate } from "@/lib/translations";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
