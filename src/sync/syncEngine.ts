@@ -112,8 +112,7 @@ async function markEntitySynced(entity: SyncEntity, payload: { id: string }): Pr
   } as const;
   const table = tableMap[entity];
   if (table && payload.id) {
-    // @ts-expect-error generic table update
-    await table.update(payload.id, { _synced: true });
+    await (table as any).update(payload.id, { _synced: true });
   }
 }
 
@@ -143,10 +142,10 @@ async function pullEntity(entity: SyncEntity, userId: string): Promise<void> {
     'property': db.properties,
   } as const;
 
-  await tableMap[entity].bulkPut(
+  await (tableMap[entity] as any).bulkPut(
     data.map((row: Record<string, unknown>) => ({
       ...row, _synced: true, _deletedAt: undefined,
-    })) as never[]
+    }))
   );
 }
 
