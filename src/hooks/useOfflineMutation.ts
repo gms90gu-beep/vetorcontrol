@@ -8,10 +8,10 @@
 
 import { useCallback, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { db, type SyncEntity } from '../db/database';
-import { enqueue, processQueue } from '../sync/syncEngine';
-import { isOnline } from '../sync/networkMonitor';
-import { useLocalSession } from './useOfflineData';
+import { db, type SyncEntity } from '@/db/database';
+import { enqueue, processQueue } from '@/sync/syncEngine';
+import { isOnline } from '@/sync/networkMonitor';
+import { useLocalSession } from '@/hooks/useOfflineData';
 
 interface MutationOptions {
   entity: SyncEntity;
