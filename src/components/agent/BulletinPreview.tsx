@@ -13,6 +13,7 @@ type T = {
   a1: number; a2: number; b: number; c: number; d1: number; d2: number; e: number;
   focos: number; tubitos: number; samples: number;
   larvicide: number; larvicideUnit: string;
+  retroCount: number;
 };
 
 const EMPTY: T = {
@@ -20,6 +21,7 @@ const EMPTY: T = {
   depExisting: 0, depInspected: 0, depTreated: 0, depEliminated: 0,
   a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0,
   focos: 0, tubitos: 0, samples: 0, larvicide: 0, larvicideUnit: "g",
+  retroCount: 0,
 };
 
 export function BulletinPreview({ userId }: Props) {
