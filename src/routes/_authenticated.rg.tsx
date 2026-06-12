@@ -256,7 +256,17 @@ function RGPage() {
   }, [rgError]);
 
   useEffect(() => {
-    setBoletins((rgData as any[]).map(normalizeBoletimRow).filter((r) => !!r.id));
+    const arr = rgData as any[];
+    if (arr?.length) {
+      console.log('Primeiro boletim (raw):', arr[0]);
+      console.log('Primeiro boletim (data interno):', arr[0]?.data);
+      console.log('Chaves disponíveis:', Object.keys(arr[0] ?? {}), Object.keys(arr[0]?.data ?? {}));
+    } else {
+      console.log('Primeiro boletim: nenhum registro retornado');
+    }
+    const normalized = arr.map(normalizeBoletimRow).filter((r) => !!r.id);
+    console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
+    setBoletins(normalized);
   }, [rgData]);
 
 
