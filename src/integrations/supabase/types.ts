@@ -1349,6 +1349,8 @@ export type Database = {
       }
     }
     Functions: {
+      agent_integrity_check: { Args: { _fix?: boolean }; Returns: Json }
+      autoheal_agent: { Args: { _user_id: string }; Returns: string }
       can_supervise_user: { Args: { target_user_id: string }; Returns: boolean }
       check_block_completion: {
         Args: { p_block_id: string; p_cycle_id: string }

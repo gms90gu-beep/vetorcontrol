@@ -163,6 +163,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.invalidate();
         queryClient.invalidateQueries();
       }
+
+      // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent
+      if (nextUser && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        supabase.rpc("autoheal_agent", { _user_id: nextUser.id }).then(({ data, error }) => {
+          if (error) {
+            console.warn("[AUTOHEAL_AGENT] falhou:", error.message);
+          } else if (data) {
+            console.debug("[AUTOHEAL_AGENT] agent_id=", data, "profile_id=", nextUser.id);
+          }
+        });
+      }
+
     });
 
     return () => {
