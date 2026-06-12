@@ -55,6 +55,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
       console.log('[RG_RESULT] count:', rows?.length ?? 0);
       if (rows) {
         await db.rg.bulkPut(rows.map((r: any) => ({
+          ...r,
           id: r.id,
           userId: r.agent_id,
           title: `Boletim ${r.block_number ?? ''}`.trim(),
