@@ -440,6 +440,42 @@ export type Database = {
           },
         ]
       }
+      field_work_records: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          notes: string | null
+          property_id: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          notes?: string | null
+          property_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          notes?: string | null
+          property_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       field_work_sessions: {
         Row: {
           block_number: string
@@ -535,6 +571,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pending_records: {
+        Row: {
+          created_at: string
+          data: Json
+          entity_id: string
+          entity_type: string
+          id: string
+          reason: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          entity_id: string
+          entity_type: string
+          id?: string
+          reason: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          reason?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -853,6 +922,39 @@ export type Database = {
           id?: string
           metadata?: Json | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      rg_records: {
+        Row: {
+          created_at: string
+          data: Json
+          description: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          description?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          description?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
