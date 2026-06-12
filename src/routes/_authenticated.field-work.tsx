@@ -68,9 +68,20 @@ function FieldWorkPage() {
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { data, loading, error } = useFieldWorkRecords(userId);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await safeGetUser();
+      if (user) setUserId(user.id);
+    })();
+  }, []);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
+
 
   async function fetchInitialData() {
     setIsLoading(true);
