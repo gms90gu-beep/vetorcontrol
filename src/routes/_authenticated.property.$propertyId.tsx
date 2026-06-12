@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { usePropertyRecords } from "@/hooks/useOfflineData";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
 import { isOnline } from "@/lib/offline/safe-fetch";
@@ -137,6 +138,14 @@ function PropertyVisitPage() {
   const [agent, setAgent] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { data, loading, error: propertyError } = usePropertyRecords(userId);
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await safeGetUser();
+      if (user) setUserId(user.id);
+    })();
+  }, []);
 
   const resetForm = () => {
     setStatus("visited");
