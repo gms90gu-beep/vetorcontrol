@@ -69,12 +69,14 @@ function AuthenticatedLayout() {
 
 
   if (!isReady || !user || isOperationalLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-        <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" />
-        <span className="text-sm font-medium">Carregando sessão...</span>
-      </div>
-    );
+    if (navigator.onLine) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+          <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" />
+          <span className="text-sm font-medium">Carregando sessão...</span>
+        </div>
+      );
+    }
   }
 
   // System is now always operational
