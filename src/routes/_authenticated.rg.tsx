@@ -158,6 +158,11 @@ function RGPage() {
         installing: r.installing?.scriptURL ?? null,
       })));
     }).catch((e) => console.warn("[RG_SW] Falha ao verificar Service Worker", e));
+    if ("caches" in window) {
+      caches.keys()
+        .then((keys) => console.log("[RG_SW] Cache Storage keys:", keys))
+        .catch((e) => console.warn("[RG_SW] Falha ao verificar Cache Storage", e));
+    }
   }, []);
 
   useEffect(() => {
