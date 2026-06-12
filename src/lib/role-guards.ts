@@ -1,5 +1,6 @@
 import { redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { hasValidLocalSession, getLocalSession } from "@/auth/auth";
 
 export const MANAGER_ROLES = ["supervisor", "coordenador", "admin_master"] as const;
 export type ManagerRole = (typeof MANAGER_ROLES)[number];
@@ -17,11 +18,28 @@ export function isManagerRole(role: string | null | undefined): boolean {
 export async function blockManagersGuard() {
   if (typeof window === "undefined") return;
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return; // _authenticated layout will redirect to /login
+  if (!navigator.onLine) {
+    await hasValidLocalSession();
+    await getLocalSession();
+    return;
+  }
 
-  const { data: role } = await supabase.rpc("get_user_role", { u_id: session.user.id });
-  if (isManagerRole(role)) {
-    throw redirect({ to: "/supervision", replace: true });
+  try {
+    const { data: sessionData } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
+    if (!sessionData?.session) throw redirect({ to: "/login", replace: true });
+
+    const { data: role } = await Promise.race([
+      supabase.rpc("get_user_role", { u_id: sessionData.session.user.id }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
+    if (isManagerRole(role)) {
+      throw redirect({ to: "/supervision", replace: true });
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "timeout") return;
+    throw err;
   }
 }
