@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
-import { CalendarDays, CheckCircle2, XCircle, Bug, Droplets, Beaker, Home, TrendingUp } from "lucide-react";
+import { CalendarDays, CheckCircle2, XCircle, Bug, Droplets, Beaker, Home, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 
 const WORK_DAYS = 5;
 
@@ -21,6 +21,18 @@ type Totals = {
   pending: number;
 };
 
+type Diag = {
+  id: string;
+  work_date: string;
+  epi_week: number | null;
+  epi_year: number | null;
+  cycle_id: string | null;
+  status: string | null;
+  end_time: string | null;
+  reason: string; // "incluída" | motivo de ignorada
+  included: boolean;
+};
+
 const EMPTY: Totals = {
   count: 0, worked: 0, closed: 0, refused: 0, recovered: 0,
   focos: 0, tubitos: 0, larvicide: 0, larvicideUnit: "g", pending: 0,
@@ -30,6 +42,8 @@ export function MyWeeklyConsolidation({ userId }: Props) {
   const [se, setSe] = useState(getEpiWeek());
   const [totals, setTotals] = useState<Totals>(EMPTY);
   const [loading, setLoading] = useState(true);
+  const [diags, setDiags] = useState<Diag[]>([]);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     let cancel = false;
@@ -37,29 +51,57 @@ export function MyWeeklyConsolidation({ userId }: Props) {
       setLoading(true);
       const today = new Date();
       const epi = getEpiWeek(today);
-      console.log("[SE]", { work_date: today.toISOString().split("T")[0], epi_week: epi.week, epi_year: epi.year });
       if (!cancel) setSe(epi);
 
       const { data: agentRow } = await supabase
         .from("agents").select("id").eq("profile_id", userId).maybeSingle();
-      if (!agentRow) { if (!cancel) { setTotals(EMPTY); setLoading(false); } return; }
+      if (!agentRow) { if (!cancel) { setTotals(EMPTY); setDiags([]); setLoading(false); } return; }
 
       const cycle = await getActiveCycleForUser(userId);
 
-      let q = supabase
+      // Busca TODAS as diárias do agente na janela da semana (sem filtrar por
+      // epi_week / cycle_id) para diagnosticar quais entram e quais ficam de
+      // fora — usando SEMPRE os campos gravados na diária.
+      const { data: rawAll } = await supabase
         .from("daily_work_records")
         .select("*")
         .eq("agent_id", agentRow.id)
-        .eq("epi_week", epi.week)
-        .eq("epi_year", epi.year);
-      if (cycle?.id) q = q.eq("cycle_id", cycle.id);
+        .gte("work_date", isoMondayOf(today))
+        .lte("work_date", isoSundayOf(today));
 
-      const { data } = await q;
-      const rows = (data as any[]) || [];
-      const sum = (k: string) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
-      const unit = rows.find(r => r.larvicide_unit)?.larvicide_unit || "g";
+      const allRows = (rawAll as any[]) || [];
+      const diagList: Diag[] = [];
+      const consolidated: any[] = [];
+
+      for (const r of allRows) {
+        let reason = "";
+        let included = false;
+        if (!r.end_time) reason = "end_time nulo";
+        else if (r.status !== "completed") reason = "status diferente de concluído";
+        else if (!r.cycle_id) reason = "cycle_id nulo";
+        else if (cycle?.id && r.cycle_id !== cycle.id) reason = "cycle_id divergente";
+        else if (r.epi_week !== epi.week) reason = "epi_week divergente";
+        else if (r.epi_year !== epi.year) reason = "epi_year divergente";
+        else { included = true; reason = "incluída"; consolidated.push(r); }
+
+        diagList.push({
+          id: r.id, work_date: r.work_date, epi_week: r.epi_week, epi_year: r.epi_year,
+          cycle_id: r.cycle_id, status: r.status, end_time: r.end_time, reason, included,
+        });
+
+        console.log("[CONSOLIDACAO]", {
+          agent_id: r.agent_id,
+          work_date: r.work_date,
+          cycle_id: r.cycle_id,
+          epi_week: r.epi_week,
+          resultado: included ? "Diária incluída" : `Diária ignorada — Motivo: ${reason}`,
+        });
+      }
+
+      const sum = (k: string) => consolidated.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+      const unit = consolidated.find(r => r.larvicide_unit)?.larvicide_unit || "g";
       const t: Totals = {
-        count: rows.length,
+        count: consolidated.length,
         worked: sum("properties_worked"),
         closed: sum("properties_closed"),
         refused: sum("properties_refused"),
@@ -70,13 +112,16 @@ export function MyWeeklyConsolidation({ userId }: Props) {
         larvicideUnit: unit,
         pending: sum("pending_visits"),
       };
-      if (!cancel) { setTotals(t); setLoading(false); }
+      if (!cancel) { setTotals(t); setDiags(diagList); setLoading(false); }
     })();
     return () => { cancel = true; };
   }, [userId]);
 
   const visitable = totals.worked + totals.pending;
   const cov = visitable > 0 ? Math.round((totals.worked / visitable) * 100) : 0;
+  const found = diags.length;
+  const consolidatedCount = diags.filter(d => d.included).length;
+  const ignored = diags.filter(d => !d.included);
 
   return (
     <section className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-4 text-white shadow-lg">
@@ -102,17 +147,50 @@ export function MyWeeklyConsolidation({ userId }: Props) {
       {loading ? (
         <p className="text-[10px] text-white/40">Carregando…</p>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
-          <Cell icon={Home} label="Imóveis" value={totals.worked} />
-          <Cell icon={CheckCircle2} label="Fechados" value={totals.closed} />
-          <Cell icon={XCircle} label="Recusas" value={totals.refused} />
-          <Cell icon={Bug} label="Focos" value={totals.focos} />
-          <Cell icon={Beaker} label="Tubitos" value={totals.tubitos} />
-          <Cell icon={Droplets} label={`Larv. ${totals.larvicideUnit}`} value={totals.larvicide} />
-          <Cell icon={TrendingUp} label="Cobertura" value={`${cov}%`} highlight />
-          <Cell icon={CheckCircle2} label="Recuperados" value={totals.recovered} />
-          <Cell icon={XCircle} label="Pendências" value={totals.pending} />
-        </div>
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <Cell icon={Home} label="Imóveis" value={totals.worked} />
+            <Cell icon={CheckCircle2} label="Fechados" value={totals.closed} />
+            <Cell icon={XCircle} label="Recusas" value={totals.refused} />
+            <Cell icon={Bug} label="Focos" value={totals.focos} />
+            <Cell icon={Beaker} label="Tubitos" value={totals.tubitos} />
+            <Cell icon={Droplets} label={`Larv. ${totals.larvicideUnit}`} value={totals.larvicide} />
+            <Cell icon={TrendingUp} label="Cobertura" value={`${cov}%`} highlight />
+            <Cell icon={CheckCircle2} label="Recuperados" value={totals.recovered} />
+            <Cell icon={XCircle} label="Pendências" value={totals.pending} />
+          </div>
+
+          {/* Painel de diagnóstico */}
+          <div className="mt-3 pt-3 border-t border-white/10 text-[10px] text-white/70 space-y-1">
+            <div>Total de diárias encontradas: <strong className="text-white">{found}</strong></div>
+            <div>Total de diárias consolidadas: <strong className="text-emerald-300">{consolidatedCount}</strong></div>
+            <div>Total ignoradas: <strong className={ignored.length ? "text-amber-300" : "text-white"}>{ignored.length}</strong></div>
+            {ignored.length > 0 && (
+              <div className="mt-2 bg-amber-500/10 border border-amber-400/30 rounded-lg p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-amber-200 font-bold">
+                    <AlertTriangle className="h-3 w-3" /> Existem diárias não consolidadas.
+                  </span>
+                  <button
+                    onClick={() => setShowDetails(v => !v)}
+                    className="flex items-center gap-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-100 px-2 py-0.5 rounded font-bold uppercase tracking-wider"
+                  >
+                    <Eye className="h-3 w-3" /> {showDetails ? "Ocultar" : "Ver Detalhes"}
+                  </button>
+                </div>
+                {showDetails && (
+                  <ul className="mt-2 space-y-1">
+                    {ignored.map(d => (
+                      <li key={d.id} className="text-amber-100/90">
+                        {d.work_date} · SE {d.epi_week ?? "—"}/{d.epi_year ?? "—"} — <em>{d.reason}</em>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </section>
   );
@@ -132,4 +210,18 @@ function Cell({ icon: Icon, label, value, highlight }: {
       </p>
     </div>
   );
+}
+
+// ── Helpers de janela semanal (segunda → domingo da semana atual) ───────────
+function isoMondayOf(d: Date): string {
+  const x = new Date(d);
+  const day = x.getDay() || 7; // domingo=0 → 7
+  x.setDate(x.getDate() - day + 1);
+  return x.toISOString().split("T")[0];
+}
+function isoSundayOf(d: Date): string {
+  const x = new Date(d);
+  const day = x.getDay() || 7;
+  x.setDate(x.getDate() + (7 - day));
+  return x.toISOString().split("T")[0];
 }
