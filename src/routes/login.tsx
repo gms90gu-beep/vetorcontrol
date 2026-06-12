@@ -70,61 +70,74 @@ function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    const t0 = performance.now();
+    const mark = (tag: string, extra?: any) =>
+      console.log(`[${tag}] +${Math.round(performance.now() - t0)}ms`, extra ?? "");
+
+    // Promise utility with timeout to avoid hangs
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout ${label} após ${ms}ms`)), ms),
+        ),
+      ]);
+
     try {
+      mark("AUTH_START", { email });
       const loginEmail = email.includes("@") ? email : `${email}@vetor.com`;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password,
-      });
+
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: loginEmail, password }),
+        15000,
+        "signInWithPassword",
+      );
 
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
+      mark("AUTH_SUCCESS", { userId: data.user.id });
 
       if (data.session) {
-        await saveSessionLocally(data.session);
+        try {
+          await withTimeout(saveSessionLocally(data.session), 3000, "saveSessionLocally");
+        } catch (e) {
+          console.warn("[AUTH] saveSessionLocally falhou (seguindo):", e);
+        }
       }
 
-      console.debug("[Login] Login autenticado para:", data.user.email ?? data.user.id);
-
-      const session = await getSessionAfterLogin();
-      const authenticatedUser = session?.user ?? data.user;
-
-      if (!session?.user) {
-        console.warn("[Login] Sessão ainda indisponível após login; usando usuário retornado pelo signIn como fallback.");
+      // Busca o role via RPC (SECURITY DEFINER — ignora RLS)
+      mark("PROFILE_LOAD");
+      let role: string | null = null;
+      try {
+        const { data: roleData, error: roleError } = await withTimeout(
+          Promise.resolve(supabase.rpc("get_user_role", { u_id: data.user.id })),
+          8000,
+          "get_user_role",
+        ) as { data: unknown; error: unknown };
+        if (roleError) console.error("[PROFILE_LOAD] erro RPC:", roleError);
+        role = (roleData as string | null) ?? null;
+      } catch (e) {
+        console.error("[PROFILE_LOAD] timeout/exceção (fallback /dashboard):", e);
       }
-
-      // Busca o role via função SQL segura (SECURITY DEFINER — ignora RLS)
-      const { data: roleData, error: roleError } = await supabase.rpc("get_user_role", { u_id: authenticatedUser.id });
-
-      const role = roleData as string | null;
-
-      console.debug("[Login] Role encontrado via RPC:", role);
-      console.debug("[Login] Erro RPC:", roleError);
-
-      if (roleError) {
-        console.error("[Login] Falha ao buscar role; usando /dashboard como fallback seguro:", roleError);
-      }
+      mark("AGENT_LOAD", { role });
 
       toast.success("Login realizado com sucesso!");
 
-      if (role === "admin_master") {
-        console.debug("[Login] Redirecionando admin_master para /admin-master");
-        await navigate({ to: "/admin-master", replace: true });
-      } else if (role === "coordenador") {
-        console.debug("[Login] Redirecionando coordenador para /coordenador");
-        await navigate({ to: "/coordenador" as any, replace: true });
-      } else if (role === "supervisor") {
-        console.debug("[Login] Redirecionando supervisor para /supervisor");
-        await navigate({ to: "/supervisor" as any, replace: true });
-      } else if (role === "agente") {
-        console.debug("[Login] Redirecionando agente para /agente");
-        await navigate({ to: "/agente" as any, replace: true });
-      } else {
-        console.debug("[Login] Redirecionando para /dashboard, role:", role);
-        await navigate({ to: "/dashboard", replace: true });
-      }
+      const target =
+        role === "admin_master" ? "/admin-master"
+        : role === "coordenador" ? "/coordenador"
+        : role === "supervisor" ? "/supervisor"
+        : role === "agente" ? "/agente"
+        : "/dashboard";
+
+      mark("AUTH_REDIRECT", { target });
+      // Não aguardar navigate — evita prender o botão se algum loader travar
+      navigate({ to: target as any, replace: true });
+      mark("AUTH_FINISH");
     } catch (error: any) {
-      toast.error(error.message || "Erro ao fazer login");
+      console.error("[AUTH_ERROR]", error);
+      toast.error(error?.message || "Erro ao fazer login");
+    } finally {
       setIsLoading(false);
     }
   };
