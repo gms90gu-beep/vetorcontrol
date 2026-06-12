@@ -17,6 +17,7 @@ export function isManagerRole(role: string | null | undefined): boolean {
  */
 export async function blockManagersGuard() {
   if (typeof window === "undefined") return;
+  console.log('[Guard Debug] online:', navigator.onLine);
 
   if (!navigator.onLine) {
     await hasValidLocalSession();

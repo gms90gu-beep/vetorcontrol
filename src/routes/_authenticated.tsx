@@ -69,7 +69,10 @@ function AuthenticatedLayout() {
 
 
   if (!isReady || !user || isOperationalLoading) {
-    if (typeof navigator === "undefined" || navigator.onLine) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      console.log('[Offline Debug] isReady:', isReady, '| user:', !!user, '| isOperationalLoading:', isOperationalLoading);
+      // continua renderizando
+    } else {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
           <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" />
