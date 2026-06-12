@@ -52,27 +52,39 @@ const C = {
   sep: "#f0f2f4",
 };
 
-class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
-  constructor(props: any) { super(props); this.state = { hasError: false }; }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  render() { return this.state.hasError ? this.props.fallback : this.props.children; }
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: any) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: any) {
+    console.error("[RG_ERROR_BOUNDARY]", error, info?.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center gap-3">
+          <h2 className="text-xl font-bold">Erro ao carregar o módulo RG</h2>
+          <pre style={{ background: "#1a1a1a", color: "#f88", padding: 12, borderRadius: 8, maxWidth: "90vw", overflow: "auto", fontSize: 11, textAlign: "left" }}>
+            {String(this.state.error?.message || this.state.error)}
+            {"\n\n"}
+            {this.state.error?.stack?.split("\n").slice(0, 6).join("\n")}
+          </pre>
+          <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export const Route = createFileRoute("/_authenticated/rg")({
   beforeLoad: blockManagersGuard,
   component: () => (
-    <ErrorBoundary
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-          <h2 className="text-xl font-bold mb-4">Erro ao carregar o módulo RG</h2>
-          <Button onClick={() => window.location.reload()}>Tentar novamente</Button>
-        </div>
-      }
-    >
+    <ErrorBoundary>
       <RGRouteContent />
     </ErrorBoundary>
   ),
 });
+
 
 function RGRouteContent() {
   const location = useLocation();
