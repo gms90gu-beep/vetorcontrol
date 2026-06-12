@@ -19,6 +19,25 @@ const ENTITY_TABLE: Record<SyncEntity, string> = {
   'property': 'properties',
 };
 
+function toSnakeCase(payload: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: payload.id,
+    user_id: payload.userId,
+    title: payload.title,
+    description: payload.description,
+    notes: payload.notes,
+    status: payload.status,
+    data: payload.data ?? {},
+    property_id: payload.propertyId,
+    entity_type: payload.entityType,
+    entity_id: payload.entityId,
+    reason: payload.reason,
+    created_at: payload.createdAt,
+    updated_at: payload.updatedAt,
+  };
+}
+
+
 // ─── Enfileiramento ───────────────────────────────────────────────────────────
 
 export async function enqueue(
@@ -73,12 +92,13 @@ async function processItem(item: SyncQueueItem): Promise<void> {
     let error: unknown = null;
 
     if (item.type === 'CREATE') {
-      const result = await supabase.from(tableName).insert(item.payload);
+      const result = await supabase.from(tableName).insert(toSnakeCase(item.payload));
       error = result.error;
     } else if (item.type === 'UPDATE') {
-      const { id, ...rest } = item.payload as { id: string; [k: string]: unknown };
+      const { id, ...rest } = toSnakeCase(item.payload) as { id: string; [k: string]: unknown };
       const result = await supabase.from(tableName).update(rest).eq('id', id);
       error = result.error;
+
     } else if (item.type === 'DELETE') {
       const { id } = item.payload as { id: string };
       const result = await supabase.from(tableName).delete().eq('id', id);
