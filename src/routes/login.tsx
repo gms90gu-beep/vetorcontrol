@@ -110,10 +110,10 @@ function LoginPage() {
       let role: string | null = null;
       try {
         const { data: roleData, error: roleError } = await withTimeout(
-          supabase.rpc("get_user_role", { u_id: data.user.id }),
+          Promise.resolve(supabase.rpc("get_user_role", { u_id: data.user.id })),
           8000,
           "get_user_role",
-        );
+        ) as { data: unknown; error: unknown };
         if (roleError) console.error("[PROFILE_LOAD] erro RPC:", roleError);
         role = (roleData as string | null) ?? null;
       } catch (e) {
