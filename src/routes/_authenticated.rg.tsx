@@ -126,6 +126,7 @@ function RGPage() {
       try {
         const { data: { user } } = await safeGetUser();
         if (!user) return;
+        console.log('[RG_AUTH] user.id:', user.id);
         setUserId(user.id);
         const { data: agentData } = await supabase
           .from("agents").select("name, municipality, registration_id")
@@ -141,6 +142,22 @@ function RGPage() {
         console.error("[RG] agent defaults", e);
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) {
+      console.log("[RG_SW] Service Worker indisponível neste navegador");
+      return;
+    }
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      console.log("[RG_SW] Service Worker controller:", navigator.serviceWorker.controller?.scriptURL ?? null);
+      console.log("[RG_SW] Service Workers registrados:", registrations.map((r) => ({
+        scope: r.scope,
+        active: r.active?.scriptURL ?? null,
+        waiting: r.waiting?.scriptURL ?? null,
+        installing: r.installing?.scriptURL ?? null,
+      })));
+    }).catch((e) => console.warn("[RG_SW] Falha ao verificar Service Worker", e));
   }, []);
 
   useEffect(() => {
@@ -172,6 +189,15 @@ function RGPage() {
       return (a.block_number || "").localeCompare(b.block_number || "");
     });
   }, [boletins, search]);
+
+  useEffect(() => {
+    console.log(`Após filtros restaram ${filtered.length} boletins`, {
+      totalUseRGRecords: rgData.length,
+      totalTelaAntesFiltros: boletins.length,
+      search,
+      filtered,
+    });
+  }, [filtered, rgData.length, boletins.length, search]);
 
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
     try {
