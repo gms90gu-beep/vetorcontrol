@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { saveSessionLocally } from "@/auth/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,6 +79,10 @@ function LoginPage() {
 
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
+
+      if (data.session) {
+        await saveSessionLocally(data.session);
+      }
 
       console.debug("[Login] Login autenticado para:", data.user.email ?? data.user.id);
 
