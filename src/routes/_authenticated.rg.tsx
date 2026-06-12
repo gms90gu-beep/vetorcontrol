@@ -121,6 +121,52 @@ function RGPage() {
     municipality: "", name: "", registration_id: "",
   });
 
+  // Painel de diagnóstico visível
+  const [diag, setDiag] = useState({
+    authUid: "—",
+    supabaseCount: -1 as number,
+    online: typeof navigator !== "undefined" ? navigator.onLine : true,
+    swRegistered: false,
+    cacheCount: -1 as number,
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const uid = data?.session?.user?.id ?? null;
+        let supabaseCount = -1;
+        if (uid) {
+          const { count } = await supabase
+            .from("boletins_rg")
+            .select("id", { count: "exact", head: true })
+            .eq("agent_id", uid);
+          supabaseCount = count ?? 0;
+        }
+        let swRegistered = false;
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          swRegistered = regs.length > 0;
+        }
+        let cacheCount = -1;
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          cacheCount = keys.length;
+        }
+        setDiag((d) => ({
+          ...d,
+          authUid: uid ?? "—",
+          supabaseCount,
+          online: navigator.onLine,
+          swRegistered,
+          cacheCount,
+        }));
+      } catch (e) {
+        console.warn("[RG_DIAG] erro", e);
+      }
+    })();
+  }, [userId, rgData.length]);
+
   useEffect(() => {
     (async () => {
       try {
