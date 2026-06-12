@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { useFieldWorkRecords } from "@/hooks/useOfflineData";
 import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
