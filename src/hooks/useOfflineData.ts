@@ -52,9 +52,19 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
       if (rows) {
-        await db.rg.bulkPut(
-          rows.map((r: any) => ({ ...r, _synced: true, _deletedAt: undefined }))
-        );
+        await db.rg.bulkPut(rows.map((r: any) => ({
+          id: r.id,
+          userId: r.user_id,
+          title: r.title,
+          description: r.description,
+          status: r.status,
+          data: r.data ?? {},
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          _synced: true,
+          _deletedAt: undefined,
+        })));
+
         setIsStale(false);
       }
     } catch {
@@ -99,9 +109,20 @@ export function useFieldWorkRecords(userId?: string): UseOfflineDataResult<Field
         .select('*')
         .eq('user_id', userId);
       if (rows) {
-        await db.fieldWork.bulkPut(
-          rows.map((r: any) => ({ ...r, _synced: true, _deletedAt: undefined }))
-        );
+        await db.fieldWork.bulkPut(rows.map((r: any) => ({
+          id: r.id,
+          userId: r.user_id,
+          propertyId: r.property_id,
+          title: r.title,
+          notes: r.notes,
+          status: r.status,
+          data: r.data ?? {},
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          _synced: true,
+          _deletedAt: undefined,
+        })));
+
         setIsStale(false);
       }
     } catch {
@@ -141,9 +162,19 @@ export function usePendingRecords(userId?: string): UseOfflineDataResult<Pending
         .select('*')
         .eq('user_id', userId);
       if (rows) {
-        await db.pendingItems.bulkPut(
-          rows.map((r: any) => ({ ...r, _synced: true, _deletedAt: undefined }))
-        );
+        await db.pendingItems.bulkPut(rows.map((r: any) => ({
+          id: r.id,
+          userId: r.user_id,
+          entityType: r.entity_type,
+          entityId: r.entity_id,
+          reason: r.reason,
+          data: r.data ?? {},
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          _synced: true,
+          _deletedAt: undefined,
+        })));
+
         setIsStale(false);
       }
     } catch {
