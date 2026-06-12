@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { useAuth } from "@/hooks/useAuth";
+import { usePendingRecords } from "@/hooks/useOfflineData";
 import {
   AlertTriangle,
   Home,
