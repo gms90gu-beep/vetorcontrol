@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type RGRecord, type FieldWorkRecord, type PendingRecord, type PropertyRecord } from '@/db/database';
+import { db as offlineDb } from '@/lib/offline/db';
 import { supabase } from '@/auth/auth';
 import { isOnline } from '@/sync/networkMonitor';
 
@@ -25,6 +26,22 @@ interface UseOfflineDataResult<T> {
 
 // ─── RG ───────────────────────────────────────────────────────────────────────
 
+function toRGRecord(r: any): RGRecord {
+  return {
+    ...r,
+    id: r.id,
+    userId: r.agent_id,
+    title: `Boletim ${r.block_number ?? ''}`.trim(),
+    description: r.locality ?? undefined,
+    status: r.finalized_at ? 'finalized' : 'draft',
+    data: r,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    _synced: true,
+    _deletedAt: undefined,
+  };
+}
+
 export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +50,21 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   // Lê TODOS os registros locais não deletados — o escopo por agente já é
   // garantido na hora do fetch (eq agent_id) e por RLS no servidor.
   const data = useLiveQuery(
-    () => db.rg.filter((r) => !r._deletedAt).toArray(),
-    [],
+    async () => {
+      const rgRows = await db.rg.filter((r) => !r._deletedAt).toArray();
+      const trabalhoCacheRows = await offlineDb.boletins_rg.toArray();
+      const trabalhoRows = trabalhoCacheRows
+        .map((r) => r.data)
+        .filter((r) => !r?._deletedAt && (!userId || r.agent_id === userId));
+      console.log(`Dexie retornou ${rgRows.length} boletins`, { source: 'AppDB.rg', userId });
+      console.log('[RG_COMPARE] useRGRecords vs FieldWorkPage', {
+        useRGRecordsDexie: rgRows.length,
+        fieldWorkPageDexieBoletinsRg: trabalhoRows.length,
+        note: 'FieldWorkPage usa listRemoteOrCache("boletins_rg") em vetorcontrol-offline.boletins_rg',
+      });
+      return (rgRows.length > 0 ? rgRows : trabalhoRows.map(toRGRecord)) as RGRecord[];
+    },
+    [userId],
     [] as RGRecord[]
   ) ?? [];
 
@@ -45,27 +75,21 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     setError(null);
     try {
       console.log('[RG_QUERY] agent_id:', userId);
+      const { data: sessionData } = await (supabase as any).auth.getSession();
+      console.log('[RG_AUTH] auth.uid():', sessionData?.session?.user?.id ?? null, '| user.id:', userId);
       const { data: rows, error: apiError } = await (supabase as any)
         .from('boletins_rg')
         .select('*')
         .eq('agent_id', userId)
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
+      console.log(`Supabase retornou ${rows?.length ?? 0} boletins`, rows);
       console.log('[RG_RESULT] count:', rows?.length ?? 0, rows);
       if (rows) {
-        await db.rg.bulkPut(rows.map((r: any) => ({
-          ...r,
-          id: r.id,
-          userId: r.agent_id,
-          title: `Boletim ${r.block_number ?? ''}`.trim(),
-          description: r.locality ?? undefined,
-          status: r.finalized_at ? 'finalized' : 'draft',
-          data: r,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at,
-          _synced: true,
-          _deletedAt: undefined,
-        })));
+        await db.rg.bulkPut(rows.map(toRGRecord));
+        await offlineDb.boletins_rg.bulkPut(rows.map((r: any) => ({ id: r.id, data: r, updatedAt: r.updated_at })));
+        const dexieCount = await db.rg.filter((r) => !r._deletedAt).count();
+        console.log(`Dexie retornou ${dexieCount} boletins`, { source: 'AppDB.rg após sync' });
 
         setIsStale(false);
       }
