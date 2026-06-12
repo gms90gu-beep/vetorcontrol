@@ -3,6 +3,7 @@ import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { useRGRecords } from "@/hooks/useOfflineData";
 import {
   Plus,
   Search,
@@ -104,8 +105,11 @@ type BoletimRow = Boletim & { total_imoveis: number };
 function RGPage() {
   const navigate = useNavigate();
 
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { data: rgData, loading: rgLoading, error: rgError } = useRGRecords(userId);
+
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const loading = rgLoading;
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [viewBusy, setViewBusy] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState<string | null>(null);
@@ -117,51 +121,36 @@ function RGPage() {
     municipality: "", name: "", registration_id: "",
   });
 
-  useEffect(() => { void fetchAll(); }, []);
-
-  async function fetchAll() {
-    setLoading(true);
-    try {
-      const { data: { user } } = await safeGetUser();
-      if (!user) throw new Error("Não autenticado");
-
-      const { data: agentData } = await supabase
-        .from("agents").select("name, municipality, registration_id")
-        .eq("profile_id", user.id).maybeSingle();
-      if (agentData) {
-        setAgentDefaults({
-          municipality: agentData.municipality || "",
-          name: agentData.name || "",
-          registration_id: agentData.registration_id || "",
-        });
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await safeGetUser();
+        if (!user) return;
+        setUserId(user.id);
+        const { data: agentData } = await supabase
+          .from("agents").select("name, municipality, registration_id")
+          .eq("profile_id", user.id).maybeSingle();
+        if (agentData) {
+          setAgentDefaults({
+            municipality: agentData.municipality || "",
+            name: agentData.name || "",
+            registration_id: agentData.registration_id || "",
+          });
+        }
+      } catch (e: any) {
+        console.error("[RG] agent defaults", e);
       }
+    })();
+  }, []);
 
-      const { data: bs, error } = await supabase
-        .from("boletins_rg")
-        .select("id, block_number, block_id, locality, municipality, uf, agent_name, agent_id, created_at, finalized_at")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+  useEffect(() => {
+    if (rgError) toast.error(rgError);
+  }, [rgError]);
 
-      const ids = (bs || []).map((b: any) => b.id);
-      const counts: Record<string, number> = {};
-      if (ids.length) {
-        const { data: props } = await supabase
-          .from("properties")
-          .select("boletim_id")
-          .in("boletim_id", ids);
-        (props || []).forEach((p: any) => {
-          if (p.boletim_id) counts[p.boletim_id] = (counts[p.boletim_id] || 0) + 1;
-        });
-      }
+  useEffect(() => {
+    setBoletins((rgData as any[]).map((r) => ({ ...r, total_imoveis: (r as any).total_imoveis ?? 0 })) as BoletimRow[]);
+  }, [rgData]);
 
-      setBoletins((bs || []).map((b: any) => ({ ...b, total_imoveis: counts[b.id] || 0 })));
-    } catch (e: any) {
-      console.error("[RG] fetchAll", e);
-      toast.error("Erro ao carregar boletins: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
