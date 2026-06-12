@@ -138,6 +138,14 @@ function PropertyVisitPage() {
   const [agent, setAgent] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { data, loading, error: propertyError } = usePropertyRecords(userId);
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await safeGetUser();
+      if (user) setUserId(user.id);
+    })();
+  }, []);
 
   const resetForm = () => {
     setStatus("visited");
