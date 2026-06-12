@@ -29,19 +29,18 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(true);
-  const fetchedRef = useRef(false);
 
+  // Lê TODOS os registros locais não deletados — o escopo por agente já é
+  // garantido na hora do fetch (eq agent_id) e por RLS no servidor.
   const data = useLiveQuery(
-    () =>
-      userId
-        ? db.rg.where('userId').equals(userId).filter((r) => !r._deletedAt).toArray()
-        : db.rg.filter((r) => !r._deletedAt).toArray(),
-    [userId],
+    () => db.rg.filter((r) => !r._deletedAt).toArray(),
+    [],
     [] as RGRecord[]
   ) ?? [];
 
   const fetchFromAPI = useCallback(async () => {
-    if (!isOnline() || !userId) return;
+    if (!userId) return;
+    if (!isOnline()) return;
     setLoading(true);
     setError(null);
     try {
@@ -52,7 +51,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
         .eq('agent_id', userId)
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
-      console.log('[RG_RESULT] count:', rows?.length ?? 0);
+      console.log('[RG_RESULT] count:', rows?.length ?? 0, rows);
       if (rows) {
         await db.rg.bulkPut(rows.map((r: any) => ({
           ...r,
@@ -78,16 +77,14 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     }
   }, [userId]);
 
-
+  // Refetch sempre que userId mudar (sem guard de ref que trava na 1ª chamada com userId undefined).
   useEffect(() => {
-    if (!fetchedRef.current) {
-      fetchedRef.current = true;
-      fetchFromAPI();
-    }
+    fetchFromAPI();
   }, [fetchFromAPI]);
 
   return { data, loading, error, refresh: fetchFromAPI, isStale };
 }
+
 
 // ─── Field Work ───────────────────────────────────────────────────────────────
 
