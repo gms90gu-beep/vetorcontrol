@@ -127,8 +127,10 @@ function normalizeBoletimRow(raw: any): BoletimRow {
 
   return {
     id: String(raw?.id ?? data.id ?? ""),
-    block_number: raw?.block_number ?? data.block_number ?? null,
-    locality: raw?.locality ?? data.locality ?? raw?.description ?? null,
+    block_number:
+      raw?.block_number ?? data.block_number ?? raw?.quarteirao ?? data.quarteirao ?? raw?.blockId ?? data.blockId ?? null,
+    locality:
+      raw?.locality ?? data.locality ?? raw?.logradouro ?? data.logradouro ?? raw?.description ?? null,
     municipality: raw?.municipality ?? data.municipality ?? null,
     uf: raw?.uf ?? data.uf ?? null,
     agent_name: raw?.agent_name ?? data.agent_name ?? null,
