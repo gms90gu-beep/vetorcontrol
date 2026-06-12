@@ -45,20 +45,22 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     setLoading(true);
     setError(null);
     try {
+      console.log('[RG_QUERY] agent_id:', userId);
       const { data: rows, error: apiError } = await (supabase as any)
-        .from('rg_records')
+        .from('boletins_rg')
         .select('*')
-        .eq('user_id', userId)
+        .eq('agent_id', userId)
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
+      console.log('[RG_RESULT] count:', rows?.length ?? 0);
       if (rows) {
         await db.rg.bulkPut(rows.map((r: any) => ({
           id: r.id,
-          userId: r.user_id,
-          title: r.title,
-          description: r.description,
-          status: r.status,
-          data: r.data ?? {},
+          userId: r.agent_id,
+          title: `Boletim ${r.block_number ?? ''}`.trim(),
+          description: r.locality ?? undefined,
+          status: r.finalized_at ? 'finalized' : 'draft',
+          data: r,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
           _synced: true,
@@ -67,12 +69,14 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
 
         setIsStale(false);
       }
-    } catch {
+    } catch (e) {
+      console.warn('[RG_QUERY] error', e);
       setError('Falha ao sincronizar. Usando dados offline.');
     } finally {
       setLoading(false);
     }
   }, [userId]);
+
 
   useEffect(() => {
     if (!fetchedRef.current) {
