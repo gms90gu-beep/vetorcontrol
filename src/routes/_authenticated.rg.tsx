@@ -114,6 +114,32 @@ type Boletim = {
 
 type BoletimRow = Boletim & { total_imoveis: number };
 
+function safeFormatDate(value: unknown, pattern: string, fallback = "—") {
+  if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) return fallback;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return format(date, pattern);
+}
+
+function normalizeBoletimRow(raw: any): BoletimRow {
+  const data = raw?.data && typeof raw.data === "object" ? raw.data : {};
+  const createdAt = raw?.created_at ?? data.created_at ?? raw?.createdAt ?? data.createdAt ?? raw?.updated_at ?? data.updated_at ?? null;
+
+  return {
+    id: String(raw?.id ?? data.id ?? ""),
+    block_number: raw?.block_number ?? data.block_number ?? null,
+    locality: raw?.locality ?? data.locality ?? raw?.description ?? null,
+    municipality: raw?.municipality ?? data.municipality ?? null,
+    uf: raw?.uf ?? data.uf ?? null,
+    agent_name: raw?.agent_name ?? data.agent_name ?? null,
+    agent_id: raw?.agent_id ?? data.agent_id ?? raw?.userId ?? "",
+    created_at: createdAt ?? "",
+    finalized_at: raw?.finalized_at ?? data.finalized_at ?? null,
+    block_id: raw?.block_id ?? data.block_id ?? null,
+    total_imoveis: raw?.total_imoveis ?? data.total_imoveis ?? 0,
+  };
+}
+
 function RGPage() {
   const navigate = useNavigate();
 
@@ -228,7 +254,7 @@ function RGPage() {
   }, [rgError]);
 
   useEffect(() => {
-    setBoletins((rgData as any[]).map((r) => ({ ...r, total_imoveis: (r as any).total_imoveis ?? 0 })) as BoletimRow[]);
+    setBoletins((rgData as any[]).map(normalizeBoletimRow).filter((r) => !!r.id));
   }, [rgData]);
 
 
@@ -407,7 +433,7 @@ function RGPage() {
         { type: "block", value: blockLabel },
       );
 
-      const fileName = `RG_QTR_${blockLabel}_${(b.municipality || "").toUpperCase()}_${format(new Date(b.created_at), "yyyyMMdd")}.pdf`;
+      const fileName = `RG_QTR_${blockLabel}_${(b.municipality || "").toUpperCase()}_${safeFormatDate(b.created_at, "yyyyMMdd", "sem_data")}.pdf`;
       doc.save(fileName);
       toast.success("PDF gerado.", { id: tid });
     } catch (e: any) {
@@ -577,7 +603,7 @@ function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF
             </span>
           </div>
           <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
-            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {format(new Date(b.created_at), "dd/MM/yyyy")}
+            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {safeFormatDate(b.created_at, "dd/MM/yyyy")}
             {b.agent_name ? ` · ${b.agent_name}` : ""}
           </div>
         </div>
