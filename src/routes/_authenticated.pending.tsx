@@ -126,6 +126,8 @@ function StatusBadge({ status }: { status: RecoveryResult }) {
 
 function PendingPage() {
   const { user, role } = useAuth();
+  const userId = user?.id;
+  const { data, loading: pendingLoading, error: pendingError } = usePendingRecords(userId);
   const [loading, setLoading] = useState(true);
   const [pendencies, setPendencies] = useState<EnrichedPendency[]>([]);
   const [search, setSearch] = useState("");
@@ -133,6 +135,7 @@ function PendingPage() {
   const [selected, setSelected] = useState<EnrichedPendency | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [attemptDialogOpen, setAttemptDialogOpen] = useState(false);
+
 
   useEffect(() => {
     document.title = "Pendências — VetorControl";
