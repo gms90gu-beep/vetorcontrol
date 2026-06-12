@@ -603,7 +603,7 @@ function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF
             </span>
           </div>
           <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
-            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {format(new Date(b.created_at), "dd/MM/yyyy")}
+            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {safeFormatDate(b.created_at, "dd/MM/yyyy")}
             {b.agent_name ? ` · ${b.agent_name}` : ""}
           </div>
         </div>
