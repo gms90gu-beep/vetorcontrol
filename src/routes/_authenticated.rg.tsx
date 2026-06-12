@@ -127,8 +127,10 @@ function normalizeBoletimRow(raw: any): BoletimRow {
 
   return {
     id: String(raw?.id ?? data.id ?? ""),
-    block_number: raw?.block_number ?? data.block_number ?? null,
-    locality: raw?.locality ?? data.locality ?? raw?.description ?? null,
+    block_number:
+      raw?.block_number ?? data.block_number ?? raw?.quarteirao ?? data.quarteirao ?? raw?.blockId ?? data.blockId ?? null,
+    locality:
+      raw?.locality ?? data.locality ?? raw?.logradouro ?? data.logradouro ?? raw?.description ?? null,
     municipality: raw?.municipality ?? data.municipality ?? null,
     uf: raw?.uf ?? data.uf ?? null,
     agent_name: raw?.agent_name ?? data.agent_name ?? null,
@@ -254,7 +256,17 @@ function RGPage() {
   }, [rgError]);
 
   useEffect(() => {
-    setBoletins((rgData as any[]).map(normalizeBoletimRow).filter((r) => !!r.id));
+    const arr = rgData as any[];
+    if (arr?.length) {
+      console.log('Primeiro boletim (raw):', arr[0]);
+      console.log('Primeiro boletim (data interno):', arr[0]?.data);
+      console.log('Chaves disponíveis:', Object.keys(arr[0] ?? {}), Object.keys(arr[0]?.data ?? {}));
+    } else {
+      console.log('Primeiro boletim: nenhum registro retornado');
+    }
+    const normalized = arr.map(normalizeBoletimRow).filter((r) => !!r.id);
+    console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
+    setBoletins(normalized);
   }, [rgData]);
 
 
