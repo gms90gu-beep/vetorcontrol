@@ -405,17 +405,27 @@ export function DailyWorkCloser({
       // Snapshot único — Dexie é fonte autoritativa local
       const snap = await buildDailySnapshot(user.id, operationalWorkDate);
 
-      // Invariantes oficiais: Σ deposits_by_type = total_depositos | Σ foci_by_type = positive_foci
-      const sumDepByType = (Object.values(snap.depByType) as number[]).reduce((a, b) => a + b, 0);
-      const sumFociByType = (Object.values(snap.fociByType) as number[]).reduce((a, b) => a + b, 0);
-      if (sumDepByType !== snap.depInspected) {
-        console.warn("[INVARIANTE] Σ deposits_by_type ≠ total_depositos — reconciliando", { sumDepByType, depInspected: snap.depInspected });
-        snap.depExisting = sumDepByType;
-        snap.depInspected = sumDepByType;
-      }
-      if (sumFociByType !== snap.focusCount) {
-        console.warn("[INVARIANTE] Σ foci_by_type ≠ positive_foci — reconciliando", { sumFociByType, focusCount: snap.focusCount });
-        snap.focusCount = sumFociByType;
+      // Reconciliação oficial: agrupamentos por tipo são fonte de verdade.
+      const { reconcileIntegrity } = await import("@/lib/daily-integrity");
+      const integrity = reconcileIntegrity({
+        depByType: {
+          a1: snap.depByType.A1, a2: snap.depByType.A2,
+          b: snap.depByType.B,  c:  snap.depByType.C,
+          d1: snap.depByType.D1, d2: snap.depByType.D2, e: snap.depByType.E,
+        },
+        fociByType: {
+          a1: snap.fociByType.A1, a2: snap.fociByType.A2,
+          b: snap.fociByType.B,  c:  snap.fociByType.C,
+          d1: snap.fociByType.D1, d2: snap.fociByType.D2, e: snap.fociByType.E,
+        },
+        declaredTotalDeposits: snap.depInspected,
+        declaredPositiveFoci: snap.focusCount,
+      });
+      if (integrity.log.reconciled) {
+        console.warn("[INTEGRIDADE] divergência reconciliada", integrity.log);
+        snap.depExisting = integrity.totalDeposits;
+        snap.depInspected = integrity.totalDeposits;
+        snap.focusCount = integrity.totalFoci;
       }
       setSnapshot(snap);
 
