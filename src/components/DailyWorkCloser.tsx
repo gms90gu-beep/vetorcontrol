@@ -43,6 +43,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 
+type DepKey = "A1" | "A2" | "B" | "C" | "D1" | "D2" | "E";
+
 type DailySnapshot = {
   workedCount: number;
   closedCount: number;
@@ -55,26 +57,37 @@ type DailySnapshot = {
   depInspected: number;
   depTreated: number;
   depEliminated: number;
-  depByType: Record<"A1" | "A2" | "B" | "C" | "D1" | "D2" | "E", number>;
+  depByType: Record<DepKey, number>;
+  fociByType: Record<DepKey, number>;
   larvicideAmount: number;
   larvicideUnit: string | null;
   tubitos: number;
+  tubitosUsed: number;
   tubitosProps: number;
+  larvaeCollected: number;
+  cargasCollected: number;
   samples: number;
   pendingLocal: number;
   blocksWorked: number;
   blocksCompleted: number;
   blocksInProgress: number;
+  strategicPointsWorked: number;
 };
+
+const EMPTY_DEP_MAP: Record<DepKey, number> = { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 };
 
 const EMPTY_SNAPSHOT: DailySnapshot = {
   workedCount: 0, closedCount: 0, refusedCount: 0, visitedCount: 0,
   focusCount: 0, positiveProps: 0, treatedPropsCount: 0,
   depExisting: 0, depInspected: 0, depTreated: 0, depEliminated: 0,
-  depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+  depByType: { ...EMPTY_DEP_MAP },
+  fociByType: { ...EMPTY_DEP_MAP },
   larvicideAmount: 0, larvicideUnit: null,
-  tubitos: 0, tubitosProps: 0, samples: 0,
+  tubitos: 0, tubitosUsed: 0, tubitosProps: 0,
+  larvaeCollected: 0, cargasCollected: 0,
+  samples: 0,
   pendingLocal: 0, blocksWorked: 0, blocksCompleted: 0, blocksInProgress: 0,
+  strategicPointsWorked: 0,
 };
 
 async function buildDailySnapshot(userId: string, opDateStr: string): Promise<DailySnapshot> {
