@@ -104,14 +104,25 @@ async function buildDailySnapshot(userId: string, opDateStr: string): Promise<Da
   }
   const snap: DailySnapshot = {
     ...EMPTY_SNAPSHOT,
-    depByType: { A1: 0, A2: 0, B: 0, C: 0, D1: 0, D2: 0, E: 0 },
+    depByType: { ...EMPTY_DEP_MAP },
+    fociByType: { ...EMPTY_DEP_MAP },
   };
+
+  // Mapeia property_id → type para detectar Pontos Estratégicos
+  const allProperties = await listLocal<any>("properties");
+  const propType = new Map<string, string>();
+  for (const p of allProperties) propType.set(p.id, String(p.type || ""));
+  const strategicPropIds = new Set<string>();
+
   for (const v of allVisits) {
     snap.workedCount++;
     if (v.status === "closed") snap.closedCount++;
     if (v.status === "refused") snap.refusedCount++;
     if (v.status === "visited") snap.visitedCount++;
     if (v.has_focus) { snap.focusCount++; snap.positiveProps++; }
+    if (propType.get(v.property_id) === "strategic_point") {
+      strategicPropIds.add(v.property_id);
+    }
     const deps = depByVisit.get(v.id) || [];
     const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
     snap.depExisting += q;
@@ -121,11 +132,24 @@ async function buildDailySnapshot(userId: string, opDateStr: string): Promise<Da
     snap.depEliminated += deps.filter((d: any) => d.is_eliminated)
       .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
     for (const d of deps) {
-      const code = String(d.type_code || "").toUpperCase().trim() as keyof DailySnapshot["depByType"];
-      if (code in snap.depByType) snap.depByType[code] += Number(d.quantity) || 0;
+      const code = String(d.type_code || "").toUpperCase().trim() as DepKey;
+      const qty = Number(d.quantity) || 0;
+      if (code in snap.depByType) {
+        snap.depByType[code] += qty;
+        if (d.is_positive) snap.fociByType[code] += qty;
+      }
     }
-    snap.larvicideAmount += Number(v.treatment_amount) || 0;
+    const treatAmt = Number(v.treatment_amount) || 0;
+    snap.larvicideAmount += treatAmt;
     if (v.larvicide_unit) snap.larvicideUnit = v.larvicide_unit;
+    // Tubitos utilizados: tratamento aplicado quando a unidade é tubitos
+    if (String(v.larvicide_unit || "").toLowerCase().includes("tubito")) {
+      snap.tubitosUsed += treatAmt;
+    } else if (String(v.larvicide_unit || "").toLowerCase().includes("carga")) {
+      snap.cargasCollected += treatAmt;
+    } else if (String(v.larvicide_unit || "").toLowerCase().includes("larva")) {
+      snap.larvaeCollected += treatAmt;
+    }
     const tub = Number(v.tubitos_coletados) || 0;
     snap.tubitos += tub;
     if (tub > 0) snap.tubitosProps++;
@@ -134,6 +158,7 @@ async function buildDailySnapshot(userId: string, opDateStr: string): Promise<Da
       snap.treatedPropsCount++;
     }
   }
+  snap.strategicPointsWorked = strategicPropIds.size;
   const byProperty = new Map<string, any[]>();
   for (const v of allVisits) {
     const arr = byProperty.get(v.property_id) || [];
