@@ -580,22 +580,37 @@ function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF
       <div className="flex items-start gap-3">
         <div style={{ background: C.blueBg, color: C.blue, borderRadius: 10 }} className="h-12 w-12 flex flex-col items-center justify-center shrink-0">
           <span className="text-[8px] font-bold tracking-wider opacity-75">QTR</span>
-          <span className="text-sm font-bold leading-none">{b.block_number || "—"}</span>
+          <span className="text-sm font-bold leading-none">{(b as any).block_number || (b as any).quarteirao || (b as any).block || (b as any).block_id || "-"}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="font-bold text-sm truncate" style={{ color: C.text }}>
-              {b.locality || "Logradouro não informado"}
-            </div>
-            <span style={{ background: statusBg, color: statusFg, borderRadius: 6 }} className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-              {status}
-            </span>
-          </div>
-          <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
-            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {safeFormatDate(b.created_at, "dd/MM/yyyy")}
-            {b.agent_name ? ` · ${b.agent_name}` : ""}
-          </div>
+          {(() => {
+            const quarteirao = (b as any).block_number || (b as any).quarteirao || (b as any).block || (b as any).block_id || "-";
+            const titulo =
+              (b as any).logradouro ||
+              b.locality ||
+              (b as any).street_name ||
+              `Quarteirão ${quarteirao}`;
+            return (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: C.text2 }}>
+                  Quarteirão {quarteirao}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-bold text-sm truncate" style={{ color: C.text }}>
+                    {titulo}
+                  </div>
+                  <span style={{ background: statusBg, color: statusFg, borderRadius: 6 }} className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                    {status}
+                  </span>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
+                  {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} cadastrado{b.total_imoveis === 1 ? "" : "s"}
+                </div>
+              </>
+            );
+          })()}
         </div>
+
       </div>
 
       <div className="grid grid-cols-4 gap-2 mt-3">
