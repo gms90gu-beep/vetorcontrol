@@ -226,6 +226,35 @@ function RGPage() {
     setBoletins(normalized);
   }, [rgData]);
 
+  // Buscar contagem de imóveis por boletim
+  useEffect(() => {
+    if (!boletins.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = boletins.map((b) => b.id).filter(Boolean);
+        if (!ids.length) return;
+        const { data: props } = await supabase
+          .from("properties")
+          .select("boletim_id, block_number")
+          .or(`boletim_id.in.(${ids.join(",")}),block_number.in.(${boletins.map((b) => `"${(b.block_number || "").replace(/"/g, "")}"`).filter((v) => v !== '""').join(",") || '""'})`);
+        if (cancelled || !props) return;
+        const counts = new Map<string, number>();
+        for (const b of boletins) {
+          const n = props.filter((p: any) =>
+            p.boletim_id === b.id || (b.block_number && p.block_number === b.block_number)
+          ).length;
+          counts.set(b.id, n);
+        }
+        setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? b.total_imoveis ?? 0 })));
+      } catch (e) {
+        console.warn("[RG_COUNTS]", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [boletins.length]);
+
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
