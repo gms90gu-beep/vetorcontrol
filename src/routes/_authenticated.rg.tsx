@@ -121,24 +121,42 @@ function safeFormatDate(value: unknown, pattern: string, fallback = "—") {
   return format(date, pattern);
 }
 
+function pickFirst(...vals: any[]): any {
+  for (const v of vals) {
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return null;
+}
+
 function normalizeBoletimRow(raw: any): BoletimRow {
   const data = raw?.data && typeof raw.data === "object" ? raw.data : {};
-  const createdAt = raw?.created_at ?? data.created_at ?? raw?.createdAt ?? data.createdAt ?? raw?.updated_at ?? data.updated_at ?? null;
+  const createdAt = pickFirst(raw?.created_at, data.created_at, raw?.createdAt, data.createdAt, raw?.updated_at, data.updated_at);
+
+  // Try title "Boletim 4" as last resort
+  const titleMatch = typeof raw?.title === "string" ? raw.title.match(/(\d+)/) : null;
+
+  const rawBlock = pickFirst(
+    data.block_number, raw?.block_number,
+    data.quarteirao, raw?.quarteirao,
+    data.blockId, raw?.blockId,
+    data.block, raw?.block,
+    data.block_id, raw?.block_id,
+    data.number, raw?.number,
+    titleMatch?.[1],
+  );
 
   return {
     id: String(raw?.id ?? data.id ?? ""),
-    block_number:
-      raw?.block_number ?? data.block_number ?? raw?.quarteirao ?? data.quarteirao ?? raw?.blockId ?? data.blockId ?? raw?.block ?? data.block ?? raw?.block_id ?? data.block_id ?? raw?.number ?? data.number ?? null,
-    locality:
-      raw?.locality ?? data.locality ?? raw?.logradouro ?? data.logradouro ?? raw?.description ?? null,
-    municipality: raw?.municipality ?? data.municipality ?? null,
-    uf: raw?.uf ?? data.uf ?? null,
-    agent_name: raw?.agent_name ?? data.agent_name ?? null,
-    agent_id: raw?.agent_id ?? data.agent_id ?? raw?.userId ?? "",
+    block_number: rawBlock !== null && rawBlock !== undefined ? String(rawBlock) : null,
+    locality: pickFirst(data.locality, raw?.locality, data.logradouro, raw?.logradouro, raw?.description),
+    municipality: pickFirst(data.municipality, raw?.municipality),
+    uf: pickFirst(data.uf, raw?.uf),
+    agent_name: pickFirst(data.agent_name, raw?.agent_name),
+    agent_id: pickFirst(data.agent_id, raw?.agent_id, raw?.userId) ?? "",
     created_at: createdAt ?? "",
-    finalized_at: raw?.finalized_at ?? data.finalized_at ?? null,
-    block_id: raw?.block_id ?? data.block_id ?? null,
-    total_imoveis: raw?.total_imoveis ?? data.total_imoveis ?? 0,
+    finalized_at: pickFirst(data.finalized_at, raw?.finalized_at),
+    block_id: pickFirst(data.block_id, raw?.block_id),
+    total_imoveis: Number(pickFirst(data.total_imoveis, raw?.total_imoveis) ?? 0),
   };
 }
 
