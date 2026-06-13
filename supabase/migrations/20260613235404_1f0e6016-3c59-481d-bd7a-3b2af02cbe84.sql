@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_work_records ADD COLUMN IF NOT EXISTS data_integrity_log JSONB;

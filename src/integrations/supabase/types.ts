@@ -290,6 +290,7 @@ export type Database = {
           cargas_collected: number
           created_at: string
           cycle_id: string
+          data_integrity_log: Json | null
           deposits_a1: number | null
           deposits_a2: number | null
           deposits_b: number | null
@@ -338,6 +339,7 @@ export type Database = {
           cargas_collected?: number
           created_at?: string
           cycle_id: string
+          data_integrity_log?: Json | null
           deposits_a1?: number | null
           deposits_a2?: number | null
           deposits_b?: number | null
@@ -386,6 +388,7 @@ export type Database = {
           cargas_collected?: number
           created_at?: string
           cycle_id?: string
+          data_integrity_log?: Json | null
           deposits_a1?: number | null
           deposits_a2?: number | null
           deposits_b?: number | null
