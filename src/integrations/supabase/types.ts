@@ -287,11 +287,13 @@ export type Database = {
           agent_id: string
           blocks_completed: number | null
           blocks_worked: number | null
+          cargas_collected: number
           created_at: string
           cycle_id: string
           deposits_a1: number | null
           deposits_a2: number | null
           deposits_b: number | null
+          deposits_by_type: Json
           deposits_c: number | null
           deposits_d1: number | null
           deposits_d2: number | null
@@ -303,8 +305,10 @@ export type Database = {
           end_time: string | null
           epi_week: number | null
           epi_year: number | null
+          foci_by_type: Json
           id: string
           is_retroactive: boolean
+          larvae_collected: number
           larvicide_amount: number | null
           larvicide_unit: string | null
           pending_visits: number | null
@@ -319,8 +323,10 @@ export type Database = {
           samples_total: number
           start_time: string
           status: string
+          strategic_points_worked: number
           tubitos_collected: number | null
           tubitos_properties: number
+          tubitos_used: number
           updated_at: string
           week_id: string | null
           work_date: string
@@ -329,11 +335,13 @@ export type Database = {
           agent_id: string
           blocks_completed?: number | null
           blocks_worked?: number | null
+          cargas_collected?: number
           created_at?: string
           cycle_id: string
           deposits_a1?: number | null
           deposits_a2?: number | null
           deposits_b?: number | null
+          deposits_by_type?: Json
           deposits_c?: number | null
           deposits_d1?: number | null
           deposits_d2?: number | null
@@ -345,8 +353,10 @@ export type Database = {
           end_time?: string | null
           epi_week?: number | null
           epi_year?: number | null
+          foci_by_type?: Json
           id?: string
           is_retroactive?: boolean
+          larvae_collected?: number
           larvicide_amount?: number | null
           larvicide_unit?: string | null
           pending_visits?: number | null
@@ -361,8 +371,10 @@ export type Database = {
           samples_total?: number
           start_time?: string
           status: string
+          strategic_points_worked?: number
           tubitos_collected?: number | null
           tubitos_properties?: number
+          tubitos_used?: number
           updated_at?: string
           week_id?: string | null
           work_date?: string
@@ -371,11 +383,13 @@ export type Database = {
           agent_id?: string
           blocks_completed?: number | null
           blocks_worked?: number | null
+          cargas_collected?: number
           created_at?: string
           cycle_id?: string
           deposits_a1?: number | null
           deposits_a2?: number | null
           deposits_b?: number | null
+          deposits_by_type?: Json
           deposits_c?: number | null
           deposits_d1?: number | null
           deposits_d2?: number | null
@@ -387,8 +401,10 @@ export type Database = {
           end_time?: string | null
           epi_week?: number | null
           epi_year?: number | null
+          foci_by_type?: Json
           id?: string
           is_retroactive?: boolean
+          larvae_collected?: number
           larvicide_amount?: number | null
           larvicide_unit?: string | null
           pending_visits?: number | null
@@ -403,8 +419,10 @@ export type Database = {
           samples_total?: number
           start_time?: string
           status?: string
+          strategic_points_worked?: number
           tubitos_collected?: number | null
           tubitos_properties?: number
+          tubitos_used?: number
           updated_at?: string
           week_id?: string | null
           work_date?: string
