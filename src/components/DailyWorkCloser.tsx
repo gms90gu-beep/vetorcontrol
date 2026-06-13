@@ -404,6 +404,19 @@ export function DailyWorkCloser({
 
       // Snapshot único — Dexie é fonte autoritativa local
       const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+
+      // Invariantes oficiais: Σ deposits_by_type = total_depositos | Σ foci_by_type = positive_foci
+      const sumDepByType = (Object.values(snap.depByType) as number[]).reduce((a, b) => a + b, 0);
+      const sumFociByType = (Object.values(snap.fociByType) as number[]).reduce((a, b) => a + b, 0);
+      if (sumDepByType !== snap.depInspected) {
+        console.warn("[INVARIANTE] Σ deposits_by_type ≠ total_depositos — reconciliando", { sumDepByType, depInspected: snap.depInspected });
+        snap.depExisting = sumDepByType;
+        snap.depInspected = sumDepByType;
+      }
+      if (sumFociByType !== snap.focusCount) {
+        console.warn("[INVARIANTE] Σ foci_by_type ≠ positive_foci — reconciliando", { sumFociByType, focusCount: snap.focusCount });
+        snap.focusCount = sumFociByType;
+      }
       setSnapshot(snap);
 
       let { depTreated, depEliminated, larvicideAmount } = snap;
