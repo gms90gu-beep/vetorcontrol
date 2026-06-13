@@ -161,51 +161,8 @@ function RGPage() {
     municipality: "", name: "", registration_id: "",
   });
 
-  // Painel de diagnóstico visível
-  const [diag, setDiag] = useState({
-    authUid: "—",
-    supabaseCount: -1 as number,
-    online: typeof navigator !== "undefined" ? navigator.onLine : true,
-    swRegistered: false,
-    cacheCount: -1 as number,
-  });
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        const uid = data?.session?.user?.id ?? null;
-        let supabaseCount = -1;
-        if (uid) {
-          const { count } = await supabase
-            .from("boletins_rg")
-            .select("id", { count: "exact", head: true })
-            .eq("agent_id", uid);
-          supabaseCount = count ?? 0;
-        }
-        let swRegistered = false;
-        if ("serviceWorker" in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          swRegistered = regs.length > 0;
-        }
-        let cacheCount = -1;
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          cacheCount = keys.length;
-        }
-        setDiag((d) => ({
-          ...d,
-          authUid: uid ?? "—",
-          supabaseCount,
-          online: navigator.onLine,
-          swRegistered,
-          cacheCount,
-        }));
-      } catch (e) {
-        console.warn("[RG_DIAG] erro", e);
-      }
-    })();
-  }, [userId, rgData.length]);
+
 
   useEffect(() => {
     (async () => {
@@ -268,6 +225,35 @@ function RGPage() {
     console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
     setBoletins(normalized);
   }, [rgData]);
+
+  // Buscar contagem de imóveis por boletim
+  useEffect(() => {
+    if (!boletins.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ids = boletins.map((b) => b.id).filter(Boolean);
+        if (!ids.length) return;
+        const { data: props } = await supabase
+          .from("properties")
+          .select("boletim_id, block_number")
+          .or(`boletim_id.in.(${ids.join(",")}),block_number.in.(${boletins.map((b) => `"${(b.block_number || "").replace(/"/g, "")}"`).filter((v) => v !== '""').join(",") || '""'})`);
+        if (cancelled || !props) return;
+        const counts = new Map<string, number>();
+        for (const b of boletins) {
+          const n = props.filter((p: any) =>
+            p.boletim_id === b.id || (b.block_number && p.block_number === b.block_number)
+          ).length;
+          counts.set(b.id, n);
+        }
+        setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? b.total_imoveis ?? 0 })));
+      } catch (e) {
+        console.warn("[RG_COUNTS]", e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [boletins.length]);
+
 
 
   const filtered = useMemo(() => {
@@ -498,17 +484,8 @@ function RGPage() {
           </button>
         </div>
 
-        {/* DIAGNÓSTICO RG */}
-        <div style={{ background: "#0b1520", color: "#cde", borderRadius: 10, padding: 10, fontSize: 11, fontFamily: "monospace", lineHeight: 1.5 }}>
-          <div style={{ fontWeight: 700, color: "#fff", marginBottom: 4 }}>🔍 DIAGNÓSTICO RG</div>
-          <div>USER auth.uid(): <span style={{ color: "#9fe" }}>{diag.authUid}</span></div>
-          <div>RG RECORDS (Supabase): <span style={{ color: "#9fe" }}>{diag.supabaseCount === -1 ? "…" : diag.supabaseCount}</span></div>
-          <div>RG RECORDS (Dexie): <span style={{ color: "#9fe" }}>{rgData.length}</span></div>
-          <div>RG RECORDS após filtros: <span style={{ color: "#9fe" }}>{filtered.length}</span></div>
-          <div>ONLINE: <span style={{ color: diag.online ? "#9fe" : "#f87" }}>{String(diag.online)}</span></div>
-          <div>SERVICE WORKER registrado: <span style={{ color: "#9fe" }}>{diag.swRegistered ? "sim" : "não"}</span></div>
-          <div>CACHE STORAGE: <span style={{ color: "#9fe" }}>{diag.cacheCount === -1 ? "…" : diag.cacheCount}</span></div>
-        </div>
+
+
 
 
         {loading ? (
@@ -603,22 +580,37 @@ function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF
       <div className="flex items-start gap-3">
         <div style={{ background: C.blueBg, color: C.blue, borderRadius: 10 }} className="h-12 w-12 flex flex-col items-center justify-center shrink-0">
           <span className="text-[8px] font-bold tracking-wider opacity-75">QTR</span>
-          <span className="text-sm font-bold leading-none">{b.block_number || "—"}</span>
+          <span className="text-sm font-bold leading-none">{(b as any).block_number || (b as any).quarteirao || (b as any).block || (b as any).block_id || "-"}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="font-bold text-sm truncate" style={{ color: C.text }}>
-              {b.locality || "Logradouro não informado"}
-            </div>
-            <span style={{ background: statusBg, color: statusFg, borderRadius: 6 }} className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
-              {status}
-            </span>
-          </div>
-          <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
-            {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} · {safeFormatDate(b.created_at, "dd/MM/yyyy")}
-            {b.agent_name ? ` · ${b.agent_name}` : ""}
-          </div>
+          {(() => {
+            const quarteirao = (b as any).block_number || (b as any).quarteirao || (b as any).block || (b as any).block_id || "-";
+            const titulo =
+              (b as any).logradouro ||
+              b.locality ||
+              (b as any).street_name ||
+              `Quarteirão ${quarteirao}`;
+            return (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: C.text2 }}>
+                  Quarteirão {quarteirao}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-bold text-sm truncate" style={{ color: C.text }}>
+                    {titulo}
+                  </div>
+                  <span style={{ background: statusBg, color: statusFg, borderRadius: 6 }} className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                    {status}
+                  </span>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: C.text2 }}>
+                  {b.total_imoveis} imóve{b.total_imoveis === 1 ? "l" : "is"} cadastrado{b.total_imoveis === 1 ? "" : "s"}
+                </div>
+              </>
+            );
+          })()}
         </div>
+
       </div>
 
       <div className="grid grid-cols-4 gap-2 mt-3">
