@@ -18,6 +18,7 @@ import { Route as AdminMasterRouteImport } from './routes/admin-master'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
+import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated.sync-status'
 import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated.supervisor'
 import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenticated.supervision'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
@@ -36,6 +37,7 @@ import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated.admin.auditoria'
 import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
 import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
 
@@ -81,6 +83,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   id: '/vehicles',
   path: '/vehicles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
+  id: '/sync-status',
+  path: '/sync-status',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedSupervisorRoute = AuthenticatedSupervisorRouteImport.update({
@@ -179,6 +186,12 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminAuditoriaRoute =
+  AuthenticatedAdminAuditoriaRouteImport.update({
+    id: '/admin/auditoria',
+    path: '/admin/auditoria',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedRgEditarIdRoute = AuthenticatedRgEditarIdRouteImport.update({
   id: '/editar/$id',
   path: '/editar/$id',
@@ -215,7 +228,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -244,8 +259,10 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/supervision': typeof AuthenticatedSupervisionRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -276,8 +293,10 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/supervision': typeof AuthenticatedSupervisionRoute
   '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
+  '/_authenticated/sync-status': typeof AuthenticatedSyncStatusRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -309,7 +328,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/supervision'
     | '/supervisor'
+    | '/sync-status'
     | '/vehicles'
+    | '/admin/auditoria'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -338,8 +359,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/supervision'
     | '/supervisor'
+    | '/sync-status'
     | '/vehicles'
     | '/'
+    | '/admin/auditoria'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -369,8 +392,10 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/supervision'
     | '/_authenticated/supervisor'
+    | '/_authenticated/sync-status'
     | '/_authenticated/vehicles'
     | '/_authenticated/'
+    | '/_authenticated/admin/auditoria'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
@@ -450,6 +475,13 @@ declare module '@tanstack/react-router' {
       path: '/vehicles'
       fullPath: '/vehicles'
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/sync-status': {
+      id: '/_authenticated/sync-status'
+      path: '/sync-status'
+      fullPath: '/sync-status'
+      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/supervisor': {
@@ -578,6 +610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/auditoria': {
+      id: '/_authenticated/admin/auditoria'
+      path: '/admin/auditoria'
+      fullPath: '/admin/auditoria'
+      preLoaderRoute: typeof AuthenticatedAdminAuditoriaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/rg/editar/$id': {
       id: '/_authenticated/rg/editar/$id'
       path: '/editar/$id'
@@ -626,8 +665,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSupervisionRoute: typeof AuthenticatedSupervisionRoute
   AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
+  AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -649,8 +690,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSupervisionRoute: AuthenticatedSupervisionRoute,
   AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
+  AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
