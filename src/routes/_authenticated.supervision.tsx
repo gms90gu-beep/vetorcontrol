@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { SupervisionDashboard } from "@/components/supervision/SupervisionDashboard";
 import { OperationalDashboard } from "@/components/supervision/OperationalDashboard";
+import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 
