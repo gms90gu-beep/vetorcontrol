@@ -284,6 +284,9 @@ function DailyBulletinView() {
         <div className="mt-3 text-sm text-muted-foreground">
           Focos Positivos (declarado): <span className="font-semibold text-foreground">{rec.positive_foci ?? 0}</span>
         </div>
+        <div className="mt-4 pt-3 border-t">
+          <DepositDistributionBars title="Distribuição percentual de focos" data={fociByType} colorClass="bg-rose-500" />
+        </div>
       </Section>
 
       {/* SEÇÃO 5 — LARVAS */}
