@@ -211,7 +211,10 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
 
   if (userRole === "admin_master") {
     navItems.push({ label: "Admin Master", icon: ShieldCheck, to: "/admin-master" as any });
+    navItems.push({ label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" as any });
   }
+
+  navItems.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" as any });
 
   navItems.push({ label: "Configurações", icon: Settings, to: "/settings" });
 
