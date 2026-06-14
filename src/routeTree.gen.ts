@@ -28,6 +28,7 @@ import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
+import { Route as AuthenticatedHeatmapRouteImport } from './routes/_authenticated.heatmap'
 import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authenticated.field-work-list'
 import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
@@ -140,6 +141,11 @@ const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
   path: '/map',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedHeatmapRoute = AuthenticatedHeatmapRouteImport.update({
+  id: '/heatmap',
+  path: '/heatmap',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedFieldWorkListRoute =
   AuthenticatedFieldWorkListRouteImport.update({
     id: '/field-work-list',
@@ -241,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
+  '/heatmap': typeof AuthenticatedHeatmapRoute
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/field-work': typeof AuthenticatedFieldWorkRoute
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
+  '/heatmap': typeof AuthenticatedHeatmapRoute
   '/map': typeof AuthenticatedMapRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -312,6 +320,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/field-work': typeof AuthenticatedFieldWorkRoute
   '/_authenticated/field-work-list': typeof AuthenticatedFieldWorkListRoute
+  '/_authenticated/heatmap': typeof AuthenticatedHeatmapRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -350,6 +359,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/field-work'
     | '/field-work-list'
+    | '/heatmap'
     | '/map'
     | '/pending'
     | '/relatorios'
@@ -384,6 +394,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/field-work'
     | '/field-work-list'
+    | '/heatmap'
     | '/map'
     | '/pending'
     | '/relatorios'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/field-work'
     | '/_authenticated/field-work-list'
+    | '/_authenticated/heatmap'
     | '/_authenticated/map'
     | '/_authenticated/pending'
     | '/_authenticated/relatorios'
@@ -586,6 +598,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMapRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/heatmap': {
+      id: '/_authenticated/heatmap'
+      path: '/heatmap'
+      fullPath: '/heatmap'
+      preLoaderRoute: typeof AuthenticatedHeatmapRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/field-work-list': {
       id: '/_authenticated/field-work-list'
       path: '/field-work-list'
@@ -717,6 +736,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFieldWorkRoute: typeof AuthenticatedFieldWorkRoute
   AuthenticatedFieldWorkListRoute: typeof AuthenticatedFieldWorkListRoute
+  AuthenticatedHeatmapRoute: typeof AuthenticatedHeatmapRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
@@ -745,6 +765,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFieldWorkRoute: AuthenticatedFieldWorkRoute,
   AuthenticatedFieldWorkListRoute: AuthenticatedFieldWorkListRoute,
+  AuthenticatedHeatmapRoute: AuthenticatedHeatmapRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
