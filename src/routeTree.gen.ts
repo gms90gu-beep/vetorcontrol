@@ -35,6 +35,7 @@ import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
+import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
 import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
 import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
 
@@ -172,6 +173,12 @@ const AuthenticatedPropertyPropertyIdRoute =
     path: '/property/$propertyId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedDailyBulletinIdRoute =
+  AuthenticatedDailyBulletinIdRouteImport.update({
+    id: '/daily-bulletin/$id',
+    path: '/daily-bulletin/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedRgEditarIdRoute = AuthenticatedRgEditarIdRouteImport.update({
   id: '/editar/$id',
   path: '/editar/$id',
@@ -209,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/supervision': typeof AuthenticatedSupervisionRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
@@ -238,6 +246,7 @@ export interface FileRoutesByTo {
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/': typeof AuthenticatedIndexRoute
+  '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
@@ -269,6 +278,7 @@ export interface FileRoutesById {
   '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/_authenticated/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/supervision'
     | '/supervisor'
     | '/vehicles'
+    | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
     | '/rg/editar/$id'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vehicles'
     | '/'
+    | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
     | '/rg/editar/$id'
@@ -359,6 +371,7 @@ export interface FileRouteTypes {
     | '/_authenticated/supervisor'
     | '/_authenticated/vehicles'
     | '/_authenticated/'
+    | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
     | '/_authenticated/rg/editar/$id'
@@ -558,6 +571,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPropertyPropertyIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/daily-bulletin/$id': {
+      id: '/_authenticated/daily-bulletin/$id'
+      path: '/daily-bulletin/$id'
+      fullPath: '/daily-bulletin/$id'
+      preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/rg/editar/$id': {
       id: '/_authenticated/rg/editar/$id'
       path: '/editar/$id'
@@ -608,6 +628,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
 
@@ -630,6 +651,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
 
@@ -649,13 +671,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
