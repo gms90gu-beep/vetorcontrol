@@ -1,77 +1,94 @@
-# Auditoria do Fluxo de Relatórios
+# Consolidação Estrutural — RG → Trabalho → Boletins → Relatórios
 
-Vou executar a auditoria em 5 etapas, com mudanças cirúrgicas para garantir que a **diária** seja a única fonte de verdade do **Boletim Semanal**.
-
----
-
-## ETAPA 1 — Encerramento da Jornada (`DailyWorkCloser`)
-
-**Estado atual:** já grava ~20 campos em `daily_work_records` (snapshot completo) na refatoração anterior.
-
-**Ajustes:**
-- Adicionar log `[DIARIA_SALVA] { id, agent_id, work_date, cycle_id }` após o upsert retornar.
-- Validar que TODOS os campos da auditoria estão sendo gravados (worked, closed, refused, recovered, pending, LI, A1/A2/B/C/D1/D2/E, focos, tubitos, amostras, larvicida, quarteirões).
-- Migration leve: garantir colunas que faltam em `daily_work_records` (ex.: `depositos_por_tipo` JSON, ou colunas planas `dep_a1..dep_e` se ainda não existirem).
+Este é um trabalho grande (10 fases). Vou entregar em **ondas incrementais**, cada uma testável isoladamente, para evitar regressões no fluxo que já está funcionando (RG → Boletim RG → DailyWorkCloser → Boletim Diário, concluído nas Fases 1–3 anteriores).
 
 ---
 
-## ETAPA 2 — Área Relatórios (`/relatorios`)
+## Onda A — Fundação de Auditoria e Sincronização (Fases 2, 3, 4)
 
-**Problema:** `ReportsDashboard` hoje consulta `visits` direto — mistura origem de dados.
+**Objetivo:** dar visibilidade total ao admin e travar o fluxo RG → Trabalho.
 
-**Mudanças em `src/components/reports/ReportsDashboard.tsx`:**
-- Trocar query base de `visits` por `daily_work_records` (filtrado por `agent_id` + `cycle_id` ativo).
-- Nova seção **"Relatórios Diários do Ciclo: X"** com tabela:
-  Data · Ciclo · Semana do Ciclo · SE · Imóveis · Fechados · Recusas · Focos · Status (✓ Consolidada).
-- KPIs passam a ser somatório das diárias, não contagem de visits.
+1. **`/admin/auditoria`** (apenas `admin_master`)
+   - Cards de totais: boletins RG, quarteirões, imóveis, visitas, daily_work_records.
+   - Seção "Consistência": quarteirões sem imóveis, imóveis sem quarteirão, visitas órfãs, daily_work_records com `data_integrity_log.reconciled = true`.
+   - Seção "Sincronização": resumo de `db.mutations` (pendentes, erros, última sync).
+   - Server fn `getAuditSnapshot` com `requireSupabaseAuth` + checagem `has_role(admin_master)`.
 
----
+2. **`/sync-status`** (todos os papéis autenticados)
+   - Reaproveita `useSyncStatus` + `listFailedMutations`.
+   - Status Online/Offline, última sync, contadores por tabela.
+   - Botões: **Sincronizar agora** (`flushMutations`), **Reprocessar fila** (`retryFailedMutations`), **Limpar cache local** (com confirmação dupla — só apaga `db` se `mutations.count() === 0`, senão bloqueia).
 
-## ETAPA 3 — Painel "Meu Consolidado Semanal" (Agente)
-
-**Novo componente:** `src/components/agent/MyWeeklyConsolidation.tsx`
-- Buscar `daily_work_records` da SE atual (epi_week/epi_year) do agente logado.
-- Exibir: SE atual, "Diárias: X de 5", Imóveis, Fechados, Recusas, Focos, Tubitos, Larvicida (g), Cobertura %.
-- Inserir no `AgentDashboard`.
-
----
-
-## ETAPA 4 — Boletim Semanal vira soma das diárias
-
-**Em `src/components/reports/WeeklyReportGenerator.tsx`:**
-- Refatorar para somar `daily_work_records` da SE em vez de recalcular a partir de `visits`.
-- Adicionar **validador de integridade**: se Σ(diárias) divergir de uma checagem cruzada (ou se houver dia útil sem diária consolidada), abortar com toast explicando o motivo.
-- Log `[BOLETIM_FONTE] daily_work_records count=N`.
+3. **Validação RG → Trabalho** (Fase 4)
+   - No `field-work` / `PropertyVisitButtons`: ao listar quarteirões, filtrar apenas os que possuem `properties` vinculadas via `boletins_rg`.
+   - Se o agente tentar abrir um quarteirão sem imóveis, exibir toast bloqueante: *"Este quarteirão não possui imóveis cadastrados no RG."*
 
 ---
 
-## ETAPA 5 — Aba "Prévia do Boletim" (Agente)
+## Onda B — Inteligência Operacional (Fases 5, 7, 8)
 
-**Novo componente:** `src/components/agent/BulletinPreview.tsx`
-- Mesmos totais do boletim oficial, calculados ao vivo a partir das diárias já consolidadas da semana.
-- Tabela com: totais acumulados, depósitos por tipo (A1–E), focos, tubitos, larvicida, cobertura.
-- Adicionar como nova aba/cartão dentro do `AgentDashboard`.
+**Objetivo:** transformar os boletins em ferramentas de análise.
 
----
+4. **Ranking de agentes no Supervisor Dashboard** (Fase 5)
+   - Adicionar tabela "Produção por Agente" em `SupervisionDashboard`, agregando `daily_work_records` da semana epidemiológica corrente, filtrado por `supervisor_id = auth.uid()`.
+   - Colunas: agente, imóveis trabalhados, fechados, focos, depósitos, tubitos. Ordenação desc por imóveis trabalhados.
 
-## Detalhes Técnicos
+5. **Boletim Diário aprimorado** (Fase 7)
+   - No `/_authenticated/daily-bulletin/$id`: adicionar barras de distribuição percentual por tipo de depósito e foco usando `withPercentages` (já existe em `daily-integrity.ts`).
 
-- **Fonte única:** `daily_work_records` para tudo que for relatório/boletim. `visits` continua sendo a fonte operacional do dia, mas relatórios não a leem mais.
-- **Filtro de ciclo:** já existe `getActiveCycleForUser` — reaproveitar.
-- **SE:** já existe `getEpiWeek` em `src/lib/cycle-week.ts`.
-- **Migration:** adicionar colunas faltantes em `daily_work_records` se necessário (verificar primeiro com `read_query`).
-- **Offline:** o upsert de `daily_work_records` já passa pela fila offline; sem mudança.
+6. **Boletim Semanal com comparativo** (Fase 8)
+   - Em `MyWeeklyConsolidation` (ou nova rota): buscar semana atual e anterior, exibir delta (▲/▼ + %) para produção, focos, depósitos, tubitos, larvas.
 
 ---
 
-## Arquivos Afetados
+## Onda C — Visão Global e PDFs Oficiais (Fases 6, 9, 10)
 
-- `src/components/DailyWorkCloser.tsx` (log + verificação de campos)
-- `src/components/reports/ReportsDashboard.tsx` (refatoração da fonte de dados + tabela de diárias)
-- `src/components/reports/WeeklyReportGenerator.tsx` (somatório de diárias + validação)
-- `src/components/agent/AgentDashboard.tsx` (inclusão dos novos painéis)
-- `src/components/agent/MyWeeklyConsolidation.tsx` (novo)
-- `src/components/agent/BulletinPreview.tsx` (novo)
-- Migration Supabase, se faltar coluna em `daily_work_records`
+**Objetivo:** completar a camada gerencial e padronizar saídas oficiais.
 
-Posso prosseguir com a implementação?
+7. **`/heatmap`** (Fase 6)
+   - Mapa interativo (Leaflet) com camadas: produção, focos, depósitos. Agregação por `block_number`.
+
+8. **PDF institucional** (Fase 9)
+   - Helper `src/lib/pdf/institutional-header.ts`: cabeçalho (prefeitura, SMS, vigilância, município de `system_settings`) e rodapé (data, emissor, UUID, QR code via `qrcode`).
+   - Aplicar em `DailyReportGenerator`, `WeeklyReportGenerator`, `PDFReportGenerator`, e no PDF do boletim diário.
+
+9. **Dashboard Admin Master global** (Fase 10)
+   - Filtros: município, supervisor, agente, bairro, localidade, semana, ciclo.
+   - KPIs globais + produção por agente e por supervisor.
+
+---
+
+## Detalhes técnicos
+
+### Migrations necessárias
+- Nenhuma nova tabela; todas as fases consomem o que já existe (`daily_work_records`, `boletins_rg`, `properties`, `visits`, `weekly_bulletins`, `user_roles`).
+- Adicionar view `v_daily_consistency` para a tela de auditoria (quarteirões sem imóveis, imóveis órfãos etc.) — opcional, pode ficar em SQL na server fn.
+
+### Padrões a respeitar
+- **Server fns** para todas as agregações (`createServerFn` + `requireSupabaseAuth`), nunca query Supabase direto em loader.
+- **Rotas protegidas** sob `src/routes/_authenticated.*` (já há gate); papéis admin checados via `has_role` na server fn, não no client.
+- **Offline-first**: telas de auditoria/heatmap/admin podem ser online-only (mostram skeleton quando offline). `/sync-status` deve funcionar 100% offline.
+- **Sem recalcular** dados nos boletins — só ler `daily_work_records` (regra reforçada na Fase 3 anterior).
+
+### Estrutura de arquivos prevista
+```
+src/routes/
+  _authenticated.admin.auditoria.tsx        (Onda A)
+  _authenticated.sync-status.tsx            (Onda A)
+  _authenticated.heatmap.tsx                (Onda C)
+  _authenticated.admin.dashboard.tsx        (Onda C)
+src/lib/
+  audit.functions.ts                        (Onda A)
+  weekly-comparison.functions.ts            (Onda B)
+  pdf/institutional-header.ts               (Onda C)
+src/components/
+  audit/ConsistencyPanel.tsx
+  supervision/AgentRanking.tsx              (Onda B)
+  reports/DepositDistributionBars.tsx       (Onda B)
+```
+
+---
+
+## Pergunta antes de começar
+
+Confirma que quer que eu **comece pela Onda A** (auditoria + sync-status + validação RG→Trabalho) agora? Ou prefere ordem diferente — por exemplo priorizar Onda B (ranking + boletins aprimorados) que afeta mais o dia-a-dia dos supervisores?
