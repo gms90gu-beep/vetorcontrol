@@ -17,6 +17,7 @@ import { Route as ComandoRouteImport } from './routes/comando'
 import { Route as AdminMasterRouteImport } from './routes/admin-master'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
+import { Route as AuthenticatedWeeklyComparisonRouteImport } from './routes/_authenticated.weekly-comparison'
 import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
 import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated.sync-status'
 import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated.supervisor'
@@ -80,6 +81,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedWeeklyComparisonRoute =
+  AuthenticatedWeeklyComparisonRouteImport.update({
+    id: '/weekly-comparison',
+    path: '/weekly-comparison',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
   id: '/vehicles',
   path: '/vehicles',
@@ -230,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
@@ -261,6 +269,7 @@ export interface FileRoutesByTo {
   '/supervisor': typeof AuthenticatedSupervisorRoute
   '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/vehicles': typeof AuthenticatedVehiclesRoute
+  '/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -295,6 +304,7 @@ export interface FileRoutesById {
   '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
   '/_authenticated/sync-status': typeof AuthenticatedSyncStatusRoute
   '/_authenticated/vehicles': typeof AuthenticatedVehiclesRoute
+  '/_authenticated/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/sync-status'
     | '/vehicles'
+    | '/weekly-comparison'
     | '/admin/auditoria'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/sync-status'
     | '/vehicles'
+    | '/weekly-comparison'
     | '/'
     | '/admin/auditoria'
     | '/daily-bulletin/$id'
@@ -394,6 +406,7 @@ export interface FileRouteTypes {
     | '/_authenticated/supervisor'
     | '/_authenticated/sync-status'
     | '/_authenticated/vehicles'
+    | '/_authenticated/weekly-comparison'
     | '/_authenticated/'
     | '/_authenticated/admin/auditoria'
     | '/_authenticated/daily-bulletin/$id'
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/weekly-comparison': {
+      id: '/_authenticated/weekly-comparison'
+      path: '/weekly-comparison'
+      fullPath: '/weekly-comparison'
+      preLoaderRoute: typeof AuthenticatedWeeklyComparisonRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/vehicles': {
@@ -667,6 +687,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
   AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedVehiclesRoute: typeof AuthenticatedVehiclesRoute
+  AuthenticatedWeeklyComparisonRoute: typeof AuthenticatedWeeklyComparisonRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
@@ -692,6 +713,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
   AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedVehiclesRoute: AuthenticatedVehiclesRoute,
+  AuthenticatedWeeklyComparisonRoute: AuthenticatedWeeklyComparisonRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,

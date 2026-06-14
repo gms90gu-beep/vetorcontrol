@@ -195,6 +195,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     ? [
         { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
         { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
         { label: "Relatórios", icon: FileText, to: "/relatorios" },
         { label: "Intelligence", icon: BarChart3, to: "/reports" },
         { label: "Mapa", icon: MapIcon, to: "/map" },
@@ -205,6 +206,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "Trabalho", icon: MapIcon, to: "/field-work" },
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
+        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
         { label: "Mapa", icon: MapIcon, to: "/map" },
         { label: "Relatórios", icon: FileText, to: "/relatorios" },
       ];

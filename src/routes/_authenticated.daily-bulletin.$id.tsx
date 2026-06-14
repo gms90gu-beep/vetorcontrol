@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DEP_ORDER, normalizeDepJson } from "@/lib/daily-integrity";
+import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -241,6 +242,9 @@ function DailyBulletinView() {
             </TableBody>
           </Table>
         </div>
+        <div className="mt-4 pt-3 border-t">
+          <DepositDistributionBars title="Distribuição percentual" data={depByType} colorClass="bg-blue-500" />
+        </div>
       </Section>
 
       {/* SEÇÃO 3 — TRATAMENTO */}
@@ -279,6 +283,9 @@ function DailyBulletinView() {
         </div>
         <div className="mt-3 text-sm text-muted-foreground">
           Focos Positivos (declarado): <span className="font-semibold text-foreground">{rec.positive_foci ?? 0}</span>
+        </div>
+        <div className="mt-4 pt-3 border-t">
+          <DepositDistributionBars title="Distribuição percentual de focos" data={fociByType} colorClass="bg-rose-500" />
         </div>
       </Section>
 
