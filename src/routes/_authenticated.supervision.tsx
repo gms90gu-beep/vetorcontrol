@@ -25,12 +25,15 @@ function SupervisionPage() {
     <div className="w-full h-full pb-20">
       <Tabs defaultValue="equipe" className="w-full">
         <div className="px-4 pt-4 bg-[#0b1520]">
-          <TabsList className="grid grid-cols-2 w-full bg-white/5 border border-white/10">
+          <TabsList className="grid grid-cols-3 w-full bg-white/5 border border-white/10">
             <TabsTrigger value="equipe" className="text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white/70">
               Equipe
             </TabsTrigger>
             <TabsTrigger value="operacional" className="text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white/70">
-              Dashboard Operacional
+              Operacional
+            </TabsTrigger>
+            <TabsTrigger value="producao" className="text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white/70">
+              Produção (DWR)
             </TabsTrigger>
           </TabsList>
         </div>
@@ -39,6 +42,9 @@ function SupervisionPage() {
         </TabsContent>
         <TabsContent value="operacional" className="mt-0 px-4 py-5 bg-[#f4f5f7] min-h-screen">
           <OperationalDashboard />
+        </TabsContent>
+        <TabsContent value="producao" className="mt-0 px-4 py-5 bg-[#f4f5f7] min-h-screen">
+          <AgentProductionRanking />
         </TabsContent>
       </Tabs>
     </div>
