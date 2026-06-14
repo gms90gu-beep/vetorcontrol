@@ -242,6 +242,9 @@ function DailyBulletinView() {
             </TableBody>
           </Table>
         </div>
+        <div className="mt-4 pt-3 border-t">
+          <DepositDistributionBars title="Distribuição percentual" data={depByType} colorClass="bg-blue-500" />
+        </div>
       </Section>
 
       {/* SEÇÃO 3 — TRATAMENTO */}
