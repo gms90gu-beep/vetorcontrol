@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DEP_ORDER, normalizeDepJson } from "@/lib/daily-integrity";
+import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
