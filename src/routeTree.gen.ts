@@ -38,6 +38,8 @@ import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
+import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
 import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated.admin.auditoria'
 import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
 import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
@@ -193,6 +195,18 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminPendenciasRoute =
+  AuthenticatedAdminPendenciasRouteImport.update({
+    id: '/admin/pendencias',
+    path: '/admin/pendencias',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminDashboardRoute =
+  AuthenticatedAdminDashboardRouteImport.update({
+    id: '/admin/dashboard',
+    path: '/admin/dashboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminAuditoriaRoute =
   AuthenticatedAdminAuditoriaRouteImport.update({
     id: '/admin/auditoria',
@@ -239,6 +253,8 @@ export interface FileRoutesByFullPath {
   '/vehicles': typeof AuthenticatedVehiclesRoute
   '/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -272,6 +288,8 @@ export interface FileRoutesByTo {
   '/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
+  '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -307,6 +325,8 @@ export interface FileRoutesById {
   '/_authenticated/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
+  '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
+  '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -342,6 +362,8 @@ export interface FileRouteTypes {
     | '/vehicles'
     | '/weekly-comparison'
     | '/admin/auditoria'
+    | '/admin/dashboard'
+    | '/admin/pendencias'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -375,6 +397,8 @@ export interface FileRouteTypes {
     | '/weekly-comparison'
     | '/'
     | '/admin/auditoria'
+    | '/admin/dashboard'
+    | '/admin/pendencias'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -409,6 +433,8 @@ export interface FileRouteTypes {
     | '/_authenticated/weekly-comparison'
     | '/_authenticated/'
     | '/_authenticated/admin/auditoria'
+    | '/_authenticated/admin/dashboard'
+    | '/_authenticated/admin/pendencias'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
@@ -630,6 +656,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/pendencias': {
+      id: '/_authenticated/admin/pendencias'
+      path: '/admin/pendencias'
+      fullPath: '/admin/pendencias'
+      preLoaderRoute: typeof AuthenticatedAdminPendenciasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/auditoria': {
       id: '/_authenticated/admin/auditoria'
       path: '/admin/auditoria'
@@ -690,6 +730,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedWeeklyComparisonRoute: typeof AuthenticatedWeeklyComparisonRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
+  AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
+  AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -716,6 +758,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWeeklyComparisonRoute: AuthenticatedWeeklyComparisonRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
+  AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
+  AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
@@ -736,3 +780,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
