@@ -17,6 +17,11 @@ import {
 } from '@/lib/offline/cleanup-ghosts';
 import { auditTerritory, type TerritoryRow } from '@/lib/audit/territory';
 import { OPERATIONAL_AGENTS } from '@/lib/audit/operational-agents';
+import {
+  runHomologation,
+  getLastHomologationReport,
+  type HomologationReport,
+} from '@/lib/audit/homologation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,6 +52,7 @@ function RGPipelinePage() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [lastReport, setLastReport] = useState<any>(null);
+  const [homolog, setHomolog] = useState<HomologationReport | null>(null);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -68,6 +74,7 @@ function RGPipelinePage() {
       setSnap({ server: (rows ?? []) as ServerRow[], local, legacy, legacySample });
       setConflicts(await getReconcileConflicts());
       setLastCleanup(await getLastCleanupReport());
+      setHomolog(await getLastHomologationReport());
     } finally {
       setLoading(false);
     }
@@ -126,6 +133,13 @@ function RGPipelinePage() {
       );
       setOpSnapshot(results);
     } finally { setLoading(false); }
+  };
+
+  const runHomolog = async () => {
+    if (!userId) return;
+    setLoading(true);
+    try { setHomolog(await runHomologation(userId)); }
+    finally { setLoading(false); }
   };
 
   if (!isReady) return <div className="p-6">Carregando autenticação…</div>;
@@ -204,6 +218,7 @@ function RGPipelinePage() {
           <TabsTrigger value="snapshot">Snapshot operacional</TabsTrigger>
           <TabsTrigger value="conflitos">Conflitos ({conflicts.length})</TabsTrigger>
           <TabsTrigger value="limpeza">Limpeza</TabsTrigger>
+          <TabsTrigger value="homologacao">Homologação</TabsTrigger>
         </TabsList>
 
         <TabsContent value="boletim">
@@ -338,6 +353,43 @@ function RGPipelinePage() {
               </pre>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="homologacao" className="space-y-3">
+          <div className="flex gap-2 items-center">
+            <Button onClick={runHomolog} disabled={loading}>Executar suite de homologação</Button>
+            {homolog && (
+              <span className={`px-2 py-1 rounded text-xs font-semibold ${homolog.approved ? 'bg-green-200 text-green-900' : 'bg-red-200 text-red-900'}`}>
+                {homolog.approved ? '✓ APROVADO' : '⚠ REPROVADO'}
+              </span>
+            )}
+          </div>
+          {homolog && (
+            <Table>
+              <TableHeader>
+                <TableRow><TableHead>Teste</TableHead><TableHead>Nome</TableHead><TableHead>Status</TableHead></TableRow>
+              </TableHeader>
+              <TableBody>
+                {homolog.results.map((r) => (
+                  <TableRow key={r.id} className={r.pass ? '' : 'bg-red-50'}>
+                    <TableCell className="font-mono text-xs">{r.id}</TableCell>
+                    <TableCell className="text-sm">{r.name}</TableCell>
+                    <TableCell>{r.pass ? '✓' : '✗'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {homolog && (
+            <pre className="bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto max-h-96">
+              {JSON.stringify(homolog, null, 2)}
+            </pre>
+          )}
+          <div className="text-xs text-muted-foreground border-t pt-2">
+            <p className="font-semibold">Testes manuais (não automáticos):</p>
+            <p>T4 — Offline real: abrir RG/Trabalho/Pendências, desligar internet, fechar e reabrir o app.</p>
+            <p>T7 — Criar boletim novo (Localidade Teste / Quarteirão 99) e validar em RG, Trabalho, offline e após sync.</p>
+          </div>
         </TabsContent>
       </Tabs>
 
