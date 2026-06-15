@@ -85,8 +85,7 @@ export async function cleanupGhosts(userId: string): Promise<GhostReport> {
 
   // 1. sem agent_id
   report.removedNoOwner += await pruneNoOwner(offlineDb.boletins_rg, 'agent_id');
-  report.removedNoOwner += await pruneNoOwner(offlineDb.field_work_records, 'agent_id');
-  report.removedNoOwner += await pruneNoOwner(offlineDb.pending_records, 'agent_id');
+  report.removedNoOwner += await pruneNoOwner(offlineDb.daily_work_records, 'agent_id');
 
   // 2. duplicados
   report.removedDuplicates += await pruneDuplicates(offlineDb.boletins_rg);
