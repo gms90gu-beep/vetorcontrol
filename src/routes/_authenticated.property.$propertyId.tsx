@@ -880,6 +880,15 @@ function PropertyVisitPage() {
         </div>
       </div>
 
+      {property && (
+        <PropertyLocationSection
+          property={property}
+          role={userRole}
+          actorId={userId ?? null}
+          onUpdated={() => fetchData()}
+        />
+      )}
+
       {/* Cards Operacionais */}
       <div className="grid grid-cols-3 gap-3 px-1">
         <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-1 group active:scale-95 transition-all">
