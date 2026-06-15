@@ -89,15 +89,21 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [serverCount, setServerCount] = useState<number | null>(null);
 
   // Lê de AMBOS os caches Dexie e faz UNION por id, sempre filtrando por userId.
+  // CRÍTICO: enquanto userId for undefined (auth não pronto), NÃO ler nada — evita vazar registros de outros usuários.
   const data = useLiveQuery(
     async () => {
+      if (!userId) {
+        console.log('[RG_PIPELINE] userId: undefined | authReady: false | fetchExecutado: false — aguardando auth');
+        return [] as RGRecord[];
+      }
+
       const rgRowsAll = await db.rg.filter((r) => !r._deletedAt).toArray();
-      const rgRows = userId ? rgRowsAll.filter((r) => r.userId === userId) : rgRowsAll;
+      const rgRows = rgRowsAll.filter((r) => r.userId === userId);
 
       const trabalhoCacheRows = await offlineDb.boletins_rg.toArray();
       const trabalhoRows = trabalhoCacheRows
         .map((r) => r.data)
-        .filter((r) => !r?._deletedAt && (!userId || r.agent_id === userId))
+        .filter((r) => !r?._deletedAt && r?.agent_id === userId)
         .map(toRGRecord);
 
       const byId = new Map<string, RGRecord>();
@@ -106,7 +112,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
       const merged = Array.from(byId.values());
 
       console.log(
-        `[RG_PIPELINE] Servidor: ${serverCount ?? '?'} | Dexie(AppDB.rg): ${rgRows.length} | OfflineDB(boletins_rg): ${trabalhoRows.length} | Renderizados: ${merged.length} | userId: ${userId}`,
+        `[RG_PIPELINE] Servidor: ${serverCount ?? '?'} | Dexie(AppDB.rg): ${rgRows.length} | OfflineDB(boletins_rg): ${trabalhoRows.length} | Renderizados: ${merged.length} | userId: ${userId} | authReady: true | fetchExecutado: ${serverCount !== null}`,
       );
       return merged;
     },
