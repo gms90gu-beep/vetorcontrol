@@ -42,10 +42,51 @@ function toRGRecord(r: any): RGRecord {
   };
 }
 
+const RG_MIGRATION_KEY = 'rg_cache_migration_v1';
+
+async function runOneTimeRGCleanup(userId: string) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (localStorage.getItem(RG_MIGRATION_KEY) === 'done') return;
+
+    // 1) AppDB.rg: remove sem userId + duplicados por id
+    const all = await db.rg.toArray();
+    const seen = new Set<string>();
+    const removeIds: string[] = [];
+    for (const r of all) {
+      if (!r.userId) removeIds.push(r.id);
+      else if (seen.has(r.id)) removeIds.push(r.id);
+      else seen.add(r.id);
+    }
+    if (removeIds.length) await db.rg.bulkDelete(removeIds);
+
+    // 2) offlineDb.boletins_rg: remove sem agent_id + duplicados
+    const cache = await offlineDb.boletins_rg.toArray();
+    const seen2 = new Set<string>();
+    const removeIds2: string[] = [];
+    for (const r of cache) {
+      if (!r.data?.agent_id || !r.id) removeIds2.push(r.id);
+      else if (seen2.has(r.id)) removeIds2.push(r.id);
+      else seen2.add(r.id);
+    }
+    if (removeIds2.length) await offlineDb.boletins_rg.bulkDelete(removeIds2);
+
+    localStorage.setItem(RG_MIGRATION_KEY, 'done');
+    console.log('[RG_MIGRATION_v1] limpeza concluída', {
+      appDbRemoved: removeIds.length,
+      offlineDbRemoved: removeIds2.length,
+      userId,
+    });
+  } catch (e) {
+    console.warn('[RG_MIGRATION_v1] falhou', e);
+  }
+}
+
 export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(true);
+  const [serverCount, setServerCount] = useState<number | null>(null);
 
   // Lê de AMBOS os caches Dexie e faz UNION por id, sempre filtrando por userId.
   const data = useLiveQuery(
@@ -64,15 +105,12 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
       for (const r of rgRows) byId.set(r.id, r); // AppDB sobrescreve cache antigo
       const merged = Array.from(byId.values());
 
-      console.log('[RG_COMPARE] useRGRecords union', {
-        appDbRg: rgRows.length,
-        offlineBoletinsRg: trabalhoRows.length,
-        merged: merged.length,
-        userId,
-      });
+      console.log(
+        `[RG_PIPELINE] Servidor: ${serverCount ?? '?'} | Dexie(AppDB.rg): ${rgRows.length} | OfflineDB(boletins_rg): ${trabalhoRows.length} | Renderizados: ${merged.length} | userId: ${userId}`,
+      );
       return merged;
     },
-    [userId],
+    [userId, serverCount],
     [] as RGRecord[]
   ) ?? [];
 
@@ -82,14 +120,18 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     setLoading(true);
     setError(null);
     try {
-      console.log('[RG_QUERY] agent_id:', userId);
+      await runOneTimeRGCleanup(userId);
+
       const { data: rows, error: apiError } = await (supabase as any)
         .from('boletins_rg')
         .select('*')
         .eq('agent_id', userId)
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
-      console.log(`[RG_RESULT] Supabase retornou ${rows?.length ?? 0} boletins para ${userId}`);
+      const count = rows?.length ?? 0;
+      console.log(`[RG_SERVER] Supabase retornou ${count} boletins para ${userId}`);
+      setServerCount(count);
+
       if (rows) {
         const serverIds = new Set<string>(rows.map((r: any) => r.id));
 
