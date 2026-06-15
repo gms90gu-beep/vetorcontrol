@@ -54,6 +54,7 @@ import {
   printPdf,
   shareBlobViaWhatsApp,
 } from "@/components/reports/DailyReportGenerator";
+import { AgentReportsSimple } from "@/components/agent/AgentReportsSimple";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
