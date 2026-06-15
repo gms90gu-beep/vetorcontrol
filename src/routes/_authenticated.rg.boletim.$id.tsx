@@ -212,6 +212,14 @@ function BoletimView() {
   const totalImoveis = imoveis.length;
   const totalHabitantes = imoveis.reduce((acc, p) => acc + (p.inhabitants || 0), 0);
 
+  const gpsStats = useMemo(() => {
+    const total = imoveis.length;
+    const geo = imoveis.filter((p) => p.latitude != null && p.longitude != null).length;
+    const pendentes = total - geo;
+    const cobertura = total > 0 ? (geo / total) * 100 : 0;
+    return { total, geo, pendentes, cobertura };
+  }, [imoveis]);
+
   async function gerarPDF() {
     if (!boletim) return;
     try {
