@@ -191,7 +191,7 @@ function RGPage() {
         const { data: { user } } = await safeGetUser();
         if (!user) return;
         console.log('[RG_AUTH] user.id:', user.id);
-        setUserId(user.id);
+        // userId agora vem de useAuth — não precisa setar aqui.
         const { data: agentData } = await supabase
           .from("agents").select("name, municipality, registration_id")
           .eq("profile_id", user.id).maybeSingle();
