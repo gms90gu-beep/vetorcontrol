@@ -435,6 +435,9 @@ function BoletimView() {
             BRG · FA-D-05 · Quarteirão {boletim.block_number || "—"}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setMapOpen(true)}>
+              <MapIcon className="h-4 w-4" /> Ver mapa do quarteirão
+            </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
               <Printer className="h-4 w-4" /> Imprimir
             </Button>
