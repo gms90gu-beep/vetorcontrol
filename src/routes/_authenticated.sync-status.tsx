@@ -151,6 +151,8 @@ function SyncStatusPage() {
           </CardContent>
         </Card>
       )}
+
+      <OfflineDiagnostics />
     </div>
   );
 }
