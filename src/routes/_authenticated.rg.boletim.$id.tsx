@@ -451,7 +451,34 @@ function BoletimView() {
         </div>
       </div>
 
+      {/* Painel de Cobertura GPS (não imprime) */}
+      <div className="brg-no-print max-w-[230mm] mx-auto px-4 pt-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <GpsStat label="Imóveis" value={gpsStats.total} />
+          <GpsStat label="Georreferenciados" value={gpsStats.geo} accent="emerald" />
+          <GpsStat label="Pendentes" value={gpsStats.pendentes} accent={gpsStats.pendentes > 0 ? "amber" : "slate"} />
+          <GpsStat label="Cobertura GPS" value={`${gpsStats.cobertura.toFixed(2)}%`} accent="blue" />
+        </div>
+      </div>
+
+      <BlockMapDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        blockNumber={boletim.block_number}
+        properties={imoveis.map((p) => ({
+          id: p.id,
+          number: p.number,
+          street_name: p.street_name,
+          type: p.type,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          had_previous_focus: p.had_previous_focus,
+          status: p.status,
+        }))}
+      />
+
       <div className="brg-scroll">
+
         {folhas.map((folha, idx) => {
           const isLast = idx === folhas.length - 1;
           return (
