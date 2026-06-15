@@ -803,6 +803,19 @@ function PropertyVisitPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
+      <GeolocationCaptureDialog
+        open={geoDialogOpen}
+        propertyId={(property?.id as string) || (propertyId as string)}
+        actorId={userId ?? null}
+        propertyLabel={property?.number ? `Imóvel ${property.number}` : undefined}
+        onClose={(saved) => {
+          setGeoDialogOpen(false);
+          if (saved) {
+            // Atualiza estado local com timestamp; lat/lng serão preenchidos no próximo fetchData
+            fetchData();
+          }
+        }}
+      />
       {/* Header Operational */}
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
