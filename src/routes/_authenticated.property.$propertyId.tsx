@@ -40,6 +40,8 @@ import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { getOperationalVisitDate } from "@/lib/operational-date";
+import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
+import { PropertyLocationSection } from "@/components/property/PropertyLocationSection";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -139,13 +141,33 @@ function PropertyVisitPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [geoDialogOpen, setGeoDialogOpen] = useState(false);
+  const [geoPromptedFor, setGeoPromptedFor] = useState<string | null>(null);
   const { data, loading, error: propertyError } = usePropertyRecords(userId);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await safeGetUser();
-      if (user) setUserId(user.id);
+      if (user) {
+        setUserId(user.id);
+        try {
+          const { data: r } = await supabase.rpc("get_user_role", { u_id: user.id });
+          setUserRole((r as string) ?? null);
+        } catch {}
+      }
     })();
   }, []);
+
+  // Primeira visita: se o imóvel não tem coordenadas, oferece capturar.
+  useEffect(() => {
+    if (!property?.id) return;
+    if (geoPromptedFor === property.id) return;
+    const noCoords = property.latitude == null || property.longitude == null;
+    if (noCoords) {
+      setGeoDialogOpen(true);
+      setGeoPromptedFor(property.id);
+    }
+  }, [property?.id, property?.latitude, property?.longitude, geoPromptedFor]);
 
   const resetForm = () => {
     setStatus("visited");
@@ -781,6 +803,19 @@ function PropertyVisitPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
+      <GeolocationCaptureDialog
+        open={geoDialogOpen}
+        propertyId={(property?.id as string) || (propertyId as string)}
+        actorId={userId ?? null}
+        propertyLabel={property?.number ? `Imóvel ${property.number}` : undefined}
+        onClose={(saved) => {
+          setGeoDialogOpen(false);
+          if (saved) {
+            // Atualiza estado local com timestamp; lat/lng serão preenchidos no próximo fetchData
+            fetchData();
+          }
+        }}
+      />
       {/* Header Operational */}
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
@@ -844,6 +879,15 @@ function PropertyVisitPage() {
           </div>
         </div>
       </div>
+
+      {property && (
+        <PropertyLocationSection
+          property={property}
+          role={userRole}
+          actorId={userId ?? null}
+          onUpdated={() => fetchData()}
+        />
+      )}
 
       {/* Cards Operacionais */}
       <div className="grid grid-cols-3 gap-3 px-1">
