@@ -612,3 +612,18 @@ function HeaderRow({ items }: { items: [string, string | null | undefined][] }) 
     </div>
   );
 }
+
+function GpsStat({ label, value, accent = "slate" }: { label: string; value: number | string; accent?: "slate" | "emerald" | "amber" | "blue" }) {
+  const colors: Record<string, string> = {
+    slate: "text-slate-900",
+    emerald: "text-emerald-600",
+    amber: "text-amber-600",
+    blue: "text-blue-600",
+  };
+  return (
+    <div className="flex flex-col items-center justify-center py-1">
+      <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <span className={`text-lg font-black ${colors[accent]}`}>{value}</span>
+    </div>
+  );
+}
