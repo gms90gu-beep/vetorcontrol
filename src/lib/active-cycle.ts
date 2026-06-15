@@ -5,25 +5,48 @@ export type ActiveCycle = {
   number: number | null;
   year: number | null;
   name: string | null;
-  source: "session" | "in_progress" | "none";
+  source: "by_date" | "session" | "in_progress" | "none";
 };
 
 /**
- * Resolve o ciclo operacional do usuário.
- * Prioridade:
- *   1) cycle_id da sessão de campo ativa do usuário (in_progress)
- *   2) cycle_id da sessão mais recente do usuário (qualquer status)
- *   3) ciclo com status = 'in_progress' no banco
+ * Resolve o ciclo operacional CORRETO.
  *
- * Garante que tela e relatórios sigam o ciclo em que o agente está
- * realmente trabalhando, e não um ciclo "ativo" desalinhado.
+ * Nova prioridade (correção definitiva):
+ *   1) Ciclo cuja data atual esteja entre start_date e end_date  (fonte da verdade: calendário)
+ *   2) cycle_id da sessão de campo mais recente do usuário       (fallback contextual)
+ *   3) ciclo com status='in_progress'                            (fallback final)
  */
 export async function getActiveCycleForUser(userId: string | null | undefined): Promise<ActiveCycle | null> {
-  // 1 + 2 — sessão do usuário
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 1 — Ciclo pela DATA atual (regra principal)
+  const { data: byDate } = await supabase
+    .from("cycles")
+    .select("id, number, year, name")
+    .lte("start_date", today)
+    .gte("end_date", today)
+    .order("year", { ascending: false })
+    .order("number", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (byDate) {
+    const resolved: ActiveCycle = {
+      id: byDate.id,
+      number: (byDate as any).number ?? null,
+      year: (byDate as any).year ?? null,
+      name: (byDate as any).name ?? null,
+      source: "by_date",
+    };
+    console.log(`[CICLO] Ciclo ativo carregado (por data): ${resolved.name || resolved.id}`);
+    return resolved;
+  }
+
+  // 2 — Sessão do usuário
   if (userId) {
     const { data: session } = await supabase
       .from("field_work_sessions")
-      .select("cycle_id, status, created_at")
+      .select("cycle_id")
       .eq("user_id", userId)
       .not("cycle_id", "is", null)
       .order("created_at", { ascending: false })
@@ -37,20 +60,19 @@ export async function getActiveCycleForUser(userId: string | null | undefined): 
         .eq("id", session.cycle_id)
         .maybeSingle();
       if (cyc) {
-        const resolved: ActiveCycle = {
+        console.log(`[CICLO] Ciclo ativo carregado (sessão): ${cyc.name || cyc.id}`);
+        return {
           id: cyc.id,
           number: (cyc as any).number ?? null,
           year: (cyc as any).year ?? null,
           name: (cyc as any).name ?? null,
           source: "session",
         };
-        console.log(`[CICLO] Ciclo ativo carregado (sessão): ${resolved.name || resolved.id}`);
-        return resolved;
       }
     }
   }
 
-  // 3 — fallback: ciclo in_progress
+  // 3 — Fallback: in_progress
   const { data: inProg } = await supabase
     .from("cycles")
     .select("id, number, year, name")
@@ -60,15 +82,14 @@ export async function getActiveCycleForUser(userId: string | null | undefined): 
     .maybeSingle();
 
   if (inProg) {
-    const resolved: ActiveCycle = {
+    console.log(`[CICLO] Ciclo ativo carregado (in_progress fallback): ${inProg.name || inProg.id}`);
+    return {
       id: inProg.id,
       number: (inProg as any).number ?? null,
       year: (inProg as any).year ?? null,
       name: (inProg as any).name ?? null,
       source: "in_progress",
     };
-    console.log(`[CICLO] Ciclo ativo carregado (in_progress): ${resolved.name || resolved.id}`);
-    return resolved;
   }
 
   console.warn("[CICLO] Nenhum ciclo ativo encontrado.");
