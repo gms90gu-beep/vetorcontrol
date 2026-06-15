@@ -11,6 +11,7 @@ import {
   type FailedMutationInfo,
 } from "@/lib/offline/sync";
 import { db, clearOfflineDB } from "@/lib/offline/db";
+import { OfflineDiagnostics } from "@/components/OfflineDiagnostics";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/sync-status")({
