@@ -40,6 +40,8 @@ import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { getOperationalVisitDate } from "@/lib/operational-date";
+import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
+import { PropertyLocationSection } from "@/components/property/PropertyLocationSection";
 
 const DEPOSIT_TYPES = [
   { code: "A1", name: "Caixa d'água" },
@@ -139,13 +141,33 @@ function PropertyVisitPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [geoDialogOpen, setGeoDialogOpen] = useState(false);
+  const [geoPromptedFor, setGeoPromptedFor] = useState<string | null>(null);
   const { data, loading, error: propertyError } = usePropertyRecords(userId);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await safeGetUser();
-      if (user) setUserId(user.id);
+      if (user) {
+        setUserId(user.id);
+        try {
+          const { data: r } = await supabase.rpc("get_user_role", { u_id: user.id });
+          setUserRole((r as string) ?? null);
+        } catch {}
+      }
     })();
   }, []);
+
+  // Primeira visita: se o imóvel não tem coordenadas, oferece capturar.
+  useEffect(() => {
+    if (!property?.id) return;
+    if (geoPromptedFor === property.id) return;
+    const noCoords = property.latitude == null || property.longitude == null;
+    if (noCoords) {
+      setGeoDialogOpen(true);
+      setGeoPromptedFor(property.id);
+    }
+  }, [property?.id, property?.latitude, property?.longitude, geoPromptedFor]);
 
   const resetForm = () => {
     setStatus("visited");
