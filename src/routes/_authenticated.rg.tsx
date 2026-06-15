@@ -164,7 +164,9 @@ function normalizeBoletimRow(raw: any): BoletimRow {
 function RGPage() {
   const navigate = useNavigate();
 
-  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { user, isReady } = useAuth();
+  const userId = isReady ? user?.id : undefined;
+  console.log(`[RG_PIPELINE] authReady: ${isReady} | userId: ${userId ?? 'undefined'} | fetchExecutado: ${!!userId}`);
   const { data: rgData, loading: rgLoading, error: rgError } = useRGRecords(userId);
 
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
