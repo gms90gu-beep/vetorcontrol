@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { useRGRecords } from "@/hooks/useOfflineData";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Plus,
   Search,
@@ -163,7 +164,9 @@ function normalizeBoletimRow(raw: any): BoletimRow {
 function RGPage() {
   const navigate = useNavigate();
 
-  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const { user, isReady } = useAuth();
+  const userId = isReady ? user?.id : undefined;
+  console.log(`[RG_PIPELINE] authReady: ${isReady} | userId: ${userId ?? 'undefined'} | fetchExecutado: ${!!userId}`);
   const { data: rgData, loading: rgLoading, error: rgError } = useRGRecords(userId);
 
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
@@ -188,7 +191,7 @@ function RGPage() {
         const { data: { user } } = await safeGetUser();
         if (!user) return;
         console.log('[RG_AUTH] user.id:', user.id);
-        setUserId(user.id);
+        // userId agora vem de useAuth — não precisa setar aqui.
         const { data: agentData } = await supabase
           .from("agents").select("name, municipality, registration_id")
           .eq("profile_id", user.id).maybeSingle();
