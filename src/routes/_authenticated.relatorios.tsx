@@ -87,7 +87,7 @@ function RelatoriosPage() {
         </p>
       </header>
 
-      {isAgent && <AgentReports />}
+      {isAgent && <AgentReportsSimple />}
       {(isSupervisor || isAdmin) && <SupervisorReports />}
       {isCoordinator && <CoordinatorReports />}
     </div>
