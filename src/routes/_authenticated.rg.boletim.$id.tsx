@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { Button } from "@/components/ui/button";
-import { Printer, Download, X, Loader2 } from "lucide-react";
+import { Printer, Download, X, Loader2, Map as MapIcon, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { BlockMapDialog } from "@/components/rg/BlockMapDialog";
 
 export const Route = createFileRoute("/_authenticated/rg/boletim/$id")({
   component: BoletimView,
@@ -24,6 +25,11 @@ type Property = {
   complement: string | null;
   type: string;
   inhabitants: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocoded_at: string | null;
+  had_previous_focus: boolean | null;
+  status: string | null;
 };
 
 type Boletim = {
@@ -69,6 +75,7 @@ function BoletimView() {
   const [boletim, setBoletim] = useState<Boletim | null>(null);
   const [imoveis, setImoveis] = useState<Property[]>([]);
   const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -171,7 +178,7 @@ function BoletimView() {
       // to evitar mostrar imóveis de outros boletins ou registros órfãos).
       const { data: byBoletimLink } = await supabase
         .from("properties")
-        .select("id, street_name, side, number, sequence, complement, type, inhabitants")
+        .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status")
         .eq("boletim_id", b.id)
         .order("sequence", { ascending: true });
 
@@ -204,6 +211,14 @@ function BoletimView() {
 
   const totalImoveis = imoveis.length;
   const totalHabitantes = imoveis.reduce((acc, p) => acc + (p.inhabitants || 0), 0);
+
+  const gpsStats = useMemo(() => {
+    const total = imoveis.length;
+    const geo = imoveis.filter((p) => p.latitude != null && p.longitude != null).length;
+    const pendentes = total - geo;
+    const cobertura = total > 0 ? (geo / total) * 100 : 0;
+    return { total, geo, pendentes, cobertura };
+  }, [imoveis]);
 
   async function gerarPDF() {
     if (!boletim) return;
@@ -322,6 +337,22 @@ function BoletimView() {
             margin: { left: 10, right: 10 },
           });
 
+          // Cobertura GPS do quarteirão
+          autoTable(doc, {
+            startY: (doc as any).lastAutoTable.finalY + 2,
+            head: [["Imóveis", "Georreferenciados", "Pendentes", "Cobertura GPS"]],
+            body: [[
+              String(gpsStats.total),
+              String(gpsStats.geo),
+              String(gpsStats.pendentes),
+              `${gpsStats.cobertura.toFixed(2)}%`,
+            ]],
+            theme: "grid",
+            styles: { fontSize: 9, halign: "center", lineColor: [0, 0, 0], lineWidth: 0.1 },
+            headStyles: { fillColor: [220, 240, 230], textColor: [0, 0, 0], fontStyle: "bold" },
+            margin: { left: 10, right: 10 },
+          });
+
           const sigY = (doc as any).lastAutoTable.finalY + 14;
           doc.setFontSize(8);
           doc.setFont("helvetica", "normal");
@@ -404,6 +435,9 @@ function BoletimView() {
             BRG · FA-D-05 · Quarteirão {boletim.block_number || "—"}
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setMapOpen(true)}>
+              <MapIcon className="h-4 w-4" /> Ver mapa do quarteirão
+            </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
               <Printer className="h-4 w-4" /> Imprimir
             </Button>
@@ -417,7 +451,34 @@ function BoletimView() {
         </div>
       </div>
 
+      {/* Painel de Cobertura GPS (não imprime) */}
+      <div className="brg-no-print max-w-[230mm] mx-auto px-4 pt-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <GpsStat label="Imóveis" value={gpsStats.total} />
+          <GpsStat label="Georreferenciados" value={gpsStats.geo} accent="emerald" />
+          <GpsStat label="Pendentes" value={gpsStats.pendentes} accent={gpsStats.pendentes > 0 ? "amber" : "slate"} />
+          <GpsStat label="Cobertura GPS" value={`${gpsStats.cobertura.toFixed(2)}%`} accent="blue" />
+        </div>
+      </div>
+
+      <BlockMapDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        blockNumber={boletim.block_number}
+        properties={imoveis.map((p) => ({
+          id: p.id,
+          number: p.number,
+          street_name: p.street_name,
+          type: p.type,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          had_previous_focus: p.had_previous_focus,
+          status: p.status,
+        }))}
+      />
+
       <div className="brg-scroll">
+
         {folhas.map((folha, idx) => {
           const isLast = idx === folhas.length - 1;
           return (
@@ -548,6 +609,21 @@ function HeaderRow({ items }: { items: [string, string | null | undefined][] }) 
           <div className="brg-value">{value || "—"}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function GpsStat({ label, value, accent = "slate" }: { label: string; value: number | string; accent?: "slate" | "emerald" | "amber" | "blue" }) {
+  const colors: Record<string, string> = {
+    slate: "text-slate-900",
+    emerald: "text-emerald-600",
+    amber: "text-amber-600",
+    blue: "text-blue-600",
+  };
+  return (
+    <div className="flex flex-col items-center justify-center py-1">
+      <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <span className={`text-lg font-black ${colors[accent]}`}>{value}</span>
     </div>
   );
 }
