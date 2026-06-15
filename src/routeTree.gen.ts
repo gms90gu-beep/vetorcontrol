@@ -39,6 +39,7 @@ import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
 import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
@@ -204,6 +205,12 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminRgPipelineRoute =
+  AuthenticatedAdminRgPipelineRouteImport.update({
+    id: '/admin/rg-pipeline',
+    path: '/admin/rg-pipeline',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminPendenciasRoute =
   AuthenticatedAdminPendenciasRouteImport.update({
     id: '/admin/pendencias',
@@ -286,6 +293,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -325,6 +333,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -366,6 +375,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/_authenticated/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/data-audit'
     | '/admin/pendencias'
+    | '/admin/rg-pipeline'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -446,6 +457,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/data-audit'
     | '/admin/pendencias'
+    | '/admin/rg-pipeline'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -486,6 +498,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/data-audit'
     | '/_authenticated/admin/pendencias'
+    | '/_authenticated/admin/rg-pipeline'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
@@ -714,6 +727,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/rg-pipeline': {
+      id: '/_authenticated/admin/rg-pipeline'
+      path: '/admin/rg-pipeline'
+      fullPath: '/admin/rg-pipeline'
+      preLoaderRoute: typeof AuthenticatedAdminRgPipelineRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/pendencias': {
       id: '/_authenticated/admin/pendencias'
       path: '/admin/pendencias'
@@ -815,6 +835,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminDataAuditRoute: typeof AuthenticatedAdminDataAuditRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
+  AuthenticatedAdminRgPipelineRoute: typeof AuthenticatedAdminRgPipelineRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -847,6 +868,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminDataAuditRoute: AuthenticatedAdminDataAuditRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
+  AuthenticatedAdminRgPipelineRoute: AuthenticatedAdminRgPipelineRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
