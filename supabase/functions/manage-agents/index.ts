@@ -99,16 +99,21 @@ serve(async (req) => {
     // Coordenadores criam agentes vinculados a si (coordinator_id = caller).
     // Admin Master cria sem vínculo automático.
     if (action === "create") {
-      const { email, password, full_name, registration_number, city } = agentData;
+      const { email, password, full_name, registration_number, city, supervisor_id } = agentData;
 
       if (!email || !password || !full_name) {
         throw new Error("Campos obrigatórios faltando: nome, e-mail e senha.");
       }
 
-      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
-
-      const autoSupervisorId = callerRole === "supervisor" ? user.id : null;
+      const autoSupervisorId =
+        callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
       const autoCoordinatorId = callerRole === "coordenador" ? user.id : null;
+
+      if (!autoSupervisorId) {
+        throw new Error("Todo agente deve ser vinculado a um supervisor (supervisor_id obrigatório).");
+      }
+
+      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
 
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authUser.id,
