@@ -337,6 +337,22 @@ function BoletimView() {
             margin: { left: 10, right: 10 },
           });
 
+          // Cobertura GPS do quarteirão
+          autoTable(doc, {
+            startY: (doc as any).lastAutoTable.finalY + 2,
+            head: [["Imóveis", "Georreferenciados", "Pendentes", "Cobertura GPS"]],
+            body: [[
+              String(gpsStats.total),
+              String(gpsStats.geo),
+              String(gpsStats.pendentes),
+              `${gpsStats.cobertura.toFixed(2)}%`,
+            ]],
+            theme: "grid",
+            styles: { fontSize: 9, halign: "center", lineColor: [0, 0, 0], lineWidth: 0.1 },
+            headStyles: { fillColor: [220, 240, 230], textColor: [0, 0, 0], fontStyle: "bold" },
+            margin: { left: 10, right: 10 },
+          });
+
           const sigY = (doc as any).lastAutoTable.finalY + 14;
           doc.setFontSize(8);
           doc.setFont("helvetica", "normal");
