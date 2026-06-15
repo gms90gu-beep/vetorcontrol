@@ -216,6 +216,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
     navItems.push({ label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard" as any });
     navItems.push({ label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" as any });
     navItems.push({ label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit" as any });
+    navItems.push({ label: "🔍 Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit" as any });
   }
 
   if (isManager) {
