@@ -7,17 +7,36 @@ export type CycleWeekInfo = {
 };
 
 /**
- * Semana Epidemiológica (ISO week + ISO year).
- * Sempre derivada da data — independente do ciclo.
+ * Semana Epidemiológica (padrão brasileiro / SINAN).
+ * Semana começa no domingo e termina no sábado.
+ * SE 1 = semana que contém o sábado mais próximo de 1º de janeiro.
  */
 export function getEpiWeek(d: Date = new Date()): { week: number; year: number } {
-  // ISO 8601 week algorithm
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return { week, year: date.getUTCFullYear() };
+  const firstSundayOfEpiYear = (y: number): Date => {
+    const jan1 = new Date(y, 0, 1);
+    const dow = jan1.getDay(); // 0=dom..6=sab
+    const diffToSat = ((6 - dow) + 7) % 7;
+    const sat = new Date(y, 0, 1 + diffToSat);
+    if (diffToSat >= 4) sat.setDate(sat.getDate() - 7); // sábado mais próximo
+    const sun = new Date(sat);
+    sun.setDate(sun.getDate() - 6);
+    return sun;
+  };
+  const ref = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  let year = ref.getFullYear();
+  let firstSun = firstSundayOfEpiYear(year);
+  if (ref < firstSun) {
+    year -= 1;
+    firstSun = firstSundayOfEpiYear(year);
+  } else {
+    const nextSun = firstSundayOfEpiYear(year + 1);
+    if (ref >= nextSun) {
+      year += 1;
+      firstSun = nextSun;
+    }
+  }
+  const week = Math.floor((ref.getTime() - firstSun.getTime()) / 86400000 / 7) + 1;
+  return { week, year };
 }
 
 /**
