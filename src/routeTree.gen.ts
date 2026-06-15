@@ -41,6 +41,7 @@ import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_a
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
+import { Route as AuthenticatedAdminCycleAuditRouteImport } from './routes/_authenticated.admin.cycle-audit'
 import { Route as AuthenticatedAdminCalendarAuditRouteImport } from './routes/_authenticated.admin.calendar-audit'
 import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated.admin.auditoria'
 import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
@@ -214,6 +215,12 @@ const AuthenticatedAdminDashboardRoute =
     path: '/admin/dashboard',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminCycleAuditRoute =
+  AuthenticatedAdminCycleAuditRouteImport.update({
+    id: '/admin/cycle-audit',
+    path: '/admin/cycle-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminCalendarAuditRoute =
   AuthenticatedAdminCalendarAuditRouteImport.update({
     id: '/admin/calendar-audit',
@@ -268,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/weekly-comparison': typeof AuthenticatedWeeklyComparisonRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/admin/calendar-audit': typeof AuthenticatedAdminCalendarAuditRoute
+  '/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -305,6 +313,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/admin/calendar-audit': typeof AuthenticatedAdminCalendarAuditRoute
+  '/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -344,6 +353,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/auditoria': typeof AuthenticatedAdminAuditoriaRoute
   '/_authenticated/admin/calendar-audit': typeof AuthenticatedAdminCalendarAuditRoute
+  '/_authenticated/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/weekly-comparison'
     | '/admin/auditoria'
     | '/admin/calendar-audit'
+    | '/admin/cycle-audit'
     | '/admin/dashboard'
     | '/admin/pendencias'
     | '/daily-bulletin/$id'
@@ -420,6 +431,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/auditoria'
     | '/admin/calendar-audit'
+    | '/admin/cycle-audit'
     | '/admin/dashboard'
     | '/admin/pendencias'
     | '/daily-bulletin/$id'
@@ -458,6 +470,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/admin/auditoria'
     | '/_authenticated/admin/calendar-audit'
+    | '/_authenticated/admin/cycle-audit'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/pendencias'
     | '/_authenticated/daily-bulletin/$id'
@@ -702,6 +715,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/cycle-audit': {
+      id: '/_authenticated/admin/cycle-audit'
+      path: '/admin/cycle-audit'
+      fullPath: '/admin/cycle-audit'
+      preLoaderRoute: typeof AuthenticatedAdminCycleAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/calendar-audit': {
       id: '/_authenticated/admin/calendar-audit'
       path: '/admin/calendar-audit'
@@ -771,6 +791,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminAuditoriaRoute: typeof AuthenticatedAdminAuditoriaRoute
   AuthenticatedAdminCalendarAuditRoute: typeof AuthenticatedAdminCalendarAuditRoute
+  AuthenticatedAdminCycleAuditRoute: typeof AuthenticatedAdminCycleAuditRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
@@ -801,6 +822,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminAuditoriaRoute: AuthenticatedAdminAuditoriaRoute,
   AuthenticatedAdminCalendarAuditRoute: AuthenticatedAdminCalendarAuditRoute,
+  AuthenticatedAdminCycleAuditRoute: AuthenticatedAdminCycleAuditRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,

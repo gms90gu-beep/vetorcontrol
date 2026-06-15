@@ -1510,6 +1510,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      sync_cycle_statuses: { Args: never; Returns: Json }
     }
     Enums: {
       activity_type: "routine" | "infestation_survey" | "pending"
