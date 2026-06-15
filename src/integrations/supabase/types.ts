@@ -1493,6 +1493,7 @@ export type Database = {
         Returns: undefined
       }
       cleanup_demo_data: { Args: never; Returns: Json }
+      data_audit_report: { Args: never; Returns: Json }
       ensure_annual_cycles: {
         Args: { target_year: number }
         Returns: undefined
