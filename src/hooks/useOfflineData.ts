@@ -47,22 +47,30 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(true);
 
-  // Lê TODOS os registros locais não deletados — o escopo por agente já é
-  // garantido na hora do fetch (eq agent_id) e por RLS no servidor.
+  // Lê de AMBOS os caches Dexie e faz UNION por id, sempre filtrando por userId.
   const data = useLiveQuery(
     async () => {
-      const rgRows = await db.rg.filter((r) => !r._deletedAt).toArray();
+      const rgRowsAll = await db.rg.filter((r) => !r._deletedAt).toArray();
+      const rgRows = userId ? rgRowsAll.filter((r) => r.userId === userId) : rgRowsAll;
+
       const trabalhoCacheRows = await offlineDb.boletins_rg.toArray();
       const trabalhoRows = trabalhoCacheRows
         .map((r) => r.data)
-        .filter((r) => !r?._deletedAt && (!userId || r.agent_id === userId));
-      console.log(`Dexie retornou ${rgRows.length} boletins`, { source: 'AppDB.rg', userId });
-      console.log('[RG_COMPARE] useRGRecords vs FieldWorkPage', {
-        useRGRecordsDexie: rgRows.length,
-        fieldWorkPageDexieBoletinsRg: trabalhoRows.length,
-        note: 'FieldWorkPage usa listRemoteOrCache("boletins_rg") em vetorcontrol-offline.boletins_rg',
+        .filter((r) => !r?._deletedAt && (!userId || r.agent_id === userId))
+        .map(toRGRecord);
+
+      const byId = new Map<string, RGRecord>();
+      for (const r of trabalhoRows) byId.set(r.id, r);
+      for (const r of rgRows) byId.set(r.id, r); // AppDB sobrescreve cache antigo
+      const merged = Array.from(byId.values());
+
+      console.log('[RG_COMPARE] useRGRecords union', {
+        appDbRg: rgRows.length,
+        offlineBoletinsRg: trabalhoRows.length,
+        merged: merged.length,
+        userId,
       });
-      return (rgRows.length > 0 ? rgRows : trabalhoRows.map(toRGRecord)) as RGRecord[];
+      return merged;
     },
     [userId],
     [] as RGRecord[]
@@ -75,21 +83,37 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     setError(null);
     try {
       console.log('[RG_QUERY] agent_id:', userId);
-      const { data: sessionData } = await (supabase as any).auth.getSession();
-      console.log('[RG_AUTH] auth.uid():', sessionData?.session?.user?.id ?? null, '| user.id:', userId);
       const { data: rows, error: apiError } = await (supabase as any)
         .from('boletins_rg')
         .select('*')
         .eq('agent_id', userId)
         .order('updated_at', { ascending: false });
       if (apiError) throw apiError;
-      console.log(`Supabase retornou ${rows?.length ?? 0} boletins`, rows);
-      console.log('[RG_RESULT] count:', rows?.length ?? 0, rows);
+      console.log(`[RG_RESULT] Supabase retornou ${rows?.length ?? 0} boletins para ${userId}`);
       if (rows) {
+        const serverIds = new Set<string>(rows.map((r: any) => r.id));
+
+        // Reconcilia AppDB.rg: remove linhas deste usuário que sumiram do servidor.
+        const localForUser = await db.rg.filter((r) => r.userId === userId).toArray();
+        const toDelete = localForUser.filter((r) => !serverIds.has(r.id)).map((r) => r.id);
+        if (toDelete.length) {
+          await db.rg.bulkDelete(toDelete);
+          console.log(`[RG_RECONCILE] AppDB.rg: removidas ${toDelete.length} linhas órfãs`);
+        }
         await db.rg.bulkPut(rows.map(toRGRecord));
-        await offlineDb.boletins_rg.bulkPut(rows.map((r: any) => ({ id: r.id, data: r, updatedAt: r.updated_at })));
-        const dexieCount = await db.rg.filter((r) => !r._deletedAt).count();
-        console.log(`Dexie retornou ${dexieCount} boletins`, { source: 'AppDB.rg após sync' });
+
+        // Reconcilia offlineDb.boletins_rg do mesmo usuário.
+        const localCache = await offlineDb.boletins_rg.toArray();
+        const cacheToDelete = localCache
+          .filter((r) => r.data?.agent_id === userId && !serverIds.has(r.id))
+          .map((r) => r.id);
+        if (cacheToDelete.length) {
+          await offlineDb.boletins_rg.bulkDelete(cacheToDelete);
+          console.log(`[RG_RECONCILE] offlineDb.boletins_rg: removidas ${cacheToDelete.length} linhas órfãs`);
+        }
+        await offlineDb.boletins_rg.bulkPut(
+          rows.map((r: any) => ({ id: r.id, data: r, updatedAt: r.updated_at }))
+        );
 
         setIsStale(false);
       }
@@ -101,7 +125,6 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     }
   }, [userId]);
 
-  // Refetch sempre que userId mudar (sem guard de ref que trava na 1ª chamada com userId undefined).
   useEffect(() => {
     fetchFromAPI();
   }, [fetchFromAPI]);
