@@ -7,7 +7,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, Navigation, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // Align with database Row type for properties
@@ -55,13 +55,14 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
             <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[60px] text-center">Comp.</TableHead>
             <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[40px] text-center">Tipo</TableHead>
             <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[40px] text-center">Hab.</TableHead>
+            <TableHead className="border-r border-slate-300 text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[60px] text-center">GPS</TableHead>
             <TableHead className="text-[9px] font-black uppercase text-slate-600 px-2 py-0 h-10 min-w-[80px] text-center">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {properties.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="h-32 text-center text-slate-400 font-bold uppercase text-[10px]">
+              <TableCell colSpan={9} className="h-32 text-center text-slate-400 font-bold uppercase text-[10px]">
                 Nenhum imóvel registrado neste quarteirão.
               </TableCell>
             </TableRow>
@@ -89,6 +90,17 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
                 <TableCell className="border-r border-slate-300 px-2 py-1 text-[11px] font-black text-slate-800 text-center">
                   {prop.inhabitants || 0}
                 </TableCell>
+                <TableCell className="border-r border-slate-300 px-2 py-1 text-center">
+                  {prop.latitude != null && prop.longitude != null ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600" title="Georreferenciado">
+                      <Navigation className="h-3 w-3" /> ✓
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-600" title="Sem localização">
+                      <AlertTriangle className="h-3 w-3" /> ⚠
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="px-2 py-1 text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Button 
@@ -115,6 +127,7 @@ export function RGBulletinTable({ properties, onEdit, onDelete }: RGBulletinTabl
           {/* Fill empty rows to make it look like a physical sheet */}
           {Array.from({ length: Math.max(0, 10 - properties.length) }).map((_, i) => (
             <TableRow key={`empty-${i}`} className="h-10 border-b border-slate-200">
+              <TableCell className="border-r border-slate-300"></TableCell>
               <TableCell className="border-r border-slate-300"></TableCell>
               <TableCell className="border-r border-slate-300"></TableCell>
               <TableCell className="border-r border-slate-300"></TableCell>
