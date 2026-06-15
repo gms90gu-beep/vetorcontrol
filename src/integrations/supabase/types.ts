@@ -461,6 +461,39 @@ export type Database = {
           },
         ]
       }
+      data_audit_snapshots: {
+        Row: {
+          actions_count: number
+          alerts_count: number
+          created_at: string
+          id: string
+          module_scores: Json
+          report: Json
+          score: number
+          user_id: string | null
+        }
+        Insert: {
+          actions_count?: number
+          alerts_count?: number
+          created_at?: string
+          id?: string
+          module_scores?: Json
+          report?: Json
+          score: number
+          user_id?: string | null
+        }
+        Update: {
+          actions_count?: number
+          alerts_count?: number
+          created_at?: string
+          id?: string
+          module_scores?: Json
+          report?: Json
+          score?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       field_work_records: {
         Row: {
           created_at: string
@@ -1486,6 +1519,7 @@ export type Database = {
     }
     Functions: {
       agent_integrity_check: { Args: { _fix?: boolean }; Returns: Json }
+      auto_data_audit_snapshot: { Args: never; Returns: Json }
       autoheal_agent: { Args: { _user_id: string }; Returns: string }
       can_supervise_user: { Args: { target_user_id: string }; Returns: boolean }
       check_block_completion: {
@@ -1510,6 +1544,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      save_data_audit_snapshot: {
+        Args: {
+          _actions_count?: number
+          _alerts_count?: number
+          _module_scores: Json
+          _score: number
+        }
+        Returns: string
       }
       sync_cycle_statuses: { Args: never; Returns: Json }
     }
