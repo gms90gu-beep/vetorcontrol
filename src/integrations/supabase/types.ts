@@ -694,6 +694,8 @@ export type Database = {
           complement: string | null
           container_count: number | null
           created_at: string
+          geocoded_at: string | null
+          geocoded_by: string | null
           had_previous_focus: boolean | null
           id: string
           inhabitants: number | null
@@ -721,6 +723,8 @@ export type Database = {
           complement?: string | null
           container_count?: number | null
           created_at?: string
+          geocoded_at?: string | null
+          geocoded_by?: string | null
           had_previous_focus?: boolean | null
           id?: string
           inhabitants?: number | null
@@ -748,6 +752,8 @@ export type Database = {
           complement?: string | null
           container_count?: number | null
           created_at?: string
+          geocoded_at?: string | null
+          geocoded_by?: string | null
           had_previous_focus?: boolean | null
           id?: string
           inhabitants?: number | null
@@ -781,6 +787,13 @@ export type Database = {
             columns: ["boletim_id"]
             isOneToOne: false
             referencedRelation: "boletins_rg"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "properties_geocoded_by_fkey"
+            columns: ["geocoded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

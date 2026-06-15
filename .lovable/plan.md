@@ -1,94 +1,85 @@
-# Consolidação Estrutural — RG → Trabalho → Boletins → Relatórios
+# Georreferenciamento Inteligente dos Imóveis
 
-Este é um trabalho grande (10 fases). Vou entregar em **ondas incrementais**, cada uma testável isoladamente, para evitar regressões no fluxo que já está funcionando (RG → Boletim RG → DailyWorkCloser → Boletim Diário, concluído nas Fases 1–3 anteriores).
+Sistema que captura a localização GPS apenas na **primeira visita** de cada imóvel e a reutiliza nas próximas — sem rastrear o agente.
 
----
+## 1. Banco de dados
 
-## Onda A — Fundação de Auditoria e Sincronização (Fases 2, 3, 4)
+Migração em `properties`:
+- `latitude NUMERIC`
+- `longitude NUMERIC`
+- `geocoded_at TIMESTAMPTZ`
+- `geocoded_by UUID` (referência ao agente que registrou — auditoria)
 
-**Objetivo:** dar visibilidade total ao admin e travar o fluxo RG → Trabalho.
+Índice composto `(latitude, longitude)` para consultas do mapa.
 
-1. **`/admin/auditoria`** (apenas `admin_master`)
-   - Cards de totais: boletins RG, quarteirões, imóveis, visitas, daily_work_records.
-   - Seção "Consistência": quarteirões sem imóveis, imóveis sem quarteirão, visitas órfãs, daily_work_records com `data_integrity_log.reconciled = true`.
-   - Seção "Sincronização": resumo de `db.mutations` (pendentes, erros, última sync).
-   - Server fn `getAuditSnapshot` com `requireSupabaseAuth` + checagem `has_role(admin_master)`.
+## 2. Fluxo da primeira visita
 
-2. **`/sync-status`** (todos os papéis autenticados)
-   - Reaproveita `useSyncStatus` + `listFailedMutations`.
-   - Status Online/Offline, última sync, contadores por tabela.
-   - Botões: **Sincronizar agora** (`flushMutations`), **Reprocessar fila** (`retryFailedMutations`), **Limpar cache local** (com confirmação dupla — só apaga `db` se `mutations.count() === 0`, senão bloqueia).
+No componente `PropertyVisitButtons` (handler de "Realizar Visita"):
 
-3. **Validação RG → Trabalho** (Fase 4)
-   - No `field-work` / `PropertyVisitButtons`: ao listar quarteirões, filtrar apenas os que possuem `properties` vinculadas via `boletins_rg`.
-   - Se o agente tentar abrir um quarteirão sem imóveis, exibir toast bloqueante: *"Este quarteirão não possui imóveis cadastrados no RG."*
-
----
-
-## Onda B — Inteligência Operacional (Fases 5, 7, 8)
-
-**Objetivo:** transformar os boletins em ferramentas de análise.
-
-4. **Ranking de agentes no Supervisor Dashboard** (Fase 5)
-   - Adicionar tabela "Produção por Agente" em `SupervisionDashboard`, agregando `daily_work_records` da semana epidemiológica corrente, filtrado por `supervisor_id = auth.uid()`.
-   - Colunas: agente, imóveis trabalhados, fechados, focos, depósitos, tubitos. Ordenação desc por imóveis trabalhados.
-
-5. **Boletim Diário aprimorado** (Fase 7)
-   - No `/_authenticated/daily-bulletin/$id`: adicionar barras de distribuição percentual por tipo de depósito e foco usando `withPercentages` (já existe em `daily-integrity.ts`).
-
-6. **Boletim Semanal com comparativo** (Fase 8)
-   - Em `MyWeeklyConsolidation` (ou nova rota): buscar semana atual e anterior, exibir delta (▲/▼ + %) para produção, focos, depósitos, tubitos, larvas.
-
----
-
-## Onda C — Visão Global e PDFs Oficiais (Fases 6, 9, 10)
-
-**Objetivo:** completar a camada gerencial e padronizar saídas oficiais.
-
-7. **`/heatmap`** (Fase 6)
-   - Mapa interativo (Leaflet) com camadas: produção, focos, depósitos. Agregação por `block_number`.
-
-8. **PDF institucional** (Fase 9)
-   - Helper `src/lib/pdf/institutional-header.ts`: cabeçalho (prefeitura, SMS, vigilância, município de `system_settings`) e rodapé (data, emissor, UUID, QR code via `qrcode`).
-   - Aplicar em `DailyReportGenerator`, `WeeklyReportGenerator`, `PDFReportGenerator`, e no PDF do boletim diário.
-
-9. **Dashboard Admin Master global** (Fase 10)
-   - Filtros: município, supervisor, agente, bairro, localidade, semana, ciclo.
-   - KPIs globais + produção por agente e por supervisor.
-
----
-
-## Detalhes técnicos
-
-### Migrations necessárias
-- Nenhuma nova tabela; todas as fases consomem o que já existe (`daily_work_records`, `boletins_rg`, `properties`, `visits`, `weekly_bulletins`, `user_roles`).
-- Adicionar view `v_daily_consistency` para a tela de auditoria (quarteirões sem imóveis, imóveis órfãos etc.) — opcional, pode ficar em SQL na server fn.
-
-### Padrões a respeitar
-- **Server fns** para todas as agregações (`createServerFn` + `requireSupabaseAuth`), nunca query Supabase direto em loader.
-- **Rotas protegidas** sob `src/routes/_authenticated.*` (já há gate); papéis admin checados via `has_role` na server fn, não no client.
-- **Offline-first**: telas de auditoria/heatmap/admin podem ser online-only (mostram skeleton quando offline). `/sync-status` deve funcionar 100% offline.
-- **Sem recalcular** dados nos boletins — só ler `daily_work_records` (regra reforçada na Fase 3 anterior).
-
-### Estrutura de arquivos prevista
-```
-src/routes/
-  _authenticated.admin.auditoria.tsx        (Onda A)
-  _authenticated.sync-status.tsx            (Onda A)
-  _authenticated.heatmap.tsx                (Onda C)
-  _authenticated.admin.dashboard.tsx        (Onda C)
-src/lib/
-  audit.functions.ts                        (Onda A)
-  weekly-comparison.functions.ts            (Onda B)
-  pdf/institutional-header.ts               (Onda C)
-src/components/
-  audit/ConsistencyPanel.tsx
-  supervision/AgentRanking.tsx              (Onda B)
-  reports/DepositDistributionBars.tsx       (Onda B)
+```text
+clicar em Visitar
+  └─ property.latitude && property.longitude?
+       ├─ sim → segue visita normal
+       └─ não → modal "Deseja usar sua localização atual
+                       como localização oficial deste imóvel?"
+                  ├─ SIM → navigator.geolocation.getCurrentPosition()
+                  │         → grava lat/lng/geocoded_at/geocoded_by
+                  │         → toast "Localização registrada"
+                  │         → segue visita normal
+                  └─ NÃO → segue visita normal (sem GPS)
 ```
 
----
+Gravação offline-first: usa `useOfflineMutation`/repo de `properties` (Dexie + fila `mutations`).
 
-## Pergunta antes de começar
+## 3. Tela do imóvel (`_authenticated.property.$propertyId.tsx`)
 
-Confirma que quer que eu **comece pela Onda A** (auditoria + sync-status + validação RG→Trabalho) agora? Ou prefere ordem diferente — por exemplo priorizar Onda B (ranking + boletins aprimorados) que afeta mais o dia-a-dia dos supervisores?
+Nova seção **Localização**:
+- Lat / Lng (6 casas)
+- "Georreferenciado em DD/MM/YYYY"
+- Botão **📍 Ver no mapa** (abre Google Maps com `?q=lat,lng`)
+- Botão **🔄 Atualizar localização** — visível apenas para `supervisor` / `admin_master` (usa `role-guards`)
+
+Se sem coordenadas: aviso "Imóvel ainda não georreferenciado".
+
+## 4. Mapa epidemiológico (`_authenticated.heatmap.tsx`)
+
+Substitui agregação heurística por marcadores reais usando `latitude/longitude` de `properties`:
+- 🟢 sem foco | 🔴 foco positivo | 🟠 pendente | 🔵 PE | 🟣 caso confirmado
+- Clique → popup com histórico (visitas, depósitos, focos, pendências)
+- Usa Google Maps JS API já presente (`VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY`)
+
+## 5. Exportação
+
+Adicionar colunas `latitude` e `longitude` em `institutional-export.ts` (CSV/XLSX/PDF).
+
+## 6. Permissões
+
+- `agente` → pode gravar lat/lng **somente** quando ainda nulos (RLS já cobre por supervisor; adiciona policy específica)
+- `supervisor` / `admin_master` → podem sobrescrever
+- RLS via `has_role` + `can_supervise_user`
+
+## 7. Offline
+
+- Reuso do `db.properties` (Dexie) + `enqueueMutation({ table: 'properties', op: 'update', pk: id, payload: { latitude, longitude, geocoded_at } })`
+- `syncEngine` já flusha quando online
+
+## Arquivos a criar/editar
+
+**Criar:**
+- `supabase/migrations/<ts>_property_geo.sql` — colunas + índice + policy
+- `src/components/property/GeolocationCaptureDialog.tsx` — modal SIM/NÃO + GPS
+- `src/components/property/PropertyLocationSection.tsx` — bloco "Localização" na tela do imóvel
+- `src/lib/geolocation.ts` — helper `requestCurrentPosition()` (Promise wrapper)
+
+**Editar:**
+- `src/components/PropertyVisitButtons.tsx` — intercepta clique de "Visitar" para abrir dialog quando faltam coords
+- `src/routes/_authenticated.property.$propertyId.tsx` — inclui `PropertyLocationSection`
+- `src/routes/_authenticated.heatmap.tsx` — passa a usar `properties.latitude/longitude`
+- `src/lib/institutional-export.ts` — colunas lat/lng
+
+## Decisões já tomadas (não vou perguntar)
+
+- Sem rastreamento contínuo, sem histórico de trajeto, sem watchPosition.
+- `getCurrentPosition` com `{ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }`.
+- Imóvel sem coordenadas **não** bloqueia a visita.
+- Reutiliza o mapa do Google já configurado; sem dependências novas.
