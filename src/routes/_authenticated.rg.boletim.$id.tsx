@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { Button } from "@/components/ui/button";
-import { Printer, Download, X, Loader2 } from "lucide-react";
+import { Printer, Download, X, Loader2, Map as MapIcon, Navigation } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { BlockMapDialog } from "@/components/rg/BlockMapDialog";
 
 export const Route = createFileRoute("/_authenticated/rg/boletim/$id")({
   component: BoletimView,
@@ -24,6 +25,11 @@ type Property = {
   complement: string | null;
   type: string;
   inhabitants: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocoded_at: string | null;
+  had_previous_focus: boolean | null;
+  status: string | null;
 };
 
 type Boletim = {
@@ -69,6 +75,7 @@ function BoletimView() {
   const [boletim, setBoletim] = useState<Boletim | null>(null);
   const [imoveis, setImoveis] = useState<Property[]>([]);
   const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -171,7 +178,7 @@ function BoletimView() {
       // to evitar mostrar imóveis de outros boletins ou registros órfãos).
       const { data: byBoletimLink } = await supabase
         .from("properties")
-        .select("id, street_name, side, number, sequence, complement, type, inhabitants")
+        .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status")
         .eq("boletim_id", b.id)
         .order("sequence", { ascending: true });
 
