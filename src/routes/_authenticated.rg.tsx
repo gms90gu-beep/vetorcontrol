@@ -666,7 +666,7 @@ function NewBoletimForm({ onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const [block, setBlock] = useState("");
-  const [locality, setLocality] = useState("");
+  const [side, setSide] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -674,7 +674,8 @@ function NewBoletimForm({ onSubmit, onCancel }: {
     if (!block.trim()) { toast.error("Informe o número do quarteirão"); return; }
     setSaving(true);
     try {
-      await onSubmit({ block_number: block.trim(), locality: locality.trim() });
+      // locality fica vazio: logradouro agora pertence ao imóvel, não ao quarteirão.
+      await onSubmit({ block_number: block.trim(), locality: "" });
     } finally {
       setSaving(false);
     }
@@ -687,8 +688,11 @@ function NewBoletimForm({ onSubmit, onCancel }: {
         <Input value={block} onChange={(e) => setBlock(e.target.value)} placeholder="Ex: 05" className="h-10 mt-1" autoFocus />
       </div>
       <div>
-        <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Logradouro / Localidade</Label>
-        <Input value={locality} onChange={(e) => setLocality(e.target.value)} placeholder="Ex: Rua Castro Alves" className="h-10 mt-1" />
+        <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Lado</Label>
+        <Input value={side} onChange={(e) => setSide(e.target.value)} placeholder="Ex: Par / Ímpar" className="h-10 mt-1" />
+        <p className="text-[10px] mt-1" style={{ color: C.text2 }}>
+          O logradouro agora é informado em cada imóvel.
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
