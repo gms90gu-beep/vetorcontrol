@@ -66,7 +66,26 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [isStale, setIsStale] = useState(true);
   const [serverCount, setServerCount] = useState<number | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rows = userId ? await offlineDb.boletins_rg.toArray() : [];
+      if (cancelled) return;
+      const cache = rows
+        .map((r) => r.data)
+        .filter((r) => r && !r._deletedAt && r.agent_id === userId)
+        .map(toRGRecord);
+      const remote = Array.from({ length: serverCount ?? 0 });
+      const merged = cache;
+      const unique = Array.from(new Map(merged.map((r) => [r.id, r])).values());
 
+      console.log('[RG_CACHE]', cache.length);
+      console.log('[RG_REMOTE]', remote.length);
+      console.log('[RG_MERGED]', merged.length);
+      console.log('[RG_DUPLICATES]', { original: merged.length, deduplicado: unique.length });
+    })().catch((e) => console.warn('[RG_DIAGNOSTIC_LOGS] falhou', e));
+    return () => { cancelled = true; };
+  }, [userId, serverCount]);
 
   // Fonte única de verdade: offlineDb.boletins_rg, filtrado por userId.
   const data = useLiveQuery(
