@@ -307,6 +307,13 @@ function RGPage() {
     });
   }, [filtered, rgData.length, boletins.length, search]);
 
+  console.log("[RG_RENDER_SOURCE]", {
+    hookRecords: rgData.length,
+    stateBoletins: boletins.length,
+    renderedCards: filtered.length,
+    source: "RGPage local state derived from useRGRecords",
+  });
+
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
     try {
       const { data: { user } } = await safeGetUser();
@@ -513,29 +520,25 @@ function RGPage() {
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-6 w-6 animate-spin" style={{ color: C.text }} />
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14 }} className="p-10 text-center">
-            <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: C.text2 }} />
-            <div className="font-semibold" style={{ color: C.text }}>Nenhum boletim cadastrado</div>
-            <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
-          </div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((b) => (
-              <BoletimCard
-                key={b.id}
-                b={b}
-                pdfBusy={pdfBusy === b.id}
-                viewBusy={viewBusy === b.id}
-                editBusy={editBusy === b.id}
-                deleteBusy={deleteBusy === b.id}
-                onView={() => handleView(b)}
-                onPDF={() => handlePDF(b)}
-                onEdit={() => handleEdit(b)}
-                onDelete={() => setPendingDelete(b)}
-              />
-            ))}
-          </div>
+          <BoletimCardList
+            boletins={filtered}
+            pdfBusy={pdfBusy}
+            viewBusy={viewBusy}
+            editBusy={editBusy}
+            deleteBusy={deleteBusy}
+            onView={handleView}
+            onPDF={handlePDF}
+            onEdit={handleEdit}
+            onDelete={setPendingDelete}
+            emptyFallback={(
+              <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14 }} className="p-10 text-center">
+                <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: C.text2 }} />
+                <div className="font-semibold" style={{ color: C.text }}>Nenhum boletim cadastrado</div>
+                <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
+              </div>
+            )}
+          />
         )}
       </main>
 
@@ -576,6 +579,42 @@ function RGPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, emptyFallback, onView, onPDF, onEdit, onDelete }: {
+  boletins: BoletimRow[];
+  pdfBusy: string | null;
+  viewBusy: string | null;
+  editBusy: string | null;
+  deleteBusy: string | null;
+  emptyFallback?: ReactNode;
+  onView: (b: BoletimRow) => void;
+  onPDF: (b: BoletimRow) => void;
+  onEdit: (b: BoletimRow) => void;
+  onDelete: (b: BoletimRow) => void;
+}) {
+  console.log("[RG_COMPONENT_RENDER]", boletins.length);
+  console.log("[RG_IDS]", boletins.map((b) => b.id));
+  console.log("[RG_BLOCKS]", boletins.map((b) => `${b.block_number ?? "null"}-${b.locality ?? "null"}`));
+
+  return (
+    <div className="space-y-2">
+      {boletins.length === 0 && emptyFallback ? emptyFallback : boletins.map((b) => (
+        <BoletimCard
+          key={b.id}
+          b={b}
+          pdfBusy={pdfBusy === b.id}
+          viewBusy={viewBusy === b.id}
+          editBusy={editBusy === b.id}
+          deleteBusy={deleteBusy === b.id}
+          onView={() => onView(b)}
+          onPDF={() => onPDF(b)}
+          onEdit={() => onEdit(b)}
+          onDelete={() => onDelete(b)}
+        />
+      ))}
     </div>
   );
 }
