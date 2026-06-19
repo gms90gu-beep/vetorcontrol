@@ -73,15 +73,30 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
         return [] as RGRecord[];
       }
       const rows = await offlineDb.boletins_rg.toArray();
-      const mine = rows
+      const mineRaw = rows
         .map((r) => r.data)
         .filter((r) => r && !r._deletedAt && r.agent_id === userId)
         .map(toRGRecord);
 
-      console.log(
-        `[RG_PIPELINE] Servidor: ${serverCount ?? '?'} | Local(boletins_rg): ${mine.length} | Renderizados: ${mine.length} | userId: ${userId} | authReady: true | fetchExecutado: ${serverCount !== null}`,
+      const totalOriginal = mineRaw.length;
+      const unique = Array.from(new Map(mineRaw.map((r) => [r.id, r])).values());
+      const totalDeduplicado = unique.length;
+
+      console.log('[RG_CACHE] total:', rows.length);
+      console.log('[RG_REMOTE] total:', serverCount ?? '?');
+      console.log('[RG_MERGED] total:', totalOriginal);
+      console.log('[RG_DUPLICATES]', totalOriginal, totalDeduplicado);
+      if (totalOriginal !== totalDeduplicado) {
+        console.warn('[RG_DUPLICATES] duplicados removidos:', totalOriginal - totalDeduplicado);
+      }
+      unique.forEach((r) =>
+        console.log('[RG_RENDER]', r.id, (r.data as any)?.block_number, (r.data as any)?.locality),
       );
-      return mine;
+
+      console.log(
+        `[RG_PIPELINE] Servidor: ${serverCount ?? '?'} | Local(boletins_rg): ${unique.length} | Renderizados: ${unique.length} | userId: ${userId} | authReady: true | fetchExecutado: ${serverCount !== null}`,
+      );
+      return unique;
     },
     [userId, serverCount],
     [] as RGRecord[],
