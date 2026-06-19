@@ -307,6 +307,16 @@ function RGPage() {
     });
   }, [filtered, rgData.length, boletins.length, search]);
 
+  console.log("[RG_COMPONENT_RENDER]", boletins.length);
+  console.log("[RG_IDS]", boletins.map((b) => b.id));
+  console.log("[RG_BLOCKS]", boletins.map((b) => `${b.block_number ?? "null"}-${b.locality ?? "null"}`));
+  console.log("[RG_RENDER_SOURCE]", {
+    hookRecords: rgData.length,
+    stateBoletins: boletins.length,
+    renderedCards: filtered.length,
+    source: "RGPage local state derived from useRGRecords",
+  });
+
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
     try {
       const { data: { user } } = await safeGetUser();
