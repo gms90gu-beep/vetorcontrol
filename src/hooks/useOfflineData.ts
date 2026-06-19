@@ -71,10 +71,16 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   // Fonte única de verdade: offlineDb.boletins_rg, filtrado por userId.
   const data = useLiveQuery(
     async () => {
+      console.log('[RG_LIVEQUERY_RUN]', { userId });
       if (!userId) {
+        console.log('[RG_CACHE]', 0);
+        console.log('[RG_REMOTE]', serverCount ?? 0);
+        console.log('[RG_MERGED]', 0);
+        console.log('[RG_DUPLICATES]', { original: 0, deduplicado: 0 });
         console.log('[RG_PIPELINE] userId: undefined | authReady: false | fetchExecutado: false — aguardando auth');
         return [] as RGRecord[];
       }
+
       const rows = await offlineDb.boletins_rg.toArray();
       const mineRaw = rows
         .map((r) => r.data)
