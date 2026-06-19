@@ -66,6 +66,11 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const [isStale, setIsStale] = useState(true);
   const [serverCount, setServerCount] = useState<number | null>(null);
 
+  console.log('[RG_CACHE]', 0);
+  console.log('[RG_REMOTE]', serverCount ?? 0);
+  console.log('[RG_MERGED]', 0);
+  console.log('[RG_DUPLICATES]', { original: 0, deduplicado: 0 });
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
