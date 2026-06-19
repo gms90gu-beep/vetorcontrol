@@ -520,12 +520,6 @@ function RGPage() {
           <div className="flex items-center justify-center h-64">
             <Loader2 className="h-6 w-6 animate-spin" style={{ color: C.text }} />
           </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14 }} className="p-10 text-center">
-            <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: C.text2 }} />
-            <div className="font-semibold" style={{ color: C.text }}>Nenhum boletim cadastrado</div>
-            <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
-          </div>
         ) : (
           <BoletimCardList
             boletins={filtered}
@@ -537,6 +531,13 @@ function RGPage() {
             onPDF={handlePDF}
             onEdit={handleEdit}
             onDelete={setPendingDelete}
+            emptyFallback={(
+              <div style={{ background: C.card, border: `1px dashed ${C.border}`, borderRadius: 14 }} className="p-10 text-center">
+                <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: C.text2 }} />
+                <div className="font-semibold" style={{ color: C.text }}>Nenhum boletim cadastrado</div>
+                <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
+              </div>
+            )}
           />
         )}
       </main>
@@ -588,6 +589,7 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, on
   viewBusy: string | null;
   editBusy: string | null;
   deleteBusy: string | null;
+  emptyFallback?: ReactNode;
   onView: (b: BoletimRow) => void;
   onPDF: (b: BoletimRow) => void;
   onEdit: (b: BoletimRow) => void;
@@ -599,7 +601,7 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, on
 
   return (
     <div className="space-y-2">
-      {boletins.map((b) => (
+      {boletins.length === 0 && emptyFallback ? emptyFallback : boletins.map((b) => (
         <BoletimCard
           key={b.id}
           b={b}
