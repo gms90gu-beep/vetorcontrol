@@ -530,22 +530,17 @@ function RGPage() {
             <div className="text-xs mt-1" style={{ color: C.text2 }}>Clique em "Novo Boletim" para começar.</div>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((b) => (
-              <BoletimCard
-                key={b.id}
-                b={b}
-                pdfBusy={pdfBusy === b.id}
-                viewBusy={viewBusy === b.id}
-                editBusy={editBusy === b.id}
-                deleteBusy={deleteBusy === b.id}
-                onView={() => handleView(b)}
-                onPDF={() => handlePDF(b)}
-                onEdit={() => handleEdit(b)}
-                onDelete={() => setPendingDelete(b)}
-              />
-            ))}
-          </div>
+          <BoletimCardList
+            boletins={filtered}
+            pdfBusy={pdfBusy}
+            viewBusy={viewBusy}
+            editBusy={editBusy}
+            deleteBusy={deleteBusy}
+            onView={handleView}
+            onPDF={handlePDF}
+            onEdit={handleEdit}
+            onDelete={setPendingDelete}
+          />
         )}
       </main>
 
@@ -586,6 +581,41 @@ function RGPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
+  boletins: BoletimRow[];
+  pdfBusy: string | null;
+  viewBusy: string | null;
+  editBusy: string | null;
+  deleteBusy: string | null;
+  onView: (b: BoletimRow) => void;
+  onPDF: (b: BoletimRow) => void;
+  onEdit: (b: BoletimRow) => void;
+  onDelete: (b: BoletimRow) => void;
+}) {
+  console.log("[RG_COMPONENT_RENDER]", boletins.length);
+  console.log("[RG_IDS]", boletins.map((b) => b.id));
+  console.log("[RG_BLOCKS]", boletins.map((b) => `${b.block_number ?? "null"}-${b.locality ?? "null"}`));
+
+  return (
+    <div className="space-y-2">
+      {boletins.map((b) => (
+        <BoletimCard
+          key={b.id}
+          b={b}
+          pdfBusy={pdfBusy === b.id}
+          viewBusy={viewBusy === b.id}
+          editBusy={editBusy === b.id}
+          deleteBusy={deleteBusy === b.id}
+          onView={() => onView(b)}
+          onPDF={() => onPDF(b)}
+          onEdit={() => onEdit(b)}
+          onDelete={() => onDelete(b)}
+        />
+      ))}
     </div>
   );
 }
