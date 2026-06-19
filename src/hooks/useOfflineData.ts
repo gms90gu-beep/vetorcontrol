@@ -60,10 +60,13 @@ async function dropLegacyAppDbRG() {
 }
 
 export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
+  console.log('[RG_HOOK_START]', { userId, ts: Date.now() });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(true);
   const [serverCount, setServerCount] = useState<number | null>(null);
+
+
 
   // Fonte única de verdade: offlineDb.boletins_rg, filtrado por userId.
   const data = useLiveQuery(
