@@ -583,7 +583,7 @@ function RGPage() {
   );
 }
 
-function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
+function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, emptyFallback, onView, onPDF, onEdit, onDelete }: {
   boletins: BoletimRow[];
   pdfBusy: string | null;
   viewBusy: string | null;
