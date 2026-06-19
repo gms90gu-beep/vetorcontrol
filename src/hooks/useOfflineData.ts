@@ -60,18 +60,27 @@ async function dropLegacyAppDbRG() {
 }
 
 export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
+  console.log('[RG_HOOK_START]', { userId, ts: Date.now() });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isStale, setIsStale] = useState(true);
   const [serverCount, setServerCount] = useState<number | null>(null);
 
+
+
   // Fonte única de verdade: offlineDb.boletins_rg, filtrado por userId.
   const data = useLiveQuery(
     async () => {
+      console.log('[RG_LIVEQUERY_RUN]', { userId });
       if (!userId) {
+        console.log('[RG_CACHE]', 0);
+        console.log('[RG_REMOTE]', serverCount ?? 0);
+        console.log('[RG_MERGED]', 0);
+        console.log('[RG_DUPLICATES]', { original: 0, deduplicado: 0 });
         console.log('[RG_PIPELINE] userId: undefined | authReady: false | fetchExecutado: false — aguardando auth');
         return [] as RGRecord[];
       }
+
       const rows = await offlineDb.boletins_rg.toArray();
       const mineRaw = rows
         .map((r) => r.data)
@@ -80,15 +89,15 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
 
       const totalOriginal = mineRaw.length;
       const unique = Array.from(new Map(mineRaw.map((r) => [r.id, r])).values());
-      const totalDeduplicado = unique.length;
 
-      console.log('[RG_CACHE] total:', rows.length);
-      console.log('[RG_REMOTE] total:', serverCount ?? '?');
-      console.log('[RG_MERGED] total:', totalOriginal);
-      console.log('[RG_DUPLICATES]', totalOriginal, totalDeduplicado);
-      if (totalOriginal !== totalDeduplicado) {
-        console.warn('[RG_DUPLICATES] duplicados removidos:', totalOriginal - totalDeduplicado);
+      console.log('[RG_CACHE]', rows.length);
+      console.log('[RG_REMOTE]', serverCount ?? 0);
+      console.log('[RG_MERGED]', totalOriginal);
+      console.log('[RG_DUPLICATES]', { original: totalOriginal, deduplicado: unique.length });
+      if (totalOriginal !== unique.length) {
+        console.warn('[RG_DUPLICATES] removidos:', totalOriginal - unique.length);
       }
+
       unique.forEach((r) =>
         console.log('[RG_RENDER]', r.id, (r.data as any)?.block_number, (r.data as any)?.locality),
       );
