@@ -243,6 +243,8 @@ function RGPage() {
       console.log('Primeiro boletim: nenhum registro retornado');
     }
     const normalized = arr.map(normalizeBoletimRow).filter((r) => !!r.id);
+    console.log('[RG_NORMALIZED]', normalized);
+    console.log('[RG_NORMALIZED_COUNT]', normalized.length);
     console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
     setBoletins(normalized);
   }, [rgData]);
