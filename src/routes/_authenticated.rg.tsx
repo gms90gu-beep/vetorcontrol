@@ -603,6 +603,27 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, em
   console.log("[RG_COMPONENT_RENDER]", boletins.length);
   console.log("[RG_IDS]", boletins.map((b) => b.id));
   console.log("[RG_BLOCKS]", boletins.map((b) => `${b.block_number ?? "null"}-${b.locality ?? "null"}`));
+  console.log(
+    "[RG_BLOCK_DETAILS]",
+    boletins.map((b) => ({
+      id: b.id,
+      block_number: b.block_number,
+      locality: b.locality,
+      status: (b as any).status,
+      created_at: (b as any).created_at,
+      property_count: (b as any).property_count,
+    })),
+  );
+  const grouped = Object.entries(
+    boletins.reduce<Record<string, string[]>>((acc, item) => {
+      const key = `${item.block_number ?? "null"}-${item.locality ?? "null"}`;
+      (acc[key] ??= []).push(item.id);
+      return acc;
+    }, {}),
+  );
+  console.log("[RG_GROUPED_BLOCKS]", grouped);
+  const duplicates = grouped.filter(([, ids]) => ids.length > 1);
+  console.log("[RG_DUPLICATE_BLOCKS]", duplicates);
 
   return (
     <div className="space-y-2">
