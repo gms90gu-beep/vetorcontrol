@@ -56,8 +56,11 @@ function AuthenticatedLayout() {
   const router = useRouter();
   const location = useLocation();
   const { user, isReady, signOut } = useAuth();
-  const isLandscape = useOrientation();
+  const isMobileDevice = useIsMobile();
+  const isLandscapeRaw = useOrientation();
+  const isLandscape = isMobileDevice && isLandscapeRaw;
   const { isOperational, isLoading: isOperationalLoading, userRole } = useOperationalDate();
+  console.log("[SIDEBAR_RENDER]", { userRole, pathname: location.pathname, isMobileDevice, isLandscape, w: typeof window !== "undefined" ? window.innerWidth : null });
 
   useEffect(() => {
     if (!isReady) return;
