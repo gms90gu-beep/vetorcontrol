@@ -243,6 +243,8 @@ function RGPage() {
       console.log('Primeiro boletim: nenhum registro retornado');
     }
     const normalized = arr.map(normalizeBoletimRow).filter((r) => !!r.id);
+    console.log('[RG_NORMALIZED]', normalized);
+    console.log('[RG_NORMALIZED_COUNT]', normalized.length);
     console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
     setBoletins(normalized);
   }, [rgData]);
@@ -286,7 +288,8 @@ function RGPage() {
           (b.locality || "").toLowerCase().includes(q) ||
           (b.agent_name || "").toLowerCase().includes(q),
         );
-    return [...base].sort((a, b) => {
+    console.log("[RG_SORT_INPUT]", base.map((r) => ({ id: r.id, block: r.block_number, locality: r.locality })));
+    const sorted = [...base].sort((a, b) => {
       const na = parseInt((a.block_number || "").replace(/\D/g, ""), 10);
       const nb = parseInt((b.block_number || "").replace(/\D/g, ""), 10);
       const aHas = !isNaN(na);
@@ -296,6 +299,8 @@ function RGPage() {
       if (!aHas && bHas) return 1;
       return (a.block_number || "").localeCompare(b.block_number || "");
     });
+    console.log("[RG_SORT_OUTPUT]", sorted.map((r) => ({ id: r.id, block: r.block_number, locality: r.locality })));
+    return sorted;
   }, [boletins, search]);
 
   useEffect(() => {

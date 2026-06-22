@@ -106,20 +106,33 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
       }
 
       const rows = await offlineDb.boletins_rg.toArray();
+      console.log('[RG_RAW_RECORDS]', rows);
+      console.log('[RG_RAW_COUNT]', rows.length);
+
       const mineRaw = rows
         .map((r) => r.data)
         .filter((r) => r && !r._deletedAt && r.agent_id === userId)
         .map(toRGRecord);
 
       const totalOriginal = mineRaw.length;
-      const unique = Array.from(new Map(mineRaw.map((r) => [r.id, r])).values());
+      console.log('[RG_BEFORE_DEDUPE]', totalOriginal);
+      console.log('[RG_DEDUPE_KEY]', 'id');
+      const seen = new Map<string, ReturnType<typeof toRGRecord>>();
+      const removedIds: string[] = [];
+      for (const r of mineRaw) {
+        if (seen.has(r.id)) removedIds.push(r.id);
+        else seen.set(r.id, r);
+      }
+      const unique = Array.from(seen.values());
+      console.log('[RG_AFTER_DEDUPE]', unique.length);
+      console.log('[RG_REMOVED_IDS]', removedIds);
 
       console.log('[RG_CACHE]', rows.length);
       console.log('[RG_REMOTE]', serverCount ?? 0);
       console.log('[RG_MERGED]', totalOriginal);
       console.log('[RG_DUPLICATES]', { original: totalOriginal, deduplicado: unique.length });
       if (totalOriginal !== unique.length) {
-        console.warn('[RG_DUPLICATES] removidos:', totalOriginal - unique.length);
+        console.warn('[RG_DUPLICATES] removidos:', totalOriginal - unique.length, removedIds);
       }
 
       unique.forEach((r) =>
