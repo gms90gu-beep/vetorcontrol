@@ -614,16 +614,30 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, em
       property_count: (b as any).property_count,
     })),
   );
-  const grouped = Object.entries(
-    boletins.reduce<Record<string, string[]>>((acc, item) => {
-      const key = `${item.block_number ?? "null"}-${item.locality ?? "null"}`;
-      (acc[key] ??= []).push(item.id);
-      return acc;
-    }, {}),
-  );
+  const groupedMap = boletins.reduce<Record<string, string[]>>((acc, item) => {
+    const key = `${item.block_number ?? "null"}-${item.locality ?? "null"}`;
+    (acc[key] ??= []).push(item.id);
+    return acc;
+  }, {});
+  const grouped = Object.entries(groupedMap).map(([block, ids]) => ({ block, ids }));
   console.log("[RG_GROUPED_BLOCKS]", grouped);
-  const duplicates = grouped.filter(([, ids]) => ids.length > 1);
+  console.log("[RG_GROUPED_BLOCKS_JSON]", JSON.stringify(grouped, null, 2));
+  const duplicates = grouped.filter((g) => g.ids.length > 1);
   console.log("[RG_DUPLICATE_BLOCKS]", duplicates);
+  console.log("[RG_DUPLICATE_BLOCKS_JSON]", JSON.stringify(duplicates, null, 2));
+  const duplicateIds = new Set(duplicates.flatMap((g) => g.ids));
+  const duplicateDetails = boletins
+    .filter((b) => duplicateIds.has(b.id))
+    .map((b) => ({
+      id: b.id,
+      block_number: b.block_number,
+      locality: b.locality,
+      created_at: (b as any).created_at,
+      agent_id: (b as any).agent_id ?? (b as any).user_id,
+    }));
+  console.log("[RG_DUPLICATE_DETAILS]", duplicateDetails);
+  console.log("[RG_DUPLICATE_DETAILS_JSON]", JSON.stringify(duplicateDetails, null, 2));
+
 
   return (
     <div className="space-y-2">
