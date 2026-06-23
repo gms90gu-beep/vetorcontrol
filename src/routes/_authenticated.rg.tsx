@@ -3,6 +3,7 @@ import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { db as offlineDb } from "@/lib/offline/db";
 import { useRGRecords } from "@/hooks/useOfflineData";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -167,7 +168,7 @@ function RGPage() {
   const { user, isReady } = useAuth();
   const userId = isReady ? user?.id : undefined;
   console.log(`[RG_PIPELINE] authReady: ${isReady} | userId: ${userId ?? 'undefined'} | fetchExecutado: ${!!userId}`);
-  const { data: rgData, loading: rgLoading, error: rgError } = useRGRecords(userId);
+  const { data: rgData, loading: rgLoading, error: rgError, refresh: refreshRGRecords } = useRGRecords(userId);
 
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
   const loading = rgLoading;
@@ -346,16 +347,94 @@ function RGPage() {
   }
 
   async function handleDelete(b: BoletimRow) {
-    setDeleteBusy(b.id);
+    const boletimId = b.id;
+    console.log("[RG_DELETE_START]", boletimId);
+    setDeleteBusy(boletimId);
     const t = toast.loading("Excluindo...");
     try {
-      await supabase.from("properties").update({ boletim_id: null }).eq("boletim_id", b.id);
-      const { error } = await supabase.from("boletins_rg").delete().eq("id", b.id);
+      const cacheBefore = await offlineDb.boletins_rg.get(boletimId);
+      const relatedPropertiesBefore = await supabase
+        .from("properties")
+        .select("id, boletim_id, block_id, block_number")
+        .eq("boletim_id", boletimId);
+      const relatedBlockBefore = b.block_id
+        ? await supabase
+            .from("blocks")
+            .select("id, number, locality, total_properties")
+            .eq("id", b.block_id)
+            .maybeSingle()
+        : { data: null, error: null };
+
+      console.log("[RG_DELETE_AUDIT_BEFORE]", {
+        boletimId,
+        block_id: b.block_id ?? null,
+        cacheExists: !!cacheBefore,
+        relatedPropertiesCount: relatedPropertiesBefore.data?.length ?? 0,
+        relatedPropertiesError: relatedPropertiesBefore.error,
+        relatedBlock: relatedBlockBefore.data,
+        relatedBlockError: relatedBlockBefore.error,
+      });
+
+      const unlinkProperties = await supabase
+        .from("properties")
+        .update({ boletim_id: null })
+        .eq("boletim_id", boletimId)
+        .select("id, boletim_id, block_id, block_number");
+      console.log("[RG_DELETE_PROPERTIES_RESULT]", {
+        boletimId,
+        data: unlinkProperties.data,
+        error: unlinkProperties.error,
+        action: "UPDATE properties SET boletim_id = null (preserva imóveis; não executa DELETE em properties)",
+      });
+      if (unlinkProperties.error) throw unlinkProperties.error;
+
+      const { data, error } = await supabase
+        .from("boletins_rg")
+        .delete()
+        .eq("id", boletimId)
+        .select("id, block_number, locality, agent_id, block_id");
+      console.log("[RG_DELETE_RESULT]", {
+        boletimId,
+        data,
+        error,
+      });
       if (error) throw error;
-      setBoletins((arr) => arr.filter((x) => x.id !== b.id));
+
+      const verifyBoletim = await supabase
+        .from("boletins_rg")
+        .select("id, block_number, locality, agent_id, block_id")
+        .eq("id", boletimId)
+        .maybeSingle();
+      console.log("[RG_DELETE_VERIFY]", {
+        boletimId,
+        persisted: !verifyBoletim.data && !verifyBoletim.error,
+        data: verifyBoletim.data,
+        error: verifyBoletim.error,
+      });
+
+      console.log("[RG_DELETE_BLOCKS_RESULT]", {
+        boletimId,
+        block_id: b.block_id ?? null,
+        action: "Nenhum DELETE em blocks executado pela tela RG; FK boletins_rg.block_id usa ON DELETE SET NULL e properties.block_id usa ON DELETE CASCADE.",
+      });
+
+      await offlineDb.boletins_rg.delete(boletimId);
+      const cacheAfter = await offlineDb.boletins_rg.get(boletimId);
+      console.log("[RG_OFFLINE_CACHE_AFTER_DELETE]", {
+        boletimId,
+        cacheExists: !!cacheAfter,
+      });
+
+      setBoletins((arr) => {
+        const next = arr.filter((x) => x.id !== boletimId);
+        console.log("[RG_AFTER_DELETE_COUNT]", next.length);
+        return next;
+      });
+      void refreshRGRecords();
       toast.success("Boletim excluído.", { id: t });
     } catch (e: any) {
       console.error("[RG] delete boletim", e);
+      console.log("[RG_AFTER_DELETE_COUNT]", boletins.length);
       toast.error("Erro ao excluir: " + e.message, { id: t });
     } finally {
       setDeleteBusy(null);
