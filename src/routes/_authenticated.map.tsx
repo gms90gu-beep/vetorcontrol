@@ -1,135 +1,376 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { 
-  Map as MapIcon, 
-  MapPin, 
-  Layers, 
-  Navigation2, 
-  Search, 
-  Filter,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Maximize2
-} from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Popup,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet.heat";
+import {
+  getPropertyMapPoints,
+  type PropertyMapPoint,
+} from "@/lib/wave-c.functions";
+import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Download,
+  FileSpreadsheet,
+  Flame,
+  Loader2,
+  MapPin,
+  Navigation2,
+  Search,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/map")({
-  component: MapPage,
+  component: OperationalMapPage,
 });
 
-function MapPage() {
-  const [activeLayer, setActiveLayer] = useState("visits");
+type Category = "focus" | "pendency" | "strategic" | "clean";
+
+const CATEGORY_META: Record<
+  Category,
+  { color: string; label: string; emoji: string }
+> = {
+  focus: { color: "#dc2626", label: "Foco positivo", emoji: "🔴" },
+  pendency: { color: "#f97316", label: "Pendência", emoji: "🟠" },
+  strategic: { color: "#2563eb", label: "Ponto Estratégico", emoji: "🔵" },
+  clean: { color: "#16a34a", label: "Sem foco", emoji: "🟢" },
+};
+
+function classify(p: PropertyMapPoint): Category {
+  if (p.has_positive_focus) return "focus";
+  if (p.has_pendency) return "pendency";
+  if (p.is_strategic) return "strategic";
+  return "clean";
+}
+
+function isoOffset(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const FILTERS: { id: "all" | Category; label: string }[] = [
+  { id: "all", label: "Todos" },
+  { id: "focus", label: "Focos" },
+  { id: "pendency", label: "Pendências" },
+  { id: "strategic", label: "Pontos Estratégicos" },
+  { id: "clean", label: "Sem foco" },
+];
+
+function OperationalMapPage() {
+  const [from, setFrom] = useState(isoOffset(-90));
+  const [to, setTo] = useState(isoOffset(0));
+  const [filter, setFilter] = useState<"all" | Category>("all");
+  const [search, setSearch] = useState("");
+  const [showHeat, setShowHeat] = useState(false);
+
+  const fetchProps = useServerFn(getPropertyMapPoints);
+  const props = useQuery({
+    queryKey: ["op-map-points", from, to],
+    queryFn: () => fetchProps({ data: { from, to } }),
+  });
+
+  const allPoints = props.data?.points ?? [];
+
+  const visiblePoints = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allPoints.filter((p) => {
+      const cat = classify(p);
+      if (filter !== "all" && cat !== filter) return false;
+      if (!q) return true;
+      const hay = `${p.street ?? ""} ${p.number ?? ""} ${p.block_number ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [allPoints, filter, search]);
+
+  const counts = useMemo(() => {
+    const c = { focus: 0, pendency: 0, strategic: 0, clean: 0 };
+    for (const p of allPoints) c[classify(p)]++;
+    return c;
+  }, [allPoints]);
+
+  const center = useMemo<[number, number]>(() => {
+    if (visiblePoints.length === 0) return [-15.78, -47.93]; // Brasil fallback
+    const lat = visiblePoints.reduce((s, p) => s + p.latitude, 0) / visiblePoints.length;
+    const lng = visiblePoints.reduce((s, p) => s + p.longitude, 0) / visiblePoints.length;
+    return [lat, lng];
+  }, [visiblePoints]);
+
+  const head = ["ID", "Quart.", "Endereço", "Nº", "Lat", "Lng", "Situação"];
+  const rows = useMemo(
+    () =>
+      visiblePoints.map((p) => [
+        p.id,
+        p.block_number ?? "",
+        p.street ?? "",
+        p.number ?? "",
+        p.latitude.toFixed(6),
+        p.longitude.toFixed(6),
+        CATEGORY_META[classify(p)].label,
+      ]),
+    [visiblePoints],
+  );
 
   return (
-    <div className="h-[calc(100vh-8rem)] w-full flex flex-col gap-4 animate-in fade-in duration-700">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black tracking-tighter text-primary">Mapa</h2>
-        <p className="text-muted-foreground font-medium">Visualização territorial em tempo real</p>
-      </div>
-
-      <div className="relative flex-1 rounded-[2.5rem] overflow-hidden shadow-2xl bg-accent/20 border-4 border-white">
-        {/* Placeholder for real map */}
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=1000')] bg-cover bg-center opacity-40 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/20" />
-        
-        {/* Map Grid Pattern */}
-        <div className="absolute inset-0 opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
-
-        {/* Floating Search */}
-        <div className="absolute top-6 left-6 right-6 z-10 flex gap-2">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input 
-              placeholder="Buscar rua ou quarteirão..." 
-              className="pl-12 h-12 rounded-2xl border-none bg-background/90 backdrop-blur-xl shadow-2xl shadow-black/10 text-sm font-bold focus-visible:ring-primary/30"
-            />
-          </div>
-          <Button variant="secondary" size="icon" className="h-12 w-12 rounded-2xl bg-background/90 backdrop-blur-xl shadow-2xl shadow-black/10 border-none shrink-0 active:scale-95 transition-all">
-            <Filter className="h-5 w-5 text-primary" />
+    <div className="container mx-auto max-w-7xl p-3 sm:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-rose-500" /> Mapa Operacional
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Imóveis georreferenciados — clique no marcador para detalhes e navegação por GPS.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={showHeat ? "default" : "outline"}
+            onClick={() => setShowHeat((v) => !v)}
+          >
+            <Flame className="h-4 w-4 mr-1" /> Heatmap
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => downloadXLSX("mapa-operacional.xls", "Imoveis", head, rows)}
+            disabled={rows.length === 0}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1" /> XLSX
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => downloadCSV("mapa-operacional.csv", head, rows)}
+            disabled={rows.length === 0}
+          >
+            <Download className="h-4 w-4 mr-1" /> CSV
           </Button>
         </div>
+      </div>
 
-        {/* Map Markers (Visual Mockup) */}
-        <MapMarker x="30%" y="40%" status="visited" label="Q-042" />
-        <MapMarker x="60%" y="30%" status="focus" label="Foco" />
-        <MapMarker x="45%" y="65%" status="pending" label="Pendente" />
-        <MapMarker x="75%" y="55%" status="visited" label="Q-043" />
-        <MapMarker x="20%" y="70%" status="visited" label="Q-041" />
-
-        {/* Bottom Controls */}
-        <div className="absolute bottom-6 left-6 right-6 flex flex-col gap-4">
-          <div className="flex justify-between items-end">
-            <div className="flex flex-col gap-2">
-              <MapLayerButton active={activeLayer === 'visits'} onClick={() => setActiveLayer('visits')} icon={CheckCircle2} label="Visitas" />
-              <MapLayerButton active={activeLayer === 'focus'} onClick={() => setActiveLayer('focus')} icon={AlertTriangle} label="Focos" />
-              <MapLayerButton active={activeLayer === 'blocks'} onClick={() => setActiveLayer('blocks')} icon={Layers} label="Quadras" />
+      <Card>
+        <CardContent className="p-3 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por rua, número ou quarteirão"
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            
-            <div className="flex flex-col gap-2">
-              <Button size="icon" className="h-12 w-12 rounded-2xl bg-primary shadow-2xl shadow-primary/40 active:scale-90 transition-all">
-                <Navigation2 className="h-6 w-6" />
-              </Button>
-              <Button size="icon" variant="secondary" className="h-12 w-12 rounded-2xl bg-background/90 backdrop-blur-xl shadow-2xl shadow-black/10 border-none active:scale-90 transition-all">
-                <Maximize2 className="h-5 w-5 text-primary" />
-              </Button>
-            </div>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="w-40"
+            />
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="w-40"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => props.refetch()}
+              disabled={props.isLoading}
+            >
+              {props.isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Atualizar"
+              )}
+            </Button>
           </div>
 
-          <Card className="border-none shadow-2xl bg-background/90 backdrop-blur-xl rounded-3xl overflow-hidden animate-in slide-in-from-bottom-8 duration-1000">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                  <MapPin className="h-6 w-6" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-lg font-black tracking-tight uppercase">Localidade Central</span>
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Setor Operacional 04</span>
-                </div>
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map((f) => {
+              const active = filter === f.id;
+              const count =
+                f.id === "all"
+                  ? allPoints.length
+                  : counts[f.id as Category];
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setFilter(f.id)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  {f.label} <span className="opacity-70 ml-1">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="h-[60vh] min-h-[420px] w-full rounded-lg overflow-hidden relative">
+            {props.isLoading ? (
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-              <div className="text-right">
-                <div className="text-xl font-black text-emerald-600 tracking-tight">85%</div>
-                <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Cobertura</div>
+            ) : allPoints.length === 0 ? (
+              <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground text-center">
+                Nenhum imóvel georreferenciado no período. As coordenadas são
+                capturadas na primeira visita.
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            ) : (
+              <MapContainer
+                center={center}
+                zoom={15}
+                scrollWheelZoom
+                style={{ height: "100%", width: "100%" }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{y}/{x}.png"
+                />
+                <FitBounds points={visiblePoints} />
+                {showHeat && <HeatLayer points={visiblePoints} />}
+                {!showHeat &&
+                  visiblePoints.map((p) => {
+                    const cat = classify(p);
+                    const meta = CATEGORY_META[cat];
+                    return (
+                      <CircleMarker
+                        key={p.id}
+                        center={[p.latitude, p.longitude]}
+                        radius={8}
+                        pathOptions={{
+                          color: "#fff",
+                          weight: 2,
+                          fillColor: meta.color,
+                          fillOpacity: 0.9,
+                        }}
+                      >
+                        <Popup>
+                          <PointPopup point={p} />
+                        </Popup>
+                      </CircleMarker>
+                    );
+                  })}
+              </MapContainer>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap gap-3 text-xs">
+        {(Object.keys(CATEGORY_META) as Category[]).map((k) => (
+          <div key={k} className="flex items-center gap-1.5">
+            <span
+              className="h-3 w-3 rounded-full ring-1 ring-white"
+              style={{ background: CATEGORY_META[k].color }}
+            />
+            <span>
+              {CATEGORY_META[k].emoji} {CATEGORY_META[k].label}
+            </span>
+          </div>
+        ))}
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        Coordenadas oficiais de <code>properties.latitude/longitude</code>.
+        Visualização escopada por perfil: supervisores veem apenas seus
+        agentes; coordenadores e admin master veem todo o território
+        permitido.
+      </p>
     </div>
   );
 }
 
-function MapMarker({ x, y, status, label }: any) {
-  const colors: any = {
-    visited: "bg-emerald-500 shadow-emerald-500/40",
-    focus: "bg-red-500 shadow-red-500/40 animate-pulse",
-    pending: "bg-yellow-500 shadow-yellow-500/40"
-  };
-
+function PointPopup({ point }: { point: PropertyMapPoint }) {
+  const meta = CATEGORY_META[classify(point)];
+  const url = `https://www.google.com/maps/search/?api=1&query=${point.latitude},${point.longitude}`;
   return (
-    <div 
-      className="absolute flex flex-col items-center gap-1 group cursor-pointer" 
-      style={{ left: x, top: y }}
-    >
-      <div className={`h-4 w-4 rounded-full border-2 border-white shadow-xl transition-transform group-hover:scale-150 ${colors[status]}`} />
-      <div className="px-2 py-0.5 rounded-lg bg-background/90 backdrop-blur-sm shadow-xl text-[8px] font-black uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">
-        {label}
+    <div className="text-xs space-y-1 min-w-[200px]">
+      <div className="font-semibold text-sm">
+        {point.street ?? "Endereço não informado"}
+        {point.number ? `, ${point.number}` : ""}
       </div>
+      <div className="text-muted-foreground">
+        Quarteirão {point.block_number ?? "—"}
+      </div>
+      <div>
+        <Badge
+          style={{ background: meta.color, color: "#fff" }}
+          className="border-none"
+        >
+          {meta.emoji} {meta.label}
+        </Badge>
+      </div>
+      {point.status && (
+        <div className="text-muted-foreground">Status: {point.status}</div>
+      )}
+      <div className="font-mono text-[10px] text-muted-foreground">
+        {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-xs font-medium hover:opacity-90"
+      >
+        <Navigation2 className="h-3.5 w-3.5" /> Navegar
+      </a>
     </div>
   );
 }
 
-function MapLayerButton({ active, onClick, icon: Icon, label }: any) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl shadow-2xl shadow-black/10 transition-all active:scale-95 ${active ? 'bg-primary text-primary-foreground font-black' : 'bg-background/90 backdrop-blur-xl text-muted-foreground font-bold'}`}
-    >
-      <Icon className={`h-4 w-4 ${active ? 'text-white' : 'text-primary'}`} />
-      <span className="text-[10px] uppercase tracking-widest">{label}</span>
-    </button>
-  );
+function FitBounds({ points }: { points: PropertyMapPoint[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+    }
+  }, [points, map]);
+  return null;
+}
+
+function HeatLayer({ points }: { points: PropertyMapPoint[] }) {
+  const map = useMap();
+  const layerRef = useRef<L.Layer | null>(null);
+  useEffect(() => {
+    const data: [number, number, number][] = points.map((p) => [
+      p.latitude,
+      p.longitude,
+      p.has_positive_focus ? 1 : 0.3,
+    ]);
+    // @ts-expect-error leaflet.heat plugin
+    const layer = L.heatLayer(data, {
+      radius: 28,
+      blur: 22,
+      maxZoom: 17,
+      gradient: { 0.2: "#16a34a", 0.5: "#f97316", 0.9: "#dc2626" },
+    });
+    layer.addTo(map);
+    layerRef.current = layer;
+    return () => {
+      if (layerRef.current) map.removeLayer(layerRef.current);
+    };
+  }, [points, map]);
+  return null;
 }
