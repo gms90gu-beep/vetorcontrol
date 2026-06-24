@@ -556,6 +556,9 @@ export function SupervisionDashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="rounded-xl">
+                      <DropdownMenuItem onClick={() => openAgentRG(agent)}>
+                        <ClipboardList className="h-3.5 w-3.5 mr-2" /> Ver RG
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => navigate({ to: "/reports" })}>
                         <FileText className="h-3.5 w-3.5 mr-2" /> Ver Relatório
                       </DropdownMenuItem>
@@ -594,6 +597,90 @@ export function SupervisionDashboard() {
                 <StatBox label="Trabalhados" value={viewingAgent.stats?.worked || 0} />
                 <StatBox label="Fechados" value={viewingAgent.stats?.closed || 0} />
                 <StatBox label="Focos" value={viewingAgent.stats?.focus || 0} danger />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* RG do agente: quarteirões + imóveis georreferenciados */}
+      <Dialog open={!!rgAgent} onOpenChange={(o) => { if (!o) { setRgAgent(null); setRgBoletins([]); } }}>
+        <DialogContent className="sm:max-w-[560px] rounded-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase">
+              RG · {rgAgent?.full_name}
+            </DialogTitle>
+          </DialogHeader>
+          {rgLoading ? (
+            <div className="py-10 flex items-center justify-center text-slate-400 text-sm gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando boletins...
+            </div>
+          ) : rgBoletins.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 text-sm">
+              Este agente ainda não possui boletins RG.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <StatBox label="Quarteirões" value={rgBoletins.length} />
+                <StatBox
+                  label="Imóveis"
+                  value={rgBoletins.reduce((s, b) => s + (b.total_imoveis || 0), 0)}
+                />
+                <StatBox
+                  label="Geo (GPS)"
+                  value={rgBoletins.reduce((s, b) => s + (b.geocoded || 0), 0)}
+                />
+              </div>
+              <div className="space-y-2">
+                {rgBoletins.map((b) => {
+                  const pct = b.total_imoveis > 0
+                    ? Math.round(((b.geocoded || 0) / b.total_imoveis) * 100)
+                    : 0;
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => {
+                        setRgAgent(null);
+                        navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
+                      }}
+                      className="w-full text-left bg-white rounded-2xl p-3 border border-slate-100 shadow-sm hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-black text-slate-900">
+                            Quarteirão {b.block_number || "—"}
+                          </p>
+                          <p className="text-[11px] font-bold text-slate-500 truncate">
+                            {b.locality || "Sem localidade"}
+                            {b.municipality ? ` · ${b.municipality}` : ""}
+                          </p>
+                        </div>
+                        <Badge
+                          className={cn(
+                            "rounded-md px-1.5 py-0 font-black text-[9px] uppercase tracking-wider border-none",
+                            b.finalized_at
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700",
+                          )}
+                        >
+                          {b.finalized_at ? "FINALIZADO" : "RASCUNHO"}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex items-center gap-4 text-[11px] font-bold text-slate-600">
+                        <span>{b.total_imoveis} imóveis</span>
+                        <span className="text-emerald-700">{b.geocoded} c/ GPS</span>
+                        <span className="ml-auto text-slate-400">{pct}%</span>
+                      </div>
+                      <div className="mt-1 h-[3px] w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
