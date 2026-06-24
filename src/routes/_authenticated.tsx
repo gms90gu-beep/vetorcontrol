@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 import { hasValidLocalSession } from "@/lib/auth";
 
