@@ -679,11 +679,12 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
           .from("profiles")
           .select("id, full_name")
           .in("id", profileIds);
-        for (const p of profs ?? []) profileNameById.set(p.id, p.full_name);
+        for (const p of profs ?? []) profileNameById.set(p.id, p.full_name ?? "Agente");
       }
       for (const a of ags ?? []) {
-        agentNameById.set(a.id, profileNameById.get(a.profile_id) || a.name || "Agente");
+        agentNameById.set(a.id, (a.profile_id && profileNameById.get(a.profile_id)) || a.name || "Agente");
       }
+
     }
 
     const points: PropertyMapPoint[] = propList.map((p) => {
