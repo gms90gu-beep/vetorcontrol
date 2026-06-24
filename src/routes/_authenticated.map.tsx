@@ -53,6 +53,7 @@ function MapNotFound() {
 }
 
 function MapPage() {
+  console.log("[MAP_ROUTE_MOUNT]");
   // ClientOnly gate — leaflet touches `window` at import time
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
