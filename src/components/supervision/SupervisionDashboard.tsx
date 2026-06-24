@@ -54,6 +54,9 @@ export function SupervisionDashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [isAddingAgent, setIsAddingAgent] = useState(false);
   const [viewingAgent, setViewingAgent] = useState<any | null>(null);
+  const [rgAgent, setRgAgent] = useState<any | null>(null);
+  const [rgLoading, setRgLoading] = useState(false);
+  const [rgBoletins, setRgBoletins] = useState<any[]>([]);
   const [newAgent, setNewAgent] = useState({
     full_name: "",
     email: "",
