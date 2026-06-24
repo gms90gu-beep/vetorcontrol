@@ -195,6 +195,45 @@ export function SupervisionDashboard() {
     }
   };
 
+  async function openAgentRG(agent: any) {
+    setRgAgent(agent);
+    setRgLoading(true);
+    setRgBoletins([]);
+    try {
+      const { data: boletins, error: bErr } = await supabase
+        .from("boletins_rg")
+        .select("id, block_number, locality, municipality, finalized_at, created_at")
+        .eq("agent_id", agent.id)
+        .order("created_at", { ascending: false });
+      if (bErr) throw bErr;
+
+      const list = boletins || [];
+      const ids = list.map((b: any) => b.id);
+      let props: any[] = [];
+      if (ids.length) {
+        const { data: pdata } = await supabase
+          .from("properties")
+          .select("id, boletim_id, block_number, latitude, longitude")
+          .in("boletim_id", ids);
+        props = pdata || [];
+      }
+
+      const enriched = list.map((b: any) => {
+        const mine = props.filter((p) => p.boletim_id === b.id);
+        const geocoded = mine.filter(
+          (p) => p.latitude != null && p.longitude != null,
+        ).length;
+        return { ...b, total_imoveis: mine.length, geocoded };
+      });
+      setRgBoletins(enriched);
+    } catch (e: any) {
+      console.error("[Supervision.openAgentRG]", e);
+      toast.error(e?.message || "Erro ao carregar RG do agente");
+    } finally {
+      setRgLoading(false);
+    }
+  }
+
   const totals = useMemo(() => {
     const active = agents.filter((a) => a.is_active).length;
     const inactive = agents.filter((a) => !a.is_active).length;
