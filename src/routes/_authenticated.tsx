@@ -256,7 +256,6 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
         { label: "Relatórios", icon: FileText, to: "/relatorios" },
       ];
 
