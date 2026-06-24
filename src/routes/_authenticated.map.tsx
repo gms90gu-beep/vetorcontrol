@@ -54,12 +54,28 @@ function MapNotFound() {
 
 function MapPage() {
   console.log("[MAP_ROUTE_MOUNT]");
+  const { userRole } = useOperationalDate();
+  const isManager = userRole === "supervisor" || userRole === "coordenador" || userRole === "admin_master";
   // ClientOnly gate — leaflet touches `window` at import time
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    console.log("[MAP_INIT] client mount");
+    console.log("[MAP_INIT] client mount", { userRole });
     setMounted(true);
-  }, []);
+  }, [userRole]);
+
+  if (!isManager) {
+    return (
+      <div className="container mx-auto max-w-2xl p-6">
+        <div className="rounded-lg border border-accent/50 bg-card/50 p-6 space-y-2">
+          <h2 className="text-lg font-semibold">Mapa operacional indisponível</h2>
+          <p className="text-sm text-muted-foreground">
+            Esta tela é exclusiva para supervisores, coordenadores e admin master.
+            Como agente, utilize <strong>Trabalho</strong> e <strong>RG</strong> para registrar visitas no campo.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!mounted) {
     return (
