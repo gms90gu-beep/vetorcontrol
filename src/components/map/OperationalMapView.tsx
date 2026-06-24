@@ -176,6 +176,7 @@ export default function OperationalMapView() {
     if (raw.length !== filtered.length) {
       console.warn("[MAP_POINTS] descartados sem GPS válido:", raw.length - filtered.length);
     }
+    console.log("[MAP_QUERY_RESULT]", { total: filtered.length, raw: raw.length });
     console.log("[MAP_POINTS]", { total: raw.length, valid: filtered.length });
     return filtered;
   }, [props.data]);
