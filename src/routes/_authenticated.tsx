@@ -155,7 +155,7 @@ function BottomNav() {
         <NavItem to={homeTo} icon={Home} label="Início" />
         <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
         <NavItem to="/rg" icon={MapPin} label="RG" />
-        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+        {isManager && <NavItem to="/map" icon={MapIcon} label="Mapa" />}
         <NavItem to="/relatorios" icon={FileText} label="Relat." />
         <button
           type="button"
