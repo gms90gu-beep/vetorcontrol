@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
 
 const OperationalMapView = lazy(() => {
   console.log("[MAP_LAZY_START]");
