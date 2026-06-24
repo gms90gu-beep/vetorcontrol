@@ -507,12 +507,65 @@ export interface PropertyMapPoint {
   number: string | null;
   street: string | null;
   block_number: string | null;
+  locality: string | null;
   latitude: number;
   longitude: number;
   status: string | null;
   has_pendency: boolean;
   has_positive_focus: boolean;
   is_strategic: boolean;
+  boletim_id: string | null;
+  agent_name: string | null;
+  last_visit_at: string | null;
+  deposits_found: number;
+  positive_foci_count: number;
+  pendency_count: number;
+  is_recurrent: boolean;
+  risk_score: number;
+  risk_level: "low" | "med" | "high";
+}
+
+export interface BlockRiskScore {
+  block_number: string;
+  locality: string | null;
+  score: number;
+  level: "low" | "med" | "high";
+  props_count: number;
+  focus_count: number;
+  pending_count: number;
+  centroid: { lat: number; lng: number };
+}
+
+export interface GpsCoverage {
+  properties_total: number;
+  properties_geo: number;
+  coverage_pct: number;
+  blocks_total: number;
+  blocks_geo: number;
+}
+
+function riskLevel(score: number): "low" | "med" | "high" {
+  if (score >= 6) return "high";
+  if (score >= 3) return "med";
+  return "low";
+}
+
+async function scopedAgentIds(
+  supabase: any,
+  userId: string,
+  role: "admin_master" | "coordenador" | "supervisor",
+): Promise<string[] | null> {
+  if (role === "admin_master") return null;
+  let profQ = supabase.from("profiles").select("id");
+  if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
+  const { data: profiles } = await profQ;
+  const profileIds = (profiles ?? []).map((p: any) => p.id);
+  if (profileIds.length === 0) return [];
+  const { data: agents } = await supabase
+    .from("agents")
+    .select("id")
+    .in("profile_id", profileIds);
+  return (agents ?? []).map((a: any) => a.id);
 }
 
 export const getPropertyMapPoints = createServerFn({ method: "POST" })
@@ -521,72 +574,247 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[] }> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
+    const agentIds = await scopedAgentIds(supabase, userId, role);
+    if (agentIds && agentIds.length === 0) return { points: [] };
 
-    let agentIds: string[] | null = null;
-    if (role !== "admin_master") {
-      let profQ = supabase.from("profiles").select("id");
-      if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
-      const { data: profiles } = await profQ;
-      const profileIds = (profiles ?? []).map((p: any) => p.id);
-      if (profileIds.length === 0) return { points: [] };
-      const { data: agents } = await supabase.from("agents").select("id").in("profile_id", profileIds);
-      agentIds = (agents ?? []).map((a: any) => a.id);
-      if (agentIds.length === 0) return { points: [] };
+    let boletimIds: string[] | null = null;
+    const boletimAgentMap = new Map<string, { agent_id: string | null; locality: string | null }>();
+    if (agentIds) {
+      const { data: boletins } = await supabase
+        .from("boletins_rg")
+        .select("id, agent_id, locality")
+        .in("agent_id", agentIds);
+      boletimIds = (boletins ?? []).map((b: any) => b.id);
+      if (boletimIds.length === 0) return { points: [] };
+      for (const b of boletins ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
     }
 
     let propQ = supabase
       .from("properties")
-      .select("id, number, street_name, block_number, type, status, latitude, longitude")
+      .select("id, number, street_name, block_number, type, status, latitude, longitude, boletim_id")
       .not("latitude", "is", null)
       .not("longitude", "is", null)
       .limit(5000);
-
-    if (agentIds) {
-      // restringe a imóveis cujo boletim pertence aos agentes do escopo
-      const { data: boletins } = await supabase
-        .from("boletins_rg")
-        .select("id")
-        .in("agent_id", agentIds);
-      const boletimIds = (boletins ?? []).map((b: any) => b.id);
-      if (boletimIds.length === 0) return { points: [] };
-      propQ = propQ.in("boletim_id", boletimIds);
-    }
+    if (boletimIds) propQ = propQ.in("boletim_id", boletimIds);
 
     const { data: props } = await propQ;
     const propList = (props ?? []) as any[];
     if (propList.length === 0) return { points: [] };
 
+    if (!agentIds) {
+      const ids = Array.from(new Set(propList.map((p) => p.boletim_id).filter(Boolean)));
+      if (ids.length > 0) {
+        const { data: bs } = await supabase
+          .from("boletins_rg")
+          .select("id, agent_id, locality")
+          .in("id", ids);
+        for (const b of bs ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
+      }
+    }
+
     const propIds = propList.map((p) => p.id);
+
     const { data: pends } = await supabase
       .from("property_pendencies")
       .select("property_id, resolved_at")
       .in("property_id", propIds);
-    const openPendencies = new Set(
-      (pends ?? []).filter((p: any) => !p.resolved_at).map((p: any) => p.property_id),
-    );
+    const pendingByProp = new Map<string, number>();
+    for (const p of pends ?? []) {
+      if (!p.resolved_at) pendingByProp.set(p.property_id, (pendingByProp.get(p.property_id) ?? 0) + 1);
+    }
 
-    const { data: foci } = await supabase
+    const { data: visits } = await supabase
       .from("visits")
-      .select("property_id")
+      .select("id, property_id, agent_id, has_focus, visit_date")
       .in("property_id", propIds)
-      .eq("has_focus", true)
       .gte("visit_date", data.from)
-      .lte("visit_date", data.to);
-    const focusProps = new Set((foci ?? []).map((v: any) => v.property_id));
+      .lte("visit_date", data.to)
+      .order("visit_date", { ascending: false });
 
-    const points: PropertyMapPoint[] = propList.map((p) => ({
-      id: p.id,
-      number: p.number ?? null,
-      street: p.street_name ?? null,
-      block_number: p.block_number != null ? String(p.block_number) : null,
-      latitude: Number(p.latitude),
-      longitude: Number(p.longitude),
-      status: p.status ?? null,
-      has_pendency: openPendencies.has(p.id),
-      has_positive_focus: focusProps.has(p.id),
-      is_strategic: p.type === "strategic_point",
-    }));
+    const focusByProp = new Map<string, number>();
+    const lastVisitByProp = new Map<string, string>();
+    const lastAgentByProp = new Map<string, string>();
+    const visitIds: string[] = [];
+    for (const v of visits ?? []) {
+      visitIds.push(v.id);
+      if (v.has_focus) focusByProp.set(v.property_id, (focusByProp.get(v.property_id) ?? 0) + 1);
+      if (!lastVisitByProp.has(v.property_id)) {
+        lastVisitByProp.set(v.property_id, v.visit_date);
+        if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
+      }
+    }
+
+    const depByProp = new Map<string, number>();
+    if (visitIds.length > 0) {
+      const { data: deps } = await supabase
+        .from("visit_deposits")
+        .select("visit_id")
+        .in("visit_id", visitIds);
+      const visitToProp = new Map<string, string>();
+      for (const v of visits ?? []) visitToProp.set(v.id, v.property_id);
+      for (const d of deps ?? []) {
+        const pid = visitToProp.get(d.visit_id);
+        if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
+      }
+    }
+
+    const agentIdsForName = Array.from(
+      new Set(
+        [
+          ...lastAgentByProp.values(),
+          ...Array.from(boletimAgentMap.values()).map((b) => b.agent_id),
+        ].filter(Boolean) as string[],
+      ),
+    );
+    const agentNameById = new Map<string, string>();
+    if (agentIdsForName.length > 0) {
+      const { data: ags } = await supabase
+        .from("agents")
+        .select("id, name, profile_id")
+        .in("id", agentIdsForName);
+      const profileIds = (ags ?? []).map((a: any) => a.profile_id).filter(Boolean);
+      const profileNameById = new Map<string, string>();
+      if (profileIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", profileIds);
+        for (const p of profs ?? []) profileNameById.set(p.id, p.full_name);
+      }
+      for (const a of ags ?? []) {
+        agentNameById.set(a.id, profileNameById.get(a.profile_id) || a.name || "Agente");
+      }
+    }
+
+    const points: PropertyMapPoint[] = propList.map((p) => {
+      const boletim = p.boletim_id ? boletimAgentMap.get(p.boletim_id) : null;
+      const agentId = lastAgentByProp.get(p.id) || boletim?.agent_id || null;
+      const foci = focusByProp.get(p.id) ?? 0;
+      const pend = pendingByProp.get(p.id) ?? 0;
+      const recurrent = foci >= 2;
+      const isPe = p.type === "strategic_point";
+      const score = foci * 3 + pend * 2 + (recurrent ? 2 : 0) + (isPe ? 1 : 0);
+      return {
+        id: p.id,
+        number: p.number ?? null,
+        street: p.street_name ?? null,
+        block_number: p.block_number != null ? String(p.block_number) : null,
+        locality: boletim?.locality ?? null,
+        latitude: Number(p.latitude),
+        longitude: Number(p.longitude),
+        status: p.status ?? null,
+        has_pendency: pend > 0,
+        has_positive_focus: foci > 0,
+        is_strategic: isPe,
+        boletim_id: p.boletim_id ?? null,
+        agent_name: agentId ? agentNameById.get(agentId) ?? null : null,
+        last_visit_at: lastVisitByProp.get(p.id) ?? null,
+        deposits_found: depByProp.get(p.id) ?? 0,
+        positive_foci_count: foci,
+        pendency_count: pend,
+        is_recurrent: recurrent,
+        risk_score: score,
+        risk_level: riskLevel(score),
+      };
+    });
 
     return { points };
   });
+
+export const getBlockRiskScores = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { from: string; to: string }) => input)
+  .handler(async ({ data, context }): Promise<{ blocks: BlockRiskScore[] }> => {
+    const result = await (getPropertyMapPoints as any)({ data });
+    const points = (result.points ?? []) as PropertyMapPoint[];
+    const byKey = new Map<
+      string,
+      BlockRiskScore & { latSum: number; lngSum: number }
+    >();
+    for (const p of points) {
+      if (!p.block_number) continue;
+      const key = `${p.block_number}::${p.locality ?? ""}`;
+      const cur =
+        byKey.get(key) ??
+        ({
+          block_number: p.block_number,
+          locality: p.locality,
+          score: 0,
+          level: "low" as const,
+          props_count: 0,
+          focus_count: 0,
+          pending_count: 0,
+          centroid: { lat: 0, lng: 0 },
+          latSum: 0,
+          lngSum: 0,
+        } as BlockRiskScore & { latSum: number; lngSum: number });
+      cur.score += p.risk_score;
+      cur.props_count += 1;
+      cur.focus_count += p.positive_foci_count;
+      cur.pending_count += p.pendency_count;
+      cur.latSum += p.latitude;
+      cur.lngSum += p.longitude;
+      byKey.set(key, cur);
+    }
+    const blocks: BlockRiskScore[] = Array.from(byKey.values()).map((b) => {
+      const avgScore = b.score / Math.max(1, b.props_count);
+      return {
+        block_number: b.block_number,
+        locality: b.locality,
+        score: Math.round(b.score),
+        level: riskLevel(avgScore),
+        props_count: b.props_count,
+        focus_count: b.focus_count,
+        pending_count: b.pending_count,
+        centroid: { lat: b.latSum / b.props_count, lng: b.lngSum / b.props_count },
+      };
+    });
+    return { blocks };
+  });
+
+export const getGpsCoverage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((_input: Record<string, never>) => ({}))
+  .handler(async ({ context }): Promise<GpsCoverage> => {
+    const { supabase, userId } = context;
+    const role = await requireAdminOrSupervisor(supabase, userId);
+    const agentIds = await scopedAgentIds(supabase, userId, role);
+
+    let boletimIds: string[] | null = null;
+    if (agentIds) {
+      if (agentIds.length === 0)
+        return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
+      const { data: boletins } = await supabase
+        .from("boletins_rg")
+        .select("id")
+        .in("agent_id", agentIds);
+      boletimIds = (boletins ?? []).map((b: any) => b.id);
+      if (boletimIds.length === 0)
+        return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
+    }
+
+    let q = supabase.from("properties").select("id, latitude, longitude, block_number");
+    if (boletimIds) q = q.in("boletim_id", boletimIds);
+    const { data: props } = await q.limit(50000);
+    const list = (props ?? []) as any[];
+
+    const blocksTotal = new Set<string>();
+    const blocksGeo = new Set<string>();
+    let geo = 0;
+    for (const p of list) {
+      if (p.block_number != null) blocksTotal.add(String(p.block_number));
+      if (p.latitude != null && p.longitude != null) {
+        geo += 1;
+        if (p.block_number != null) blocksGeo.add(String(p.block_number));
+      }
+    }
+    return {
+      properties_total: list.length,
+      properties_geo: geo,
+      coverage_pct: list.length === 0 ? 0 : Math.round((geo / list.length) * 1000) / 10,
+      blocks_total: blocksTotal.size,
+      blocks_geo: blocksGeo.size,
+    };
+  });
+
 
