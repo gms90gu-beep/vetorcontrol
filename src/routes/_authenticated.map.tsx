@@ -2,15 +2,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const OperationalMapView = lazy(() =>
-  import("@/components/map/OperationalMapView").catch((err) => {
-    console.error("[MAP_IMPORT_ERROR]", {
-      message: (err as Error).message,
-      stack: (err as Error).stack,
+const OperationalMapView = lazy(() => {
+  console.log("[MAP_LAZY_START]");
+  return import("@/components/map/OperationalMapView")
+    .then((mod) => {
+      console.log("[MAP_LAZY_SUCCESS]");
+      return mod;
+    })
+    .catch((err) => {
+      console.error("[MAP_IMPORT_ERROR]", {
+        message: (err as Error).message,
+        stack: (err as Error).stack,
+      });
+      throw err;
     });
-    throw err;
-  }),
-);
+});
 
 function MapRouteErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   useEffect(() => {
@@ -47,6 +53,7 @@ function MapNotFound() {
 }
 
 function MapPage() {
+  console.log("[MAP_ROUTE_MOUNT]");
   // ClientOnly gate — leaflet touches `window` at import time
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

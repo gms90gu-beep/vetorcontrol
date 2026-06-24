@@ -95,6 +95,7 @@ function isValidCoord(lat: unknown, lng: unknown): boolean {
 }
 
 export default function OperationalMapView() {
+  console.log("[MAP_COMPONENT_MOUNT]");
   console.log("[MAP_INIT]", { ts: Date.now() });
 
   const [preset, setPreset] = useState<Preset>("current");
@@ -147,7 +148,10 @@ export default function OperationalMapView() {
 
   const props = useQuery({
     queryKey: ["op-map-points", from, to],
-    queryFn: () => fetchProps({ data: { from, to } }),
+    queryFn: () => {
+      console.log("[MAP_QUERY_START]", { from, to });
+      return fetchProps({ data: { from, to } });
+    },
   });
   const blocks = useQuery({
     queryKey: ["op-map-blocks", from, to],
@@ -172,6 +176,7 @@ export default function OperationalMapView() {
     if (raw.length !== filtered.length) {
       console.warn("[MAP_POINTS] descartados sem GPS válido:", raw.length - filtered.length);
     }
+    console.log("[MAP_QUERY_RESULT]", { total: filtered.length, raw: raw.length });
     console.log("[MAP_POINTS]", { total: raw.length, valid: filtered.length });
     return filtered;
   }, [props.data]);
