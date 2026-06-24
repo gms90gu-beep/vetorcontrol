@@ -95,6 +95,7 @@ function isValidCoord(lat: unknown, lng: unknown): boolean {
 }
 
 export default function OperationalMapView() {
+  console.log("[MAP_COMPONENT_MOUNT]");
   console.log("[MAP_INIT]", { ts: Date.now() });
 
   const [preset, setPreset] = useState<Preset>("current");
