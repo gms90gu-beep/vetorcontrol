@@ -148,7 +148,10 @@ export default function OperationalMapView() {
 
   const props = useQuery({
     queryKey: ["op-map-points", from, to],
-    queryFn: () => fetchProps({ data: { from, to } }),
+    queryFn: () => {
+      console.log("[MAP_QUERY_START]", { from, to });
+      return fetchProps({ data: { from, to } });
+    },
   });
   const blocks = useQuery({
     queryKey: ["op-map-blocks", from, to],
