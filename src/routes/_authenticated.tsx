@@ -36,6 +36,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 import { hasValidLocalSession } from "@/lib/auth";
 
@@ -131,33 +132,78 @@ function getShortPanelTitle(role: string | null) {
 function BottomNav() {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
+  const [moreOpen, setMoreOpen] = useState(false);
   if (!isMobile) return null;
 
   const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
+  const homeTo = isManager ? "/supervision" : "/dashboard";
 
+  const moreItems: Array<{ to: string; icon: any; label: string }> = [
+    { to: "/cycles", icon: Layers, label: "Ciclos" },
+    { to: "/pending", icon: AlertTriangle, label: "Pendências" },
+    { to: "/weekly-comparison", icon: BarChart3, label: "Boletim Semanal" },
+    { to: "/sync-status", icon: RefreshCw, label: "Sincronização" },
+    { to: "/settings", icon: Settings, label: "Configurações" },
+  ];
   if (isManager) {
-    return (
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-4 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
-        <NavItem to="/supervision" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
-        <NavItem to="/relatorios" icon={FileText} label="Relat." />
-        <NavItem to="/reports" icon={BarChart3} label="Intel." />
-        <NavItem to="/map" icon={MapIcon} label="Mapa" />
-        <NavItem to="/settings" icon={Settings} label="Ajustes" />
-      </div>
-    );
+    moreItems.unshift({ to: "/reports", icon: BarChart3, label: "Intel." });
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
-      <NavItem to="/dashboard" icon={LayoutDashboard} label={getShortPanelTitle(userRole)} />
-      <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
-      <NavItem to="/rg" icon={MapPin} label="RG" />
-      <NavItem to="/pending" icon={AlertTriangle} label="Pend." />
-      <NavItem to="/relatorios" icon={FileText} label="Relat." />
-      <NavItem to="/settings" icon={Settings} label="Ajustes" />
-    </div>
+    <>
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
+        <NavItem to={homeTo} icon={Home} label="Início" />
+        <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
+        <NavItem to="/rg" icon={MapPin} label="RG" />
+        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+        <NavItem to="/relatorios" icon={FileText} label="Relat." />
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          className="flex flex-col items-center gap-1 text-muted-foreground transition-all active:scale-90"
+        >
+          <Settings className="h-6 w-6" />
+          <span className="text-[10px] font-bold uppercase tracking-tight">Mais</span>
+        </button>
+      </div>
+      <MoreMenuSheet open={moreOpen} onOpenChange={setMoreOpen} items={moreItems} />
+    </>
   );
 }
+
+function MoreMenuSheet({
+  open,
+  onOpenChange,
+  items,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  items: Array<{ to: string; icon: any; label: string }>;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-2xl pb-[env(safe-area-inset-bottom,1.5rem)]">
+        <SheetHeader>
+          <SheetTitle>Mais opções</SheetTitle>
+        </SheetHeader>
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          {items.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to as any}
+              onClick={() => onOpenChange(false)}
+              className="flex items-center gap-3 rounded-xl border border-accent/40 bg-card/50 px-4 py-3 text-sm font-semibold text-foreground active:scale-95 transition"
+            >
+              <item.icon className="h-5 w-5 text-primary shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 
 function NavItem({ to, icon: Icon, label }: any) {
   return (
