@@ -155,7 +155,7 @@ function BottomNav() {
         <NavItem to={homeTo} icon={Home} label="Início" />
         <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
         <NavItem to="/rg" icon={MapPin} label="RG" />
-        <NavItem to="/map" icon={MapIcon} label="Mapa" />
+        {isManager && <NavItem to="/map" icon={MapIcon} label="Mapa" />}
         <NavItem to="/relatorios" icon={FileText} label="Relat." />
         <button
           type="button"
@@ -256,7 +256,6 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
         { label: "RG", icon: MapPin, to: "/rg" },
         { label: "Pendências", icon: AlertTriangle, to: "/pending" },
         { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
         { label: "Relatórios", icon: FileText, to: "/relatorios" },
       ];
 
