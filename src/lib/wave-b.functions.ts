@@ -214,15 +214,11 @@ export const getWeeklyComparison = createServerFn({ method: "POST" })
 
     let agentIds: string[] = [];
     if (scope === "self") {
-      const { data: a } = await supabase
-        .from("agents")
-        .select("id")
-        .eq("profile_id", userId)
-        .maybeSingle();
-      if (a?.id) agentIds = [a.id];
+      // próprio profile_id (DWR.agent_id == profile_id)
+      agentIds = [userId];
     } else {
-      const { agents } = await resolveScopedAgents(supabase, userId);
-      agentIds = agents.map((a: any) => a.id);
+      const { profiles } = await resolveScopedAgents(supabase, userId);
+      agentIds = (profiles as any[]).map((p) => p.id);
       if (data.agentId) agentIds = agentIds.filter((id) => id === data.agentId);
     }
 
