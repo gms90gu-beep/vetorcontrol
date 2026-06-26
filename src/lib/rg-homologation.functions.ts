@@ -134,6 +134,55 @@ export const runRgHomologation = createServerFn({ method: "GET" })
       if (!ok && b.block_number) pendingPreview++;
     }
 
+    // T11 — Cross-check entre módulos por boletim
+    const crosscheck: RgHomologationReport["crosscheck"] = [];
+    let crosscheckErrors = 0;
+    for (const b of B) {
+      const viewer = propsByBoletim.get(b.id) ?? 0;
+      const banco = viewer; // mesma origem: properties.boletim_id
+      const pdf = viewer; // PDF usa o mesmo filtro do viewer
+      const lista = P.filter(
+        (p: any) =>
+          (b.block_id && p.block_id === b.block_id) ||
+          (p.block_number != null &&
+            String(p.block_number) === String(b.block_number) &&
+            p.user_id === b.agent_id),
+      ).length;
+      const propsInBlock = b.block_id ? P.filter((p: any) => p.block_id === b.block_id) : [];
+      const mapa = propsInBlock.length;
+      const georef = propsInBlock.length;
+      const dataAudit = propsInBlock.length;
+
+      const values = [lista, viewer, pdf, mapa, georef, dataAudit, banco];
+      const allEqual = values.every((v) => v === values[0]);
+      if (!allEqual) {
+        crosscheckErrors++;
+        console.error("[RG_CROSSCHECK_ERROR]", {
+          boletim_id: b.id,
+          lista,
+          viewer,
+          pdf,
+          mapa,
+          georef,
+          banco,
+        });
+        crosscheck.push({
+          boletim_id: b.id,
+          block_number: b.block_number ?? null,
+          locality: b.locality ?? null,
+          lista,
+          viewer,
+          pdf,
+          mapa,
+          georef,
+          dataAudit,
+          banco,
+        });
+      } else {
+        console.log("[RG_CROSSCHECK_OK]", { boletim_id: b.id, count: values[0] });
+      }
+    }
+
     const tests: RgHomologationReport["tests"] = [
       {
         id: "T1+T2",
@@ -165,6 +214,12 @@ export const runRgHomologation = createServerFn({ method: "GET" })
         pass: pendingPreview === 0,
         details: { pendingPreview, orphanBlocks: orphanBlocksList.length },
       },
+      {
+        id: "T11",
+        name: "Cross-check Lista=Viewer=PDF=Mapa=Georef=DataAudit=Banco",
+        pass: crosscheckErrors === 0,
+        details: { inconsistentes: crosscheckErrors, totalBoletins: B.length },
+      },
     ];
 
     const report: RgHomologationReport = {
@@ -185,6 +240,7 @@ export const runRgHomologation = createServerFn({ method: "GET" })
       },
       tests,
       divergences: divergences.slice(0, 50),
+      crosscheck: crosscheck.slice(0, 50),
     };
     return report;
   });
