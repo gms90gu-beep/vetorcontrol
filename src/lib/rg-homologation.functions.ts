@@ -30,6 +30,18 @@ export type RgHomologationReport = {
     headerCount: number;
     viewerCount: number;
   }[];
+  crosscheck: {
+    boletim_id: string;
+    block_number: string | null;
+    locality: string | null;
+    lista: number;
+    viewer: number;
+    pdf: number;
+    mapa: number;
+    georef: number;
+    dataAudit: number;
+    banco: number;
+  }[];
 };
 
 async function assertAdmin(supabase: any, userId: string) {
