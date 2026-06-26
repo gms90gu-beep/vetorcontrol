@@ -270,6 +270,7 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
   if (isManager) {
     navItems.push({ label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias" as any });
     navItems.push({ label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap" as any });
+    navItems.push({ label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit" as any });
   }
 
   navItems.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" as any });
