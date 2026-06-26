@@ -83,21 +83,20 @@ export function AgentReportsSimple() {
         .select("full_name, registration_number, city")
         .eq("id", session.user.id)
         .maybeSingle();
+      // DWR usa profile_id como agent_id; agents só fornece metadados de cadastro
       const { data: agent } = await supabase
         .from("agents")
-        .select("id, name, registration_id, municipality")
+        .select("name, registration_id, municipality")
         .eq("profile_id", session.user.id)
         .maybeSingle();
-      if (agent?.id) {
-        setAgentId(agent.id);
-        setAgentMeta({
-          name: agent.name || profile?.full_name || "Agente",
-          registration:
-            agent.registration_id || profile?.registration_number || "—",
-          municipality: agent.municipality || profile?.city || "—",
-        });
-        await fetchDailies(agent.id);
-      }
+      setAgentId(session.user.id);
+      setAgentMeta({
+        name: agent?.name || profile?.full_name || "Agente",
+        registration:
+          agent?.registration_id || profile?.registration_number || "—",
+        municipality: agent?.municipality || profile?.city || "—",
+      });
+      await fetchDailies(session.user.id);
       setLoading(false);
     })();
   }, [fetchDailies]);
