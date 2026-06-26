@@ -172,22 +172,21 @@ function AgentReports() {
         .eq("id", session.user.id)
         .maybeSingle();
 
+      // DWR.agent_id == profile_id; agents só fornece metadados de cadastro
       const { data: agent } = await supabase
         .from("agents")
-        .select("id, name, registration_id, municipality")
+        .select("name, registration_id, municipality")
         .eq("profile_id", session.user.id)
         .maybeSingle();
 
-      if (agent?.id) {
-        setAgentId(agent.id);
-        setAgentMeta({
-          name: agent.name || profile?.full_name || "Agente",
-          registration:
-            agent.registration_id || profile?.registration_number || "—",
-          municipality: agent.municipality || profile?.city || "—",
-        });
-        await fetchDailies(agent.id);
-      }
+      setAgentId(session.user.id);
+      setAgentMeta({
+        name: agent?.name || profile?.full_name || "Agente",
+        registration:
+          agent?.registration_id || profile?.registration_number || "—",
+        municipality: agent?.municipality || profile?.city || "—",
+      });
+      await fetchDailies(session.user.id);
 
       const { data: cs } = await supabase
         .from("cycles")

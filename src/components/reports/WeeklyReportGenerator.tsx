@@ -29,16 +29,12 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       .eq("id", agentAuthId)
       .maybeSingle();
 
+    // agents serve apenas para metadados de cadastro do agente
     const { data: agentRow } = await supabase
       .from("agents")
-      .select("id, name, registration_id, municipality")
+      .select("name, registration_id, municipality")
       .eq("profile_id", agentAuthId)
       .maybeSingle();
-
-    if (!agentRow) {
-      toast.error("Agente não encontrado para este usuário.");
-      return null;
-    }
 
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
     console.log("[SE]", { work_date: referenceDate.toISOString().split("T")[0], epi_week: epiWeek, epi_year: epiYear });
@@ -53,7 +49,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     let dailiesQuery = supabase
       .from("daily_work_records")
       .select("*")
-      .eq("agent_id", agentRow.id)
+      .eq("agent_id", agentAuthId)
       .eq("epi_week", epiWeek)
       .eq("epi_year", epiYear)
       .order("work_date", { ascending: true });
@@ -153,9 +149,9 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     autoTable(pdf, {
       startY: y + 1,
       body: [
-        ["Município", agentRow.municipality || profile?.city || "—", "Ciclo", cycleName],
-        ["Agente", agentRow.name || profile?.full_name || "—", "Semana Epi.", `SE ${epiWeek}`],
-        ["Matrícula", agentRow.registration_id || profile?.registration_number || "—", "Ano", String(epiYear)],
+        ["Município", agentRow?.municipality || profile?.city || "—", "Ciclo", cycleName],
+        ["Agente", agentRow?.name || profile?.full_name || "—", "Semana Epi.", `SE ${epiWeek}`],
+        ["Matrícula", agentRow?.registration_id || profile?.registration_number || "—", "Ano", String(epiYear)],
         ["Emissão", new Date().toLocaleString("pt-BR"), "Diárias", String(records.length)],
       ],
       theme: "grid",
@@ -300,7 +296,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     pdf.setFontSize(8);
     pdf.text("Assinatura do Agente", pageW / 2, y + 4, { align: "center" });
     pdf.setFont("helvetica", "bold");
-    pdf.text(agentRow.name || profile?.full_name || "—", pageW / 2, y + 9, { align: "center" });
+    pdf.text(agentRow?.name || profile?.full_name || "—", pageW / 2, y + 9, { align: "center" });
 
     // Rodapé
     pdf.setFont("helvetica", "normal");
@@ -311,7 +307,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       14, pageH - 6
     );
 
-    const fileName = `Boletim_Semanal_Oficial_SE${epiWeek}_${epiYear}_${agentRow.registration_id || agentRow.id}.pdf`;
+    const fileName = `Boletim_Semanal_Oficial_SE${epiWeek}_${epiYear}_${agentRow?.registration_id || agentAuthId}.pdf`;
     const blob = pdf.output("blob");
 
     if (records.length === 0) {

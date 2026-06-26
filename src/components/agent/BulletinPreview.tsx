@@ -38,15 +38,12 @@ export function BulletinPreview({ userId }: Props) {
       console.log("[SE]", { work_date: today.toISOString().split("T")[0], epi_week: epi.week, epi_year: epi.year });
       if (!cancel) setSe(epi);
 
-      const { data: agentRow } = await supabase
-        .from("agents").select("id").eq("profile_id", userId).maybeSingle();
-      if (!agentRow) { if (!cancel) { setT(EMPTY); setLoading(false); } return; }
-
+      // DWR.agent_id == profile_id
       const cycle = await getActiveCycleForUser(userId);
       let q = supabase
         .from("daily_work_records")
         .select("*")
-        .eq("agent_id", agentRow.id)
+        .eq("agent_id", userId)
         .eq("epi_week", epi.week)
         .eq("epi_year", epi.year);
       if (cycle?.id) q = q.eq("cycle_id", cycle.id);

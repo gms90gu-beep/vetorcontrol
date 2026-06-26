@@ -315,6 +315,7 @@ export type Database = {
           larvae_collected: number
           larvicide_amount: number | null
           larvicide_unit: string | null
+          legacy_agent_id: string
           pending_visits: number | null
           positive_foci: number | null
           properties_closed: number | null
@@ -364,6 +365,7 @@ export type Database = {
           larvae_collected?: number
           larvicide_amount?: number | null
           larvicide_unit?: string | null
+          legacy_agent_id: string
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
@@ -413,6 +415,7 @@ export type Database = {
           larvae_collected?: number
           larvicide_amount?: number | null
           larvicide_unit?: string | null
+          legacy_agent_id?: string
           pending_visits?: number | null
           positive_foci?: number | null
           properties_closed?: number | null
@@ -435,10 +438,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "daily_work_records_agent_id_fkey"
+            foreignKeyName: "daily_work_records_agent_id_profile_fkey"
             columns: ["agent_id"]
             isOneToOne: false
-            referencedRelation: "agents"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

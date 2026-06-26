@@ -45,16 +45,9 @@ async function resolveScopedAgents(supabase: any, userId: string) {
   const { data: profiles, error: profErr } = await profileQuery;
   if (profErr) throw new Error(profErr.message);
 
-  const profileIds = (profiles ?? []).map((p: any) => p.id);
-  if (profileIds.length === 0) return { role, profiles: [], agents: [] as any[] };
-
-  const { data: agents, error: agentsErr } = await supabase
-    .from("agents")
-    .select("id, profile_id")
-    .in("profile_id", profileIds);
-  if (agentsErr) throw new Error(agentsErr.message);
-
-  return { role: role as "supervisor" | "admin_master" | "coordenador", profiles, agents: agents ?? [] };
+  console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", (profiles ?? []).length);
+  // profile_id é a identidade canônica; DWR.agent_id == profile_id
+  return { role: role as "supervisor" | "admin_master" | "coordenador", profiles: profiles ?? [] };
 }
 
 function emptyTotals() {
@@ -88,13 +81,13 @@ export const getAgentProduction = createServerFn({ method: "POST" })
   .inputValidator((input: { from: string; to: string; agentId?: string }) => input)
   .handler(async ({ data, context }): Promise<AgentProductionResult> => {
     const { supabase, userId } = context;
-    const { role, profiles, agents } = await resolveScopedAgents(supabase, userId);
+    const { role, profiles } = await resolveScopedAgents(supabase, userId);
 
     const profilesById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
-    let agentIds = agents.map((a: any) => a.id);
-    if (data.agentId) agentIds = agentIds.filter((id: string) => id === data.agentId);
+    let profileIds = (profiles as any[]).map((p) => p.id);
+    if (data.agentId) profileIds = profileIds.filter((id: string) => id === data.agentId);
 
-    if (agentIds.length === 0) {
+    if (profileIds.length === 0) {
       return {
         scope: role === "admin_master" ? "admin_master" : "supervisor",
         from: data.from,
@@ -107,19 +100,19 @@ export const getAgentProduction = createServerFn({ method: "POST" })
     const { data: dwr, error } = await supabase
       .from("daily_work_records")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", profileIds)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (error) throw new Error(error.message);
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
     const byAgent = new Map<string, AgentProductionRow>();
-    for (const a of agents) {
-      const prof = profilesById.get(a.profile_id);
-      byAgent.set(a.id, {
-        agent_id: a.id,
-        profile_id: a.profile_id,
-        full_name: prof?.full_name || "Sem nome",
-        registration: prof?.registration_id ?? null,
+    for (const p of profiles as any[]) {
+      byAgent.set(p.id, {
+        agent_id: p.id,
+        profile_id: p.id,
+        full_name: p.full_name || "Sem nome",
+        registration: p.registration_id ?? null,
         ...emptyTotals(),
       });
     }
@@ -152,6 +145,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
         (totals as any)[k] += (r as any)[k];
       }
     }
+    void profilesById;
 
     return {
       scope: role === "admin_master" ? "admin_master" : "supervisor",
@@ -220,15 +214,11 @@ export const getWeeklyComparison = createServerFn({ method: "POST" })
 
     let agentIds: string[] = [];
     if (scope === "self") {
-      const { data: a } = await supabase
-        .from("agents")
-        .select("id")
-        .eq("profile_id", userId)
-        .maybeSingle();
-      if (a?.id) agentIds = [a.id];
+      // próprio profile_id (DWR.agent_id == profile_id)
+      agentIds = [userId];
     } else {
-      const { agents } = await resolveScopedAgents(supabase, userId);
-      agentIds = agents.map((a: any) => a.id);
+      const { profiles } = await resolveScopedAgents(supabase, userId);
+      agentIds = (profiles as any[]).map((p) => p.id);
       if (data.agentId) agentIds = agentIds.filter((id) => id === data.agentId);
     }
 

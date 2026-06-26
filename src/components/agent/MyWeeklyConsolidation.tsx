@@ -53,10 +53,7 @@ export function MyWeeklyConsolidation({ userId }: Props) {
       const epi = getEpiWeek(today);
       if (!cancel) setSe(epi);
 
-      const { data: agentRow } = await supabase
-        .from("agents").select("id").eq("profile_id", userId).maybeSingle();
-      if (!agentRow) { if (!cancel) { setTotals(EMPTY); setDiags([]); setLoading(false); } return; }
-
+      // DWR.agent_id == profile_id
       const cycle = await getActiveCycleForUser(userId);
 
       // Busca TODAS as diárias do agente na janela da semana (sem filtrar por
@@ -65,7 +62,7 @@ export function MyWeeklyConsolidation({ userId }: Props) {
       const { data: rawAll } = await supabase
         .from("daily_work_records")
         .select("*")
-        .eq("agent_id", agentRow.id)
+        .eq("agent_id", userId)
         .gte("work_date", isoMondayOf(today))
         .lte("work_date", isoSundayOf(today));
 

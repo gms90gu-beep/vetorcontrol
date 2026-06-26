@@ -113,37 +113,32 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     }
 
     const profileIds = (profiles ?? []).map((p: any) => p.id);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds.length);
     if (profileIds.length === 0) {
       return emptyDashboard(role, data);
     }
 
-    const { data: agents } = await supabase
-      .from("agents")
-      .select("id, profile_id")
-      .in("profile_id", profileIds);
-    const agentList = (agents ?? []) as { id: string; profile_id: string }[];
-    let agentIds = agentList.map((a) => a.id);
-    if (data.agentId) agentIds = agentIds.filter((id) => id === data.agentId);
-    const profileByAgent = new Map(agentList.map((a) => [a.id, a.profile_id]));
-
-    if (agentIds.length === 0) return emptyDashboard(role, data);
+    let scopedProfiles = profileIds;
+    if (data.agentId) scopedProfiles = scopedProfiles.filter((id) => id === data.agentId);
+    if (scopedProfiles.length === 0) return emptyDashboard(role, data);
 
     let dwrQ = supabase
       .from("daily_work_records")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", scopedProfiles)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
     const { data: dwr, error: de } = await dwrQ;
     if (de) throw new Error(de.message);
 
-    // Pendencies open (no resolved_at)
+    // Pendencies open (no resolved_at) — agent_id é profile_id
     const { count: pendOpen } = await supabase
       .from("property_pendencies")
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
-      .in("agent_id", agentIds);
+      .in("agent_id", scopedProfiles);
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
       daily_records: 0,
@@ -183,8 +178,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       kpis.cargas_collected += +r.cargas_collected || 0;
       activeAgents.add(r.agent_id);
 
-      const profId = profileByAgent.get(r.agent_id);
-      const prof = profId ? profileById.get(profId) : null;
+      const prof = profileById.get(r.agent_id);
       const supId = prof?.supervisor_id ?? null;
       const supKey = supId ?? "—";
       if (!bySup.has(supKey)) {
@@ -225,8 +219,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     // Count unique agents per supervisor (in scope, with records)
     const supAgentSet = new Map<string, Set<string>>();
     for (const r of (dwr ?? []) as any[]) {
-      const profId = profileByAgent.get(r.agent_id);
-      const prof = profId ? profileById.get(profId) : null;
+      const prof = profileById.get(r.agent_id);
       const supKey = prof?.supervisor_id ?? "—";
       if (!supAgentSet.has(supKey)) supAgentSet.set(supKey, new Set());
       supAgentSet.get(supKey)!.add(r.agent_id);
@@ -314,32 +307,22 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     const profileIds = (profiles ?? []).map((p: any) => p.id);
     const nameByProfile = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name || "Sem nome"]));
 
-    let agentIds: string[] = [];
-    const agentToProfile = new Map<string, string>();
-    if (profileIds.length > 0) {
-      const { data: agents } = await supabase
-        .from("agents")
-        .select("id, profile_id")
-        .in("profile_id", profileIds);
-      for (const a of (agents ?? []) as any[]) {
-        agentIds.push(a.id);
-        agentToProfile.set(a.id, a.profile_id);
-      }
-    }
-
-    if (agentIds.length === 0) {
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds.length);
+    if (profileIds.length === 0) {
       return { total_open: 0, total_resolved: 0, rows: [], by_status: {} };
     }
 
+    // property_pendencies.agent_id armazena profile_id
     let q = supabase
       .from("property_pendencies")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", profileIds)
       .order("last_attempt_at", { ascending: false })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
     const { data: pends, error } = await q;
     if (error) throw new Error(error.message);
+    console.log("[RBAC_RESULT]", "pendencies", (pends ?? []).length);
 
     const propIds = Array.from(new Set((pends ?? []).map((p: any) => p.property_id).filter(Boolean)));
     const propsById = new Map<string, any>();
@@ -357,7 +340,6 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     const rows: PendencyRow[] = [];
     for (const p of (pends ?? []) as any[]) {
       const prop = propsById.get(p.property_id) || {};
-      const profId = p.agent_id ? agentToProfile.get(p.agent_id) : null;
       const status = String(p.current_status || "—");
       byStatus[status] = (byStatus[status] || 0) + 1;
       if (p.resolved_at) totalResolved++;
@@ -369,7 +351,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
         street: prop.street_name ?? null,
         block_number: prop.block_number ?? null,
         agent_id: p.agent_id,
-        agent_name: profId ? nameByProfile.get(profId) || "Sem nome" : "Sem agente",
+        agent_name: p.agent_id ? nameByProfile.get(p.agent_id) || "Sem nome" : "Sem agente",
         current_status: status,
         reason: p.reason ?? null,
         attempt_count: p.attempt_count ?? 0,
@@ -407,41 +389,29 @@ export const getHeatmapData = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
-    // For supervisor/coordenador, scope agents; admin_master sees all
-    let agentIds: string[] | null = null;
-    let profileIdsScope: string[] | null = null;
-    if (role !== "admin_master") {
-      profileIdsScope = await scopedProfileIds(supabase, userId, role as any);
-      if (!profileIdsScope || profileIdsScope.length === 0) {
-        agentIds = [];
-      } else {
-        const { data: agents } = await supabase.from("agents").select("id").in("profile_id", profileIdsScope);
-        agentIds = (agents ?? []).map((a: any) => a.id);
-      }
-    }
-    console.log("[HEATMAP_ROLE]", role, "scope_profiles", profileIdsScope?.length ?? "all", "scope_agents", agentIds?.length ?? "all");
+    // Escopo único por profile_id (DWR.agent_id e boletins_rg.agent_id são profile_id)
+    const profileIdsScope = await scopedProfileIds(supabase, userId, role);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIdsScope?.length ?? "all");
 
     let dwrQ = supabase
       .from("daily_work_records")
       .select("agent_id, properties_worked, positive_foci, deposits_by_type")
       .gte("work_date", data.from)
       .lte("work_date", data.to);
-    if (agentIds !== null) {
-      if (agentIds.length === 0) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
-      dwrQ = dwrQ.in("agent_id", agentIds);
+    if (profileIdsScope !== null) {
+      if (profileIdsScope.length === 0) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
+      dwrQ = dwrQ.in("agent_id", profileIdsScope);
     }
     const { data: dwr } = await dwrQ;
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
-    // Aggregate at the agent's recent block(s). Approximation: distribute
-    // by agent → blocks (via boletins_rg). For Wave C v1 we aggregate at
-    // agent_id level and map to all blocks they touched in window.
     const { data: blocks } = await supabase
       .from("blocks")
       .select("number, latitude, longitude");
     const blockMap = new Map<string, any>();
     for (const b of (blocks ?? []) as any[]) blockMap.set(String(b.number), b);
 
-    // boletins_rg.agent_id armazena profile_id
+    // Boletins do escopo → quarteirões por profile_id
     let bolQ = supabase.from("boletins_rg").select("agent_id, block_number");
     if (profileIdsScope) bolQ = bolQ.in("agent_id", profileIdsScope);
     const { data: boletins } = await bolQ;
@@ -452,18 +422,10 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       agentBlocks.get(b.agent_id)!.add(String(b.block_number));
     }
 
-    // map agents.profile_id → agent.id (DWR.agent_id is agents.id)
-    const distinctAgentIds = Array.from(new Set((dwr ?? []).map((r: any) => r.agent_id)));
-    const { data: agents2 } = distinctAgentIds.length
-      ? await supabase.from("agents").select("id, profile_id").in("id", distinctAgentIds)
-      : { data: [] as any[] };
-    const agentToProfile = new Map((agents2 ?? []).map((a: any) => [a.id, a.profile_id]));
-
     const byBlock = new Map<string, HeatmapPoint>();
     const totals = zeroHeat();
     for (const r of (dwr ?? []) as any[]) {
-      const profId = agentToProfile.get(r.agent_id);
-      const blocks = profId ? agentBlocks.get(profId) : null;
+      const blocks = agentBlocks.get(r.agent_id) ?? null;
       const pw = +r.properties_worked || 0;
       const pf = +r.positive_foci || 0;
       const dt = sumDepJson(r.deposits_by_type);
@@ -471,7 +433,6 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       totals.positive_foci += pf;
       totals.deposits_total += dt;
       if (!blocks || blocks.size === 0) continue;
-      // distribute equally across the agent's blocks
       const share = 1 / blocks.size;
       for (const bn of blocks) {
         if (!byBlock.has(bn)) {
@@ -796,16 +757,17 @@ export const getGpsCoverage = createServerFn({ method: "POST" })
   .handler(async ({ context }): Promise<GpsCoverage> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
-    const agentIds = await scopedAgentIds(supabase, userId, role);
+    const profileIds = await scopedProfileIds(supabase, userId, role);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds?.length ?? "all");
 
     let boletimIds: string[] | null = null;
-    if (agentIds) {
-      if (agentIds.length === 0)
+    if (profileIds) {
+      if (profileIds.length === 0)
         return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
       const { data: boletins } = await supabase
         .from("boletins_rg")
         .select("id")
-        .in("agent_id", agentIds);
+        .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
       if (boletimIds.length === 0)
         return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
