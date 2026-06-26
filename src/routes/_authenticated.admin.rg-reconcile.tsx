@@ -13,6 +13,7 @@ import {
   executeReconcile,
   deleteOrphanBlocks,
 } from "@/lib/rg-reconcile.functions";
+import { runRgHomologation, type RgHomologationReport } from "@/lib/rg-homologation.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/rg-reconcile")({
   component: Page,
