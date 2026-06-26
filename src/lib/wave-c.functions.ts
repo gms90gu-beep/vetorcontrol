@@ -409,17 +409,17 @@ export const getHeatmapData = createServerFn({ method: "POST" })
 
     // For supervisor/coordenador, scope agents; admin_master sees all
     let agentIds: string[] | null = null;
+    let profileIdsScope: string[] | null = null;
     if (role !== "admin_master") {
-      let profQ = supabase.from("profiles").select("id");
-      if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
-      const { data: profiles } = await profQ;
-      const profileIds = (profiles ?? []).map((p: any) => p.id);
-      if (profileIds.length === 0) agentIds = [];
-      else {
-        const { data: agents } = await supabase.from("agents").select("id").in("profile_id", profileIds);
+      profileIdsScope = await scopedProfileIds(supabase, userId, role as any);
+      if (!profileIdsScope || profileIdsScope.length === 0) {
+        agentIds = [];
+      } else {
+        const { data: agents } = await supabase.from("agents").select("id").in("profile_id", profileIdsScope);
         agentIds = (agents ?? []).map((a: any) => a.id);
       }
     }
+    console.log("[HEATMAP_ROLE]", role, "scope_profiles", profileIdsScope?.length ?? "all", "scope_agents", agentIds?.length ?? "all");
 
     let dwrQ = supabase
       .from("daily_work_records")
@@ -441,10 +441,10 @@ export const getHeatmapData = createServerFn({ method: "POST" })
     const blockMap = new Map<string, any>();
     for (const b of (blocks ?? []) as any[]) blockMap.set(String(b.number), b);
 
-    // Properties per block via boletins_rg (each boletim has agent + block)
-    const { data: boletins } = await supabase
-      .from("boletins_rg")
-      .select("agent_id, block_number");
+    // boletins_rg.agent_id armazena profile_id
+    let bolQ = supabase.from("boletins_rg").select("agent_id, block_number");
+    if (profileIdsScope) bolQ = bolQ.in("agent_id", profileIdsScope);
+    const { data: boletins } = await bolQ;
     const agentBlocks = new Map<string, Set<string>>();
     for (const b of (boletins ?? []) as any[]) {
       if (!b.agent_id || !b.block_number) continue;
