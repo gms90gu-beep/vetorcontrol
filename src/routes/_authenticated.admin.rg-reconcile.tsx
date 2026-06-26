@@ -203,6 +203,45 @@ function Page() {
                 </Table>
               </div>
             )}
+            {homolog.crosscheck && homolog.crosscheck.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2 text-destructive">
+                  ⚠ T11 — Boletins Inconsistentes entre Módulos (top 50)
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Boletim</TableHead>
+                      <TableHead>Quart.</TableHead>
+                      <TableHead>Localidade</TableHead>
+                      <TableHead>Lista</TableHead>
+                      <TableHead>Viewer</TableHead>
+                      <TableHead>PDF</TableHead>
+                      <TableHead>Mapa</TableHead>
+                      <TableHead>Georef</TableHead>
+                      <TableHead>DataAudit</TableHead>
+                      <TableHead>Banco</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {homolog.crosscheck.map((c) => (
+                      <TableRow key={c.boletim_id}>
+                        <TableCell className="font-mono text-xs">{c.boletim_id.slice(0, 8)}</TableCell>
+                        <TableCell>{c.block_number ?? "—"}</TableCell>
+                        <TableCell>{c.locality ?? "—"}</TableCell>
+                        <TableCell>{c.lista}</TableCell>
+                        <TableCell>{c.viewer}</TableCell>
+                        <TableCell>{c.pdf}</TableCell>
+                        <TableCell>{c.mapa}</TableCell>
+                        <TableCell>{c.georef}</TableCell>
+                        <TableCell>{c.dataAudit}</TableCell>
+                        <TableCell>{c.banco}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
