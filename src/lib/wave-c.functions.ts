@@ -389,41 +389,29 @@ export const getHeatmapData = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
-    // For supervisor/coordenador, scope agents; admin_master sees all
-    let agentIds: string[] | null = null;
-    let profileIdsScope: string[] | null = null;
-    if (role !== "admin_master") {
-      profileIdsScope = await scopedProfileIds(supabase, userId, role as any);
-      if (!profileIdsScope || profileIdsScope.length === 0) {
-        agentIds = [];
-      } else {
-        const { data: agents } = await supabase.from("agents").select("id").in("profile_id", profileIdsScope);
-        agentIds = (agents ?? []).map((a: any) => a.id);
-      }
-    }
-    console.log("[HEATMAP_ROLE]", role, "scope_profiles", profileIdsScope?.length ?? "all", "scope_agents", agentIds?.length ?? "all");
+    // Escopo único por profile_id (DWR.agent_id e boletins_rg.agent_id são profile_id)
+    const profileIdsScope = await scopedProfileIds(supabase, userId, role);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIdsScope?.length ?? "all");
 
     let dwrQ = supabase
       .from("daily_work_records")
       .select("agent_id, properties_worked, positive_foci, deposits_by_type")
       .gte("work_date", data.from)
       .lte("work_date", data.to);
-    if (agentIds !== null) {
-      if (agentIds.length === 0) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
-      dwrQ = dwrQ.in("agent_id", agentIds);
+    if (profileIdsScope !== null) {
+      if (profileIdsScope.length === 0) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
+      dwrQ = dwrQ.in("agent_id", profileIdsScope);
     }
     const { data: dwr } = await dwrQ;
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
-    // Aggregate at the agent's recent block(s). Approximation: distribute
-    // by agent → blocks (via boletins_rg). For Wave C v1 we aggregate at
-    // agent_id level and map to all blocks they touched in window.
     const { data: blocks } = await supabase
       .from("blocks")
       .select("number, latitude, longitude");
     const blockMap = new Map<string, any>();
     for (const b of (blocks ?? []) as any[]) blockMap.set(String(b.number), b);
 
-    // boletins_rg.agent_id armazena profile_id
+    // Boletins do escopo → quarteirões por profile_id
     let bolQ = supabase.from("boletins_rg").select("agent_id, block_number");
     if (profileIdsScope) bolQ = bolQ.in("agent_id", profileIdsScope);
     const { data: boletins } = await bolQ;
@@ -434,18 +422,10 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       agentBlocks.get(b.agent_id)!.add(String(b.block_number));
     }
 
-    // map agents.profile_id → agent.id (DWR.agent_id is agents.id)
-    const distinctAgentIds = Array.from(new Set((dwr ?? []).map((r: any) => r.agent_id)));
-    const { data: agents2 } = distinctAgentIds.length
-      ? await supabase.from("agents").select("id, profile_id").in("id", distinctAgentIds)
-      : { data: [] as any[] };
-    const agentToProfile = new Map((agents2 ?? []).map((a: any) => [a.id, a.profile_id]));
-
     const byBlock = new Map<string, HeatmapPoint>();
     const totals = zeroHeat();
     for (const r of (dwr ?? []) as any[]) {
-      const profId = agentToProfile.get(r.agent_id);
-      const blocks = profId ? agentBlocks.get(profId) : null;
+      const blocks = agentBlocks.get(r.agent_id) ?? null;
       const pw = +r.properties_worked || 0;
       const pf = +r.positive_foci || 0;
       const dt = sumDepJson(r.deposits_by_type);
@@ -453,7 +433,6 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       totals.positive_foci += pf;
       totals.deposits_total += dt;
       if (!blocks || blocks.size === 0) continue;
-      // distribute equally across the agent's blocks
       const share = 1 / blocks.size;
       for (const bn of blocks) {
         if (!byBlock.has(bn)) {
