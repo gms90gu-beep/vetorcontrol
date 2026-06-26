@@ -20,7 +20,7 @@ const toneStyles: Record<KPITone, { ring: string; icon: string; accent: string }
   info:    { ring: "border-info/20",    icon: "bg-info-soft text-info", accent: "text-info" },
 };
 
-export interface KPICardProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface KPICardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   title: React.ReactNode;
   value: React.ReactNode;
   icon?: React.ReactNode;
