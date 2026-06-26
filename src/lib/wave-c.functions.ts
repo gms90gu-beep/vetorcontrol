@@ -626,9 +626,10 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
     const { data: props } = await propQ;
     const propList = (props ?? []) as any[];
+    console.log("[MAP_TOTAL_GEOREF]", propList.length);
     if (propList.length === 0) return { points: [] };
 
-    if (!agentIds) {
+    if (!profileIds) {
       const ids = Array.from(new Set(propList.map((p) => p.boletim_id).filter(Boolean)));
       if (ids.length > 0) {
         const { data: bs } = await supabase
