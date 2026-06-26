@@ -126,11 +126,86 @@ function Page() {
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching || busy}>
             Atualizar prévia
           </Button>
+          <Button variant="secondary" onClick={onHomolog} disabled={busy}>
+            Rodar Homologação
+          </Button>
           <Button onClick={onExecute} disabled={busy || rows.length === 0}>
             Executar reconciliação
           </Button>
         </div>
       </div>
+
+      {homolog && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Homologação{" "}
+              <Badge variant={homolog.approved ? "default" : "destructive"}>
+                {homolog.approved ? "APROVADA" : "DIVERGÊNCIAS"}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+              <Stat label="Boletins" value={homolog.counts.boletins} />
+              <Stat label="Blocks" value={homolog.counts.blocks} />
+              <Stat label="Imóveis" value={homolog.counts.properties} />
+              <Stat label="Imóveis s/ boletim" value={homolog.counts.propertiesWithoutBoletim} warn={homolog.counts.propertiesWithoutBoletim > 0} />
+              <Stat label="Boletins s/ block" value={homolog.counts.boletinsWithoutBlock} warn={homolog.counts.boletinsWithoutBlock > 0} />
+              <Stat label="Boletins órfãos" value={homolog.counts.orphanBoletins} warn={homolog.counts.orphanBoletins > 0} />
+              <Stat label="GPS cobertos" value={homolog.counts.gpsCovered} />
+              <Stat label="GPS faltando" value={homolog.counts.gpsMissing} />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teste</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Detalhes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {homolog.tests.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{t.id} — {t.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={t.pass ? "default" : "destructive"}>{t.pass ? "OK" : "ERRO"}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{JSON.stringify(t.details)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {homolog.divergences.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Divergências Cabeçalho × Viewer (top 50)</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Boletim</TableHead>
+                      <TableHead>Quart.</TableHead>
+                      <TableHead>Localidade</TableHead>
+                      <TableHead>Cabeçalho</TableHead>
+                      <TableHead>Viewer</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {homolog.divergences.map((d) => (
+                      <TableRow key={d.boletim_id}>
+                        <TableCell className="font-mono text-xs">{d.boletim_id.slice(0, 8)}</TableCell>
+                        <TableCell>{d.block_number ?? "—"}</TableCell>
+                        <TableCell>{d.locality ?? "—"}</TableCell>
+                        <TableCell>{d.headerCount}</TableCell>
+                        <TableCell>{d.viewerCount}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Total boletins" value={data?.totalBoletins ?? 0} />
