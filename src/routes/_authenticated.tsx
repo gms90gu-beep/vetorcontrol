@@ -129,6 +129,54 @@ function getShortPanelTitle(role: string | null) {
   }
 }
 
+type NavItemDef = { label: string; icon: any; to: string };
+
+function buildNavItems(userRole: string | null): NavItemDef[] {
+  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
+
+  const items: NavItemDef[] = isManager
+    ? [
+        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
+        { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
+        { label: "Intelligence", icon: BarChart3, to: "/reports" },
+        { label: "Mapa", icon: MapIcon, to: "/map" },
+      ]
+    : [
+        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
+        { label: "Ciclos", icon: Layers, to: "/cycles" },
+        { label: "Trabalho", icon: MapIcon, to: "/field-work" },
+        { label: "RG", icon: MapPin, to: "/rg" },
+        { label: "Pendências", icon: AlertTriangle, to: "/pending" },
+        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" },
+        { label: "Relatórios", icon: FileText, to: "/relatorios" },
+      ];
+
+  if (userRole === "admin_master") {
+    items.push(
+      { label: "Admin Master", icon: ShieldCheck, to: "/admin-master" },
+      { label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard" },
+      { label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" },
+      { label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit" },
+      { label: "Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit" },
+    );
+  }
+
+  if (isManager) {
+    items.push(
+      { label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias" },
+      { label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap" },
+      { label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit" },
+    );
+  }
+
+  items.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" });
+  items.push({ label: "Configurações", icon: Settings, to: "/settings" });
+
+  return items;
+}
+
 function BottomNav() {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
@@ -136,36 +184,33 @@ function BottomNav() {
   if (!isMobile) return null;
 
   const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
-  const homeTo = isManager ? "/supervision" : "/dashboard";
+  const allItems = buildNavItems(userRole);
 
-  const moreItems: Array<{ to: string; icon: any; label: string }> = [
-    { to: "/cycles", icon: Layers, label: "Ciclos" },
-    { to: "/pending", icon: AlertTriangle, label: "Pendências" },
-    { to: "/weekly-comparison", icon: BarChart3, label: "Boletim Semanal" },
-    { to: "/sync-status", icon: RefreshCw, label: "Sincronização" },
-    { to: "/settings", icon: Settings, label: "Configurações" },
-  ];
-  if (isManager) {
-    moreItems.unshift({ to: "/reports", icon: BarChart3, label: "Intel." });
-  }
+  // 4 primary shortcuts on the bar; everything else lives in "Mais".
+  // For managers, mirror the Supervisor sidebar (no /field-work, no /rg).
+  const primary: NavItemDef[] = isManager
+    ? [
+        { label: "Painel", icon: Home, to: "/supervision" },
+        { label: "Equipe", icon: Users, to: "/supervision" },
+        { label: "Mapa", icon: MapIcon, to: "/map" },
+        { label: "Relat.", icon: FileText, to: "/relatorios" },
+      ]
+    : [
+        { label: "Início", icon: Home, to: "/dashboard" },
+        { label: "Trabalho", icon: CheckSquare, to: "/field-work" },
+        { label: "RG", icon: MapPin, to: "/rg" },
+        { label: "Relat.", icon: FileText, to: "/relatorios" },
+      ];
+
+  const primaryTos = new Set(primary.map((p) => p.to));
+  const moreItems = allItems.filter((i) => !primaryTos.has(i.to));
 
   return (
     <>
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
-        <NavItem to={homeTo} icon={Home} label="Início" />
-        {isManager ? (
-          <>
-            <NavItem to="/supervision" icon={Users} label="Equipe" />
-            <NavItem to="/map" icon={MapIcon} label="Mapa" />
-            <NavItem to="/admin/pendencias" icon={AlertTriangle} label="Pend." />
-          </>
-        ) : (
-          <>
-            <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
-            <NavItem to="/rg" icon={MapPin} label="RG" />
-          </>
-        )}
-        <NavItem to="/relatorios" icon={FileText} label="Relat." />
+        {primary.map((item) => (
+          <NavItem key={`${item.to}-${item.label}`} to={item.to} icon={item.icon} label={item.label} />
+        ))}
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
@@ -187,18 +232,18 @@ function MoreMenuSheet({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  items: Array<{ to: string; icon: any; label: string }>;
+  items: NavItemDef[];
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl pb-[env(safe-area-inset-bottom,1.5rem)]">
+      <SheetContent side="bottom" className="rounded-t-2xl pb-[env(safe-area-inset-bottom,1.5rem)] max-h-[80vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Mais opções</SheetTitle>
         </SheetHeader>
         <div className="grid grid-cols-2 gap-3 mt-4">
           {items.map((item) => (
             <Link
-              key={item.to}
+              key={`${item.to}-${item.label}`}
               to={item.to as any}
               onClick={() => onOpenChange(false)}
               className="flex items-center gap-3 rounded-xl border border-accent/40 bg-card/50 px-4 py-3 text-sm font-semibold text-foreground active:scale-95 transition"
@@ -212,6 +257,7 @@ function MoreMenuSheet({
     </Sheet>
   );
 }
+
 
 
 function NavItem({ to, icon: Icon, label }: any) {
@@ -245,46 +291,8 @@ function getPanelTitle(role: string | null) {
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
-  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
+  const navItems = buildNavItems(userRole);
 
-  // Managers (supervisor/coordenador/admin_master) get a management-focused menu
-  // without operational field actions (Trabalho, RG, Pendências, Ciclos, Veículos).
-  const navItems = isManager
-    ? [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
-        { label: "Equipe", icon: Users, to: "/supervision" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-        { label: "Intelligence", icon: BarChart3, to: "/reports" },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
-      ]
-    : [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
-        { label: "Ciclos", icon: Layers, to: "/cycles" },
-        { label: "Trabalho", icon: MapIcon, to: "/field-work" },
-        { label: "RG", icon: MapPin, to: "/rg" },
-        { label: "Pendências", icon: AlertTriangle, to: "/pending" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-      ];
-
-  if (userRole === "admin_master") {
-    navItems.push({ label: "Admin Master", icon: ShieldCheck, to: "/admin-master" as any });
-    navItems.push({ label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard" as any });
-    navItems.push({ label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" as any });
-    navItems.push({ label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit" as any });
-    navItems.push({ label: "🔍 Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit" as any });
-  }
-
-  if (isManager) {
-    navItems.push({ label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias" as any });
-    navItems.push({ label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap" as any });
-    navItems.push({ label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit" as any });
-  }
-
-  navItems.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" as any });
-
-  navItems.push({ label: "Configurações", icon: Settings, to: "/settings" });
 
   return (
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
@@ -299,7 +307,8 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
       <SidebarContent>
         <SidebarMenu className="px-2 py-4 gap-2">
           {navItems.map((item) => (
-            <SidebarMenuItem key={item.to}>
+            <SidebarMenuItem key={`${item.to}-${item.label}`}>
+
               <SidebarMenuButton asChild tooltip={item.label}>
                 <Link 
                   to={item.to as any} 
