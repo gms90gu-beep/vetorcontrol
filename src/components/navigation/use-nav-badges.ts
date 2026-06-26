@@ -32,7 +32,7 @@ export function useNavBadges(): Record<BadgeKey, number> {
           const { count } = await supabase
             .from("daily_work_records")
             .select("id", { count: "exact", head: true })
-            .eq("profile_id", user.id)
+            .eq("agent_id", user.id)
             .eq("status", "pending");
           if (!cancelled) setPendencias(count ?? 0);
         }
