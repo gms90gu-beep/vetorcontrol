@@ -33,10 +33,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
-  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
   Building2,
+  ChevronRight,
   Download,
   FileSpreadsheet,
   FileText,
@@ -51,6 +54,7 @@ import {
   Search,
   SlidersHorizontal,
   Target,
+  X,
 } from "lucide-react";
 
 type Category = "focus" | "pendency" | "strategic" | "clean";
@@ -59,7 +63,7 @@ const CATEGORY_META: Record<Category, { color: string; label: string; emoji: str
   focus: { color: "#dc2626", label: "Foco positivo", emoji: "🔴" },
   pendency: { color: "#f97316", label: "Pendência", emoji: "🟠" },
   strategic: { color: "#2563eb", label: "Ponto Estratégico", emoji: "🔵" },
-  clean: { color: "#16a34a", label: "Sem foco", emoji: "🟢" },
+  clean: { color: "#16a34a", label: "Regularizado", emoji: "🟢" },
 };
 
 const RISK_META: Record<"low" | "med" | "high", { color: string; label: string }> = {
@@ -80,10 +84,12 @@ const FILTERS: { id: "all" | Category; label: string }[] = [
   { id: "focus", label: "Focos" },
   { id: "pendency", label: "Pendências" },
   { id: "strategic", label: "PE" },
-  { id: "clean", label: "Sem foco" },
+  { id: "clean", label: "Regular." },
 ];
 
 type Preset = "current" | "previous" | "last4" | "custom";
+type HeatMode = "count" | "focus" | "pendency";
+type PanelView = "default" | "detail";
 
 function presetRange(preset: Preset, custom: { from: string; to: string }) {
   if (preset === "current") return currentEpiRange();
@@ -132,11 +138,15 @@ export default function OperationalMapView() {
   const [filter, setFilter] = useState<"all" | Category>("all");
   const [search, setSearch] = useState("");
   const [showHeat, setShowHeat] = useState(false);
+  const [heatMode, setHeatMode] = useState<HeatMode>("count");
   const [showBlocks, setShowBlocks] = useState(false);
   const [showProperties, setShowProperties] = useState(true);
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("carto");
   const [fullscreen, setFullscreen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selected, setSelected] = useState<PropertyMapPoint | null>(null);
+  const [panelView, setPanelView] = useState<PanelView>("default");
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; ts: number } | null>(null);
   const mapWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -176,7 +186,7 @@ export default function OperationalMapView() {
       const cat = classify(p);
       if (filter !== "all" && cat !== filter) return false;
       if (!q) return true;
-      const hay = `${p.street ?? ""} ${p.number ?? ""} ${p.block_number ?? ""} ${p.locality ?? ""}`.toLowerCase();
+      const hay = `${p.street ?? ""} ${p.number ?? ""} ${p.block_number ?? ""} ${p.locality ?? ""} ${p.agent_name ?? ""} ${p.id ?? ""}`.toLowerCase();
       return hay.includes(q);
     });
   }, [allPoints, filter, search]);
@@ -197,6 +207,27 @@ export default function OperationalMapView() {
     return { blocks: blocksSet.size, localities: locSet.size };
   }, [allPoints]);
 
+  const distributions = useMemo(() => {
+    const byLocality = new Map<string, number>();
+    const byBlock = new Map<string, number>();
+    const byAgent = new Map<string, number>();
+    for (const p of allPoints) {
+      const loc = p.locality ?? "—";
+      byLocality.set(loc, (byLocality.get(loc) ?? 0) + 1);
+      const blk = p.block_number ? `Q ${p.block_number}` : "—";
+      byBlock.set(blk, (byBlock.get(blk) ?? 0) + 1);
+      const ag = p.agent_name ?? "—";
+      byAgent.set(ag, (byAgent.get(ag) ?? 0) + 1);
+    }
+    const top = (m: Map<string, number>, n = 5) =>
+      [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    return {
+      locality: top(byLocality),
+      block: top(byBlock),
+      agent: top(byAgent),
+    };
+  }, [allPoints]);
+
   const center = useMemo<[number, number]>(() => {
     if (visiblePoints.length === 0) return [-15.78, -47.93];
     const lat = visiblePoints.reduce((s, p) => s + p.latitude, 0) / visiblePoints.length;
@@ -210,6 +241,9 @@ export default function OperationalMapView() {
       day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
     });
   }, [props.dataUpdatedAt]);
+
+  const cov = coverage.data;
+  const withoutCoords = Math.max(0, (cov?.properties_total ?? 0) - (cov?.properties_geo ?? 0));
 
   const head = [
     "ID","Quart.","Localidade","Endereço","Nº","Lat","Lng","Agente","Última visita",
@@ -258,9 +292,49 @@ export default function OperationalMapView() {
     }
   }
 
-  const PanelContent = (
-    <div className="space-y-4">
+  function handleSelectPoint(p: PropertyMapPoint) {
+    setSelected(p);
+    setPanelView("detail");
+    setSheetOpen(true);
+    setFlyTo({ lat: p.latitude, lng: p.longitude, ts: Date.now() });
+  }
+
+  function clearSelection() {
+    setSelected(null);
+    setPanelView("default");
+  }
+
+  // KPI strip — clickable filters
+  const kpis: Array<{
+    id: string;
+    label: string;
+    value: number | string;
+    accent: string;
+    onClick?: () => void;
+    active?: boolean;
+    suffix?: string;
+  }> = [
+    { id: "total", label: "Total imóveis", value: allPoints.length, accent: "from-slate-500/15 to-slate-500/0", onClick: () => setFilter("all"), active: filter === "all" },
+    { id: "clean", label: "Regularizados", value: counts.clean, accent: "from-emerald-500/25 to-emerald-500/0", onClick: () => setFilter("clean"), active: filter === "clean" },
+    { id: "pendency", label: "Pendências", value: counts.pendency, accent: "from-orange-500/25 to-orange-500/0", onClick: () => setFilter("pendency"), active: filter === "pendency" },
+    { id: "focus", label: "Focos", value: counts.focus, accent: "from-rose-500/25 to-rose-500/0", onClick: () => setFilter("focus"), active: filter === "focus" },
+    { id: "strategic", label: "PE", value: counts.strategic, accent: "from-blue-500/25 to-blue-500/0", onClick: () => setFilter("strategic"), active: filter === "strategic" },
+    { id: "nocoord", label: "Sem coordenadas", value: withoutCoords, accent: "from-amber-500/20 to-amber-500/0" },
+    { id: "gps", label: "Cobertura GPS", value: cov?.coverage_pct ?? 0, suffix: "%", accent: "from-violet-500/25 to-violet-500/0" },
+    { id: "blocks", label: "Quarteirões", value: territorialCounts.blocks, accent: "from-indigo-500/20 to-indigo-500/0" },
+    { id: "loc", label: "Localidades", value: territorialCounts.localities, accent: "from-teal-500/20 to-teal-500/0" },
+  ];
+
+  const PanelDefault = (
+    <div className="space-y-4 animate-in fade-in-50 duration-300">
       <SummarySection counts={counts} total={allPoints.length} />
+      <DistributionsSection
+        statusCounts={counts}
+        total={allPoints.length}
+        locality={distributions.locality}
+        block={distributions.block}
+        agent={distributions.agent}
+      />
       <LayersSection
         showProperties={showProperties}
         setShowProperties={setShowProperties}
@@ -268,6 +342,8 @@ export default function OperationalMapView() {
         setShowBlocks={setShowBlocks}
         showHeat={showHeat}
         setShowHeat={setShowHeat}
+        heatMode={heatMode}
+        setHeatMode={setHeatMode}
         baseLayer={baseLayer}
         setBaseLayer={setBaseLayer}
       />
@@ -286,37 +362,37 @@ export default function OperationalMapView() {
         setTo={setTo}
       />
       <LegendSection counts={counts} />
-      <ExportSection
-        exportPDF={exportPDF}
-        head={head}
-        rows={rows}
-      />
+      <ExportSection exportPDF={exportPDF} head={head} rows={rows} />
     </div>
   );
+
+  const PanelDetail = selected && (
+    <PropertyDetailPanel
+      point={selected}
+      onClose={clearSelection}
+      onCenter={() => setFlyTo({ lat: selected.latitude, lng: selected.longitude, ts: Date.now() })}
+    />
+  );
+
+  const PanelBody = panelView === "detail" && selected ? PanelDetail : PanelDefault;
 
   return (
     <div className={fullscreen ? "fixed inset-0 z-50 bg-background" : "h-[calc(100vh-64px)] w-full"}>
       <div className="flex flex-col h-full">
         {/* TOP BAR */}
-        <header className="border-b bg-card/60 backdrop-blur-md px-4 py-3 flex items-center gap-3 flex-wrap">
+        <header className="border-b bg-card/70 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-500 text-white shadow-sm">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-rose-500 via-orange-500 to-amber-400 text-white shadow-md shadow-rose-500/20">
               <MapPin className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold leading-tight truncate">
-                Mapa de Inteligência Territorial
+              <h1 className="text-base sm:text-lg font-bold leading-tight truncate tracking-tight">
+                Centro de Inteligência Territorial
               </h1>
               <p className="text-[11px] text-muted-foreground leading-tight">
                 Última sincronização: {lastSync}
               </p>
             </div>
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 ml-2">
-            <Pill icon={<Building2 className="h-3.5 w-3.5" />} label="Imóveis" value={allPoints.length} />
-            <Pill icon={<Layers className="h-3.5 w-3.5" />} label="Quarteirões" value={territorialCounts.blocks} />
-            <Pill icon={<Target className="h-3.5 w-3.5" />} label="Localidades" value={territorialCounts.localities} />
           </div>
 
           <div className="flex items-center gap-1.5 ml-auto">
@@ -332,7 +408,6 @@ export default function OperationalMapView() {
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline ml-1.5">Exportar</span>
             </Button>
-            {/* Mobile sheet trigger */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button size="sm" variant="default" className="lg:hidden">
@@ -340,24 +415,52 @@ export default function OperationalMapView() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
-                <div className="pt-4">{PanelContent}</div>
+                <div className="pt-4">{PanelBody}</div>
               </SheetContent>
             </Sheet>
           </div>
         </header>
 
+        {/* KPI DASHBOARD STRIP */}
+        <div className="border-b bg-gradient-to-b from-background to-muted/20 px-3 py-2 overflow-x-auto">
+          <div className="flex items-stretch gap-2 min-w-max">
+            {kpis.map((k) => {
+              const clickable = !!k.onClick;
+              return (
+                <button
+                  key={k.id}
+                  type="button"
+                  onClick={k.onClick}
+                  disabled={!clickable}
+                  className={`group relative text-left rounded-xl border px-3 py-2 min-w-[120px] bg-gradient-to-br ${k.accent} backdrop-blur-sm transition-all ${
+                    clickable ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5" : "cursor-default"
+                  } ${k.active ? "ring-2 ring-primary border-primary/60 shadow-md" : ""}`}
+                >
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {k.label}
+                  </div>
+                  <div className="text-lg font-bold tabular-nums leading-tight mt-0.5">
+                    {typeof k.value === "number" ? k.value.toLocaleString("pt-BR") : k.value}
+                    {k.suffix && <span className="text-xs font-medium text-muted-foreground ml-0.5">{k.suffix}</span>}
+                  </div>
+                  {k.active && (
+                    <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* MAIN SPLIT */}
         <div className="flex-1 min-h-0 flex">
-          {/* MAP AREA */}
           <main className="flex-1 min-w-0 p-3">
             <div
               ref={mapWrapRef}
               className="relative h-full w-full rounded-2xl overflow-hidden border shadow-sm bg-muted/30"
             >
               {props.isLoading ? (
-                <div className="flex h-full items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
+                <MapSkeleton />
               ) : props.error ? (
                 <div className="flex h-full items-center justify-center p-6 text-sm text-destructive text-center">
                   Erro ao carregar dados: {(props.error as Error).message}
@@ -373,35 +476,168 @@ export default function OperationalMapView() {
                     center={center}
                     visiblePoints={visiblePoints}
                     showHeat={showHeat}
+                    heatMode={heatMode}
                     showBlocks={showBlocks}
                     showProperties={showProperties}
                     blocks={blocks.data?.blocks ?? []}
                     baseLayer={baseLayer}
+                    selectedId={selected?.id ?? null}
+                    onSelectPoint={handleSelectPoint}
+                    flyTo={flyTo}
                   />
-                  {/* Floating mini legend */}
-                  <div className="absolute bottom-3 left-3 z-[400] bg-card/90 backdrop-blur-md border rounded-xl px-3 py-2 shadow-md hidden sm:flex items-center gap-3 text-[11px]">
+                  {/* Floating glass legend */}
+                  <div className="absolute bottom-3 left-3 z-[400] bg-card/80 backdrop-blur-xl border rounded-xl px-3 py-2 shadow-lg hidden sm:flex items-center gap-3 text-[11px] animate-in fade-in slide-in-from-bottom-2">
                     {(Object.keys(CATEGORY_META) as Category[]).map((k) => (
                       <span key={k} className="flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: CATEGORY_META[k].color }} />
+                        <span className="h-2.5 w-2.5 rounded-full ring-2 ring-white/80 shadow" style={{ background: CATEGORY_META[k].color }} />
                         {CATEGORY_META[k].label}
                       </span>
                     ))}
                   </div>
-                  {/* Cobertura GPS pill */}
-                  <div className="absolute top-3 right-3 z-[400] bg-card/90 backdrop-blur-md border rounded-xl px-3 py-2 shadow-md text-[11px] flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-violet-500" />
-                    <span className="font-semibold">{coverage.data?.coverage_pct ?? 0}%</span>
-                    <span className="text-muted-foreground">cobertura GPS</span>
+                  {/* Counter pill */}
+                  <div className="absolute top-3 left-3 z-[400] bg-card/80 backdrop-blur-xl border rounded-xl px-3 py-1.5 shadow-md text-[11px] flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                    <Building2 className="h-3.5 w-3.5 text-primary" />
+                    <span className="font-semibold tabular-nums">{visiblePoints.length}</span>
+                    <span className="text-muted-foreground">de {allPoints.length} visíveis</span>
                   </div>
                 </>
               )}
             </div>
           </main>
 
-          {/* RIGHT PANEL — desktop */}
-          <aside className="hidden lg:block w-[340px] xl:w-[380px] shrink-0 border-l bg-card/40 overflow-y-auto p-4">
-            {PanelContent}
+          <aside className="hidden lg:block w-[360px] xl:w-[400px] shrink-0 border-l bg-card/40 backdrop-blur-sm overflow-y-auto p-4">
+            {PanelBody}
           </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============= Detail panel ============= */
+
+function PropertyDetailPanel({
+  point, onClose, onCenter,
+}: { point: PropertyMapPoint; onClose: () => void; onCenter: () => void }) {
+  const cat = classify(point);
+  const meta = CATEGORY_META[cat];
+  const risk = RISK_META[point.risk_level];
+  const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`;
+
+  return (
+    <div className="space-y-3 animate-in fade-in-50 slide-in-from-right-2 duration-300">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Voltar
+        </button>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition cursor-pointer">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <Card className="overflow-hidden">
+        <div
+          className="h-1.5"
+          style={{ background: `linear-gradient(90deg, ${meta.color}, ${risk.color})` }}
+        />
+        <CardContent className="p-4 space-y-3">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Imóvel</div>
+            <div className="text-base font-bold leading-tight mt-0.5">
+              {point.street ?? "Endereço não informado"}
+              {point.number ? `, ${point.number}` : ""}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Quarteirão {point.block_number ?? "—"} {point.locality ? `· ${point.locality}` : ""}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            <Badge style={{ background: meta.color, color: "#fff" }} className="border-none">
+              {meta.label}
+            </Badge>
+            <Badge style={{ background: risk.color, color: "#fff" }} className="border-none">
+              Risco {risk.label} ({point.risk_score})
+            </Badge>
+            {point.is_recurrent && (
+              <Badge variant="outline" className="border-rose-300 text-rose-700 dark:text-rose-300">
+                Recorrente
+              </Badge>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <MiniStat label="Focos" value={point.positive_foci_count} accent="text-rose-600" />
+            <MiniStat label="Depósitos" value={point.deposits_found} accent="text-amber-600" />
+            <MiniStat label="Pend." value={point.pendency_count} accent="text-orange-600" />
+          </div>
+
+          <div className="space-y-1.5 text-xs">
+            <DetailRow label="Agente" value={point.agent_name ?? "—"} />
+            <DetailRow label="Última visita" value={point.last_visit_at ?? "—"} />
+            <DetailRow
+              label="Coordenadas"
+              value={`${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}`}
+              mono
+            />
+            <DetailRow label="ID" value={point.id} mono />
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onCenter}>
+              <Target className="h-3.5 w-3.5 mr-1" /> Centralizar
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+              <a href={navUrl} target="_blank" rel="noopener noreferrer">
+                <Navigation2 className="h-3.5 w-3.5 mr-1" /> Rota
+              </a>
+            </Button>
+            {point.boletim_id && (
+              <Button size="sm" variant="default" className="h-8 text-xs col-span-2" asChild>
+                <a href={`/rg/boletim/${point.boletim_id}`}>
+                  Abrir cadastro <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </a>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <span className={`text-right break-all ${mono ? "font-mono text-[11px]" : ""}`}>{value}</span>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  return (
+    <div className="rounded-lg bg-muted/60 border px-2 py-1.5 text-center">
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className={`text-base font-bold tabular-nums ${accent ?? ""}`}>{value}</div>
+    </div>
+  );
+}
+
+/* ============= Skeleton ============= */
+
+function MapSkeleton() {
+  return (
+    <div className="absolute inset-0 p-4 space-y-3">
+      <Skeleton className="h-full w-full rounded-xl" />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="bg-card/80 backdrop-blur border rounded-xl px-4 py-2 flex items-center gap-2 text-sm shadow-md">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando inteligência territorial…
         </div>
       </div>
     </div>
@@ -410,22 +646,12 @@ export default function OperationalMapView() {
 
 /* ============= Panel sub-sections ============= */
 
-function Pill({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
-  return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 border text-[11px]">
-      {icon}
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-bold">{value.toLocaleString("pt-BR")}</span>
-    </div>
-  );
-}
-
 function SummarySection({
   counts, total,
 }: { counts: Record<Category, number>; total: number }) {
   const items = [
     { label: "Total", value: total, color: "from-slate-500/15 to-slate-500/5", text: "text-slate-700 dark:text-slate-200", icon: <Building2 className="h-4 w-4" /> },
-    { label: "Sem foco", value: counts.clean, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-700 dark:text-emerald-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
+    { label: "Regular.", value: counts.clean, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-700 dark:text-emerald-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
     { label: "Pendências", value: counts.pendency, color: "from-orange-500/20 to-orange-500/5", text: "text-orange-700 dark:text-orange-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> },
     { label: "Focos", value: counts.focus, color: "from-rose-500/20 to-rose-500/5", text: "text-rose-700 dark:text-rose-300", icon: <Flame className="h-4 w-4" /> },
     { label: "PE", value: counts.strategic, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-700 dark:text-blue-300", icon: <Target className="h-4 w-4" /> },
@@ -440,7 +666,7 @@ function SummarySection({
               {it.icon}
               {it.label}
             </div>
-            <div className="text-xl font-bold mt-1">{it.value.toLocaleString("pt-BR")}</div>
+            <div className="text-xl font-bold mt-1 tabular-nums">{it.value.toLocaleString("pt-BR")}</div>
           </div>
         ))}
       </div>
@@ -448,15 +674,82 @@ function SummarySection({
   );
 }
 
+function DistributionsSection({
+  statusCounts, total, locality, block, agent,
+}: {
+  statusCounts: Record<Category, number>;
+  total: number;
+  locality: [string, number][];
+  block: [string, number][];
+  agent: [string, number][];
+}) {
+  const statusRows: [string, number, string][] = [
+    ["Regularizados", statusCounts.clean, CATEGORY_META.clean.color],
+    ["Pendências", statusCounts.pendency, CATEGORY_META.pendency.color],
+    ["Focos", statusCounts.focus, CATEGORY_META.focus.color],
+    ["PE", statusCounts.strategic, CATEGORY_META.strategic.color],
+  ];
+  return (
+    <section>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+        <BarChart3 className="h-3.5 w-3.5" /> Estatísticas
+      </h3>
+      <Card>
+        <CardContent className="p-3 space-y-3">
+          <BarBlock title="Por status" rows={statusRows.map(([l, v, c]) => ({ label: l, value: v, color: c }))} max={total} />
+          <BarBlock title="Top localidades" rows={locality.map(([l, v]) => ({ label: l, value: v, color: "#0ea5e9" }))} max={total} />
+          <BarBlock title="Top quarteirões" rows={block.map(([l, v]) => ({ label: l, value: v, color: "#8b5cf6" }))} max={total} />
+          <BarBlock title="Top agentes" rows={agent.map(([l, v]) => ({ label: l, value: v, color: "#14b8a6" }))} max={total} />
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function BarBlock({
+  title, rows, max,
+}: { title: string; rows: { label: string; value: number; color: string }[]; max: number }) {
+  if (rows.length === 0) return null;
+  const denom = Math.max(1, max);
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{title}</div>
+      <div className="space-y-1">
+        {rows.map((r) => {
+          const pct = Math.round((r.value / denom) * 100);
+          return (
+            <div key={r.label} className="text-[11px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">{r.label}</span>
+                <span className="tabular-nums text-muted-foreground shrink-0">
+                  {r.value} <span className="opacity-60">({pct}%)</span>
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-0.5">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: r.color }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LayersSection({
   showProperties, setShowProperties,
   showBlocks, setShowBlocks,
   showHeat, setShowHeat,
+  heatMode, setHeatMode,
   baseLayer, setBaseLayer,
 }: {
   showProperties: boolean; setShowProperties: (v: boolean) => void;
   showBlocks: boolean; setShowBlocks: (v: boolean) => void;
   showHeat: boolean; setShowHeat: (v: boolean) => void;
+  heatMode: HeatMode; setHeatMode: (v: HeatMode) => void;
   baseLayer: BaseLayerId; setBaseLayer: (v: BaseLayerId) => void;
 }) {
   return (
@@ -469,6 +762,25 @@ function LayersSection({
           <LayerSwitch icon={<Building2 className="h-4 w-4 text-emerald-500" />} label="Imóveis" checked={showProperties} onChange={setShowProperties} />
           <LayerSwitch icon={<Layers className="h-4 w-4 text-blue-500" />} label="Quarteirões" checked={showBlocks} onChange={setShowBlocks} />
           <LayerSwitch icon={<Flame className="h-4 w-4 text-rose-500" />} label="Mapa de Calor" checked={showHeat} onChange={setShowHeat} />
+          {showHeat && (
+            <div className="pl-6 grid grid-cols-3 gap-1 animate-in fade-in slide-in-from-top-1">
+              {([
+                { id: "count", label: "Quantidade" },
+                { id: "focus", label: "Focos" },
+                { id: "pendency", label: "Pend." },
+              ] as { id: HeatMode; label: string }[]).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setHeatMode(m.id)}
+                  className={`text-[10px] px-1.5 py-1 rounded-md border transition ${
+                    heatMode === m.id ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="pt-2 border-t">
             <div className="text-[11px] text-muted-foreground mb-1.5">Mapa base</div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -519,14 +831,14 @@ function FiltersSection({
   return (
     <section>
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-        <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros rápidos
+        <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
       </h3>
       <Card>
         <CardContent className="p-3 space-y-2.5">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar rua, nº, quarteirão…"
+              placeholder="Buscar rua, nº, quarteirão, localidade, agente, ID…"
               className="pl-8 h-9 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -603,7 +915,7 @@ function LegendSection({ counts }: { counts: Record<Category, number> }) {
                 <span className="h-3 w-3 rounded-full ring-2 ring-white shadow" style={{ background: CATEGORY_META[k].color }} />
                 {CATEGORY_META[k].label}
               </span>
-              <span className="text-muted-foreground text-xs">{counts[k]}</span>
+              <span className="text-muted-foreground text-xs tabular-nums">{counts[k]}</span>
             </div>
           ))}
           <div className="pt-2 border-t mt-2 space-y-1.5">
@@ -649,18 +961,26 @@ function SafeMap({
   center,
   visiblePoints,
   showHeat,
+  heatMode,
   showBlocks,
   showProperties,
   blocks,
   baseLayer,
+  selectedId,
+  onSelectPoint,
+  flyTo,
 }: {
   center: [number, number];
   visiblePoints: PropertyMapPoint[];
   showHeat: boolean;
+  heatMode: HeatMode;
   showBlocks: boolean;
   showProperties: boolean;
   blocks: BlockRiskScore[];
   baseLayer: BaseLayerId;
+  selectedId: string | null;
+  onSelectPoint: (p: PropertyMapPoint) => void;
+  flyTo: { lat: number; lng: number; ts: number } | null;
 }) {
   try {
     const base = BASE_LAYERS[baseLayer];
@@ -674,7 +994,8 @@ function SafeMap({
       >
         <TileLayer key={baseLayer} attribution={base.attribution} url={base.url} />
         <FitBounds points={visiblePoints} />
-        {showHeat && <HeatLayer points={visiblePoints} />}
+        <FlyController target={flyTo} />
+        {showHeat && <HeatLayer points={visiblePoints} mode={heatMode} />}
         {showBlocks &&
           blocks
             .filter((b) => isValidCoord(b.centroid?.lat, b.centroid?.lng))
@@ -689,6 +1010,10 @@ function SafeMap({
                   fillColor: RISK_META[b.level].color,
                   fillOpacity: 0.25,
                 }}
+                eventHandlers={{
+                  mouseover: (e) => e.target.setStyle({ fillOpacity: 0.45, weight: 3 }),
+                  mouseout: (e) => e.target.setStyle({ fillOpacity: 0.25, weight: 2 }),
+                }}
               >
                 <Popup>
                   <BlockPopup block={b} />
@@ -696,7 +1021,7 @@ function SafeMap({
               </CircleMarker>
             ))}
         {!showHeat && showProperties && (
-          <ClusterLayer points={visiblePoints} />
+          <ClusterLayer points={visiblePoints} selectedId={selectedId} onSelect={onSelectPoint} />
         )}
       </MapContainer>
     );
@@ -711,9 +1036,26 @@ function SafeMap({
   }
 }
 
-function ClusterLayer({ points }: { points: PropertyMapPoint[] }) {
+function FlyController({ target }: { target: { lat: number; lng: number; ts: number } | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    try {
+      map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), 18), { duration: 0.8 });
+    } catch (err) {
+      console.error("[MAP_FLY_ERROR]", err);
+    }
+  }, [target, map]);
+  return null;
+}
+
+function ClusterLayer({
+  points, selectedId, onSelect,
+}: { points: PropertyMapPoint[]; selectedId: string | null; onSelect: (p: PropertyMapPoint) => void }) {
   const map = useMap();
   const groupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     const group = (L as unknown as { markerClusterGroup: (o?: unknown) => L.MarkerClusterGroup })
@@ -723,9 +1065,13 @@ function ClusterLayer({ points }: { points: PropertyMapPoint[] }) {
         maxClusterRadius: 50,
         iconCreateFunction: (cluster: { getChildCount: () => number }) => {
           const n = cluster.getChildCount();
-          const size = n < 10 ? 32 : n < 100 ? 38 : 46;
+          const size = n < 10 ? 34 : n < 100 ? 42 : 52;
+          const inner = size - 8;
           return L.divIcon({
-            html: `<div style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:9999px;background:rgba(37,99,235,0.85);color:#fff;font-weight:700;font-size:12px;border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.25)">${n}</div>`,
+            html: `<div style="position:relative;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;inset:0;border-radius:9999px;background:radial-gradient(circle at 30% 30%, rgba(59,130,246,0.95), rgba(37,99,235,0.85));box-shadow:0 4px 14px rgba(37,99,235,0.45),0 0 0 4px rgba(255,255,255,0.7)"></div>
+              <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${inner}px;height:${inner}px;color:#fff;font-weight:700;font-size:12px;font-family:system-ui">${n}</div>
+            </div>`,
             className: "rg-cluster-icon",
             iconSize: [size, size],
           });
@@ -747,49 +1093,35 @@ function ClusterLayer({ points }: { points: PropertyMapPoint[] }) {
     for (const p of points) {
       const cat = classify(p);
       const meta = CATEGORY_META[cat];
+      const isSel = selectedId === p.id;
+      const size = isSel ? 22 : 14;
+      const ring = isSel ? "3px solid #fff;box-shadow:0 0 0 3px rgba(37,99,235,0.55),0 2px 6px rgba(0,0,0,0.35)" : "2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4)";
       const icon = L.divIcon({
-        html: `<div style="width:14px;height:14px;border-radius:9999px;background:${meta.color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>`,
+        html: `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${meta.color};border-radius:9999px;${isSel ? "" : ""};transition:all .2s;${ring.replace(/^/, "")}"></div>`,
         className: "rg-marker-icon",
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
       });
-      const m = L.marker([p.latitude, p.longitude], { icon, title: `${p.street ?? ""} ${p.number ?? ""}`.trim() });
-      m.bindPopup(() => {
-        const div = document.createElement("div");
-        renderPointPopupHTML(div, p);
-        return div;
+      const m = L.marker([p.latitude, p.longitude], {
+        icon,
+        title: `${p.street ?? ""} ${p.number ?? ""}`.trim(),
       });
+      // Lightweight hover tooltip
+      m.bindTooltip(
+        `<div style="font-family:system-ui;font-size:11px;line-height:1.35">
+          <div style="font-weight:600">${escapeHtml(p.id.slice(0, 8))} · ${meta.emoji} ${escapeHtml(meta.label)}</div>
+          <div style="color:#475569">Quarteirão ${escapeHtml(p.block_number ?? "—")}</div>
+          <div style="color:#475569">${escapeHtml(p.agent_name ?? "Sem agente")}</div>
+        </div>`,
+        { direction: "top", offset: [0, -6], opacity: 0.95, className: "rg-marker-tooltip" },
+      );
+      m.on("click", () => onSelectRef.current(p));
       markers.push(m);
     }
     group.addLayers(markers);
-  }, [points]);
+  }, [points, selectedId]);
 
   return null;
-}
-
-function renderPointPopupHTML(container: HTMLElement, p: PropertyMapPoint) {
-  const cat = classify(p);
-  const meta = CATEGORY_META[cat];
-  const risk = RISK_META[p.risk_level];
-  const navUrl = `https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}`;
-  container.innerHTML = `
-    <div style="font-family:system-ui;font-size:12px;min-width:240px">
-      <div style="font-weight:600;font-size:13px">${escapeHtml(p.street ?? "Endereço não informado")}${p.number ? `, ${escapeHtml(String(p.number))}` : ""}</div>
-      <div style="color:#64748b;margin-top:2px">Quarteirão ${escapeHtml(p.block_number ?? "—")}${p.locality ? ` · ${escapeHtml(p.locality)}` : ""}</div>
-      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
-        <span style="background:${meta.color};color:#fff;padding:2px 6px;border-radius:6px;font-size:10px">${meta.emoji} ${meta.label}</span>
-        <span style="background:${risk.color};color:#fff;padding:2px 6px;border-radius:6px;font-size:10px">Risco ${risk.label} (${p.risk_score})</span>
-      </div>
-      <div style="margin-top:6px;color:#64748b">Agente: <span style="color:#0f172a">${escapeHtml(p.agent_name ?? "—")}</span></div>
-      <div style="color:#64748b">Última visita: <span style="color:#0f172a">${escapeHtml(p.last_visit_at ?? "—")}</span></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center;margin-top:6px">
-        <div style="background:#f1f5f9;border-radius:4px;padding:2px"><div style="font-size:9px;color:#64748b">Focos</div><div style="font-weight:600">${p.positive_foci_count}</div></div>
-        <div style="background:#f1f5f9;border-radius:4px;padding:2px"><div style="font-size:9px;color:#64748b">Depósitos</div><div style="font-weight:600">${p.deposits_found}</div></div>
-        <div style="background:#f1f5f9;border-radius:4px;padding:2px"><div style="font-size:9px;color:#64748b">Pend.</div><div style="font-weight:600">${p.pendency_count}</div></div>
-      </div>
-      <div style="margin-top:6px"><a href="${navUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#2563eb;color:#fff;padding:4px 8px;border-radius:6px;font-size:11px;text-decoration:none">↗ Navegar</a></div>
-    </div>
-  `;
 }
 
 function escapeHtml(s: string): string {
@@ -841,14 +1173,20 @@ function FitBounds({ points }: { points: PropertyMapPoint[] }) {
   return null;
 }
 
-function HeatLayer({ points }: { points: PropertyMapPoint[] }) {
+function HeatLayer({ points, mode }: { points: PropertyMapPoint[]; mode: HeatMode }) {
   const map = useMap();
   const layerRef = useRef<L.Layer | null>(null);
   useEffect(() => {
     try {
       const data: [number, number, number][] = points
         .filter((p) => isValidCoord(p.latitude, p.longitude))
-        .map((p) => [p.latitude, p.longitude, p.has_positive_focus ? 1 : 0.3]);
+        .map((p) => {
+          let w = 0.3;
+          if (mode === "focus") w = p.has_positive_focus ? 1 : 0.1;
+          else if (mode === "pendency") w = p.has_pendency ? 0.9 : 0.1;
+          else w = 0.5;
+          return [p.latitude, p.longitude, w];
+        });
       const heatFn = (L as unknown as { heatLayer?: (d: unknown, o: unknown) => L.Layer }).heatLayer;
       if (typeof heatFn !== "function") return;
       const layer = heatFn(data, {
@@ -863,6 +1201,6 @@ function HeatLayer({ points }: { points: PropertyMapPoint[] }) {
     return () => {
       try { if (layerRef.current) map.removeLayer(layerRef.current); } catch { /* noop */ }
     };
-  }, [points, map]);
+  }, [points, mode, map]);
   return null;
 }
