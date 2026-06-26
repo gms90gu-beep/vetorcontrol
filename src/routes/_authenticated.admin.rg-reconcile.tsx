@@ -8,12 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getReconcilePreview,
   executeReconcile,
   deleteOrphanBlocks,
 } from "@/lib/rg-reconcile.functions";
 import { runRgHomologation, type RgHomologationReport } from "@/lib/rg-homologation.functions";
+
 
 export const Route = createFileRoute("/_authenticated/admin/rg-reconcile")({
   component: Page,
