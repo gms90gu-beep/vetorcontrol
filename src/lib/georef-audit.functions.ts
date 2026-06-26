@@ -270,7 +270,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
       orphans: {
         properties_without_block: propsWithoutBlock,
         properties_without_boletim: propsWithoutBoletim,
-        blocks_without_properties: blocksWithoutProps || 0,
+        blocks_without_properties: blocksWithoutProps,
         boletins_without_properties: boletinsWithoutProps,
       },
       history_sample: historySample,
