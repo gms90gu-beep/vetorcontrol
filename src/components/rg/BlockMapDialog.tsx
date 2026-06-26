@@ -216,7 +216,7 @@ export function BlockMapDialog({
           )}
           {phase === "no-geo" && (
             <Overlay
-              icon={<MapOff className="h-6 w-6" />}
+              icon={<MapPinOff className="h-6 w-6" />}
               title="Sem coordenadas registradas"
               description="Nenhum imóvel deste quarteirão possui coordenadas. Capture a localização nas próximas visitas."
             />
