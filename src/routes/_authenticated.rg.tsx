@@ -250,31 +250,24 @@ function RGPage() {
     setBoletins(normalized);
   }, [rgData]);
 
-  // Buscar contagem de imóveis por boletim (usa boletim_id + fallback por block_id
-  // para refletir exatamente os mesmos imóveis exibidos no detalhe do boletim).
+  // Contagem de imóveis por boletim — fonte única: boletim_id.
+  // Não usar fallback por block_id: após reconciliação, todo imóvel possui boletim_id.
   useEffect(() => {
     if (!boletins.length) return;
     let cancelled = false;
     (async () => {
       try {
         const ids = boletins.map((b) => b.id).filter(Boolean);
-        const blockIds = boletins.map((b: any) => b.block_id).filter(Boolean);
-        if (!ids.length && !blockIds.length) return;
-        const filters: string[] = [];
-        if (ids.length) filters.push(`boletim_id.in.(${ids.join(",")})`);
-        if (blockIds.length) filters.push(`block_id.in.(${blockIds.join(",")})`);
+        if (!ids.length) return;
         const { data: props } = await supabase
           .from("properties")
-          .select("boletim_id, block_id")
-          .or(filters.join(","));
+          .select("boletim_id")
+          .in("boletim_id", ids);
         if (cancelled || !props) return;
         const counts = new Map<string, number>();
-        for (const b of boletins as any[]) {
-          const n = props.filter((p: any) =>
-            p.boletim_id === b.id ||
-            (!p.boletim_id && b.block_id && p.block_id === b.block_id)
-          ).length;
-          counts.set(b.id, n);
+        for (const p of props as any[]) {
+          if (!p.boletim_id) continue;
+          counts.set(p.boletim_id, (counts.get(p.boletim_id) ?? 0) + 1);
         }
         setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? 0 })));
       } catch (e) {
@@ -283,6 +276,7 @@ function RGPage() {
     })();
     return () => { cancelled = true; };
   }, [boletins.length]);
+
 
 
 

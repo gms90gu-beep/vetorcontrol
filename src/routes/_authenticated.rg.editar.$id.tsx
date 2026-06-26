@@ -351,7 +351,11 @@ function EditarBoletim() {
         setBlockId(effectiveBlockId);
       }
 
-      // --- Paraleliza tudo que não depende um do outro para reduzir latência ---
+      if (!effectiveBlockId) {
+        throw new Error("Quarteirão obrigatório: informe o número do quarteirão antes de salvar.");
+      }
+
+
       const boletimUpdate = supabase
         .from("boletins_rg")
         .update({

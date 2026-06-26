@@ -8,12 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getReconcilePreview,
   executeReconcile,
   deleteOrphanBlocks,
 } from "@/lib/rg-reconcile.functions";
 import { runRgHomologation, type RgHomologationReport } from "@/lib/rg-homologation.functions";
+
 
 export const Route = createFileRoute("/_authenticated/admin/rg-reconcile")({
   component: Page,
@@ -29,6 +31,42 @@ function Page() {
   const [busy, setBusy] = useState(false);
   const [selectedOrphans, setSelectedOrphans] = useState<Set<string>>(new Set());
   const [homolog, setHomolog] = useState<RgHomologationReport | null>(null);
+  const [integrity, setIntegrity] = useState<any | null>(null);
+
+  async function onIntegrityCheck() {
+    setBusy(true);
+    try {
+      const { data: chk, error } = await supabase.rpc("rg_integrity_check" as any);
+      if (error) throw error;
+      setIntegrity(chk);
+      console.log("[RG_INTEGRITY_CHECK]", chk);
+      const status = (chk as any)?.status;
+      toast[status === "OK" ? "success" : "warning"](`Diagnóstico: ${status}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onReconcileIdempotent() {
+    if (!confirm("Executar reconciliação idempotente (segura para repetir)?")) return;
+    setBusy(true);
+    try {
+      const { data: r, error } = await supabase.rpc("reconcile_rg_integrity" as any);
+      if (error) throw error;
+      console.log("[RG_RECONCILE_IDEMPOTENT]", r);
+      const m = r as any;
+      toast.success(`✓ ${m?.blocks_linked ?? 0} boletins · ${m?.properties_linked ?? 0} imóveis · ${m?.orphans_removed ?? 0} órfãos`);
+      await refetch();
+      await onIntegrityCheck();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
 
   useEffect(() => {
     if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
@@ -122,18 +160,48 @@ function Page() {
             Prévia somente leitura. Execução exige confirmação.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching || busy}>
             Atualizar prévia
+          </Button>
+          <Button variant="outline" onClick={onIntegrityCheck} disabled={busy}>
+            Diagnóstico de Integridade
           </Button>
           <Button variant="secondary" onClick={onHomolog} disabled={busy}>
             Rodar Homologação
           </Button>
+          <Button variant="secondary" onClick={onReconcileIdempotent} disabled={busy}>
+            Reconciliar (idempotente)
+          </Button>
           <Button onClick={onExecute} disabled={busy || rows.length === 0}>
-            Executar reconciliação
+            Executar reconciliação (legado)
           </Button>
         </div>
       </div>
+
+      {integrity && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Diagnóstico de Integridade{" "}
+              <Badge variant={integrity.status === "OK" ? "default" : "destructive"}>
+                {integrity.status}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <Stat label="Boletins s/ block" value={integrity.boletins_sem_block?.length ?? 0} warn={(integrity.boletins_sem_block?.length ?? 0) > 0} />
+              <Stat label="Imóveis s/ boletim" value={integrity.properties_sem_boletim?.length ?? 0} />
+              <Stat label="Block divergente" value={integrity.properties_block_divergente?.length ?? 0} warn={(integrity.properties_block_divergente?.length ?? 0) > 0} />
+              <Stat label="Blocks duplicados" value={integrity.blocks_duplicados?.length ?? 0} warn={(integrity.blocks_duplicados?.length ?? 0) > 0} />
+              <Stat label="Div. card/detalhe" value={integrity.divergencia_card_detalhe?.length ?? 0} warn={(integrity.divergencia_card_detalhe?.length ?? 0) > 0} />
+            </div>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-72">{JSON.stringify(integrity, null, 2)}</pre>
+          </CardContent>
+        </Card>
+      )}
+
 
       {homolog && (
         <Card>
