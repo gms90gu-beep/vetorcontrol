@@ -227,10 +227,9 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
     const propsWithoutBlock = scoped.filter((p: any) => !p.block_id && !p.block_number).length;
     const propsWithoutBoletim = scoped.filter((p: any) => !p.boletim_id).length;
 
-    const { count: blocksWithoutProps } = await supabase
-      .from("blocks")
-      .select("id", { count: "exact", head: true })
-      .not("id", "in", `(${Array.from(new Set(scoped.map((p: any) => p.block_id).filter(Boolean))).slice(0, 1).map(() => "''").join(",") || "''"})`);
+    const { data: allBlocks } = await supabase.from("blocks").select("id");
+    const usedBlockIds = new Set(scoped.map((p: any) => p.block_id).filter(Boolean));
+    const blocksWithoutProps = (allBlocks || []).filter((b: any) => !usedBlockIds.has(b.id)).length;
 
     const { data: boletinsAll } = await supabase
       .from("boletins_rg")
