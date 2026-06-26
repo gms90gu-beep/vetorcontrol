@@ -209,7 +209,7 @@ export function AdminMasterDashboard() {
     try {
       const { data: agent } = await supabase
         .from("agents")
-        .select("id, phone")
+        .select("phone")
         .eq("profile_id", u.id)
         .maybeSingle();
 
@@ -221,31 +221,30 @@ export function AdminMasterDashboard() {
       let blockCount = 0;
       let lastActivity: string | null = null;
 
-      if (agent?.id) {
-        const { count: vc } = await supabase
-          .from("visits")
-          .select("*", { count: "exact", head: true })
-          .eq("agent_id", agent.id);
-        visitCount = vc ?? 0;
+      // visits.agent_id e daily_work_records.agent_id armazenam profile_id
+      const { count: vc } = await supabase
+        .from("visits")
+        .select("*", { count: "exact", head: true })
+        .eq("agent_id", u.id);
+      visitCount = vc ?? 0;
 
-        const { data: lastVisit } = await supabase
-          .from("visits")
-          .select("visit_date")
-          .eq("agent_id", agent.id)
-          .order("visit_date", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        lastActivity = lastVisit?.visit_date ?? null;
+      const { data: lastVisit } = await supabase
+        .from("visits")
+        .select("visit_date")
+        .eq("agent_id", u.id)
+        .order("visit_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      lastActivity = lastVisit?.visit_date ?? null;
 
-        const { data: dailyRecs } = await supabase
-          .from("daily_work_records")
-          .select("properties_worked")
-          .eq("agent_id", agent.id);
-        blockCount = (dailyRecs ?? []).reduce(
-          (acc, r: any) => acc + (r.properties_worked ?? 0),
-          0,
-        );
-      }
+      const { data: dailyRecs } = await supabase
+        .from("daily_work_records")
+        .select("properties_worked")
+        .eq("agent_id", u.id);
+      blockCount = (dailyRecs ?? []).reduce(
+        (acc, r: any) => acc + (r.properties_worked ?? 0),
+        0,
+      );
 
       setHistory({ visits: visitCount, blocks: blockCount, lastActivity });
     } catch (e) {
