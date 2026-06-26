@@ -31,6 +31,42 @@ function Page() {
   const [busy, setBusy] = useState(false);
   const [selectedOrphans, setSelectedOrphans] = useState<Set<string>>(new Set());
   const [homolog, setHomolog] = useState<RgHomologationReport | null>(null);
+  const [integrity, setIntegrity] = useState<any | null>(null);
+
+  async function onIntegrityCheck() {
+    setBusy(true);
+    try {
+      const { data: chk, error } = await supabase.rpc("rg_integrity_check" as any);
+      if (error) throw error;
+      setIntegrity(chk);
+      console.log("[RG_INTEGRITY_CHECK]", chk);
+      const status = (chk as any)?.status;
+      toast[status === "OK" ? "success" : "warning"](`Diagnóstico: ${status}`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onReconcileIdempotent() {
+    if (!confirm("Executar reconciliação idempotente (segura para repetir)?")) return;
+    setBusy(true);
+    try {
+      const { data: r, error } = await supabase.rpc("reconcile_rg_integrity" as any);
+      if (error) throw error;
+      console.log("[RG_RECONCILE_IDEMPOTENT]", r);
+      const m = r as any;
+      toast.success(`✓ ${m?.blocks_linked ?? 0} boletins · ${m?.properties_linked ?? 0} imóveis · ${m?.orphans_removed ?? 0} órfãos`);
+      await refetch();
+      await onIntegrityCheck();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
 
   useEffect(() => {
     if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
