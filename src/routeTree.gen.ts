@@ -39,6 +39,7 @@ import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_authenticated.admin.rg-reconcile'
 import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
 import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
@@ -206,6 +207,12 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminRgReconcileRoute =
+  AuthenticatedAdminRgReconcileRouteImport.update({
+    id: '/admin/rg-reconcile',
+    path: '/admin/rg-reconcile',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminRgPipelineRoute =
   AuthenticatedAdminRgPipelineRouteImport.update({
     id: '/admin/rg-pipeline',
@@ -302,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
+  '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -343,6 +351,7 @@ export interface FileRoutesByTo {
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
+  '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -386,6 +395,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/_authenticated/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
+  '/_authenticated/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -429,6 +439,7 @@ export interface FileRouteTypes {
     | '/admin/georef-audit'
     | '/admin/pendencias'
     | '/admin/rg-pipeline'
+    | '/admin/rg-reconcile'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
     | '/admin/georef-audit'
     | '/admin/pendencias'
     | '/admin/rg-pipeline'
+    | '/admin/rg-reconcile'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -512,6 +524,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/georef-audit'
     | '/_authenticated/admin/pendencias'
     | '/_authenticated/admin/rg-pipeline'
+    | '/_authenticated/admin/rg-reconcile'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
@@ -740,6 +753,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/rg-reconcile': {
+      id: '/_authenticated/admin/rg-reconcile'
+      path: '/admin/rg-reconcile'
+      fullPath: '/admin/rg-reconcile'
+      preLoaderRoute: typeof AuthenticatedAdminRgReconcileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/rg-pipeline': {
       id: '/_authenticated/admin/rg-pipeline'
       path: '/admin/rg-pipeline'
@@ -857,6 +877,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminGeorefAuditRoute: typeof AuthenticatedAdminGeorefAuditRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
   AuthenticatedAdminRgPipelineRoute: typeof AuthenticatedAdminRgPipelineRoute
+  AuthenticatedAdminRgReconcileRoute: typeof AuthenticatedAdminRgReconcileRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -891,6 +912,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminGeorefAuditRoute: AuthenticatedAdminGeorefAuditRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
   AuthenticatedAdminRgPipelineRoute: AuthenticatedAdminRgPipelineRoute,
+  AuthenticatedAdminRgReconcileRoute: AuthenticatedAdminRgReconcileRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
