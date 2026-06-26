@@ -866,6 +866,3 @@ function HeatLayer({ points }: { points: PropertyMapPoint[] }) {
   }, [points, map]);
   return null;
 }
-
-// Unused import suppression — preserved for type completeness
-void Link;
