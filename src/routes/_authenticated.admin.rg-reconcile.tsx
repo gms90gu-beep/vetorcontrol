@@ -25,8 +25,10 @@ function Page() {
   const fetchPreview = useServerFn(getReconcilePreview);
   const runExecute = useServerFn(executeReconcile);
   const runDeleteOrphans = useServerFn(deleteOrphanBlocks);
+  const runHomolog = useServerFn(runRgHomologation);
   const [busy, setBusy] = useState(false);
   const [selectedOrphans, setSelectedOrphans] = useState<Set<string>>(new Set());
+  const [homolog, setHomolog] = useState<RgHomologationReport | null>(null);
 
   useEffect(() => {
     if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
