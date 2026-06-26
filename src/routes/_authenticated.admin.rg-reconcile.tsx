@@ -160,18 +160,48 @@ function Page() {
             Prévia somente leitura. Execução exige confirmação.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching || busy}>
             Atualizar prévia
+          </Button>
+          <Button variant="outline" onClick={onIntegrityCheck} disabled={busy}>
+            Diagnóstico de Integridade
           </Button>
           <Button variant="secondary" onClick={onHomolog} disabled={busy}>
             Rodar Homologação
           </Button>
+          <Button variant="secondary" onClick={onReconcileIdempotent} disabled={busy}>
+            Reconciliar (idempotente)
+          </Button>
           <Button onClick={onExecute} disabled={busy || rows.length === 0}>
-            Executar reconciliação
+            Executar reconciliação (legado)
           </Button>
         </div>
       </div>
+
+      {integrity && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Diagnóstico de Integridade{" "}
+              <Badge variant={integrity.status === "OK" ? "default" : "destructive"}>
+                {integrity.status}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <Stat label="Boletins s/ block" value={integrity.boletins_sem_block?.length ?? 0} warn={(integrity.boletins_sem_block?.length ?? 0) > 0} />
+              <Stat label="Imóveis s/ boletim" value={integrity.properties_sem_boletim?.length ?? 0} />
+              <Stat label="Block divergente" value={integrity.properties_block_divergente?.length ?? 0} warn={(integrity.properties_block_divergente?.length ?? 0) > 0} />
+              <Stat label="Blocks duplicados" value={integrity.blocks_duplicados?.length ?? 0} warn={(integrity.blocks_duplicados?.length ?? 0) > 0} />
+              <Stat label="Div. card/detalhe" value={integrity.divergencia_card_detalhe?.length ?? 0} warn={(integrity.divergencia_card_detalhe?.length ?? 0) > 0} />
+            </div>
+            <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-72">{JSON.stringify(integrity, null, 2)}</pre>
+          </CardContent>
+        </Card>
+      )}
+
 
       {homolog && (
         <Card>
