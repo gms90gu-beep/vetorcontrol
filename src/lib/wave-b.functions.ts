@@ -81,13 +81,13 @@ export const getAgentProduction = createServerFn({ method: "POST" })
   .inputValidator((input: { from: string; to: string; agentId?: string }) => input)
   .handler(async ({ data, context }): Promise<AgentProductionResult> => {
     const { supabase, userId } = context;
-    const { role, profiles, agents } = await resolveScopedAgents(supabase, userId);
+    const { role, profiles } = await resolveScopedAgents(supabase, userId);
 
     const profilesById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
-    let agentIds = agents.map((a: any) => a.id);
-    if (data.agentId) agentIds = agentIds.filter((id: string) => id === data.agentId);
+    let profileIds = (profiles as any[]).map((p) => p.id);
+    if (data.agentId) profileIds = profileIds.filter((id: string) => id === data.agentId);
 
-    if (agentIds.length === 0) {
+    if (profileIds.length === 0) {
       return {
         scope: role === "admin_master" ? "admin_master" : "supervisor",
         from: data.from,
@@ -100,19 +100,19 @@ export const getAgentProduction = createServerFn({ method: "POST" })
     const { data: dwr, error } = await supabase
       .from("daily_work_records")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", profileIds)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (error) throw new Error(error.message);
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
     const byAgent = new Map<string, AgentProductionRow>();
-    for (const a of agents) {
-      const prof = profilesById.get(a.profile_id);
-      byAgent.set(a.id, {
-        agent_id: a.id,
-        profile_id: a.profile_id,
-        full_name: prof?.full_name || "Sem nome",
-        registration: prof?.registration_id ?? null,
+    for (const p of profiles as any[]) {
+      byAgent.set(p.id, {
+        agent_id: p.id,
+        profile_id: p.id,
+        full_name: p.full_name || "Sem nome",
+        registration: p.registration_id ?? null,
         ...emptyTotals(),
       });
     }
@@ -145,6 +145,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
         (totals as any)[k] += (r as any)[k];
       }
     }
+    void profilesById;
 
     return {
       scope: role === "admin_master" ? "admin_master" : "supervisor",
