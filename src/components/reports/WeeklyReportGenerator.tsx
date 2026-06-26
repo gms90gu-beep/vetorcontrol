@@ -149,9 +149,9 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     autoTable(pdf, {
       startY: y + 1,
       body: [
-        ["Município", agentRow.municipality || profile?.city || "—", "Ciclo", cycleName],
-        ["Agente", agentRow.name || profile?.full_name || "—", "Semana Epi.", `SE ${epiWeek}`],
-        ["Matrícula", agentRow.registration_id || profile?.registration_number || "—", "Ano", String(epiYear)],
+        ["Município", agentRow?.municipality || profile?.city || "—", "Ciclo", cycleName],
+        ["Agente", agentRow?.name || profile?.full_name || "—", "Semana Epi.", `SE ${epiWeek}`],
+        ["Matrícula", agentRow?.registration_id || profile?.registration_number || "—", "Ano", String(epiYear)],
         ["Emissão", new Date().toLocaleString("pt-BR"), "Diárias", String(records.length)],
       ],
       theme: "grid",
