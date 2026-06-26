@@ -97,7 +97,7 @@ export const KPICard = React.memo(function KPICard({
     </div>
   );
 
-  if (rest.title && typeof rest.title === "string" && hint) {
+  if (typeof title === "string" && hint) {
     return (
       <TooltipProvider delayDuration={250}>
         <Tooltip>
