@@ -757,16 +757,17 @@ export const getGpsCoverage = createServerFn({ method: "POST" })
   .handler(async ({ context }): Promise<GpsCoverage> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
-    const agentIds = await scopedAgentIds(supabase, userId, role);
+    const profileIds = await scopedProfileIds(supabase, userId, role);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds?.length ?? "all");
 
     let boletimIds: string[] | null = null;
-    if (agentIds) {
-      if (agentIds.length === 0)
+    if (profileIds) {
+      if (profileIds.length === 0)
         return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
       const { data: boletins } = await supabase
         .from("boletins_rg")
         .select("id")
-        .in("agent_id", agentIds);
+        .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
       if (boletimIds.length === 0)
         return { properties_total: 0, properties_geo: 0, coverage_pct: 0, blocks_total: 0, blocks_geo: 0 };
