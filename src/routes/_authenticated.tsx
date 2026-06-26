@@ -307,7 +307,8 @@ function AppSidebar({ onLogout }: { onLogout: () => void }) {
       <SidebarContent>
         <SidebarMenu className="px-2 py-4 gap-2">
           {navItems.map((item) => (
-            <SidebarMenuItem key={item.to}>
+            <SidebarMenuItem key={`${item.to}-${item.label}`}>
+
               <SidebarMenuButton asChild tooltip={item.label}>
                 <Link 
                   to={item.to as any} 
