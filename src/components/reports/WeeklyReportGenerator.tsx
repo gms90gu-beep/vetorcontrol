@@ -307,7 +307,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       14, pageH - 6
     );
 
-    const fileName = `Boletim_Semanal_Oficial_SE${epiWeek}_${epiYear}_${agentRow.registration_id || agentRow.id}.pdf`;
+    const fileName = `Boletim_Semanal_Oficial_SE${epiWeek}_${epiYear}_${agentRow?.registration_id || agentAuthId}.pdf`;
     const blob = pdf.output("blob");
 
     if (records.length === 0) {
