@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 export type BlockMapProperty = {
   id: string;
@@ -21,7 +23,6 @@ interface Props {
   properties: BlockMapProperty[];
 }
 
-// 🟢 sem foco | 🔴 foco positivo | 🟠 pendência | 🔵 PE | 🟣 caso confirmado
 function colorFor(p: BlockMapProperty): { color: string; label: string } {
   if (p.had_previous_focus) return { color: "#ef4444", label: "Foco positivo" };
   if (p.has_pendency) return { color: "#f97316", label: "Pendência" };
@@ -29,80 +30,62 @@ function colorFor(p: BlockMapProperty): { color: string; label: string } {
   return { color: "#10b981", label: "Sem foco" };
 }
 
-declare global {
-  interface Window {
-    __rgInitBlockMap?: () => void;
-    google?: any;
-  }
-}
-
-function loadMapsApi(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.google?.maps?.Map) return resolve();
-    const existing = document.querySelector<HTMLScriptElement>("script[data-rg-gmaps]");
-    if (existing) {
-      const i = setInterval(() => {
-        if (window.google?.maps?.Map) { clearInterval(i); resolve(); }
-      }, 100);
-      setTimeout(() => { clearInterval(i); reject(new Error("Timeout carregando Google Maps")); }, 15000);
-      return;
-    }
-    window.__rgInitBlockMap = () => resolve();
-    const key = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
-    const channel = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID || "";
-    if (!key) return reject(new Error("Google Maps key não configurada"));
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&callback=__rgInitBlockMap${channel ? `&channel=${channel}` : ""}`;
-    s.async = true;
-    s.setAttribute("data-rg-gmaps", "true");
-    s.onerror = () => reject(new Error("Falha ao carregar Google Maps"));
-    document.head.appendChild(s);
-  });
-}
-
 export function BlockMapDialog({ open, onOpenChange, blockNumber, properties }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<L.Map | null>(null);
   const geo = properties.filter((p) => p.latitude != null && p.longitude != null);
 
   useEffect(() => {
     if (!open || !mapRef.current || geo.length === 0) return;
-    let cancelled = false;
-    loadMapsApi()
-      .then(() => {
-        if (cancelled || !mapRef.current) return;
-        const center = { lat: geo[0].latitude as number, lng: geo[0].longitude as number };
-        const map = new window.google.maps.Map(mapRef.current, {
-          center,
-          zoom: 18,
-          mapTypeId: "hybrid",
-        });
-        const bounds = new window.google.maps.LatLngBounds();
-        geo.forEach((p) => {
-          const { color, label } = colorFor(p);
-          const pos = { lat: p.latitude as number, lng: p.longitude as number };
-          const marker = new window.google.maps.Marker({
-            position: pos,
-            map,
-            title: `Nº ${p.number} — ${label}`,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 9,
-              fillColor: color,
-              fillOpacity: 1,
-              strokeColor: "#fff",
-              strokeWeight: 2,
-            },
-          });
-          const info = new window.google.maps.InfoWindow({
-            content: `<div style="font-family:system-ui;font-size:12px"><b>Nº ${p.number}</b><br/>${p.street_name ?? ""}<br/><span style="color:${color}">●</span> ${label}</div>`,
-          });
-          marker.addListener("click", () => info.open({ anchor: marker, map }));
-          bounds.extend(pos);
-        });
-        if (geo.length > 1) map.fitBounds(bounds);
-      })
-      .catch((e) => console.error("[BlockMapDialog]", e));
-    return () => { cancelled = true; };
+
+    // Pequeno delay para garantir que o container do dialog tenha dimensões
+    const timer = setTimeout(() => {
+      if (!mapRef.current) return;
+
+      // Limpa instância anterior se existir
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+
+      const center: L.LatLngExpression = [geo[0].latitude as number, geo[0].longitude as number];
+      const map = L.map(mapRef.current, { center, zoom: 18 });
+      mapInstance.current = map;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+
+      const bounds = L.latLngBounds([]);
+      geo.forEach((p) => {
+        const { color, label } = colorFor(p);
+        const pos: L.LatLngExpression = [p.latitude as number, p.longitude as number];
+        const marker = L.circleMarker(pos, {
+          radius: 9,
+          fillColor: color,
+          fillOpacity: 1,
+          color: "#fff",
+          weight: 2,
+        }).addTo(map);
+        marker.bindPopup(
+          `<div style="font-family:system-ui;font-size:12px"><b>Nº ${p.number}</b><br/>${p.street_name ?? ""}<br/><span style="color:${color}">●</span> ${label}</div>`,
+        );
+        bounds.extend(pos);
+      });
+
+      if (geo.length > 1) map.fitBounds(bounds, { padding: [24, 24] });
+      // Garante render correto após o dialog abrir
+      setTimeout(() => map.invalidateSize(), 100);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
   }, [open, geo]);
 
   return (
