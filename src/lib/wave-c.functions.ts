@@ -307,32 +307,22 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     const profileIds = (profiles ?? []).map((p: any) => p.id);
     const nameByProfile = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name || "Sem nome"]));
 
-    let agentIds: string[] = [];
-    const agentToProfile = new Map<string, string>();
-    if (profileIds.length > 0) {
-      const { data: agents } = await supabase
-        .from("agents")
-        .select("id, profile_id")
-        .in("profile_id", profileIds);
-      for (const a of (agents ?? []) as any[]) {
-        agentIds.push(a.id);
-        agentToProfile.set(a.id, a.profile_id);
-      }
-    }
-
-    if (agentIds.length === 0) {
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds.length);
+    if (profileIds.length === 0) {
       return { total_open: 0, total_resolved: 0, rows: [], by_status: {} };
     }
 
+    // property_pendencies.agent_id armazena profile_id
     let q = supabase
       .from("property_pendencies")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", profileIds)
       .order("last_attempt_at", { ascending: false })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
     const { data: pends, error } = await q;
     if (error) throw new Error(error.message);
+    console.log("[RBAC_RESULT]", "pendencies", (pends ?? []).length);
 
     const propIds = Array.from(new Set((pends ?? []).map((p: any) => p.property_id).filter(Boolean)));
     const propsById = new Map<string, any>();
@@ -350,7 +340,6 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     const rows: PendencyRow[] = [];
     for (const p of (pends ?? []) as any[]) {
       const prop = propsById.get(p.property_id) || {};
-      const profId = p.agent_id ? agentToProfile.get(p.agent_id) : null;
       const status = String(p.current_status || "—");
       byStatus[status] = (byStatus[status] || 0) + 1;
       if (p.resolved_at) totalResolved++;
@@ -362,7 +351,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
         street: prop.street_name ?? null,
         block_number: prop.block_number ?? null,
         agent_id: p.agent_id,
-        agent_name: profId ? nameByProfile.get(profId) || "Sem nome" : "Sem agente",
+        agent_name: p.agent_id ? nameByProfile.get(p.agent_id) || "Sem nome" : "Sem agente",
         current_status: status,
         reason: p.reason ?? null,
         attempt_count: p.attempt_count ?? 0,
