@@ -1,44 +1,32 @@
-import { createFileRoute, Outlet, Link, useRouter, useLocation, redirect } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  LayoutDashboard, 
-  Map as MapIcon, 
-  FileText, 
-  Settings, 
-  LogOut,
-  RefreshCw,
-  ChevronLeft,
-  Layers,
-  AlertTriangle,
-  MapPin,
-  Home,
-  CheckSquare,
-  ShieldCheck,
-  Users,
-  BarChart3
-} from "lucide-react";
+import { createFileRoute, Outlet, useRouter, useLocation, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
-import { Button } from "@/components/ui/button";
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarFooter, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
-  SidebarTrigger
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-
 import { hasValidLocalSession } from "@/lib/auth";
+import {
+  buildNavItems,
+  groupNavItems,
+  NAV_GROUP_LABEL,
+  type NavItem,
+} from "@/components/navigation/navigation-config";
+import { useNavBadges } from "@/components/navigation/use-nav-badges";
+import { NavigationItem } from "@/components/navigation/NavigationItem";
+import { BottomNavigation } from "@/components/navigation/BottomNavigation";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -52,7 +40,6 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-
 function AuthenticatedLayout() {
   const router = useRouter();
   const location = useLocation();
@@ -60,8 +47,7 @@ function AuthenticatedLayout() {
   const isMobileDevice = useIsMobile();
   const isLandscapeRaw = useOrientation();
   const isLandscape = isMobileDevice && isLandscapeRaw;
-  const { isOperational, isLoading: isOperationalLoading, userRole } = useOperationalDate();
-  console.log("[SIDEBAR_RENDER]", { userRole, pathname: location.pathname, isMobileDevice, isLandscape, w: typeof window !== "undefined" ? window.innerWidth : null });
+  const { isLoading: isOperationalLoading, userRole } = useOperationalDate();
 
   useEffect(() => {
     if (!isReady) return;
@@ -71,23 +57,18 @@ function AuthenticatedLayout() {
     }
   }, [isReady, router, user]);
 
-
   if (!isReady || !user || isOperationalLoading) {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      console.log('[Offline Debug] isReady:', isReady, '| user:', !!user, '| isOperationalLoading:', isOperationalLoading);
       // continua renderizando
     } else {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-          <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" />
+          <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" aria-hidden />
           <span className="text-sm font-medium">Carregando sessão...</span>
         </div>
       );
     }
   }
-
-  // System is now always operational
-  // Removed weekend block validation
 
   const handleLogout = async () => {
     await signOut();
@@ -97,240 +78,77 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background overflow-hidden relative">
-        {!isLandscape && <AppSidebar onLogout={handleLogout} />}
+        {!isLandscape && <AppSidebar userRole={userRole} onLogout={handleLogout} />}
         <main className="flex-1 flex flex-col min-w-0">
-          {!isLandscape && !location.pathname.startsWith('/supervision') && location.pathname !== '/dashboard' && <OperationalHeader />}
-          <div className={cn(
-            "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8",
-            isLandscape && "p-2 md:p-4 pb-4",
-            (location.pathname.startsWith('/supervision') || location.pathname === '/dashboard') && "p-0 md:p-0 pb-32"
-          )}>
+          {!isLandscape && !location.pathname.startsWith("/supervision") && location.pathname !== "/dashboard" && <OperationalHeader />}
+          <div
+            className={cn(
+              "flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-32 md:pb-8",
+              isLandscape && "p-2 md:p-4 pb-4",
+              (location.pathname.startsWith("/supervision") || location.pathname === "/dashboard") && "p-0 md:p-0 pb-32",
+            )}
+          >
             <Outlet />
           </div>
-          {!isLandscape && !location.pathname.startsWith('/property/') && <BottomNav />}
+          {!isLandscape && !location.pathname.startsWith("/property/") && (
+            <BottomNavigation onLogout={handleLogout} />
+          )}
         </main>
       </div>
     </SidebarProvider>
   );
 }
 
-function getShortPanelTitle(role: string | null) {
-  switch (role) {
-    case "admin_master":
-      return "Admin";
-    case "coordenador":
-      return "Coord.";
-    case "supervisor":
-      return "Superv.";
-    case "agente":
-      return "Agente";
-    default:
-      return "Início";
-  }
-}
-
-type NavItemDef = { label: string; icon: any; to: string };
-
-function buildNavItems(userRole: string | null): NavItemDef[] {
-  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
-
-  const items: NavItemDef[] = isManager
-    ? [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
-        { label: "Equipe", icon: Users, to: "/supervision" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-        { label: "Intelligence", icon: BarChart3, to: "/reports" },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
-      ]
-    : [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
-        { label: "Ciclos", icon: Layers, to: "/cycles" },
-        { label: "Trabalho", icon: MapIcon, to: "/field-work" },
-        { label: "RG", icon: MapPin, to: "/rg" },
-        { label: "Pendências", icon: AlertTriangle, to: "/pending" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-      ];
-
-  if (userRole === "admin_master") {
-    items.push(
-      { label: "Admin Master", icon: ShieldCheck, to: "/admin-master" },
-      { label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard" },
-      { label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" },
-      { label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit" },
-      { label: "Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit" },
-    );
-  }
-
-  if (isManager) {
-    items.push(
-      { label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias" },
-      { label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap" },
-      { label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit" },
-    );
-  }
-
-  items.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" });
-  items.push({ label: "Configurações", icon: Settings, to: "/settings" });
-
-  return items;
-}
-
-function BottomNav() {
+function AppSidebar({ userRole, onLogout }: { userRole: string | null; onLogout: () => void }) {
   const isMobile = useIsMobile();
-  const { userRole } = useOperationalDate();
-  const [moreOpen, setMoreOpen] = useState(false);
-  if (!isMobile) return null;
-
-  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
-  const allItems = buildNavItems(userRole);
-
-  // 4 primary shortcuts on the bar; everything else lives in "Mais".
-  // For managers, mirror the Supervisor sidebar (no /field-work, no /rg).
-  const primary: NavItemDef[] = isManager
-    ? [
-        { label: "Painel", icon: Home, to: "/supervision" },
-        { label: "Equipe", icon: Users, to: "/supervision" },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
-        { label: "Relat.", icon: FileText, to: "/relatorios" },
-      ]
-    : [
-        { label: "Início", icon: Home, to: "/dashboard" },
-        { label: "Trabalho", icon: CheckSquare, to: "/field-work" },
-        { label: "RG", icon: MapPin, to: "/rg" },
-        { label: "Relat.", icon: FileText, to: "/relatorios" },
-      ];
-
-  const primaryTos = new Set(primary.map((p) => p.to));
-  const moreItems = allItems.filter((i) => !primaryTos.has(i.to));
-
-  return (
-    <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
-        {primary.map((item) => (
-          <NavItem key={`${item.to}-${item.label}`} to={item.to} icon={item.icon} label={item.label} />
-        ))}
-        <button
-          type="button"
-          onClick={() => setMoreOpen(true)}
-          className="flex flex-col items-center gap-1 text-muted-foreground transition-all active:scale-90"
-        >
-          <Settings className="h-6 w-6" />
-          <span className="text-[10px] font-bold uppercase tracking-tight">Mais</span>
-        </button>
-      </div>
-      <MoreMenuSheet open={moreOpen} onOpenChange={setMoreOpen} items={moreItems} />
-    </>
-  );
-}
-
-function MoreMenuSheet({
-  open,
-  onOpenChange,
-  items,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  items: NavItemDef[];
-}) {
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl pb-[env(safe-area-inset-bottom,1.5rem)] max-h-[80vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Mais opções</SheetTitle>
-        </SheetHeader>
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          {items.map((item) => (
-            <Link
-              key={`${item.to}-${item.label}`}
-              to={item.to as any}
-              onClick={() => onOpenChange(false)}
-              className="flex items-center gap-3 rounded-xl border border-accent/40 bg-card/50 px-4 py-3 text-sm font-semibold text-foreground active:scale-95 transition"
-            >
-              <item.icon className="h-5 w-5 text-primary shrink-0" />
-              <span className="truncate">{item.label}</span>
-            </Link>
-          ))}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-
-
-function NavItem({ to, icon: Icon, label }: any) {
-  return (
-    <Link 
-      to={to} 
-      className="flex flex-col items-center gap-1 text-muted-foreground transition-all active:scale-90"
-      activeProps={{ className: "text-primary" }}
-    >
-      <Icon className="h-6 w-6" />
-      <span className="text-[10px] font-bold uppercase tracking-tight">{label}</span>
-    </Link>
-  );
-}
-
-function getPanelTitle(role: string | null) {
-  switch (role) {
-    case "admin_master":
-      return "Painel Administrativo";
-    case "coordenador":
-      return "Painel do Coordenador";
-    case "supervisor":
-      return "Painel do Supervisor";
-    case "agente":
-      return "Painel do Agente";
-    default:
-      return "Dashboard";
-  }
-}
-
-function AppSidebar({ onLogout }: { onLogout: () => void }) {
-  const isMobile = useIsMobile();
-  const { userRole } = useOperationalDate();
-  const navItems = buildNavItems(userRole);
-
+  const items: NavItem[] = buildNavItems(userRole);
+  const badges = useNavBadges();
+  const groups = groupNavItems(items);
 
   return (
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
       <SidebarHeader className="h-16 flex items-center px-4 border-b">
         <div className="flex items-center gap-2 font-bold text-primary">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/30">
+          <div
+            aria-hidden
+            className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/30"
+          >
             V
           </div>
           <span className="group-data-[collapsible=icon]:hidden">VetorControl</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarMenu className="px-2 py-4 gap-2">
-          {navItems.map((item) => (
-            <SidebarMenuItem key={`${item.to}-${item.label}`}>
-
-              <SidebarMenuButton asChild tooltip={item.label}>
-                <Link 
-                  to={item.to as any} 
-                  className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all hover:bg-accent active:scale-95"
-                  activeProps={{ className: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20" }}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="font-medium group-data-[collapsible=icon]:hidden">{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+        <SidebarMenu className="px-2 py-4 gap-4">
+          {groups.map(({ group, items }) => (
+            <div key={group} className="space-y-1">
+              <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground group-data-[collapsible=icon]:hidden">
+                {NAV_GROUP_LABEL[group]}
+              </div>
+              {items.map((item) => (
+                <SidebarMenuItem key={item.key}>
+                  <SidebarMenuButton asChild tooltip={item.label}>
+                    <NavigationItem
+                      item={item}
+                      mode="sidebar"
+                      badge={item.badge ? badges[item.badge] : 0}
+                    />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </div>
           ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
+            <SidebarMenuButton
               onClick={onLogout}
+              aria-label="Sair da conta"
               className="flex items-center gap-3 px-3 py-2 rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 w-full"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-5 w-5" aria-hidden />
               <span className="font-medium group-data-[collapsible=icon]:hidden">Sair</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
