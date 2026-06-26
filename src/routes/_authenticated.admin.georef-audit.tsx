@@ -89,49 +89,42 @@ function GeorefAuditPage() {
 
   function exportCSV() {
     if (!data) return;
-    downloadCSV(
-      `georef-audit-${new Date().toISOString().slice(0, 10)}.csv`,
-      data.properties.map((p) => ({
-        id: p.id,
-        endereco: p.street_name || "",
-        numero: p.number || "",
-        quarteirao: p.block_number || "",
-        localidade: p.locality || "",
-        agente: p.agent_name || "",
-        latitude: p.latitude ?? "",
-        longitude: p.longitude ?? "",
-        geocoded_at: p.geocoded_at || "",
-        status: p.status,
-      })),
-    );
+    const header = ["id", "endereco", "numero", "quarteirao", "localidade", "agente", "latitude", "longitude", "geocoded_at", "status"];
+    const rows = data.properties.map((p) => [
+      p.id, p.street_name || "", p.number || "", p.block_number || "", p.locality || "",
+      p.agent_name || "", p.latitude ?? "", p.longitude ?? "", p.geocoded_at || "", p.status,
+    ]);
+    downloadCSV(`georef-audit-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
   }
 
   function exportXLSX() {
     if (!data) return;
-    downloadXLSX(`georef-audit-${new Date().toISOString().slice(0, 10)}.xlsx`, [
-      { name: "KPIs", rows: [data.kpis] },
-      { name: "Imóveis", rows: data.properties },
-      { name: "Quarteirões", rows: data.blocks },
-      { name: "Órfãos", rows: [data.orphans] },
+    const header = ["id", "endereço", "nº", "quarteirão", "localidade", "agente", "lat", "lng", "data GPS", "status"];
+    const rows = data.properties.map((p) => [
+      p.id, p.street_name || "", p.number || "", p.block_number || "", p.locality || "",
+      p.agent_name || "", p.latitude ?? "", p.longitude ?? "", p.geocoded_at || "", p.status,
     ]);
+    downloadXLSX(`georef-audit-${new Date().toISOString().slice(0, 10)}.xls`, "Auditoria", header, rows);
   }
 
   function exportPDF() {
     if (!data) return;
-    generateInstitutionalPDF({
-      title: "Auditoria de Georreferenciamento",
-      subtitle: `Gerado em ${new Date(data.generated_at).toLocaleString("pt-BR")}`,
-      sections: [
+    generateInstitutionalPDF(
+      `georef-audit-${new Date().toISOString().slice(0, 10)}.pdf`,
+      { title: "Auditoria de Georreferenciamento", subtitle: `Gerado em ${new Date(data.generated_at).toLocaleString("pt-BR")}` },
+      [
         {
           title: "Indicadores",
-          rows: Object.entries(data.kpis).map(([k, v]) => [k, String(v ?? "—")]),
+          head: ["Indicador", "Valor"],
+          body: Object.entries(data.kpis).map(([k, v]) => [k, String(v ?? "—")]),
         },
         {
-          title: "Inconsistências",
-          rows: Object.entries(data.orphans).map(([k, v]) => [k, String(v)]),
+          title: "Inconsistências (Órfãos)",
+          head: ["Tipo", "Total"],
+          body: Object.entries(data.orphans).map(([k, v]) => [k, String(v)]),
         },
       ],
-    });
+    );
     toast.success("PDF gerado");
   }
 
