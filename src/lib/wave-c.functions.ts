@@ -178,8 +178,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       kpis.cargas_collected += +r.cargas_collected || 0;
       activeAgents.add(r.agent_id);
 
-      const profId = profileByAgent.get(r.agent_id);
-      const prof = profId ? profileById.get(profId) : null;
+      const prof = profileById.get(r.agent_id);
       const supId = prof?.supervisor_id ?? null;
       const supKey = supId ?? "—";
       if (!bySup.has(supKey)) {
