@@ -153,9 +153,18 @@ function BottomNav() {
     <>
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-accent/50 px-3 py-2 flex items-center justify-between pb-[env(safe-area-inset-bottom,1.5rem)]">
         <NavItem to={homeTo} icon={Home} label="Início" />
-        <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
-        <NavItem to="/rg" icon={MapPin} label="RG" />
-        {isManager && <NavItem to="/map" icon={MapIcon} label="Mapa" />}
+        {isManager ? (
+          <>
+            <NavItem to="/supervision" icon={Users} label="Equipe" />
+            <NavItem to="/map" icon={MapIcon} label="Mapa" />
+            <NavItem to="/admin/pendencias" icon={AlertTriangle} label="Pend." />
+          </>
+        ) : (
+          <>
+            <NavItem to="/field-work" icon={CheckSquare} label="Trabalho" />
+            <NavItem to="/rg" icon={MapPin} label="RG" />
+          </>
+        )}
         <NavItem to="/relatorios" icon={FileText} label="Relat." />
         <button
           type="button"
