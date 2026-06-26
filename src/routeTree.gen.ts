@@ -45,6 +45,7 @@ import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
 import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
+import { Route as AuthenticatedAdminDesignSystemRouteImport } from './routes/_authenticated.admin.design-system'
 import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
 import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
 import { Route as AuthenticatedAdminCycleAuditRouteImport } from './routes/_authenticated.admin.cycle-audit'
@@ -245,6 +246,12 @@ const AuthenticatedAdminGeorefAuditRoute =
     path: '/admin/georef-audit',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminDesignSystemRoute =
+  AuthenticatedAdminDesignSystemRouteImport.update({
+    id: '/admin/design-system',
+    path: '/admin/design-system',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminDataAuditRoute =
   AuthenticatedAdminDataAuditRouteImport.update({
     id: '/admin/data-audit',
@@ -320,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
+  '/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
@@ -364,6 +372,7 @@ export interface FileRoutesByTo {
   '/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
+  '/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
@@ -410,6 +419,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/cycle-audit': typeof AuthenticatedAdminCycleAuditRoute
   '/_authenticated/admin/dashboard': typeof AuthenticatedAdminDashboardRoute
   '/_authenticated/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
+  '/_authenticated/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/_authenticated/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/_authenticated/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
@@ -456,6 +466,7 @@ export interface FileRouteTypes {
     | '/admin/cycle-audit'
     | '/admin/dashboard'
     | '/admin/data-audit'
+    | '/admin/design-system'
     | '/admin/georef-audit'
     | '/admin/pendencias'
     | '/admin/rbac-audit'
@@ -500,6 +511,7 @@ export interface FileRouteTypes {
     | '/admin/cycle-audit'
     | '/admin/dashboard'
     | '/admin/data-audit'
+    | '/admin/design-system'
     | '/admin/georef-audit'
     | '/admin/pendencias'
     | '/admin/rbac-audit'
@@ -545,6 +557,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/cycle-audit'
     | '/_authenticated/admin/dashboard'
     | '/_authenticated/admin/data-audit'
+    | '/_authenticated/admin/design-system'
     | '/_authenticated/admin/georef-audit'
     | '/_authenticated/admin/pendencias'
     | '/_authenticated/admin/rbac-audit'
@@ -821,6 +834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminGeorefAuditRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/design-system': {
+      id: '/_authenticated/admin/design-system'
+      path: '/admin/design-system'
+      fullPath: '/admin/design-system'
+      preLoaderRoute: typeof AuthenticatedAdminDesignSystemRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/data-audit': {
       id: '/_authenticated/admin/data-audit'
       path: '/admin/data-audit'
@@ -914,6 +934,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminCycleAuditRoute: typeof AuthenticatedAdminCycleAuditRoute
   AuthenticatedAdminDashboardRoute: typeof AuthenticatedAdminDashboardRoute
   AuthenticatedAdminDataAuditRoute: typeof AuthenticatedAdminDataAuditRoute
+  AuthenticatedAdminDesignSystemRoute: typeof AuthenticatedAdminDesignSystemRoute
   AuthenticatedAdminGeorefAuditRoute: typeof AuthenticatedAdminGeorefAuditRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
   AuthenticatedAdminRbacAuditRoute: typeof AuthenticatedAdminRbacAuditRoute
@@ -951,6 +972,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminCycleAuditRoute: AuthenticatedAdminCycleAuditRoute,
   AuthenticatedAdminDashboardRoute: AuthenticatedAdminDashboardRoute,
   AuthenticatedAdminDataAuditRoute: AuthenticatedAdminDataAuditRoute,
+  AuthenticatedAdminDesignSystemRoute: AuthenticatedAdminDesignSystemRoute,
   AuthenticatedAdminGeorefAuditRoute: AuthenticatedAdminGeorefAuditRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
   AuthenticatedAdminRbacAuditRoute: AuthenticatedAdminRbacAuditRoute,
