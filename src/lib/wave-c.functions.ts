@@ -219,8 +219,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     // Count unique agents per supervisor (in scope, with records)
     const supAgentSet = new Map<string, Set<string>>();
     for (const r of (dwr ?? []) as any[]) {
-      const profId = profileByAgent.get(r.agent_id);
-      const prof = profId ? profileById.get(profId) : null;
+      const prof = profileById.get(r.agent_id);
       const supKey = prof?.supervisor_id ?? "—";
       if (!supAgentSet.has(supKey)) supAgentSet.set(supKey, new Set());
       supAgentSet.get(supKey)!.add(r.agent_id);
