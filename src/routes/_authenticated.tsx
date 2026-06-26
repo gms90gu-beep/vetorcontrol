@@ -291,46 +291,8 @@ function getPanelTitle(role: string | null) {
 function AppSidebar({ onLogout }: { onLogout: () => void }) {
   const isMobile = useIsMobile();
   const { userRole } = useOperationalDate();
-  const isManager = userRole === "supervisor" || userRole === "admin_master" || userRole === "coordenador";
+  const navItems = buildNavItems(userRole);
 
-  // Managers (supervisor/coordenador/admin_master) get a management-focused menu
-  // without operational field actions (Trabalho, RG, Pendências, Ciclos, Veículos).
-  const navItems = isManager
-    ? [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/supervision" },
-        { label: "Equipe", icon: Users, to: "/supervision" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-        { label: "Intelligence", icon: BarChart3, to: "/reports" },
-        { label: "Mapa", icon: MapIcon, to: "/map" },
-      ]
-    : [
-        { label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard" },
-        { label: "Ciclos", icon: Layers, to: "/cycles" },
-        { label: "Trabalho", icon: MapIcon, to: "/field-work" },
-        { label: "RG", icon: MapPin, to: "/rg" },
-        { label: "Pendências", icon: AlertTriangle, to: "/pending" },
-        { label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison" as any },
-        { label: "Relatórios", icon: FileText, to: "/relatorios" },
-      ];
-
-  if (userRole === "admin_master") {
-    navItems.push({ label: "Admin Master", icon: ShieldCheck, to: "/admin-master" as any });
-    navItems.push({ label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard" as any });
-    navItems.push({ label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria" as any });
-    navItems.push({ label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit" as any });
-    navItems.push({ label: "🔍 Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit" as any });
-  }
-
-  if (isManager) {
-    navItems.push({ label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias" as any });
-    navItems.push({ label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap" as any });
-    navItems.push({ label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit" as any });
-  }
-
-  navItems.push({ label: "Sincronização", icon: RefreshCw, to: "/sync-status" as any });
-
-  navItems.push({ label: "Configurações", icon: Settings, to: "/settings" });
 
   return (
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
