@@ -41,6 +41,7 @@ import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_a
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
 import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_authenticated.admin.rg-reconcile'
 import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
+import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
 import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
 import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
@@ -219,6 +220,12 @@ const AuthenticatedAdminRgPipelineRoute =
     path: '/admin/rg-pipeline',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminRbacAuditRoute =
+  AuthenticatedAdminRbacAuditRouteImport.update({
+    id: '/admin/rbac-audit',
+    path: '/admin/rbac-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminPendenciasRoute =
   AuthenticatedAdminPendenciasRouteImport.update({
     id: '/admin/pendencias',
@@ -308,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -350,6 +358,7 @@ export interface FileRoutesByTo {
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -394,6 +403,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/_authenticated/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
+  '/_authenticated/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/_authenticated/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/_authenticated/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/admin/data-audit'
     | '/admin/georef-audit'
     | '/admin/pendencias'
+    | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
     | '/admin/rg-reconcile'
     | '/daily-bulletin/$id'
@@ -480,6 +491,7 @@ export interface FileRouteTypes {
     | '/admin/data-audit'
     | '/admin/georef-audit'
     | '/admin/pendencias'
+    | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
     | '/admin/rg-reconcile'
     | '/daily-bulletin/$id'
@@ -523,6 +535,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/data-audit'
     | '/_authenticated/admin/georef-audit'
     | '/_authenticated/admin/pendencias'
+    | '/_authenticated/admin/rbac-audit'
     | '/_authenticated/admin/rg-pipeline'
     | '/_authenticated/admin/rg-reconcile'
     | '/_authenticated/daily-bulletin/$id'
@@ -767,6 +780,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRgPipelineRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/rbac-audit': {
+      id: '/_authenticated/admin/rbac-audit'
+      path: '/admin/rbac-audit'
+      fullPath: '/admin/rbac-audit'
+      preLoaderRoute: typeof AuthenticatedAdminRbacAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/pendencias': {
       id: '/_authenticated/admin/pendencias'
       path: '/admin/pendencias'
@@ -876,6 +896,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminDataAuditRoute: typeof AuthenticatedAdminDataAuditRoute
   AuthenticatedAdminGeorefAuditRoute: typeof AuthenticatedAdminGeorefAuditRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
+  AuthenticatedAdminRbacAuditRoute: typeof AuthenticatedAdminRbacAuditRoute
   AuthenticatedAdminRgPipelineRoute: typeof AuthenticatedAdminRgPipelineRoute
   AuthenticatedAdminRgReconcileRoute: typeof AuthenticatedAdminRgReconcileRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
@@ -911,6 +932,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminDataAuditRoute: AuthenticatedAdminDataAuditRoute,
   AuthenticatedAdminGeorefAuditRoute: AuthenticatedAdminGeorefAuditRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
+  AuthenticatedAdminRbacAuditRoute: AuthenticatedAdminRbacAuditRoute,
   AuthenticatedAdminRgPipelineRoute: AuthenticatedAdminRgPipelineRoute,
   AuthenticatedAdminRgReconcileRoute: AuthenticatedAdminRgReconcileRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
@@ -933,13 +955,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

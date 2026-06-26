@@ -274,7 +274,7 @@ export const runRbacAudit = createServerFn({ method: "POST" })
     const tests: RBACAuditResult["tests"] = [];
     tests.push({
       id: "T1", name: "Agente visualiza apenas seus dados",
-      status: (agentsSample || []).every((ag) =>
+      status: (agentsSample || []).every((ag: any) =>
         rbacByRole.filter((r) => r.user_id === ag.id).every((r) => r.diff === 0),
       ) ? "pass" : "fail",
     });
