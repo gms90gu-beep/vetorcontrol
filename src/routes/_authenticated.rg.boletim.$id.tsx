@@ -174,17 +174,15 @@ function BoletimView() {
       }
       setBoletim(b);
 
-      // Load properties linked to this boletim. Inclui fallback por block_id
-      // (imóveis órfãos do mesmo quarteirão) para que a tela bata com a contagem da lista.
-      const filters: string[] = [`boletim_id.eq.${b.id}`];
-      if ((b as any).block_id) filters.push(`and(boletim_id.is.null,block_id.eq.${(b as any).block_id})`);
+      // Imóveis do boletim — fonte única: boletim_id.
       const { data: byBoletimLink } = await supabase
         .from("properties")
         .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status")
-        .or(filters.join(","))
+        .eq("boletim_id", b.id)
         .order("sequence", { ascending: true });
 
       const props: Property[] = [...((byBoletimLink || []) as Property[])].sort(comparePropertyNumber);
+
 
       console.log("[BRG] imóveis carregados:", props.length);
       setImoveis(props);
