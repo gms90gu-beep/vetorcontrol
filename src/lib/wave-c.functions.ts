@@ -686,7 +686,8 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       }
     }
 
-    const agentIdsForName = Array.from(
+    // agent_id (em visits e boletins_rg) referencia profiles.id
+    const profileIdsForName = Array.from(
       new Set(
         [
           ...lastAgentByProp.values(),
@@ -695,24 +696,12 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       ),
     );
     const agentNameById = new Map<string, string>();
-    if (agentIdsForName.length > 0) {
-      const { data: ags } = await supabase
-        .from("agents")
-        .select("id, name, profile_id")
-        .in("id", agentIdsForName);
-      const profileIds = (ags ?? []).map((a: any) => a.profile_id).filter(Boolean);
-      const profileNameById = new Map<string, string>();
-      if (profileIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .in("id", profileIds);
-        for (const p of profs ?? []) profileNameById.set(p.id, p.full_name ?? "Agente");
-      }
-      for (const a of ags ?? []) {
-        agentNameById.set(a.id, (a.profile_id && profileNameById.get(a.profile_id)) || a.name || "Agente");
-      }
-
+    if (profileIdsForName.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", profileIdsForName);
+      for (const p of profs ?? []) agentNameById.set(p.id, p.full_name ?? "Agente");
     }
 
     const points: PropertyMapPoint[] = propList.map((p) => {
