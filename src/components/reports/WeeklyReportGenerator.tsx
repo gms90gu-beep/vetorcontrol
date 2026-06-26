@@ -296,7 +296,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     pdf.setFontSize(8);
     pdf.text("Assinatura do Agente", pageW / 2, y + 4, { align: "center" });
     pdf.setFont("helvetica", "bold");
-    pdf.text(agentRow.name || profile?.full_name || "—", pageW / 2, y + 9, { align: "center" });
+    pdf.text(agentRow?.name || profile?.full_name || "—", pageW / 2, y + 9, { align: "center" });
 
     // Rodapé
     pdf.setFont("helvetica", "normal");
