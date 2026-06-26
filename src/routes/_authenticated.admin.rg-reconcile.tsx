@@ -79,6 +79,27 @@ function Page() {
     }
   }
 
+  async function onHomolog() {
+    setBusy(true);
+    try {
+      const r = await runHomolog();
+      setHomolog(r);
+      console.log("[RG_RECONCILE_RESULT]", r);
+      console.log("[RG_FINAL_COUNTS]", r.counts);
+      for (const t of r.tests) {
+        if (t.pass) console.log("[RG_VALIDATION_OK]", t.id, t.name, t.details);
+        else console.warn("[RG_VALIDATION_ERROR]", t.id, t.name, t.details);
+      }
+      toast[r.approved ? "success" : "warning"](
+        r.approved ? "Homologação aprovada ✓" : "Homologação com divergências",
+      );
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const rows = data?.rows ?? [];
   const orphans = data?.orphanBlocks ?? [];
 
