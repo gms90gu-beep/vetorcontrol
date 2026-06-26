@@ -325,10 +325,43 @@ function RGPage() {
       const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
 
+      const locality = (payload.locality || "").trim();
+      if (!locality) throw new Error("Localidade obrigatória");
+      const normLocality = locality.toLowerCase();
+
+      // 1) Localizar bloco existente (localidade + número, case-insensitive)
+      const { data: existingBlocks } = await supabase
+        .from("blocks")
+        .select("id, number, locality")
+        .eq("number", payload.block_number);
+      let blockId =
+        (existingBlocks ?? []).find(
+          (b: any) => (b.locality ?? "").trim().toLowerCase() === normLocality,
+        )?.id ?? null;
+
+      // 2) Criar bloco se não existir
+      if (!blockId) {
+        const { data: newBlock, error: blockErr } = await supabase
+          .from("blocks")
+          .insert({
+            number: payload.block_number,
+            locality,
+            status: "not_started",
+            total_properties: 0,
+          })
+          .select("id")
+          .single();
+        if (blockErr) throw blockErr;
+        blockId = newBlock.id;
+      }
+      console.log("[RG_RECONCILE_BLOCK]", { blockId, blockNumber: payload.block_number, locality });
+
+      // 3) Criar boletim já com block_id
       const insert = {
         agent_id: user.id,
         block_number: payload.block_number,
-        locality: payload.locality || null,
+        block_id: blockId,
+        locality,
         municipality: agentDefaults.municipality || null,
         uf: "CE",
         agent_name: agentDefaults.name || null,
@@ -337,6 +370,7 @@ function RGPage() {
       const { data, error } = await supabase
         .from("boletins_rg").insert(insert).select().single();
       if (error) throw error;
+      console.log("[RG_RECONCILE_DONE]", data.id);
       setShowNew(false);
       toast.success("Boletim criado");
       navigate({ to: "/rg/boletim/$id", params: { id: data.id } });
