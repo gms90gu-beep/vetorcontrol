@@ -113,37 +113,32 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     }
 
     const profileIds = (profiles ?? []).map((p: any) => p.id);
+    console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds.length);
     if (profileIds.length === 0) {
       return emptyDashboard(role, data);
     }
 
-    const { data: agents } = await supabase
-      .from("agents")
-      .select("id, profile_id")
-      .in("profile_id", profileIds);
-    const agentList = (agents ?? []) as { id: string; profile_id: string }[];
-    let agentIds = agentList.map((a) => a.id);
-    if (data.agentId) agentIds = agentIds.filter((id) => id === data.agentId);
-    const profileByAgent = new Map(agentList.map((a) => [a.id, a.profile_id]));
-
-    if (agentIds.length === 0) return emptyDashboard(role, data);
+    let scopedProfiles = profileIds;
+    if (data.agentId) scopedProfiles = scopedProfiles.filter((id) => id === data.agentId);
+    if (scopedProfiles.length === 0) return emptyDashboard(role, data);
 
     let dwrQ = supabase
       .from("daily_work_records")
       .select("*")
-      .in("agent_id", agentIds)
+      .in("agent_id", scopedProfiles)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
     const { data: dwr, error: de } = await dwrQ;
     if (de) throw new Error(de.message);
 
-    // Pendencies open (no resolved_at)
+    // Pendencies open (no resolved_at) — agent_id é profile_id
     const { count: pendOpen } = await supabase
       .from("property_pendencies")
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
-      .in("agent_id", agentIds);
+      .in("agent_id", scopedProfiles);
+    console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
       daily_records: 0,
