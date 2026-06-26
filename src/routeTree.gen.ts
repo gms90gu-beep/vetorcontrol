@@ -39,6 +39,7 @@ import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminSystemHealthRouteImport } from './routes/_authenticated.admin.system-health'
 import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_authenticated.admin.rg-reconcile'
 import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
 import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
@@ -208,6 +209,12 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminSystemHealthRoute =
+  AuthenticatedAdminSystemHealthRouteImport.update({
+    id: '/admin/system-health',
+    path: '/admin/system-health',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminRgReconcileRoute =
   AuthenticatedAdminRgReconcileRouteImport.update({
     id: '/admin/rg-reconcile',
@@ -318,6 +325,7 @@ export interface FileRoutesByFullPath {
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
+  '/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -361,6 +369,7 @@ export interface FileRoutesByTo {
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
+  '/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -406,6 +415,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/_authenticated/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
   '/_authenticated/admin/rg-reconcile': typeof AuthenticatedAdminRgReconcileRoute
+  '/_authenticated/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
     | '/admin/rg-reconcile'
+    | '/admin/system-health'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -494,6 +505,7 @@ export interface FileRouteTypes {
     | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
     | '/admin/rg-reconcile'
+    | '/admin/system-health'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
     | '/rg/boletim/$id'
@@ -538,6 +550,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/rbac-audit'
     | '/_authenticated/admin/rg-pipeline'
     | '/_authenticated/admin/rg-reconcile'
+    | '/_authenticated/admin/system-health'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
     | '/_authenticated/rg/boletim/$id'
@@ -766,6 +779,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/system-health': {
+      id: '/_authenticated/admin/system-health'
+      path: '/admin/system-health'
+      fullPath: '/admin/system-health'
+      preLoaderRoute: typeof AuthenticatedAdminSystemHealthRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/rg-reconcile': {
       id: '/_authenticated/admin/rg-reconcile'
       path: '/admin/rg-reconcile'
@@ -899,6 +919,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminRbacAuditRoute: typeof AuthenticatedAdminRbacAuditRoute
   AuthenticatedAdminRgPipelineRoute: typeof AuthenticatedAdminRgPipelineRoute
   AuthenticatedAdminRgReconcileRoute: typeof AuthenticatedAdminRgReconcileRoute
+  AuthenticatedAdminSystemHealthRoute: typeof AuthenticatedAdminSystemHealthRoute
   AuthenticatedDailyBulletinIdRoute: typeof AuthenticatedDailyBulletinIdRoute
   AuthenticatedPropertyPropertyIdRoute: typeof AuthenticatedPropertyPropertyIdRoute
 }
@@ -935,6 +956,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRbacAuditRoute: AuthenticatedAdminRbacAuditRoute,
   AuthenticatedAdminRgPipelineRoute: AuthenticatedAdminRgPipelineRoute,
   AuthenticatedAdminRgReconcileRoute: AuthenticatedAdminRgReconcileRoute,
+  AuthenticatedAdminSystemHealthRoute: AuthenticatedAdminSystemHealthRoute,
   AuthenticatedDailyBulletinIdRoute: AuthenticatedDailyBulletinIdRoute,
   AuthenticatedPropertyPropertyIdRoute: AuthenticatedPropertyPropertyIdRoute,
 }
