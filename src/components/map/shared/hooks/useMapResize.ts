@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import L from "leaflet";
 
-export function useMapResize(map: L.Map | null, ref: React.RefObject<HTMLElement>) {
+export function useMapResize(map: L.Map | null, ref: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!map || !ref.current) return;
     const el = ref.current;

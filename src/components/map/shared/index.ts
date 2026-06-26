@@ -8,7 +8,7 @@ export * from "./SharedMarkerLayer";
 export * from "./SharedLegend";
 export * from "./SharedLoading";
 export * from "./SharedError";
-export { useResilientTileLayer, attachResilientTileLayer } from "./hooks/useResilientTileLayer";
+export { attachResilientTileLayer } from "./hooks/useResilientTileLayer";
 export { useFitBounds } from "./hooks/useFitBounds";
 export { useMapResize } from "./hooks/useMapResize";
 export { useMarkerCluster } from "./hooks/useMarkerCluster";
