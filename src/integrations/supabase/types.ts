@@ -171,7 +171,7 @@ export type Database = {
           agent_id: string
           agent_name: string | null
           agent_registration: string | null
-          block_id: string | null
+          block_id: string
           block_number: string | null
           category_1: string | null
           category_2: string | null
@@ -195,7 +195,7 @@ export type Database = {
           agent_id: string
           agent_name?: string | null
           agent_registration?: string | null
-          block_id?: string | null
+          block_id: string
           block_number?: string | null
           category_1?: string | null
           category_2?: string | null
@@ -219,7 +219,7 @@ export type Database = {
           agent_id?: string
           agent_name?: string | null
           agent_registration?: string | null
-          block_id?: string | null
+          block_id?: string
           block_number?: string | null
           category_1?: string | null
           category_2?: string | null
@@ -1551,6 +1551,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      reconcile_rg_integrity: { Args: never; Returns: Json }
+      rg_integrity_check: { Args: never; Returns: Json }
       save_data_audit_snapshot: {
         Args: {
           _actions_count?: number
