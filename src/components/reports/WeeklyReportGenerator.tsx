@@ -29,16 +29,12 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       .eq("id", agentAuthId)
       .maybeSingle();
 
+    // agents serve apenas para metadados de cadastro do agente
     const { data: agentRow } = await supabase
       .from("agents")
-      .select("id, name, registration_id, municipality")
+      .select("name, registration_id, municipality")
       .eq("profile_id", agentAuthId)
       .maybeSingle();
-
-    if (!agentRow) {
-      toast.error("Agente não encontrado para este usuário.");
-      return null;
-    }
 
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
     console.log("[SE]", { work_date: referenceDate.toISOString().split("T")[0], epi_week: epiWeek, epi_year: epiYear });
@@ -53,7 +49,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     let dailiesQuery = supabase
       .from("daily_work_records")
       .select("*")
-      .eq("agent_id", agentRow.id)
+      .eq("agent_id", agentAuthId)
       .eq("epi_week", epiWeek)
       .eq("epi_year", epiYear)
       .order("work_date", { ascending: true });
