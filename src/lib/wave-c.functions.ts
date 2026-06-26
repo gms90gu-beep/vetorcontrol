@@ -550,21 +550,40 @@ function riskLevel(score: number): "low" | "med" | "high" {
   return "low";
 }
 
-async function scopedAgentIds(
+async function scopedProfileIds(
   supabase: any,
   userId: string,
   role: "admin_master" | "coordenador" | "supervisor",
 ): Promise<string[] | null> {
   if (role === "admin_master") return null;
   let profQ = supabase.from("profiles").select("id");
-  if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
+  if (role === "supervisor") {
+    profQ = profQ.or(`supervisor_id.eq.${userId},id.eq.${userId}`);
+  } else if (role === "coordenador") {
+    // coordenador: próprios supervisores + agentes desses supervisores + ele mesmo
+    const { data: sups } = await supabase
+      .from("profiles").select("id").eq("coordinator_id", userId);
+    const supIds = (sups ?? []).map((s: any) => s.id);
+    const { data: ags } = supIds.length
+      ? await supabase.from("profiles").select("id").in("supervisor_id", supIds)
+      : { data: [] as any[] };
+    return Array.from(new Set([userId, ...supIds, ...(ags ?? []).map((a: any) => a.id)]));
+  }
   const { data: profiles } = await profQ;
-  const profileIds = (profiles ?? []).map((p: any) => p.id);
+  return (profiles ?? []).map((p: any) => p.id);
+}
+
+/** @deprecated kept for compat — use scopedProfileIds */
+async function scopedAgentIds(
+  supabase: any,
+  userId: string,
+  role: "admin_master" | "coordenador" | "supervisor",
+): Promise<string[] | null> {
+  const profileIds = await scopedProfileIds(supabase, userId, role);
+  if (profileIds === null) return null;
   if (profileIds.length === 0) return [];
   const { data: agents } = await supabase
-    .from("agents")
-    .select("id")
-    .in("profile_id", profileIds);
+    .from("agents").select("id").in("profile_id", profileIds);
   return (agents ?? []).map((a: any) => a.id);
 }
 
@@ -574,17 +593,25 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[] }> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
-    const agentIds = await scopedAgentIds(supabase, userId, role);
-    if (agentIds && agentIds.length === 0) return { points: [] };
+    // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
+    const profileIds = await scopedProfileIds(supabase, userId, role);
+    console.log("[MAP_ROLE]", role);
+    console.log("[MAP_USER]", userId);
+    console.log("[MAP_SCOPE_PROFILES]", profileIds?.length ?? "all");
+    if (profileIds && profileIds.length === 0) {
+      console.log("[MAP_EMPTY] no profiles in scope");
+      return { points: [] };
+    }
 
     let boletimIds: string[] | null = null;
     const boletimAgentMap = new Map<string, { agent_id: string | null; locality: string | null }>();
-    if (agentIds) {
+    if (profileIds) {
       const { data: boletins } = await supabase
         .from("boletins_rg")
         .select("id, agent_id, locality")
-        .in("agent_id", agentIds);
+        .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
+      console.log("[MAP_SCOPE_BOLETINS]", boletimIds.length);
       if (boletimIds.length === 0) return { points: [] };
       for (const b of boletins ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
     }
