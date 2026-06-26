@@ -199,4 +199,39 @@
   *::-webkit-scrollbar {
     display: none;
   }
+
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+    border-radius: var(--radius-sm);
+  }
 }
+
+@utility surface-1 {
+  background-color: var(--color-surface-1);
+}
+@utility surface-2 {
+  background-color: var(--color-surface-2);
+}
+@utility surface-3 {
+  background-color: var(--color-surface-3);
+}
+@utility shadow-elevate {
+  box-shadow: var(--shadow-md);
+  transition: box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+@utility shadow-elevate-hover {
+  &:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+}
+@utility animate-slide-up {
+  animation: slide-up var(--dur-slow) var(--ease-out);
+}
+
+@keyframes slide-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
