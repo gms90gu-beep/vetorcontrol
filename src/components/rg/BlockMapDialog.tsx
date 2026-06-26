@@ -8,7 +8,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
-import { attachResilientTileLayer } from "@/components/map/shared/useResilientTileLayer";
+import { attachResilientTileLayer } from "@/components/map/shared/hooks/useResilientTileLayer";
 import { MARKER_COLORS, classifyProperty, TileProvider } from "@/components/map/shared/providers";
 import { mapLogger } from "@/components/map/shared/logger";
 

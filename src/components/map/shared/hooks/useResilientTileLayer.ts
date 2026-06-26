@@ -2,8 +2,8 @@
 // On tileerror it falls through TILE_PROVIDERS in order; reports failures to mapLogger.
 
 import L from "leaflet";
-import { TILE_PROVIDERS, TileProvider } from "./providers";
-import { mapLogger } from "./logger";
+import { TILE_PROVIDERS, TileProvider } from "../providers";
+import { mapLogger } from "../logger";
 
 export type TileLayerHandle = {
   layer: L.TileLayer;
