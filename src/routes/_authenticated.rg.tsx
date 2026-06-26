@@ -250,33 +250,40 @@ function RGPage() {
     setBoletins(normalized);
   }, [rgData]);
 
-  // Buscar contagem de imóveis por boletim
+  // Buscar contagem de imóveis por boletim (usa boletim_id + fallback por block_id
+  // para refletir exatamente os mesmos imóveis exibidos no detalhe do boletim).
   useEffect(() => {
     if (!boletins.length) return;
     let cancelled = false;
     (async () => {
       try {
         const ids = boletins.map((b) => b.id).filter(Boolean);
-        if (!ids.length) return;
+        const blockIds = boletins.map((b: any) => b.block_id).filter(Boolean);
+        if (!ids.length && !blockIds.length) return;
+        const filters: string[] = [];
+        if (ids.length) filters.push(`boletim_id.in.(${ids.join(",")})`);
+        if (blockIds.length) filters.push(`block_id.in.(${blockIds.join(",")})`);
         const { data: props } = await supabase
           .from("properties")
-          .select("boletim_id, block_number")
-          .or(`boletim_id.in.(${ids.join(",")}),block_number.in.(${boletins.map((b) => `"${(b.block_number || "").replace(/"/g, "")}"`).filter((v) => v !== '""').join(",") || '""'})`);
+          .select("boletim_id, block_id")
+          .or(filters.join(","));
         if (cancelled || !props) return;
         const counts = new Map<string, number>();
-        for (const b of boletins) {
+        for (const b of boletins as any[]) {
           const n = props.filter((p: any) =>
-            p.boletim_id === b.id || (b.block_number && p.block_number === b.block_number)
+            p.boletim_id === b.id ||
+            (!p.boletim_id && b.block_id && p.block_id === b.block_id)
           ).length;
           counts.set(b.id, n);
         }
-        setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? b.total_imoveis ?? 0 })));
+        setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? 0 })));
       } catch (e) {
         console.warn("[RG_COUNTS]", e);
       }
     })();
     return () => { cancelled = true; };
   }, [boletins.length]);
+
 
 
 
