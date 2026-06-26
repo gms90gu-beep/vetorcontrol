@@ -45,16 +45,9 @@ async function resolveScopedAgents(supabase: any, userId: string) {
   const { data: profiles, error: profErr } = await profileQuery;
   if (profErr) throw new Error(profErr.message);
 
-  const profileIds = (profiles ?? []).map((p: any) => p.id);
-  if (profileIds.length === 0) return { role, profiles: [], agents: [] as any[] };
-
-  const { data: agents, error: agentsErr } = await supabase
-    .from("agents")
-    .select("id, profile_id")
-    .in("profile_id", profileIds);
-  if (agentsErr) throw new Error(agentsErr.message);
-
-  return { role: role as "supervisor" | "admin_master" | "coordenador", profiles, agents: agents ?? [] };
+  console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", (profiles ?? []).length);
+  // profile_id é a identidade canônica; DWR.agent_id == profile_id
+  return { role: role as "supervisor" | "admin_master" | "coordenador", profiles: profiles ?? [] };
 }
 
 function emptyTotals() {
