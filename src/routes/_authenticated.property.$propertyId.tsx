@@ -41,6 +41,8 @@ import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
 import { getOperationalVisitDate } from "@/lib/operational-date";
 import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
+import { FirstVisitStreetPrompt } from "@/components/property/FirstVisitStreetPrompt";
+import { getBlockCurrentStreet, detectFromGPS, isSameStreet } from "@/lib/current-street";
 import { PropertyLocationSection } from "@/components/property/PropertyLocationSection";
 
 const DEPOSIT_TYPES = [
@@ -143,6 +145,13 @@ function PropertyVisitPage() {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [geoDialogOpen, setGeoDialogOpen] = useState(false);
+  const [streetPrompt, setStreetPrompt] = useState<{
+    open: boolean;
+    mode: "first-visit" | "change-detected";
+    info: import("@/lib/current-street").BlockStreetInfo | null;
+    coords: { latitude: number; longitude: number } | null;
+    detected: string | null;
+  }>({ open: false, mode: "first-visit", info: null, coords: null, detected: null });
   const [geoPromptedFor, setGeoPromptedFor] = useState<string | null>(null);
   const { data, loading, error: propertyError } = usePropertyRecords(userId);
   useEffect(() => {
@@ -808,12 +817,49 @@ function PropertyVisitPage() {
         propertyId={(property?.id as string) || (propertyId as string)}
         actorId={userId ?? null}
         propertyLabel={property?.number ? `Imóvel ${property.number}` : undefined}
-        onClose={(saved) => {
+        onClose={async (saved, coords) => {
           setGeoDialogOpen(false);
-          if (saved) {
-            // Atualiza estado local com timestamp; lat/lng serão preenchidos no próximo fetchData
-            fetchData();
+          if (!saved) return;
+          fetchData();
+          // Fluxo CURRENT_STREET: após GPS real (em campo), sugerir/atualizar rua do quarteirão.
+          const blockId = (property as any)?.block_id as string | undefined;
+          if (!blockId || !coords) return;
+          const info = await getBlockCurrentStreet(blockId);
+          if (!info) return;
+          if (!info.currentStreet) {
+            console.log("[CURRENT_STREET_WAITING_FIRST_VISIT]");
+            setStreetPrompt({
+              open: true,
+              mode: "first-visit",
+              info,
+              coords,
+              detected: null,
+            });
+          } else {
+            const det = await detectFromGPS(coords);
+            if (det.street && !isSameStreet(det.street, info.currentStreet)) {
+              setStreetPrompt({
+                open: true,
+                mode: "change-detected",
+                info,
+                coords,
+                detected: det.street,
+              });
+            }
           }
+        }}
+      />
+      <FirstVisitStreetPrompt
+        open={streetPrompt.open}
+        blockId={(property as any)?.block_id || ""}
+        actorId={userId ?? null}
+        info={streetPrompt.info}
+        coords={streetPrompt.coords}
+        mode={streetPrompt.mode}
+        detectedStreet={streetPrompt.detected}
+        onClose={(confirmed) => {
+          setStreetPrompt((s) => ({ ...s, open: false }));
+          if (confirmed) fetchData();
         }}
       />
       {/* Header Operational */}
