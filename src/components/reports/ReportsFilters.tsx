@@ -44,16 +44,19 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
 
   async function fetchFiltersData() {
     try {
-      const [
-        { data: agentsData },
-        { data: cyclesData },
-        { data: areasData },
-        { data: weeksData }
-      ] = await Promise.all([
-        supabase.from("agents").select("id, name"),
-        supabase.from("cycles").select("id, number, name").order("number", { ascending: false }),
-        supabase.from("areas").select("id, name"),
-        supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true })
+      const [agentsData, cyclesData, areasData, weeksData] = await Promise.all([
+        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name") }),
+        listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
+        safeFetch<any[]>(
+          async () => {
+            const { data, error } = await supabase.from("areas").select("id, name");
+            if (error) throw error;
+            return data ?? [];
+          },
+          async () => [],
+          { label: "areas" },
+        ),
+        listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
 
       if (agentsData) setAgents(agentsData);
