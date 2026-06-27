@@ -1,6 +1,7 @@
 import { redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { hasValidLocalSession, getLocalSession } from "@/auth/auth";
+import { getCachedUserRole, readCachedUserRole } from "@/lib/offline/role-cache";
 
 export const MANAGER_ROLES = ["supervisor", "coordenador", "admin_master"] as const;
 export type ManagerRole = (typeof MANAGER_ROLES)[number];
