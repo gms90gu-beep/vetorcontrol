@@ -10,11 +10,10 @@ import {
   useMap,
 } from "react-leaflet";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// CSS de Leaflet/MarkerCluster vai no shell (src/styles.css) p/ evitar chunks offline.
 import "leaflet.heat";
 import "leaflet.markercluster";
-import "leaflet.markercluster/dist/MarkerCluster.css";
-import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+
 import {
   getPropertyMapPoints,
   getBlockRiskScores,
