@@ -72,18 +72,18 @@ function AuthenticatedLayout() {
     }
   }, [isReady, router, user]);
 
-  if (!mounted || !isReady || !user || isOperationalLoading) {
-    if (typeof navigator !== "undefined" && !navigator.onLine && mounted && isReady && user) {
-      // continua renderizando
-    } else {
-      return (
-        <div suppressHydrationWarning className="flex min-h-screen items-center justify-center bg-background text-foreground">
-          <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" aria-hidden />
-          <span className="text-sm font-medium">Carregando sessão...</span>
-        </div>
-      );
-    }
+  const online = typeof navigator !== "undefined" ? navigator.onLine !== false : true;
+  // Offline: nunca bloquear pelo loading operacional (role) — usa cache local imediatamente.
+  const stillBlocking = !mounted || !isReady || !user || (isOperationalLoading && online);
+  if (stillBlocking) {
+    return (
+      <div suppressHydrationWarning className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" aria-hidden />
+        <span className="text-sm font-medium">Carregando sessão...</span>
+      </div>
+    );
   }
+
 
   const handleLogout = async () => {
     await signOut();

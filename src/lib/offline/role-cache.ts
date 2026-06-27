@@ -8,7 +8,11 @@ import { safeFetch } from "./safe-fetch";
 const KEY = (uid: string) => `vc_role_${uid}`;
 
 export async function getCachedUserRole(userId: string): Promise<string | null> {
-  return safeFetch<string | null>(
+  // Offline-first imediato: se temos cache local, devolve já e revalida em background.
+  let cached: string | null = null;
+  try { cached = localStorage.getItem(KEY(userId)); } catch {}
+
+  const remote = () => safeFetch<string | null>(
     async () => {
       const { data, error } = await supabase.rpc("get_user_role", { u_id: userId });
       if (error) throw error;
@@ -16,12 +20,27 @@ export async function getCachedUserRole(userId: string): Promise<string | null> 
       try { if (role) localStorage.setItem(KEY(userId), role); } catch {}
       return role;
     },
-    async () => {
-      try { return localStorage.getItem(KEY(userId)); } catch { return null; }
-    },
+    async () => cached,
     { label: "user_role" },
   );
+
+  if (cached) {
+    // Não bloqueia a UI; revalida em background.
+    remote().catch(() => {});
+    return cached;
+  }
+
+  // Sem cache: aguarda remoto com timeout curto para não travar layout offline.
+  try {
+    return await Promise.race([
+      remote(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+    ]);
+  } catch {
+    return null;
+  }
 }
+
 
 export function readCachedUserRole(userId: string): string | null {
   try { return localStorage.getItem(KEY(userId)); } catch { return null; }
