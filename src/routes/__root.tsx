@@ -41,15 +41,25 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
 
+  // Detecta erros de rede para exibir mensagem amigável em vez de "This page didn't load".
+  const msg = String((error as any)?.message || error || "");
+  const name = String((error as any)?.name || "");
+  const isNetwork =
+    /Failed to fetch|NetworkError|Network request failed|fetch failed|Load failed/i.test(msg) ||
+    (name === "TypeError" && /fetch/i.test(msg)) ||
+    name === "AuthRetryableFetchError" ||
+    (typeof navigator !== "undefined" && navigator.onLine === false);
+
+  const title = isNetwork ? "Sem conexão no momento" : "This page didn't load";
+  const desc = isNetwork
+    ? "Você está offline ou o servidor não respondeu. Os dados salvos localmente continuam disponíveis — tente novamente quando a conexão voltar."
+    : "Something went wrong on our end. You can try refreshing or head back home.";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -58,19 +68,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            Tentar novamente
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Página inicial
           </a>
         </div>
       </div>
     </div>
   );
 }
+
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({

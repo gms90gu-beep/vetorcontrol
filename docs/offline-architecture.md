@@ -48,3 +48,22 @@
 - [x] Todas as stores listadas.
 - [x] Todos os pares leitura/escrita identificados.
 - [x] Caches paralelos a remover marcados explicitamente.
+
+---
+
+## Auditoria contínua (atualizado)
+
+### Painel
+- Rota: **/admin/offline-audit** — diagnóstico em tempo real do SW, Dexie, fila e rotas, com Score 0–100.
+
+### Script estático
+- `bun run scripts/audit-offline.ts` — varre `src/` e gera `docs/offline-audit-report.md` listando consultas `supabase.from/.rpc` sem fallback (`safeFetch` ou repo `@/lib/offline/repos`).
+
+### Suíte E2E
+- `tests/offline/offline-suite.spec.ts` — Playwright cobrindo T1, T2, T9 e T10 (navegação offline em rotas críticas + reconexão).
+
+### Boundary amigável
+- `src/routes/__root.tsx` detecta erros de rede no `ErrorComponent` e exibe "Sem conexão no momento" em vez de "This page didn't load".
+
+### Logs padronizados
+`[OFFLINE_ROUTE]`, `[OFFLINE_DEXIE]`, `[OFFLINE_QUEUE]`, `[OFFLINE_SYNC]`, `[OFFLINE_FALLBACK]`, `[OFFLINE_ERROR]`, `[OFFLINE_SUCCESS]`.

@@ -44,6 +44,7 @@ import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
 import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
 import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
+import { Route as AuthenticatedAdminOfflineAuditRouteImport } from './routes/_authenticated.admin.offline-audit'
 import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
 import { Route as AuthenticatedAdminDesignSystemRouteImport } from './routes/_authenticated.admin.design-system'
 import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
@@ -240,6 +241,12 @@ const AuthenticatedAdminPendenciasRoute =
     path: '/admin/pendencias',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminOfflineAuditRoute =
+  AuthenticatedAdminOfflineAuditRouteImport.update({
+    id: '/admin/offline-audit',
+    path: '/admin/offline-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminGeorefAuditRoute =
   AuthenticatedAdminGeorefAuditRouteImport.update({
     id: '/admin/georef-audit',
@@ -329,6 +336,7 @@ export interface FileRoutesByFullPath {
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
+  '/admin/offline-audit': typeof AuthenticatedAdminOfflineAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
@@ -374,6 +382,7 @@ export interface FileRoutesByTo {
   '/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
+  '/admin/offline-audit': typeof AuthenticatedAdminOfflineAuditRoute
   '/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
@@ -421,6 +430,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/data-audit': typeof AuthenticatedAdminDataAuditRoute
   '/_authenticated/admin/design-system': typeof AuthenticatedAdminDesignSystemRoute
   '/_authenticated/admin/georef-audit': typeof AuthenticatedAdminGeorefAuditRoute
+  '/_authenticated/admin/offline-audit': typeof AuthenticatedAdminOfflineAuditRoute
   '/_authenticated/admin/pendencias': typeof AuthenticatedAdminPendenciasRoute
   '/_authenticated/admin/rbac-audit': typeof AuthenticatedAdminRbacAuditRoute
   '/_authenticated/admin/rg-pipeline': typeof AuthenticatedAdminRgPipelineRoute
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/admin/data-audit'
     | '/admin/design-system'
     | '/admin/georef-audit'
+    | '/admin/offline-audit'
     | '/admin/pendencias'
     | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/admin/data-audit'
     | '/admin/design-system'
     | '/admin/georef-audit'
+    | '/admin/offline-audit'
     | '/admin/pendencias'
     | '/admin/rbac-audit'
     | '/admin/rg-pipeline'
@@ -559,6 +571,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/data-audit'
     | '/_authenticated/admin/design-system'
     | '/_authenticated/admin/georef-audit'
+    | '/_authenticated/admin/offline-audit'
     | '/_authenticated/admin/pendencias'
     | '/_authenticated/admin/rbac-audit'
     | '/_authenticated/admin/rg-pipeline'
@@ -827,6 +840,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPendenciasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/offline-audit': {
+      id: '/_authenticated/admin/offline-audit'
+      path: '/admin/offline-audit'
+      fullPath: '/admin/offline-audit'
+      preLoaderRoute: typeof AuthenticatedAdminOfflineAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/georef-audit': {
       id: '/_authenticated/admin/georef-audit'
       path: '/admin/georef-audit'
@@ -936,6 +956,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminDataAuditRoute: typeof AuthenticatedAdminDataAuditRoute
   AuthenticatedAdminDesignSystemRoute: typeof AuthenticatedAdminDesignSystemRoute
   AuthenticatedAdminGeorefAuditRoute: typeof AuthenticatedAdminGeorefAuditRoute
+  AuthenticatedAdminOfflineAuditRoute: typeof AuthenticatedAdminOfflineAuditRoute
   AuthenticatedAdminPendenciasRoute: typeof AuthenticatedAdminPendenciasRoute
   AuthenticatedAdminRbacAuditRoute: typeof AuthenticatedAdminRbacAuditRoute
   AuthenticatedAdminRgPipelineRoute: typeof AuthenticatedAdminRgPipelineRoute
@@ -974,6 +995,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminDataAuditRoute: AuthenticatedAdminDataAuditRoute,
   AuthenticatedAdminDesignSystemRoute: AuthenticatedAdminDesignSystemRoute,
   AuthenticatedAdminGeorefAuditRoute: AuthenticatedAdminGeorefAuditRoute,
+  AuthenticatedAdminOfflineAuditRoute: AuthenticatedAdminOfflineAuditRoute,
   AuthenticatedAdminPendenciasRoute: AuthenticatedAdminPendenciasRoute,
   AuthenticatedAdminRbacAuditRoute: AuthenticatedAdminRbacAuditRoute,
   AuthenticatedAdminRgPipelineRoute: AuthenticatedAdminRgPipelineRoute,
@@ -999,13 +1021,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
