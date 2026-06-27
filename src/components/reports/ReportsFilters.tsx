@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeFetch } from "@/lib/offline/safe-fetch";
+import { listRemoteOrCache } from "@/lib/offline/repos";
 import { 
   Filter, 
   User, 
