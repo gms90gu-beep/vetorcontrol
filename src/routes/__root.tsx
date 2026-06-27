@@ -48,35 +48,56 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error("[BOOT_FAILED]", error);
   const router = useRouter();
-
-  const msg = String((error as any)?.message || error || "");
-  const name = String((error as any)?.name || "");
+  const e = error as any;
+  const msg = String(e?.message || error || "");
+  const name = String(e?.name || "");
   const isNetwork =
     /Failed to fetch|NetworkError|Network request failed|fetch failed|Load failed/i.test(msg) ||
     (name === "TypeError" && /fetch/i.test(msg)) ||
     name === "AuthRetryableFetchError" ||
     (typeof navigator !== "undefined" && navigator.onLine === false);
 
-  // Erros de rede NUNCA bloqueiam o boot — auto-recupera silenciosamente.
+  console.log("[ERROR_BOUNDARY_SOURCE]", {
+    where: "root.errorComponent",
+    network: isNetwork,
+    name,
+    message: msg,
+    stack: String(e?.stack || "").split("\n").slice(0, 6).join("\n"),
+    online: typeof navigator !== "undefined" ? navigator.onLine : null,
+    sinceBoot: sinceBoot(),
+  });
+
+  // Erros de rede NUNCA bloqueiam a aplicação.
+  // Auto-recupera silenciosamente: tenta agora e quando voltar online.
   useEffect(() => {
     if (!isNetwork) return;
-    console.log("[BOOT_NETWORK] erro de rede no boot — auto-retry");
+    console.log("[POST_BOOT_ERROR] root errorComponent (rede) — auto-retry agendado", { sinceBoot: sinceBoot() });
     const t = setTimeout(() => {
       try { router.invalidate(); } catch {}
       try { reset(); } catch {}
-    }, 50);
-    return () => clearTimeout(t);
+    }, 250);
+    const onOnline = () => {
+      console.log("[POST_BOOT_ERROR] online restabelecido — invalidando");
+      try { router.invalidate(); } catch {}
+      try { reset(); } catch {}
+    };
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("online", onOnline);
+    };
   }, [isNetwork, reset, router]);
 
   if (isNetwork) {
+    // Não bloquear — pequeno indicador discreto no canto.
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-        <span className="text-xs text-muted-foreground">Carregando modo offline…</span>
+      <div className="fixed bottom-4 right-4 z-[80] rounded-full bg-muted/90 px-3 py-1 text-[10px] text-muted-foreground shadow">
+        Sincronizando…
       </div>
     );
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
