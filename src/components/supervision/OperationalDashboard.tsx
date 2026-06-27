@@ -39,18 +39,31 @@ export function OperationalDashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [{ data: profs }, { data: vs }, { data: cs }, { data: ws }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, role").eq("role", "agente"),
-          supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id"),
-          supabase.from("cycles").select("id, name, year, number").order("year", { ascending: false }),
-          supabase.from("weeks").select("id, number, cycle_id, start_date, end_date"),
+        const [profs, vs, cs, ws] = await Promise.all([
+          listRemoteOrCache<any>({
+            name: "profiles",
+            remote: () => supabase.from("profiles").select("id, full_name, role").eq("role", "agente") as any,
+            filter: (r) => r.role === "agente",
+          }),
+          listRemoteOrCache<any>({
+            name: "visits",
+            remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id") as any,
+          }),
+          listRemoteOrCache<any>({
+            name: "cycles",
+            remote: () => supabase.from("cycles").select("id, name, year, number").order("year", { ascending: false }) as any,
+          }),
+          listRemoteOrCache<any>({
+            name: "weeks",
+            remote: () => supabase.from("weeks").select("id, number, cycle_id, start_date, end_date") as any,
+          }),
         ]);
         setAgents(profs || []);
         setVisits(vs || []);
         setCycles(cs || []);
         setWeeks(ws || []);
       } catch (e) {
-        console.error(e);
+        console.error("[OFFLINE_ERROR] OperationalDashboard", e);
         toast.error("Erro ao carregar dados operacionais");
       } finally {
         setLoading(false);
