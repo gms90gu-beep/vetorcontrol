@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/reports")({
     if (typeof window === "undefined") return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
-    const { data: role } = await supabase.rpc("get_user_role", { u_id: session.user.id });
+    const role = await getCachedUserRole(session.user.id);
     if (!role || !["supervisor", "coordenador", "admin_master"].includes(role)) {
       throw redirect({ to: "/dashboard" });
     }
