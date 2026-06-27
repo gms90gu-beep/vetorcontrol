@@ -30,7 +30,7 @@ import { safeGetUser } from "@/lib/offline/safe-auth";
 import { usePropertyRecords } from "@/hooks/useOfflineData";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
-import { isOnline } from "@/lib/offline/safe-fetch";
+import { isOnline, safeFetch } from "@/lib/offline/safe-fetch";
 import { db } from "@/lib/offline/db";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
