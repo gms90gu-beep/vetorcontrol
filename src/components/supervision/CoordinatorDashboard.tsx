@@ -42,8 +42,10 @@ export function CoordinatorDashboard() {
     setLoading(true);
     try {
       // RLS filtra automaticamente: coordenador vê seus supervisores e os agentes deles
-      const { data: profiles, error } = await supabase.from("profiles").select("*");
-      if (error) throw error;
+      const profiles = await listRemoteOrCache<any>({
+        name: "profiles",
+        remote: async () => await supabase.from("profiles").select("*"),
+      });
 
       const supList = (profiles || []).filter((p: any) => p.role === "supervisor");
       const agList = (profiles || []).filter(
@@ -51,12 +53,19 @@ export function CoordinatorDashboard() {
       );
 
       const today = new Date().toISOString().slice(0, 10);
-      const [{ data: visits }, { data: openSessions }] = await Promise.all([
-        supabase.from("visits").select("agent_id, status, has_focus"),
-        supabase
-          .from("field_work_sessions")
-          .select("user_id, status, session_date")
-          .gte("session_date", today),
+      const [visits, openSessions] = await Promise.all([
+        listRemoteOrCache<any>({
+          name: "visits",
+          remote: async () => await supabase.from("visits").select("agent_id, status, has_focus"),
+        }),
+        listRemoteOrCache<any>({
+          name: "field_work_sessions",
+          remote: async () => await supabase
+            .from("field_work_sessions")
+            .select("user_id, status, session_date")
+            .gte("session_date", today),
+          filter: (r) => String(r.session_date || "") >= today,
+        }),
       ]);
 
       const supWithStats = supList.map((s: any) => {
