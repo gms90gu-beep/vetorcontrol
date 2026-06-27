@@ -1,6 +1,6 @@
 # Offline Audit Report
 
-> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T13:32:04.874Z
+> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T13:46:46.115Z
 
 ## Resumo
 
