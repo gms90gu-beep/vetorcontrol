@@ -154,9 +154,17 @@ function DataAuditPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.rpc("data_audit_report");
-    if (error) toast.error(error.message);
-    else setReport(data as Report);
+    const data = await safeFetch<Report | null>(
+      async () => {
+        const { data, error } = await supabase.rpc("data_audit_report");
+        if (error) throw error;
+        return data as Report;
+      },
+      async () => null,
+      { label: "data_audit_report" },
+    );
+    if (data) setReport(data);
+    else if (!isOnline()) toast.message("Relatório indisponível offline");
     await loadOffline();
     setLoading(false);
   }
