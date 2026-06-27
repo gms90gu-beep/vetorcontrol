@@ -66,6 +66,9 @@ interface DexieCheck { name: string; count: number; }
 
 function OfflineAuditPage() {
   const online = useOnlineStatus();
+  const { user } = useAuth();
+  const [rc1, setRc1] = useState<RC1Report | null>(null);
+  const [rc1Busy, setRc1Busy] = useState(false);
   const [swActive, setSwActive] = useState<boolean>(false);
   const [swScope, setSwScope] = useState<string>("");
   const [cacheKeys, setCacheKeys] = useState<string[]>([]);
