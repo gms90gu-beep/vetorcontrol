@@ -571,8 +571,13 @@ function EditarBoletim() {
         });
       }
 
-      const { error: insertError } = await supabase.from("properties").insert(payload);
-      if (insertError) throw insertError;
+      try {
+        for (const row of payload) {
+          await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+        }
+      } catch (insertError: any) {
+        throw insertError;
+      }
 
       toast.success(`${qty} imóveis criados com sucesso.`, { id: toastId });
       await load(false);
