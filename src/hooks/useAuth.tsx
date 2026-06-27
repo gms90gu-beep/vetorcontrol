@@ -164,15 +164,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries();
       }
 
-      // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent
+      // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent (no-op offline)
       if (nextUser && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-        supabase.rpc("autoheal_agent", { _user_id: nextUser.id }).then(({ data, error }) => {
-          if (error) {
-            console.warn("[AUTOHEAL_AGENT] falhou:", error.message);
-          } else if (data) {
-            console.debug("[AUTOHEAL_AGENT] agent_id=", data, "profile_id=", nextUser.id);
-          }
-        });
+        safeFetch(
+          async () => {
+            const { data, error } = await supabase.rpc("autoheal_agent", { _user_id: nextUser.id });
+            if (error) throw error;
+            if (data) console.debug("[AUTOHEAL_AGENT] agent_id=", data, "profile_id=", nextUser.id);
+            return data;
+          },
+          async () => {
+            console.log("[AUTOHEAL_AGENT] adiado (offline)");
+            return null;
+          },
+          { label: "autoheal_agent" },
+        ).catch((e) => console.warn("[AUTOHEAL_AGENT] falhou:", (e as any)?.message));
       }
 
     });
