@@ -31,14 +31,20 @@ import { BottomNavigation } from "@/components/navigation/BottomNavigation";
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
+    const online = navigator.onLine !== false;
+    console.log("[BOOT_START]", { online });
+    if (!online) console.log("[BOOT_OFFLINE] iniciando sem internet");
     const valid = await hasValidLocalSession();
+    console.log("[BOOT_SESSION]", { valid });
     if (!valid) {
-      console.warn("[Protected Guard] Sem sessão local válida, redirecionando para login.");
+      console.log("[BOOT_BLOCKED] sem sessão local — indo para /login");
       throw redirect({ to: "/login" });
     }
+    console.log("[BOOT_OK] sessão local aceita");
   },
   component: AuthenticatedLayout,
 });
+
 
 function AuthenticatedLayout() {
   const router = useRouter();
