@@ -195,7 +195,9 @@ async function persistIfEmpty(
     return result;
   }
   try {
-    const patch: Record<string, unknown> = { street_name: result.street };
+    const patch: { street_name: string; neighborhood?: string } = {
+      street_name: result.street,
+    };
     if (result.neighborhood) patch.neighborhood = result.neighborhood;
     const { error } = await supabase
       .from("properties")
