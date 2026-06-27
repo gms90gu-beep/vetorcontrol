@@ -230,6 +230,43 @@ function DesignSystemPage() {
           </div>
         </Section>
 
+        {/* Biblioteca oficial de mapas */}
+        <Section
+          title="Biblioteca oficial de mapas"
+          description="@/components/map/shared — toda renderização de mapas passa por aqui"
+        >
+          <div className="space-y-3 text-sm">
+            <InfoCard variant="primary">
+              <p className="text-sm font-semibold mb-1">Regra de ouro</p>
+              <p className="text-xs text-muted-foreground">
+                Nenhum componente fora de <code>src/components/map/shared</code> deve
+                importar <code>leaflet</code> diretamente. Use <code>SharedMap</code> como raiz e
+                componha camadas (<code>SharedMarkerLayer</code>, etc.) por dentro.
+              </p>
+            </InfoCard>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                { name: "SharedMap", desc: "Raiz: tiles resilientes (Carto → OSM → Esri), fases (loading/ready/tile-error), contexto Leaflet." },
+                { name: "SharedMarkerLayer", desc: "Pontos semânticos com classificação automática e cluster opcional." },
+                { name: "SharedLegend", desc: "Legenda padronizada baseada em MARKER_COLORS." },
+                { name: "SharedLoading / SharedError", desc: "Skeleton e variantes (tile, data, no-geo, no-data, timeout)." },
+                { name: "useResilientTileLayer", desc: "Fallback automático entre provedores em tileerror." },
+                { name: "useFitBounds / useMapResize / useMarkerCluster / useMapEvents", desc: "Hooks reaproveitáveis." },
+              ].map((c) => (
+                <div key={c.name} className="rounded-lg border border-border-subtle bg-card p-3">
+                  <code className="text-xs font-semibold">{c.name}</code>
+                  <p className="text-xs text-muted-foreground mt-1">{c.desc}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Mapas migrados: <strong>BlockMapDialog</strong>, <strong>GeorefAuditMap</strong>, rota <strong>/heatmap</strong>.
+              Detalhes em <code>docs/map-library.md</code>.
+            </p>
+          </div>
+        </Section>
+
+
         {/* Feedback */}
         <Section title="Feedback" description="Toasts e diálogos de confirmação">
           <div className="flex flex-wrap gap-2">

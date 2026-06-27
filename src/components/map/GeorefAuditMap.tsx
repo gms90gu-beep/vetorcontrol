@@ -1,14 +1,13 @@
+// Migrado para a biblioteca oficial @/components/map/shared.
+// Não instancia Leaflet diretamente — usa SharedMap + SharedMarkerLayer.
 import { useMemo } from "react";
 import {
-  MapContainer,
-  TileLayer,
-  CircleMarker,
-  Popup,
-} from "react-leaflet";
-import { Link } from "@tanstack/react-router";
-import "leaflet/dist/leaflet.css";
-import { Button } from "@/components/ui/button";
-import { Navigation2, ExternalLink } from "lucide-react";
+  SharedMap,
+  SharedMarkerLayer,
+  MARKER_COLORS,
+  type SharedMarkerPoint,
+  type LegendEntry,
+} from "@/components/map/shared";
 
 type AuditProp = {
   id: string;
@@ -25,92 +24,78 @@ type AuditProp = {
   status: "valid" | "missing" | "invalid" | "duplicated";
 };
 
-const COLOR: Record<string, string> = {
-  valid: "#16a34a",
-  missing: "#eab308",
-  invalid: "#dc2626",
-  duplicated: "#9333ea",
-  focus: "#000000",
-};
-
-function isValid(n: any) {
+function isValid(n: unknown) {
   return typeof n === "number" && Number.isFinite(n) && n !== 0;
 }
 
+const LEGEND: LegendEntry[] = [
+  { color: MARKER_COLORS.valid, label: "Válido" },
+  { color: MARKER_COLORS.missing, label: "Sem coord." },
+  { color: MARKER_COLORS.invalid, label: "Inválido" },
+  { color: MARKER_COLORS.duplicated, label: "Duplicado" },
+  { color: MARKER_COLORS.focus, label: "Foco confirmado" },
+];
+
+function popup(p: AuditProp): string {
+  const status = p.has_focus ? "focus" : p.status;
+  const color = MARKER_COLORS[status as keyof typeof MARKER_COLORS] ?? MARKER_COLORS.unknown;
+  const captured = p.geocoded_at ? new Date(p.geocoded_at).toLocaleString("pt-BR") : "—";
+  const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
+  return `
+    <div style="font-family:system-ui;font-size:12px;min-width:200px;line-height:1.45">
+      <div style="font-weight:600">${p.street_name ?? "Imóvel"} ${p.number ?? ""}</div>
+      <div>Quarteirão: <b>${p.block_number ?? "—"}</b></div>
+      <div>Localidade: ${p.locality ?? "—"}</div>
+      <div>Agente: ${p.agent_name ?? "—"}</div>
+      <div style="margin-top:4px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px"></span>
+        <b>${status}</b>${p.has_pendency ? " · pendência" : ""}
+      </div>
+      <div>Última captura: ${captured}</div>
+      <div style="font-family:ui-monospace,monospace;color:#64748b;margin-top:2px">
+        ${p.latitude?.toFixed(5)}, ${p.longitude?.toFixed(5)}
+      </div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <a href="/properties/${p.id}" style="border:1px solid #cbd5e1;border-radius:6px;padding:2px 6px;font-size:11px;text-decoration:none;color:inherit">Imóvel</a>
+        <a href="${gmaps}" target="_blank" rel="noreferrer" style="border:1px solid #cbd5e1;border-radius:6px;padding:2px 6px;font-size:11px;text-decoration:none;color:inherit">Navegar</a>
+      </div>
+    </div>
+  `;
+}
+
 export default function GeorefAuditMap({ properties }: { properties: AuditProp[] }) {
-  const points = useMemo(
+  const points: SharedMarkerPoint[] = useMemo(
     () =>
-      properties.filter(
-        (p) =>
-          isValid(p.latitude) &&
-          isValid(p.longitude) &&
-          Math.abs(p.latitude!) <= 90 &&
-          Math.abs(p.longitude!) <= 180,
-      ),
+      properties
+        .filter(
+          (p) =>
+            isValid(p.latitude) &&
+            isValid(p.longitude) &&
+            Math.abs(p.latitude!) <= 90 &&
+            Math.abs(p.longitude!) <= 180,
+        )
+        .map((p) => ({
+          id: p.id,
+          lat: p.latitude!,
+          lng: p.longitude!,
+          status: (p.has_focus ? "focus" : p.status) as SharedMarkerPoint["status"],
+          popupHtml: popup(p),
+          tooltip: `${p.street_name ?? "Imóvel"} ${p.number ?? ""}`,
+        })),
     [properties],
   );
 
-  const center: [number, number] = points.length
-    ? [
-        points.reduce((s, p) => s + (p.latitude || 0), 0) / points.length,
-        points.reduce((s, p) => s + (p.longitude || 0), 0) / points.length,
-      ]
-    : [-15.78, -47.93];
-
-  console.log("[GEOREF_MAP]", { points: points.length });
+  console.log("[GEOREF_MAP]", { points: points.length, total: properties.length });
 
   return (
-    <div className="h-[500px] w-full rounded overflow-hidden border">
-      <MapContainer
-        center={center}
-        zoom={points.length ? 14 : 5}
-        style={{ height: "100%", width: "100%" }}
-      >
-        <TileLayer
-          attribution="&copy; OpenStreetMap"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {points.map((p) => {
-          const color = p.has_focus ? COLOR.focus : COLOR[p.status] || COLOR.missing;
-          return (
-            <CircleMarker
-              key={p.id}
-              center={[p.latitude!, p.longitude!]}
-              radius={7}
-              pathOptions={{ color, fillColor: color, fillOpacity: 0.85, weight: 1 }}
-            >
-              <Popup>
-                <div className="space-y-1 text-xs">
-                  <div className="font-semibold">{p.street_name || "Imóvel"} {p.number || ""}</div>
-                  <div>Quarteirão: <b>{p.block_number || "—"}</b></div>
-                  <div>Localidade: {p.locality || "—"}</div>
-                  <div>Agente: {p.agent_name || "—"}</div>
-                  <div>Status: {p.status}</div>
-                  {p.has_focus && <div className="text-red-600 font-semibold">⚫ Foco confirmado</div>}
-                  {p.has_pendency && <div className="text-orange-600">Possui pendência</div>}
-                  <div>Última captura: {p.geocoded_at ? new Date(p.geocoded_at).toLocaleString("pt-BR") : "—"}</div>
-                  <div className="font-mono">{p.latitude?.toFixed(5)}, {p.longitude?.toFixed(5)}</div>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                      <Link to="/properties/$id" params={{ id: p.id }}>
-                        <ExternalLink className="h-3 w-3 mr-1" /> Imóvel
-                      </Link>
-                    </Button>
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 border rounded px-2 py-1 text-xs"
-                    >
-                      <Navigation2 className="h-3 w-3" /> Navegar
-                    </a>
-                  </div>
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
-    </div>
+    <SharedMap
+      height={500}
+      isEmpty={points.length === 0}
+      emptyVariant="no-geo"
+      legendEntries={LEGEND}
+      legendTrailing={`${points.length} de ${properties.length} georreferenciados`}
+    >
+      <SharedMarkerLayer points={points} />
+    </SharedMap>
   );
 }

@@ -47,6 +47,11 @@ export const MARKER_COLORS = {
   strategic: "#3b82f6",  // ponto estratégico
   clean: "#10b981",      // sem foco
   case: "#a855f7",       // caso confirmado
+  // Auditoria de georreferenciamento
+  valid: "#16a34a",
+  missing: "#eab308",
+  invalid: "#dc2626",
+  duplicated: "#9333ea",
   unknown: "#94a3b8",
 } as const;
 
