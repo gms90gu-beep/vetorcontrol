@@ -1,12 +1,12 @@
 # Offline Audit Report
 
-> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T12:34:15.258Z
+> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T12:35:37.849Z
 
 ## Resumo
 
 | Métrica | Valor |
 |---|---|
-| Arquivos varridos | 227 |
+| Arquivos varridos | 228 |
 | Arquivos com `supabase.from/.rpc` | 40 |
 | Server-only (ignorados) | 8 |
 | **Client com fallback** | **4** |
