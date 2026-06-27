@@ -40,10 +40,9 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  console.error("[BOOT_FAILED]", error);
   const router = useRouter();
 
-  // Detecta erros de rede para exibir mensagem amigável em vez de "This page didn't load".
   const msg = String((error as any)?.message || error || "");
   const name = String((error as any)?.name || "");
   const isNetwork =
@@ -52,22 +51,33 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     name === "AuthRetryableFetchError" ||
     (typeof navigator !== "undefined" && navigator.onLine === false);
 
-  const title = isNetwork ? "Sem conexão no momento" : "This page didn't load";
-  const desc = isNetwork
-    ? "Você está offline ou o servidor não respondeu. Os dados salvos localmente continuam disponíveis — tente novamente quando a conexão voltar."
-    : "Something went wrong on our end. You can try refreshing or head back home.";
+  // Erros de rede NUNCA bloqueiam o boot — auto-recupera silenciosamente.
+  useEffect(() => {
+    if (!isNetwork) return;
+    console.log("[BOOT_NETWORK] erro de rede no boot — auto-retry");
+    const t = setTimeout(() => {
+      try { router.invalidate(); } catch {}
+      try { reset(); } catch {}
+    }, 50);
+    return () => clearTimeout(t);
+  }, [isNetwork, reset, router]);
+
+  if (isNetwork) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <span className="text-xs text-muted-foreground">Carregando modo offline…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Esta página não carregou</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Algo deu errado. Tente novamente ou volte ao início.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
+            onClick={() => { router.invalidate(); reset(); }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Tentar novamente
@@ -83,6 +93,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     </div>
   );
 }
+
 
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
