@@ -138,7 +138,19 @@ function OfflineAuditPage() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); getLastRC1Report().then(setRc1); }, [refresh]);
+
+  const runRc1 = useCallback(async () => {
+    if (!user?.id) { toast.error("Sessão não disponível"); return; }
+    setRc1Busy(true);
+    try {
+      const r = await runRC1Suite(user.id);
+      setRc1(r);
+      toast.success(`RC-1: ${r.verdict} (${r.globalScore}%)`);
+    } catch (e: any) {
+      toast.error(`Falha RC-1: ${e?.message || e}`);
+    } finally { setRc1Busy(false); }
+  }, [user?.id]);
 
   // Score 0–100
   const swScore = swActive ? 25 : 0;
