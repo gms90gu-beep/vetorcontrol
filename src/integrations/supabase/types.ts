@@ -117,6 +117,9 @@ export type Database = {
         Row: {
           address: string | null
           city: string | null
+          current_street: string | null
+          current_street_confirmed_at: string | null
+          current_street_confirmed_by: string | null
           id: string
           latitude: number | null
           locality: string | null
@@ -131,6 +134,9 @@ export type Database = {
         Insert: {
           address?: string | null
           city?: string | null
+          current_street?: string | null
+          current_street_confirmed_at?: string | null
+          current_street_confirmed_by?: string | null
           id?: string
           latitude?: number | null
           locality?: string | null
@@ -145,6 +151,9 @@ export type Database = {
         Update: {
           address?: string | null
           city?: string | null
+          current_street?: string | null
+          current_street_confirmed_at?: string | null
+          current_street_confirmed_by?: string | null
           id?: string
           latitude?: number | null
           locality?: string | null
