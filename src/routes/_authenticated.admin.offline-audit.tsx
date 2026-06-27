@@ -21,6 +21,10 @@ import { db } from "@/lib/offline/db";
 import { pendingMutationCount, pendingByTable, getLastSyncAt, flushMutations } from "@/lib/offline/sync";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { runRC1Suite, getLastRC1Report, type RC1Report } from "@/lib/audit/rc1-suite";
+import { downloadMarkdown, downloadPdf } from "@/lib/audit/rc1-report";
+import { FileDown, FileText, PlayCircle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/offline-audit")({
   ssr: false,
