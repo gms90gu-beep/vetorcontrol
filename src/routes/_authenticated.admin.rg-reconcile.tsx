@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
 import {
   getReconcilePreview,
   executeReconcile,
