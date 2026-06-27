@@ -4,6 +4,7 @@ import { OperationalDashboard } from "@/components/supervision/OperationalDashbo
 import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 export const Route = createFileRoute("/_authenticated/supervision")({
   beforeLoad: async () => {
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/supervision")({
     if (!session) throw redirect({ to: "/login" });
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw redirect({ to: "/login" });
-    const { data: role } = await supabase.rpc("get_user_role", { u_id: userData.user.id });
+    const role = await getCachedUserRole(userData.user.id);
     if (!role || !["supervisor", "coordenador", "admin_master"].includes(role)) {
       throw redirect({ to: "/dashboard" });
     }

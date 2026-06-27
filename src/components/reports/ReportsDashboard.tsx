@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { safeFetch } from "@/lib/offline/safe-fetch";
+import { listRemoteOrCache } from "@/lib/offline/repos";
 import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
@@ -70,15 +72,21 @@ export function ReportsDashboard() {
     setIsLoading(true);
     try {
       // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
-      let query = supabase.from("daily_work_records").select("*");
-
+      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
-      if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
-      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
-
-      const { data: records, error } = await query.order("work_date", { ascending: false });
-      if (error) throw error;
-      const rows = (records as any[]) || [];
+      const records = await listRemoteOrCache<any>({
+        name: "daily_work_records",
+        remote: async () => {
+          let query = supabase.from("daily_work_records").select("*");
+          if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
+          if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
+          return await query.order("work_date", { ascending: false });
+        },
+        filter: (r) =>
+          (!cycleFilter || r.cycle_id === cycleFilter) &&
+          (filters.agent === "all" || r.agent_id === filters.agent),
+      });
+      const rows = records || [];
       console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
 
       setDailies(rows);
@@ -164,8 +172,16 @@ export function ReportsDashboard() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
-    
+    const profile = await safeFetch<{ full_name: string | null } | null>(
+      async () => {
+        const { data, error } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+        if (error) throw error;
+        return data;
+      },
+      async () => null,
+      { label: "profile.full_name" },
+    );
+
     const result = await generateWeeklyReportPDF(session.user.id);
     if (result) {
       openWhatsAppShare(result.fileName, profile?.full_name || "Agente");

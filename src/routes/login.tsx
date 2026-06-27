@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { saveSessionLocally } from "@/auth/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,13 +110,11 @@ function LoginPage() {
       mark("PROFILE_LOAD");
       let role: string | null = null;
       try {
-        const { data: roleData, error: roleError } = await withTimeout(
-          Promise.resolve(supabase.rpc("get_user_role", { u_id: data.user.id })),
+        role = await withTimeout(
+          getCachedUserRole(data.user.id),
           8000,
           "get_user_role",
-        ) as { data: unknown; error: unknown };
-        if (roleError) console.error("[PROFILE_LOAD] erro RPC:", roleError);
-        role = (roleData as string | null) ?? null;
+        ) as string | null;
       } catch (e) {
         console.error("[PROFILE_LOAD] timeout/exceção (fallback /dashboard):", e);
       }

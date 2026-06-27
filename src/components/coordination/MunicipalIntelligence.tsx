@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { listRemoteOrCache } from "@/lib/offline/repos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,11 +34,11 @@ export function MunicipalIntelligence() {
     (async () => {
       setLoading(true);
       try {
-        const [{ data: profs }, { data: vs }, { data: props }, { data: cs }] = await Promise.all([
-          supabase.from("profiles").select("id, full_name, email, city, role, supervisor_id, coordinator_id, is_active"),
-          supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, property_id"),
-          supabase.from("properties").select("id, neighborhood, block_id"),
-          supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }),
+        const [profs, vs, props, cs] = await Promise.all([
+          listRemoteOrCache<any>({ name: "profiles", remote: async () => await supabase.from("profiles").select("id, full_name, email, city, role, supervisor_id, coordinator_id, is_active") }),
+          listRemoteOrCache<any>({ name: "visits", remote: async () => await supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, property_id") }),
+          listRemoteOrCache<any>({ name: "properties", remote: async () => await supabase.from("properties").select("id, neighborhood, block_id") }),
+          listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }) }),
         ]);
         const sups = (profs || []).filter((p: any) => p.role === "supervisor");
         const ags = (profs || []).filter((p: any) => p.role === "agente");

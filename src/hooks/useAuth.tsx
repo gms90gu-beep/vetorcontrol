@@ -4,6 +4,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
+import { safeFetch } from "@/lib/offline/safe-fetch";
 
 type AppRole = "admin_master" | "coordenador" | "supervisor" | "agente" | string;
 
@@ -74,17 +76,15 @@ async function getVerifiedAuthState() {
 }
 
 async function getRoleForUser(userId: string) {
-  console.debug("[Auth Role] Buscando role via RPC para:", userId);
-  const { data, error } = await supabase.rpc("get_user_role", { u_id: userId });
-
-  if (error) {
-    console.error("[Auth Role] Erro ao buscar role via RPC:", error);
+  console.debug("[Auth Role] Buscando role (offline-first) para:", userId);
+  try {
+    const role = await getCachedUserRole(userId);
+    console.debug("[Auth Role] Role encontrado:", role);
+    return role;
+  } catch (error) {
+    console.error("[Auth Role] Erro ao buscar role:", error);
     return null;
   }
-
-  const role = typeof data === "string" ? data : null;
-  console.debug("[Auth Role] Role encontrado via RPC:", role);
-  return role;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -164,15 +164,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         queryClient.invalidateQueries();
       }
 
-      // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent
+      // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent (no-op offline)
       if (nextUser && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-        supabase.rpc("autoheal_agent", { _user_id: nextUser.id }).then(({ data, error }) => {
-          if (error) {
-            console.warn("[AUTOHEAL_AGENT] falhou:", error.message);
-          } else if (data) {
-            console.debug("[AUTOHEAL_AGENT] agent_id=", data, "profile_id=", nextUser.id);
-          }
-        });
+        safeFetch(
+          async () => {
+            const { data, error } = await supabase.rpc("autoheal_agent", { _user_id: nextUser.id });
+            if (error) throw error;
+            if (data) console.debug("[AUTOHEAL_AGENT] agent_id=", data, "profile_id=", nextUser.id);
+            return data;
+          },
+          async () => {
+            console.log("[AUTOHEAL_AGENT] adiado (offline)");
+            return null;
+          },
+          { label: "autoheal_agent" },
+        ).catch((e) => console.warn("[AUTOHEAL_AGENT] falhou:", (e as any)?.message));
       }
 
     });

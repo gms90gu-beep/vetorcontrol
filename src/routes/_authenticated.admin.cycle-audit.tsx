@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { listRemoteOrCache } from "@/lib/offline/repos";
+import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,11 +32,14 @@ function CycleAuditPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from("cycles")
-      .select("id,name,number,year,start_date,end_date,status")
-      .order("year", { ascending: false })
-      .order("number", { ascending: true });
+    const data = await listRemoteOrCache<Cycle>({
+      name: "cycles",
+      remote: async () => await supabase
+        .from("cycles")
+        .select("id,name,number,year,start_date,end_date,status")
+        .order("year", { ascending: false })
+        .order("number", { ascending: true }),
+    });
     setCycles((data as Cycle[]) || []);
     setLoading(false);
   }
@@ -49,14 +54,26 @@ function CycleAuditPage() {
   const multipleInProgress = cycles.filter((c) => c.status === "in_progress").length > 1;
 
   async function runSync() {
-    setSyncing(true);
-    const { data, error } = await supabase.rpc("sync_cycle_statuses");
-    setSyncing(false);
-    if (error) {
-      toast.error(error.message);
+    if (!isOnline()) {
+      toast.error("Operação requer conexão");
       return;
     }
-    toast.success(`Sincronizado: ${JSON.stringify(data)}`);
+    setSyncing(true);
+    const result = await safeFetch(
+      async () => {
+        const { data, error } = await supabase.rpc("sync_cycle_statuses");
+        if (error) throw error;
+        return data;
+      },
+      async () => null,
+      { label: "sync_cycle_statuses" },
+    );
+    setSyncing(false);
+    if (result == null) {
+      toast.error("Sincronização indisponível");
+      return;
+    }
+    toast.success(`Sincronizado: ${JSON.stringify(result)}`);
     load();
   }
 
