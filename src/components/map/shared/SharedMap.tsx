@@ -2,7 +2,7 @@
 // aplica tiles resilientes, gerencia fases, expõe a instância via contexto.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// leaflet.css é importado em src/styles.css (shell) para evitar chunk separado offline.
 import { cn } from "@/lib/utils";
 import { SharedMapContext } from "./context";
 import { attachResilientTileLayer } from "./hooks/useResilientTileLayer";
