@@ -4,6 +4,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
+import { safeFetch } from "@/lib/offline/safe-fetch";
 
 type AppRole = "admin_master" | "coordenador" | "supervisor" | "agente" | string;
 
