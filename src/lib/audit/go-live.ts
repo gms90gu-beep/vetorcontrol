@@ -67,7 +67,7 @@ async function timeDexieScan(): Promise<PerfMetric> {
 
 async function timeQueueScan(): Promise<PerfMetric> {
   const t0 = performance.now();
-  const all = await offlineDb.mutationQueue?.count?.().catch(() => 0) ?? 0;
+  const all = await pendingMutationCount().catch(() => 0);
   const ms = Math.round(performance.now() - t0);
   return { name: "Fila de sincronização", ms, ok: ms < 200, detail: `${all} itens` };
 }
