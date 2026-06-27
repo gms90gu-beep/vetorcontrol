@@ -1,9 +1,20 @@
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { Button } from "@/components/ui/button";
-import { Printer, Download, X, Loader2, Map as MapIcon, Navigation } from "lucide-react";
+import {
+  Printer,
+  Download,
+  ArrowLeft,
+  Loader2,
+  Map as MapIcon,
+  Home,
+  MapPin,
+  AlertTriangle,
+  Target,
+  ArrowDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
@@ -76,19 +87,31 @@ function BoletimView() {
   const [imoveis, setImoveis] = useState<Property[]>([]);
   const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Auto-scale do documento somente em telas estreitas
+  useEffect(() => {
+    const computeScale = () => {
+      const w = window.innerWidth;
+      if (w < 480) setScale(0.7);
+      else if (w < 768) setScale(0.82);
+      else setScale(1);
+    };
+    computeScale();
+    window.addEventListener("resize", computeScale);
+    return () => window.removeEventListener("resize", computeScale);
+  }, []);
+
   async function load() {
-    console.log("[BRG] ID recebido:", id);
     setLoading(true);
     setLoadError(null);
     try {
-      // The :id can be either a boletim_id or a block_id.
-      // Try boletim first; if not found, treat as block_id and find-or-create.
       let b: Boletim | null = null;
 
       const { data: byBoletim, error: byBoletimErr } = await supabase
@@ -96,8 +119,6 @@ function BoletimView() {
         .select("*")
         .eq("id", id)
         .maybeSingle();
-
-      console.log("[BRG] boletins_rg by id:", { data: byBoletim, error: byBoletimErr });
 
       if (byBoletimErr) {
         const msg = byBoletimErr.message || "";
@@ -111,8 +132,7 @@ function BoletimView() {
       if (byBoletim) {
         b = byBoletim as Boletim;
       } else {
-        // treat as block_id
-        const { data: byBlock, error: byBlockErr } = await supabase
+        const { data: byBlock } = await supabase
           .from("boletins_rg")
           .select("*")
           .eq("block_id", id)
@@ -120,12 +140,9 @@ function BoletimView() {
           .limit(1)
           .maybeSingle();
 
-        console.log("[BRG] boletins_rg by block_id:", { data: byBlock, error: byBlockErr });
-
         if (byBlock) {
           b = byBlock as Boletim;
         } else {
-          // create on the fly using context from block + agent
           const { data: { user } } = await safeGetUser();
           if (!user) throw new Error("Não autenticado");
 
@@ -156,7 +173,6 @@ function BoletimView() {
           };
           const { data: created, error: createErr } = await supabase
             .from("boletins_rg").insert(insertPayload).select().single();
-          console.log("[BRG] create boletim:", { data: created, error: createErr });
           if (createErr) {
             if (/permission|denied|policy|rls/i.test(createErr.message)) {
               setLoadError({ kind: "forbidden", message: "Você não possui acesso para criar este boletim." });
@@ -174,7 +190,6 @@ function BoletimView() {
       }
       setBoletim(b);
 
-      // Imóveis do boletim — fonte única: boletim_id.
       const { data: byBoletimLink } = await supabase
         .from("properties")
         .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status")
@@ -182,11 +197,7 @@ function BoletimView() {
         .order("sequence", { ascending: true });
 
       const props: Property[] = [...((byBoletimLink || []) as Property[])].sort(comparePropertyNumber);
-
-
-      console.log("[BRG] imóveis carregados:", props.length);
       setImoveis(props);
-
     } catch (e: any) {
       console.error("[BRG] erro ao carregar:", e);
       setLoadError({ kind: "generic", message: e?.message || "Erro desconhecido ao carregar boletim." });
@@ -231,7 +242,6 @@ function BoletimView() {
         if (idx > 0) doc.addPage();
         const isLast = idx === folhas.length - 1;
 
-        // Header
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
         doc.text("MINISTÉRIO DA SAÚDE - FUNASA", pageWidth / 2, 12, { align: "center" });
@@ -276,7 +286,6 @@ function BoletimView() {
         drawRow(h1y + 8, labels2);
         drawRow(h1y + 16, labels3);
 
-        // Responsáveis
         const ry = h1y + 26;
         const resp = [
           ["Inspetor Geral", boletim.inspector_general || ""],
@@ -286,7 +295,6 @@ function BoletimView() {
         ];
         drawRow(ry, resp);
 
-        // Tabela
         const tableY = ry + 12;
         const body = folha.map((p) => [
           p.street_name || "",
@@ -319,7 +327,6 @@ function BoletimView() {
 
         if (isLast) {
           const finalY = (doc as any).lastAutoTable.finalY + 4;
-          // Fechamento (totais por tipo)
           autoTable(doc, {
             startY: finalY,
             head: [["R", "C", "TB", "PE", "O", "Total Geral", "Habitantes"]],
@@ -338,7 +345,6 @@ function BoletimView() {
             margin: { left: 10, right: 10 },
           });
 
-          // Cobertura GPS do quarteirão
           autoTable(doc, {
             startY: (doc as any).lastAutoTable.finalY + 2,
             head: [["Imóveis", "Georreferenciados", "Pendentes", "Cobertura GPS"]],
@@ -378,10 +384,43 @@ function BoletimView() {
     }
   }
 
+  function exportCSV() {
+    if (!boletim || imoveis.length === 0) {
+      toast.info("Nenhum imóvel para exportar.");
+      return;
+    }
+    const headers = ["Rua", "Lado", "Número", "SEQ", "Complemento", "Tipo", "Habitantes", "Latitude", "Longitude"];
+    const lines = imoveis.map((p) =>
+      [
+        p.street_name || "",
+        p.side || "",
+        p.number || "",
+        p.sequence ?? "",
+        (p.complement || "").replace(/[,;\n]/g, " "),
+        tipoCodigo(p.type),
+        p.inhabitants ?? 0,
+        p.latitude ?? "",
+        p.longitude ?? "",
+      ].join(",")
+    );
+    const csv = [headers.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `BRG_Q${boletim.block_number || "SN"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function scrollToTable() {
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -396,10 +435,10 @@ function BoletimView() {
           : "Não foi possível carregar o boletim.";
     const detail = loadError?.message && kind === "generic" ? loadError.message : null;
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center">
-        <p className="font-bold text-slate-700 text-lg">{title}</p>
-        {detail && <p className="text-sm text-slate-500 max-w-md">{detail}</p>}
-        <p className="text-xs text-slate-400">ID: {id}</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
+        <p className="font-bold text-foreground text-lg">{title}</p>
+        {detail && <p className="text-sm text-muted-foreground max-w-md">{detail}</p>}
+        <p className="text-xs text-muted-foreground">ID: {id}</p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => load()}>Tentar novamente</Button>
           <Button onClick={() => navigate({ to: "/rg" })}>Voltar para RG</Button>
@@ -409,56 +448,129 @@ function BoletimView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 brg-screen">
-      {/* Print styles + toolbar */}
+    <div className="min-h-screen bg-muted/40 brg-screen">
       <style>{`
+        /* Documento e tabela */
+        .brg-page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 12mm;
+          background: white;
+          box-shadow: 0 4px 20px rgba(0,0,0,.08);
+          margin: 12px auto;
+        }
+        .brg-cell { border: 1px solid #000; padding: 2px 4px; font-size: 10px; }
+        .brg-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: .04em; }
+        .brg-value { font-size: 11px; font-weight: 600; min-height: 14px; }
+        .brg-table { width: 100%; border-collapse: collapse; }
+        .brg-table th, .brg-table td { border: 1px solid #000; padding: 3px 4px; font-size: 10px; }
+        .brg-table th {
+          background: #eee;
+          font-weight: 700;
+          text-align: center;
+          position: sticky;
+          top: 0;
+          z-index: 1;
+        }
+
+        /* Wrapper de scroll horizontal aplicado SOMENTE à tabela */
+        .brg-table-scroll {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo. */
+        .brg-scale-wrap {
+          transform: scale(var(--brg-scale, 1));
+          transform-origin: top center;
+          width: 100%;
+        }
+
         @media print {
           body { background: white !important; }
           .brg-no-print { display: none !important; }
           .brg-page { box-shadow: none !important; margin: 0 !important; page-break-after: always; }
           .brg-page:last-child { page-break-after: auto; }
-          aside, nav, header[data-app-header], .sidebar { display: none !important; }
-        }
-        .brg-page { width: 210mm; min-height: 297mm; padding: 12mm; margin: 12px auto; background: white; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
-        .brg-cell { border: 1px solid #000; padding: 2px 4px; font-size: 10px; }
-        .brg-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: .04em; }
-        .brg-value { font-size: 11px; font-weight: 600; min-height: 14px; }
-        .brg-table th, .brg-table td { border: 1px solid #000; padding: 3px 4px; font-size: 10px; }
-        .brg-table th { background: #eee; font-weight: 700; text-align: center; }
-        @media (max-width: 900px) {
-          .brg-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .brg-scale-wrap { transform: none !important; }
+          aside, nav, header[data-app-header], .sidebar, [data-bottom-nav] { display: none !important; }
+          .brg-table th { position: static !important; }
         }
       `}</style>
 
-      <div className="brg-no-print sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-[230mm] mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="font-black text-xs uppercase tracking-widest text-slate-700">
+      {/* Cabeçalho mobile-first */}
+      <div className="brg-no-print sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <div className="mx-auto flex h-12 w-full max-w-7xl items-center gap-2 px-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0"
+            aria-label="Voltar"
+            onClick={() => navigate({ to: "/rg" })}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight">
             BRG · FA-D-05 · Quarteirão {boletim.block_number || "—"}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setMapOpen(true)}>
-              <MapIcon className="h-4 w-4" /> Ver mapa do quarteirão
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" /> Imprimir
-            </Button>
-            <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={gerarPDF}>
-              <Download className="h-4 w-4" /> Baixar PDF
-            </Button>
-            <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate({ to: "/rg" })}>
-              <X className="h-4 w-4" /> Fechar
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 px-2.5 text-xs"
+            onClick={() => setMapOpen(true)}
+            aria-label="Ver mapa do quarteirão"
+          >
+            <MapIcon className="h-4 w-4" />
+            <span className="hidden xs:inline sm:inline">Mapa</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 px-2.5 text-xs"
+            onClick={() => window.print()}
+            aria-label="Imprimir"
+          >
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">Imprimir</span>
+          </Button>
+          <Button
+            size="sm"
+            className="h-9 gap-1.5 px-2.5 text-xs"
+            onClick={gerarPDF}
+            aria-label="Baixar PDF"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
         </div>
       </div>
 
-      {/* Painel de Cobertura GPS (não imprime) */}
-      <div className="brg-no-print max-w-[230mm] mx-auto px-4 pt-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <GpsStat label="Imóveis" value={gpsStats.total} />
-          <GpsStat label="Georreferenciados" value={gpsStats.geo} accent="emerald" />
-          <GpsStat label="Pendentes" value={gpsStats.pendentes} accent={gpsStats.pendentes > 0 ? "amber" : "slate"} />
-          <GpsStat label="Cobertura GPS" value={`${gpsStats.cobertura.toFixed(2)}%`} accent="blue" />
+      {/* KPIs compactos — máx ~90px */}
+      <div className="brg-no-print mx-auto w-full max-w-7xl px-2 pt-2 sm:px-4">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
+          <KpiMini icon={<Home className="h-4 w-4" />} value={gpsStats.total} label="Imóveis" tone="default" />
+          <KpiMini icon={<MapPin className="h-4 w-4" />} value={gpsStats.geo} label="Georref." tone="success" />
+          <KpiMini
+            icon={<AlertTriangle className="h-4 w-4" />}
+            value={gpsStats.pendentes}
+            label="Pendentes"
+            tone={gpsStats.pendentes > 0 ? "warning" : "muted"}
+          />
+          <KpiMini
+            icon={<Target className="h-4 w-4" />}
+            value={`${gpsStats.cobertura.toFixed(gpsStats.cobertura % 1 === 0 ? 0 : 2)}%`}
+            label="Cobertura GPS"
+            tone="info"
+          />
+        </div>
+        <div className="mt-2 flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-xs text-muted-foreground"
+            onClick={exportCSV}
+          >
+            <Download className="h-3.5 w-3.5" /> Exportar CSV
+          </Button>
         </div>
       </div>
 
@@ -478,13 +590,19 @@ function BoletimView() {
         }))}
       />
 
-      <div className="brg-scroll">
-
+      {/* Documento com auto-scale */}
+      <div
+        className="brg-scale-wrap"
+        style={{ ["--brg-scale" as any]: String(scale) }}
+      >
         {folhas.map((folha, idx) => {
           const isLast = idx === folhas.length - 1;
           return (
-            <section key={idx} className="brg-page">
-              {/* Cabeçalho oficial */}
+            <section
+              key={idx}
+              className="brg-page"
+              ref={idx === 0 ? tableRef : undefined}
+            >
               <div className="text-center mb-3">
                 <div className="text-[10px] font-bold uppercase tracking-widest">Ministério da Saúde — FUNASA</div>
                 <div className="text-sm font-black uppercase tracking-tight mt-0.5">
@@ -522,57 +640,61 @@ function BoletimView() {
 
               <div className="h-2" />
 
-              <table className="brg-table w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th style={{ width: "38%" }}>Rua ou Logradouro</th>
-                    <th style={{ width: "8%" }}>Lado</th>
-                    <th style={{ width: "12%" }}>Número</th>
-                    <th style={{ width: "8%" }}>SEQ</th>
-                    <th style={{ width: "14%" }}>Comp.</th>
-                    <th style={{ width: "10%" }}>Tipo</th>
-                    <th style={{ width: "10%" }}>Hab.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {folha.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
-                  ) : folha.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.street_name || ""}</td>
-                      <td className="text-center">{p.side || ""}</td>
-                      <td className="text-center font-bold">{p.number}</td>
-                      <td className="text-center">{p.sequence ?? ""}</td>
-                      <td className="text-center">{p.complement || ""}</td>
-                      <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
-                      <td className="text-center">{p.inhabitants ?? 0}</td>
+              <div className="brg-table-scroll">
+                <table className="brg-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "38%" }}>Rua ou Logradouro</th>
+                      <th style={{ width: "8%" }}>Lado</th>
+                      <th style={{ width: "12%" }}>Número</th>
+                      <th style={{ width: "8%" }}>SEQ</th>
+                      <th style={{ width: "14%" }}>Comp.</th>
+                      <th style={{ width: "10%" }}>Tipo</th>
+                      <th style={{ width: "10%" }}>Hab.</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {folha.length === 0 ? (
+                      <tr><td colSpan={7} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
+                    ) : folha.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.street_name || ""}</td>
+                        <td className="text-center">{p.side || ""}</td>
+                        <td className="text-center font-bold">{p.number}</td>
+                        <td className="text-center">{p.sequence ?? ""}</td>
+                        <td className="text-center">{p.complement || ""}</td>
+                        <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
+                        <td className="text-center">{p.inhabitants ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {isLast && (
                 <>
                   <div className="h-3" />
-                  <table className="brg-table w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th>R</th><th>C</th><th>TB</th><th>PE</th><th>O</th>
-                        <th>Total Geral</th><th>Habitantes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="text-center font-bold">
-                        <td>{counts.R}</td>
-                        <td>{counts.C}</td>
-                        <td>{counts.TB}</td>
-                        <td>{counts.PE}</td>
-                        <td>{counts.O}</td>
-                        <td>{totalImoveis}</td>
-                        <td>{totalHabitantes}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div className="brg-table-scroll">
+                    <table className="brg-table">
+                      <thead>
+                        <tr>
+                          <th>R</th><th>C</th><th>TB</th><th>PE</th><th>O</th>
+                          <th>Total Geral</th><th>Habitantes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="text-center font-bold">
+                          <td>{counts.R}</td>
+                          <td>{counts.C}</td>
+                          <td>{counts.TB}</td>
+                          <td>{counts.PE}</td>
+                          <td>{counts.O}</td>
+                          <td>{totalImoveis}</td>
+                          <td>{totalHabitantes}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-8 mt-10">
                     <div className="text-center">
@@ -597,6 +719,16 @@ function BoletimView() {
           );
         })}
       </div>
+
+      {/* FAB: ir para a tabela */}
+      <button
+        type="button"
+        onClick={scrollToTable}
+        aria-label="Ir para a tabela"
+        className="brg-no-print fixed bottom-20 right-4 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition active:scale-95 sm:bottom-6"
+      >
+        <ArrowDown className="h-5 w-5" />
+      </button>
     </div>
   );
 }
@@ -614,17 +746,34 @@ function HeaderRow({ items }: { items: [string, string | null | undefined][] }) 
   );
 }
 
-function GpsStat({ label, value, accent = "slate" }: { label: string; value: number | string; accent?: "slate" | "emerald" | "amber" | "blue" }) {
-  const colors: Record<string, string> = {
-    slate: "text-slate-900",
-    emerald: "text-emerald-600",
-    amber: "text-amber-600",
-    blue: "text-blue-600",
+type KpiTone = "default" | "success" | "warning" | "info" | "muted";
+
+function KpiMini({
+  icon,
+  value,
+  label,
+  tone = "default",
+}: {
+  icon: React.ReactNode;
+  value: number | string;
+  label: string;
+  tone?: KpiTone;
+}) {
+  const tones: Record<KpiTone, { icon: string; value: string; ring: string }> = {
+    default: { icon: "bg-muted text-foreground", value: "text-foreground", ring: "border-border" },
+    success: { icon: "bg-emerald-100 text-emerald-700", value: "text-emerald-700", ring: "border-emerald-100" },
+    warning: { icon: "bg-amber-100 text-amber-700", value: "text-amber-700", ring: "border-amber-100" },
+    info:    { icon: "bg-blue-100 text-blue-700",   value: "text-blue-700",   ring: "border-blue-100" },
+    muted:   { icon: "bg-muted text-muted-foreground", value: "text-muted-foreground", ring: "border-border" },
   };
+  const s = tones[tone];
   return (
-    <div className="flex flex-col items-center justify-center py-1">
-      <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
-      <span className={`text-lg font-black ${colors[accent]}`}>{value}</span>
+    <div
+      className={`flex h-[78px] flex-col items-center justify-center gap-0.5 rounded-xl border bg-card px-1 py-1.5 shadow-xs ${s.ring}`}
+    >
+      <div className={`grid h-6 w-6 place-items-center rounded-md ${s.icon}`}>{icon}</div>
+      <div className={`text-base font-bold leading-none tabular-nums ${s.value}`}>{value}</div>
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground truncate max-w-full">{label}</div>
     </div>
   );
 }
