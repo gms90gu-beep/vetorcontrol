@@ -13,6 +13,14 @@ import { useEffect } from "react";
 import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor";
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { PostBootErrorBoundary } from "@/components/PostBootErrorBoundary";
+
+const __BOOT_T0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+const sinceBoot = () => Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - __BOOT_T0);
+if (typeof window !== "undefined") {
+  (window as any).__BOOT_T0 = __BOOT_T0;
+  console.log("[APP_START]", { online: navigator.onLine, t: 0 });
+}
 
 
 import appCss from "../styles.css?url";
