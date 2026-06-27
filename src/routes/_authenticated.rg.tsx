@@ -861,16 +861,17 @@ function NewBoletimForm({ onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const [block, setBlock] = useState("");
+  const [locality, setLocality] = useState("");
   const [side, setSide] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!block.trim()) { toast.error("Informe o número do quarteirão"); return; }
+    if (!locality.trim()) { toast.error("Informe a localidade"); return; }
     setSaving(true);
     try {
-      // locality fica vazio: logradouro agora pertence ao imóvel, não ao quarteirão.
-      await onSubmit({ block_number: block.trim(), locality: "" });
+      await onSubmit({ block_number: block.trim(), locality: locality.trim() });
     } finally {
       setSaving(false);
     }
@@ -879,8 +880,15 @@ function NewBoletimForm({ onSubmit, onCancel }: {
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
+        <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Localidade</Label>
+        <Input value={locality} onChange={(e) => setLocality(e.target.value)} placeholder="Ex: Centro" className="h-10 mt-1" autoFocus />
+        <p className="text-[10px] mt-1" style={{ color: C.text2 }}>
+          Identifica o quarteirão dentro do município (ex: bairro / distrito).
+        </p>
+      </div>
+      <div>
         <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Quarteirão Nº</Label>
-        <Input value={block} onChange={(e) => setBlock(e.target.value)} placeholder="Ex: 05" className="h-10 mt-1" autoFocus />
+        <Input value={block} onChange={(e) => setBlock(e.target.value)} placeholder="Ex: 05" className="h-10 mt-1" />
       </div>
       <div>
         <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Lado</Label>
