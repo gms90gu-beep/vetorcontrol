@@ -21,6 +21,10 @@ import { db } from "@/lib/offline/db";
 import { pendingMutationCount, pendingByTable, getLastSyncAt, flushMutations } from "@/lib/offline/sync";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { runRC1Suite, getLastRC1Report, type RC1Report } from "@/lib/audit/rc1-suite";
+import { downloadMarkdown, downloadPdf } from "@/lib/audit/rc1-report";
+import { FileDown, FileText, PlayCircle } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/offline-audit")({
   ssr: false,
@@ -62,6 +66,9 @@ interface DexieCheck { name: string; count: number; }
 
 function OfflineAuditPage() {
   const online = useOnlineStatus();
+  const { user } = useAuth();
+  const [rc1, setRc1] = useState<RC1Report | null>(null);
+  const [rc1Busy, setRc1Busy] = useState(false);
   const [swActive, setSwActive] = useState<boolean>(false);
   const [swScope, setSwScope] = useState<string>("");
   const [cacheKeys, setCacheKeys] = useState<string[]>([]);
@@ -131,7 +138,19 @@ function OfflineAuditPage() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); getLastRC1Report().then(setRc1); }, [refresh]);
+
+  const runRc1 = useCallback(async () => {
+    if (!user?.id) { toast.error("Sessão não disponível"); return; }
+    setRc1Busy(true);
+    try {
+      const r = await runRC1Suite(user.id);
+      setRc1(r);
+      toast.success(`RC-1: ${r.verdict} (${r.globalScore}%)`);
+    } catch (e: any) {
+      toast.error(`Falha RC-1: ${e?.message || e}`);
+    } finally { setRc1Busy(false); }
+  }, [user?.id]);
 
   // Score 0–100
   const swScore = swActive ? 25 : 0;
@@ -289,6 +308,78 @@ function OfflineAuditPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Release Candidate 1 */}
+      <Card className="border-primary/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" /> Release Candidate (RC-1)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={runRc1} disabled={rc1Busy}>
+              <PlayCircle className={`mr-2 h-4 w-4 ${rc1Busy ? "animate-spin" : ""}`} />
+              Executar suíte RC-1
+            </Button>
+            <Button size="sm" variant="outline" disabled={!rc1} onClick={() => rc1 && downloadMarkdown(rc1)}>
+              <FileText className="mr-2 h-4 w-4" /> Markdown
+            </Button>
+            <Button size="sm" variant="outline" disabled={!rc1} onClick={() => rc1 && downloadPdf(rc1)}>
+              <FileDown className="mr-2 h-4 w-4" /> PDF
+            </Button>
+          </div>
+          {rc1 ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge className={rc1.verdict === "APROVADO" ? "bg-emerald-600" : rc1.verdict === "INDETERMINADO" ? "bg-amber-600" : "bg-red-600"}>
+                  {rc1.verdict}
+                </Badge>
+                <span>Score: <strong>{rc1.globalScore}%</strong></span>
+                <span className="text-muted-foreground text-xs">
+                  Executado em {new Date(rc1.ts).toLocaleString("pt-BR")}
+                </span>
+              </div>
+              <div className="space-y-1">
+                {rc1.modules.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between rounded border px-2 py-1">
+                    <span>{m.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">{m.durationMs} ms</span>
+                      {m.status === "APROVADO" ? (
+                        <Badge className="bg-emerald-600">APROVADO</Badge>
+                      ) : (
+                        <Badge variant="destructive">REPROVADO</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {rc1.crossIntegrity && (
+                <div className="rounded border p-2">
+                  <div className="font-medium mb-1">Integridade cruzada</div>
+                  <div className="grid grid-cols-2 gap-1 text-xs md:grid-cols-3">
+                    {rc1.crossIntegrity.checks.map((c) => (
+                      <div key={c.module} className="flex justify-between gap-2">
+                        <span>{c.module}</span>
+                        <span className={c.ok ? "text-emerald-600" : "text-red-600"}>
+                          {c.local}/{c.server}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-muted-foreground text-xs">
+              Nenhuma execução. Clique em "Executar suíte RC-1" para gerar o relatório institucional.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <p className="text-xs text-muted-foreground">
         Para varrer consultas sem fallback no código-fonte, rode:{" "}
