@@ -142,7 +142,11 @@ function OfflineAuditPage() {
     }
   }, []);
 
-  useEffect(() => { refresh(); getLastRC1Report().then(setRc1); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    getLastRC1Report().then(setRc1);
+    getLastGoLiveReport().then(setGoLive);
+  }, [refresh]);
 
   const runRc1 = useCallback(async () => {
     if (!user?.id) { toast.error("Sessão não disponível"); return; }
