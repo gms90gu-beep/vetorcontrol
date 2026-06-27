@@ -39,6 +39,6 @@ export function installNetworkGuard() {
   });
   window.addEventListener("offline", () => {
     console.log("[OFFLINE] Conexão perdida — modo offline ativo");
-    notifyOfflineOnce("Você está offline — o trabalho continua sendo salvo localmente");
+    // Não exibe toast bloqueante; o OfflineBanner já indica visualmente.
   });
 }
