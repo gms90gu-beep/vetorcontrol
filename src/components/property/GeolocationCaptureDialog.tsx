@@ -11,12 +11,15 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { requestCurrentPosition, savePropertyLocation } from "@/lib/geolocation";
+import { resolveAndApplyStreet, ENABLE_AUTO_STREET } from "@/lib/auto-street";
 
 interface Props {
   open: boolean;
   propertyId: string;
   actorId: string | null;
   propertyLabel?: string;
+  blockId?: string | null;
+  currentStreet?: string | null;
   onClose: (saved: boolean) => void;
 }
 
@@ -25,6 +28,8 @@ export function GeolocationCaptureDialog({
   propertyId,
   actorId,
   propertyLabel,
+  blockId,
+  currentStreet,
   onClose,
 }: Props) {
   const [loading, setLoading] = useState(false);
@@ -34,6 +39,15 @@ export function GeolocationCaptureDialog({
     try {
       const coords = await requestCurrentPosition();
       await savePropertyLocation(propertyId, coords, actorId);
+      if (ENABLE_AUTO_STREET) {
+        // Isolado: erros não impedem confirmação da localização.
+        resolveAndApplyStreet({
+          propertyId,
+          coords,
+          blockId: blockId ?? null,
+          currentStreet: currentStreet ?? null,
+        }).catch((e) => console.warn("[AUTO_STREET_ERROR]", e));
+      }
       toast.success("✓ Localização do imóvel registrada com sucesso.");
       onClose(true);
     } catch (err: any) {
