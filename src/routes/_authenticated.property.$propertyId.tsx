@@ -30,7 +30,7 @@ import { safeGetUser } from "@/lib/offline/safe-auth";
 import { usePropertyRecords } from "@/hooks/useOfflineData";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
-import { isOnline } from "@/lib/offline/safe-fetch";
+import { isOnline, safeFetch } from "@/lib/offline/safe-fetch";
 import { db } from "@/lib/offline/db";
 import { StatusButton, ToggleButton } from "@/components/PropertyVisitButtons";
 import { cn } from "@/lib/utils";
@@ -160,8 +160,16 @@ function PropertyVisitPage() {
       if (user) {
         setUserId(user.id);
         try {
-          const { data: r } = await supabase.rpc("get_user_role", { u_id: user.id });
-          setUserRole((r as string) ?? null);
+          const r = await safeFetch(
+            async () => {
+              const { data, error } = await supabase.rpc("get_user_role", { u_id: user.id });
+              if (error) throw error;
+              return data as string | null;
+            },
+            async () => null,
+            { label: "user_role" },
+          );
+          setUserRole(r ?? null);
         } catch {}
       }
     })();
@@ -319,8 +327,12 @@ function PropertyVisitPage() {
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
-      if (data) setAgent(data);
+      const rows = await listRemoteOrCache<any>({
+        name: "agents",
+        remote: async () => await supabase.from("agents").select("*").eq("profile_id", user.id),
+        filter: (r) => r.profile_id === user.id,
+      });
+      if (rows.length) setAgent(rows[0]);
     } catch (e) { console.error(e); }
   }
 
