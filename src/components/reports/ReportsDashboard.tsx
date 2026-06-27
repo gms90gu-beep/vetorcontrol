@@ -172,8 +172,16 @@ export function ReportsDashboard() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
 
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
-    
+    const profile = await safeFetch<{ full_name: string | null } | null>(
+      async () => {
+        const { data, error } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+        if (error) throw error;
+        return data;
+      },
+      async () => null,
+      { label: "profile.full_name" },
+    );
+
     const result = await generateWeeklyReportPDF(session.user.id);
     if (result) {
       openWhatsAppShare(result.fileName, profile?.full_name || "Agente");
