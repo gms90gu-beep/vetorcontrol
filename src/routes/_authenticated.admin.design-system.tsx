@@ -236,10 +236,13 @@ function DesignSystemPage() {
           description="@/components/map/shared — toda renderização de mapas passa por aqui"
         >
           <div className="space-y-3 text-sm">
-            <InfoCard tone="info" title="Regra de ouro">
-              Nenhum componente fora de <code>src/components/map/shared</code> deve
-              importar <code>leaflet</code> diretamente. Use <code>SharedMap</code> como raiz e
-              componha camadas (<code>SharedMarkerLayer</code>, etc.) por dentro.
+            <InfoCard variant="primary">
+              <p className="text-sm font-semibold mb-1">Regra de ouro</p>
+              <p className="text-xs text-muted-foreground">
+                Nenhum componente fora de <code>src/components/map/shared</code> deve
+                importar <code>leaflet</code> diretamente. Use <code>SharedMap</code> como raiz e
+                componha camadas (<code>SharedMarkerLayer</code>, etc.) por dentro.
+              </p>
             </InfoCard>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
