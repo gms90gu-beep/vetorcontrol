@@ -75,19 +75,19 @@ export function SupervisionDashboard() {
     setIsLoading(true);
     try {
       if (user?.id) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .maybeSingle();
+        const prof = await safeSupabaseRead<any>(
+          () => supabase.from("profiles").select("*").eq("id", user.id).maybeSingle() as any,
+          null,
+          "profile",
+        );
         setProfile(prof);
       }
 
       // RLS já filtra por supervisor_id
-      const { data: profiles, error: profileError } = await supabase
-        .from("profiles")
-        .select("*");
-      if (profileError) throw profileError;
+      const profiles = await listRemoteOrCache<any>({
+        name: "profiles",
+        remote: () => supabase.from("profiles").select("*") as any,
+      });
 
       const team = (profiles || []).filter(
         (p: any) => p.role === "agente" || p.role === "agent",
@@ -95,14 +95,21 @@ export function SupervisionDashboard() {
 
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
+      const todayISO = todayStart.toISOString().slice(0, 10);
 
-      const [{ data: visits }, { data: sessions }] = await Promise.all([
-        supabase.from("visits").select("agent_id, status, has_focus"),
-        supabase
-          .from("field_work_sessions")
-          .select("user_id, status, session_date")
-          .gte("session_date", todayStart.toISOString().slice(0, 10)),
+      const [visits, sessions] = await Promise.all([
+        listRemoteOrCache<any>({
+          name: "visits",
+          remote: () => supabase.from("visits").select("agent_id, status, has_focus") as any,
+        }),
+        listRemoteOrCache<any>({
+          name: "field_work_sessions",
+          remote: () => supabase.from("field_work_sessions").select("user_id, status, session_date").gte("session_date", todayISO) as any,
+          filter: (s) => !s.session_date || s.session_date >= todayISO,
+        }),
       ]);
+
+
 
       const withStats = team.map((agent: any) => {
         const av = (visits || []).filter((v: any) => v.agent_id === agent.id);
