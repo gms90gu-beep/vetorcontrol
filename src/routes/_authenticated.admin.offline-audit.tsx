@@ -400,6 +400,83 @@ function OfflineAuditPage() {
         </CardContent>
       </Card>
 
+      {/* Certificação Go-Live */}
+      <Card className="border-emerald-500/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="h-4 w-4" /> Certificação Go-Live
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={runGoLiveNow} disabled={goLiveBusy}>
+              <PlayCircle className={`mr-2 h-4 w-4 ${goLiveBusy ? "animate-spin" : ""}`} />
+              Executar Certificação Go-Live
+            </Button>
+            <Button size="sm" variant="outline" disabled={!goLive} onClick={() => goLive && downloadGoLiveMd(goLive)}>
+              <FileText className="mr-2 h-4 w-4" /> Parecer (MD)
+            </Button>
+            <Button size="sm" variant="outline" disabled={!goLive} onClick={() => goLive && downloadGoLivePdf(goLive)}>
+              <FileDown className="mr-2 h-4 w-4" /> Parecer (PDF)
+            </Button>
+          </div>
+          {goLive ? (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <Badge className={goLive.verdict === "APROVADO" ? "bg-emerald-600" : goLive.verdict === "INDETERMINADO" ? "bg-amber-600" : "bg-red-600"}>
+                  {goLive.verdict}
+                </Badge>
+                <span>Score Global: <strong>{goLive.globalScore}%</strong></span>
+                <span className="text-muted-foreground text-xs">{new Date(goLive.ts).toLocaleString("pt-BR")}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <div className="rounded border p-2">
+                  <div className="text-xs text-muted-foreground">RC-1</div>
+                  <div className="font-semibold">{goLive.rc1.globalScore}%</div>
+                </div>
+                <div className="rounded border p-2">
+                  <div className="text-xs text-muted-foreground">Performance</div>
+                  <div className="font-semibold">{goLive.performance.score}%</div>
+                </div>
+                <div className="rounded border p-2">
+                  <div className="text-xs text-muted-foreground">Segurança</div>
+                  <div className="font-semibold">{goLive.security.score}%</div>
+                </div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="font-medium mb-1">Performance</div>
+                <div className="space-y-1">
+                  {goLive.performance.metrics.map((m) => (
+                    <div key={m.name} className="flex items-center justify-between text-xs">
+                      <span>{m.name}{m.detail ? ` — ${m.detail}` : ""}</span>
+                      <span className={m.ok ? "text-emerald-600" : "text-red-600"}>{m.ms} ms</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="font-medium mb-1">Segurança</div>
+                <div className="space-y-1">
+                  {goLive.security.checks.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between text-xs">
+                      <span>{c.name}{c.detail ? ` — ${c.detail}` : ""}</span>
+                      {c.pass ? <Badge className="bg-emerald-600">OK</Badge> : <Badge variant="destructive">FALHA</Badge>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-emerald-500/40 bg-emerald-500/5 p-3">
+                <div className="font-semibold mb-1">Parecer Técnico</div>
+                <div className="text-sm">{goLive.conclusion}</div>
+              </div>
+            </>
+          ) : (
+            <div className="text-muted-foreground text-xs">
+              Nenhuma certificação executada. A suíte Go-Live agrega RC-1, performance e segurança e gera o parecer executivo.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
 
       <p className="text-xs text-muted-foreground">
