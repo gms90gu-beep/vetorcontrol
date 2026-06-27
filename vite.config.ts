@@ -21,20 +21,42 @@ export default defineConfig({
         filename: "sw.js",
         devOptions: { enabled: false },
         manifest: false, // usamos public/manifest.webmanifest
+        // Build do TanStack Start/Nitro publica em dist/client/.
+        // Sem isto, o Workbox escaneia dist/ e gera URLs precache com
+        // prefixo "client/assets/..." que não existem em produção.
+        outDir: "dist/client",
         workbox: {
-          globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-          navigateFallback: "/index.html",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/assets\//, /\.[a-z0-9]+$/i],
+          // Escaneia o diretório PÚBLICO real, não dist/.
+          globDirectory: "dist/client",
+          globPatterns: ["**/*.{js,css,svg,png,ico,woff2}"],
+          // Sem index.html (SSR). navegações usam NetworkFirst abaixo.
+          navigateFallback: null,
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          // SSR pode emitir documentos > 2 MB.
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [
-            // NÃO interceptar navegações aqui — deixar o navigateFallback servir
-            // /index.html (precacheado) para qualquer rota SPA offline.
+            // 1) Navegações (HTML SSR): NetworkFirst.
+            //    Cada rota visitada online fica cacheada e abre offline.
+            {
+              urlPattern: ({ request, sameOrigin }) =>
+                sameOrigin && request.mode === "navigate",
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "pages",
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
+            },
+            // 2) Chunks/Assets hasheados: CacheFirst (precache cobre o set inicial).
             {
               urlPattern: ({ url, sameOrigin }) =>
-                sameOrigin && /\.(?:js|css|woff2|png|svg|ico)$/.test(url.pathname),
+                sameOrigin && /^\/assets\/.+\.(?:js|css|woff2|png|svg|ico)$/.test(url.pathname),
               handler: "CacheFirst",
               options: {
                 cacheName: "static-assets",
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+                expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
               },
             },
             {
