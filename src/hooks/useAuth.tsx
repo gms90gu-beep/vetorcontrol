@@ -160,6 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextUser);
       lastAuthUserIdRef.current = nextUserId;
       setIsReady(true);
+      if (nextSession) {
+        import("@/lib/auth").then((m) => m.saveSessionLocally(nextSession as any)).catch(() => {});
+      }
+
 
       if (!nextUser) {
         setRole(null);
