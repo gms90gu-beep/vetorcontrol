@@ -327,8 +327,12 @@ function PropertyVisitPage() {
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
-      const { data } = await supabase.from("agents").select("*").eq("profile_id", user.id).maybeSingle();
-      if (data) setAgent(data);
+      const rows = await listRemoteOrCache<any>({
+        name: "agents",
+        remote: () => supabase.from("agents").select("*").eq("profile_id", user.id),
+        filter: (r) => r.profile_id === user.id,
+      });
+      if (rows.length) setAgent(rows[0]);
     } catch (e) { console.error(e); }
   }
 
