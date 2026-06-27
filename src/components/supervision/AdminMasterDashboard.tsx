@@ -825,8 +825,17 @@ function SystemToolsCard() {
     }
     setBusy(true);
     try {
-      const { data, error } = await supabase.rpc("cleanup_demo_data");
-      if (error) throw error;
+      if (!isOnline()) { toast.error("Operação requer conexão"); return; }
+      const data = await safeFetch<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("cleanup_demo_data");
+          if (error) throw error;
+          return data;
+        },
+        async () => null,
+        { label: "cleanup_demo_data" },
+      );
+      if (data == null) { toast.error("Operação indisponível"); return; }
       toast.success("Dados de demonstração removidos.");
       console.log("[cleanup_demo_data] counts:", data);
       setOpen(false);
