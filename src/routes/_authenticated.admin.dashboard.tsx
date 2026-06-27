@@ -44,10 +44,20 @@ function ExecutiveDashboardPage() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: c }, { data: s }, { data: cs }] = await Promise.all([
-        supabase.from("cycles").select("id, name, number, year").order("year", { ascending: false }),
-        supabase.from("profiles").select("id, full_name").in("role" as any, ["supervisor"] as any),
-        supabase.from("profiles").select("city"),
+      const [c, s, cs] = await Promise.all([
+        listRemoteOrCache<any>({
+          name: "cycles",
+          remote: async () => await supabase.from("cycles").select("id, name, number, year").order("year", { ascending: false }),
+        }),
+        listRemoteOrCache<any>({
+          name: "profiles",
+          remote: async () => await supabase.from("profiles").select("id, full_name").in("role" as any, ["supervisor"] as any),
+          filter: (r) => r.role === "supervisor" || r.full_name != null,
+        }),
+        listRemoteOrCache<any>({
+          name: "profiles",
+          remote: async () => await supabase.from("profiles").select("city"),
+        }),
       ]);
       setCycles(c || []);
       setSupervisors(s || []);
