@@ -22,7 +22,11 @@ export async function blockManagersGuard() {
 
   if (!navigator.onLine) {
     await hasValidLocalSession();
-    await getLocalSession();
+    const sess = await getLocalSession();
+    const cachedRole = sess ? readCachedUserRole(sess.userId) : null;
+    if (isManagerRole(cachedRole)) {
+      throw redirect({ to: "/supervision", replace: true });
+    }
     return;
   }
 
@@ -33,8 +37,8 @@ export async function blockManagersGuard() {
     ]);
     if (!sessionData?.session) throw redirect({ to: "/login", replace: true });
 
-    const { data: role } = await Promise.race([
-      supabase.rpc("get_user_role", { u_id: sessionData.session.user.id }),
+    const role = await Promise.race([
+      getCachedUserRole(sessionData.session.user.id),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
     ]);
     if (isManagerRole(role)) {
