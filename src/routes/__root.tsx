@@ -168,10 +168,12 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <SyncStatusBadge />
+        <OfflineBanner />
       </AuthProvider>
     </QueryClientProvider>
   );
 }
+
 
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
