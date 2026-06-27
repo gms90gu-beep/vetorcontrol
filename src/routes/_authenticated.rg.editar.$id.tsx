@@ -394,13 +394,13 @@ function EditarBoletim() {
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       const deletePromise = toDelete.length > 0
-        ? supabase.from("properties").delete().in("id", toDelete)
+        ? Promise.all(toDelete.map((id) => removeOffline("properties", id))).then(() => ({ error: null } as any))
         : Promise.resolve({ error: null } as any);
 
       const dirtyUpdates = sortedImoveis.filter((im) => !im._deleted && !im._new && im.id && im._dirty);
       const updatePromises = dirtyUpdates.map((im) => {
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
-        return supabase.from("properties").update({
+        return updateOffline("properties", im.id!, {
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number,
@@ -412,7 +412,8 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           block_number: form.block_number || null,
           user_id: effectiveAgentId,
-        }).eq("id", im.id!).select("id").maybeSingle();
+          updated_at: new Date().toISOString(),
+        }).then(() => ({ error: null } as any));
       });
 
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
