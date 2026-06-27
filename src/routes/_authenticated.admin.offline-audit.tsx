@@ -155,7 +155,7 @@ function OfflineAuditPage() {
       <PageHeader
         title="Auditoria Offline-First"
         description="Diagnóstico em tempo real da camada offline: Service Worker, Dexie, fila e rotas."
-        icon={ShieldCheck}
+        icon={<ShieldCheck className="h-5 w-5" />}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
