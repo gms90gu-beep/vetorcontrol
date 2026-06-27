@@ -74,17 +74,15 @@ async function getVerifiedAuthState() {
 }
 
 async function getRoleForUser(userId: string) {
-  console.debug("[Auth Role] Buscando role via RPC para:", userId);
-  const { data, error } = await supabase.rpc("get_user_role", { u_id: userId });
-
-  if (error) {
-    console.error("[Auth Role] Erro ao buscar role via RPC:", error);
+  console.debug("[Auth Role] Buscando role (offline-first) para:", userId);
+  try {
+    const role = await getCachedUserRole(userId);
+    console.debug("[Auth Role] Role encontrado:", role);
+    return role;
+  } catch (error) {
+    console.error("[Auth Role] Erro ao buscar role:", error);
     return null;
   }
-
-  const role = typeof data === "string" ? data : null;
-  console.debug("[Auth Role] Role encontrado via RPC:", role);
-  return role;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
