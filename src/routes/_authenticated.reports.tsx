@@ -3,6 +3,7 @@ import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   beforeLoad: async () => {

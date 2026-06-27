@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 export const Route = createFileRoute("/_authenticated/supervisor")({
   beforeLoad: async () => {

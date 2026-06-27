@@ -4,6 +4,7 @@ import { OperationalDashboard } from "@/components/supervision/OperationalDashbo
 import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 export const Route = createFileRoute("/_authenticated/supervision")({
   beforeLoad: async () => {

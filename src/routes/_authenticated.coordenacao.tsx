@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { MunicipalIntelligence } from "@/components/coordination/MunicipalIntelligence";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 export const Route = createFileRoute("/_authenticated/coordenacao")({
   beforeLoad: async () => {
