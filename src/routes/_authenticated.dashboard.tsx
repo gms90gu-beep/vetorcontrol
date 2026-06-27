@@ -22,7 +22,11 @@ function DashboardPage() {
     if (typeof window !== "undefined") window.location.replace("/supervision");
     return null;
   }
-  if (role === "coordenador" || role === "admin_master") {
+  if (role === "admin_master") {
+    if (typeof window !== "undefined") window.location.replace("/admin/dashboard");
+    return null;
+  }
+  if (role === "coordenador") {
     if (typeof window !== "undefined") window.location.replace("/coordenacao");
     return null;
   }

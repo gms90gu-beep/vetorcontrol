@@ -123,7 +123,7 @@ function LoginPage() {
       toast.success("Login realizado com sucesso!");
 
       const target =
-        role === "admin_master" ? "/admin-master"
+        role === "admin_master" ? "/admin/dashboard"
         : role === "coordenador" ? "/coordenador"
         : role === "supervisor" ? "/supervisor"
         : role === "agente" ? "/agente"

@@ -89,8 +89,8 @@ export function buildNavItems(userRole: string | null): NavItem[] {
 
     if (userRole === "admin_master") {
       items.push(
-        { key: "adm-master", label: "Admin Master", icon: ShieldCheck, to: "/admin-master", group: "administracao" },
-        { key: "adm-exec", label: "Painel Executivo", icon: BarChart3, to: "/admin/dashboard", group: "administracao" },
+        { key: "adm-exec", label: "Dashboard Admin", icon: BarChart3, to: "/admin/dashboard", group: "administracao" },
+        { key: "adm-master", label: "Central de Comando", icon: ShieldCheck, to: "/admin-master", group: "administracao" },
         { key: "adm-audit", label: "Auditoria", icon: ShieldCheck, to: "/admin/auditoria", group: "administracao" },
         { key: "adm-cycle-audit", label: "Auditoria de Ciclos", icon: ShieldCheck, to: "/admin/cycle-audit", group: "administracao" },
         { key: "adm-data-audit", label: "Auditoria de Dados", icon: ShieldCheck, to: "/admin/data-audit", group: "administracao" },
