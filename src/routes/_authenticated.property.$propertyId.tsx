@@ -160,8 +160,16 @@ function PropertyVisitPage() {
       if (user) {
         setUserId(user.id);
         try {
-          const { data: r } = await supabase.rpc("get_user_role", { u_id: user.id });
-          setUserRole((r as string) ?? null);
+          const r = await safeFetch(
+            async () => {
+              const { data, error } = await supabase.rpc("get_user_role", { u_id: user.id });
+              if (error) throw error;
+              return data as string | null;
+            },
+            async () => null,
+            { label: "user_role" },
+          );
+          setUserRole(r ?? null);
         } catch {}
       }
     })();
