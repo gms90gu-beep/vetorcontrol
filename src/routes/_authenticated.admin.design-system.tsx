@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -41,7 +42,7 @@ function DesignSystemPage() {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) { setAllowed(false); return; }
-      const { data: r } = await supabase.rpc("get_user_role", { u_id: u.user.id });
+      const r = await getCachedUserRole(u.user.id);
       setAllowed(r === "admin_master" || u.user.email === "gms90gu@gmail.com");
     })();
   }, []);
