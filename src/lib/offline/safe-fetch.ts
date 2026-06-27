@@ -39,9 +39,16 @@ export async function safeFetch<T>(
   opts?: { label?: string; hydrate?: (data: T) => void | Promise<void> },
 ): Promise<T> {
   const label = opts?.label || "dado";
+  const tryFallback = async (): Promise<T> => {
+    try { return await fallback(); }
+    catch (e) {
+      console.log("[POST_BOOT_SAFEFETCH]", { label, stage: "fallback-failed", message: String((e as any)?.message || e) });
+      return undefined as unknown as T;
+    }
+  };
   if (!isOnline()) {
     console.log(`[OFFLINE] Lendo Dexie (${label})`);
-    return await fallback();
+    return await tryFallback();
   }
   try {
     const data = await remote();
@@ -51,10 +58,12 @@ export async function safeFetch<T>(
     return data;
   } catch (err) {
     if (isNetworkError(err)) {
-      console.log(`[OFFLINE] Acesso Supabase bloqueado (${label}) — caindo para Dexie`);
+      console.log(`[POST_BOOT_SAFEFETCH] rede caiu (${label}) — usando Dexie`);
       notifyOfflineOnce();
-      return await fallback();
+      return await tryFallback();
     }
-    throw err;
+    // Erros não-rede: log e fallback silencioso (não bloqueia UI)
+    console.log("[POST_BOOT_SAFEFETCH]", { label, stage: "remote-error", message: String((err as any)?.message || err) });
+    return await tryFallback();
   }
 }

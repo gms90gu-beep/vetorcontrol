@@ -83,7 +83,10 @@ export function AgentDashboard() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    const t0 = (window as any).__BOOT_T0 ?? performance.now();
+    console.log("[DASHBOARD_RENDER]", { sinceBoot: Math.round(performance.now() - t0) });
     (async () => {
+      try {
       const { data: p } = await supabase
         .from("profiles")
         .select("full_name, registration_number, city")
@@ -204,6 +207,16 @@ export function AgentDashboard() {
           concluidos,
           pendentes,
         });
+      }
+      } catch (e: any) {
+        console.log("[POST_BOOT_SUPABASE]", {
+          where: "AgentDashboard",
+          name: e?.name,
+          message: String(e?.message || e),
+          online: navigator.onLine,
+          sinceBoot: Math.round(performance.now() - t0),
+        });
+        // silencioso — não bloqueia a UI, dados ficam vazios até reconectar
       }
     })();
     return () => {
