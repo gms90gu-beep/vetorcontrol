@@ -12,6 +12,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor";
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
+import { OfflineBanner } from "@/components/OfflineBanner";
+
 
 import appCss from "../styles.css?url";
 
