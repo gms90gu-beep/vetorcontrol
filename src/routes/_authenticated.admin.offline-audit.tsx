@@ -160,6 +160,19 @@ function OfflineAuditPage() {
     } finally { setRc1Busy(false); }
   }, [user?.id]);
 
+  const runGoLiveNow = useCallback(async () => {
+    if (!user?.id) { toast.error("Sessão não disponível"); return; }
+    setGoLiveBusy(true);
+    try {
+      const r = await runGoLive(user.id);
+      setGoLive(r);
+      setRc1(r.rc1);
+      toast.success(`Go-Live: ${r.verdict} (${r.globalScore}%)`);
+    } catch (e: any) {
+      toast.error(`Falha Go-Live: ${e?.message || e}`);
+    } finally { setGoLiveBusy(false); }
+  }, [user?.id]);
+
   // Score 0–100
   const swScore = swActive ? 25 : 0;
   const dexieScore = dexie.some((d) => d.count > 0) ? 25 : dexie.length > 0 ? 15 : 0;
