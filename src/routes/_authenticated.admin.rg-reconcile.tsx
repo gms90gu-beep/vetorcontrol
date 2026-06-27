@@ -35,10 +35,19 @@ function Page() {
   const [integrity, setIntegrity] = useState<any | null>(null);
 
   async function onIntegrityCheck() {
+    if (!isOnline()) { toast.error("Operação requer conexão"); return; }
     setBusy(true);
     try {
-      const { data: chk, error } = await supabase.rpc("rg_integrity_check" as any);
-      if (error) throw error;
+      const chk = await safeFetch<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("rg_integrity_check" as any);
+          if (error) throw error;
+          return data;
+        },
+        async () => null,
+        { label: "rg_integrity_check" },
+      );
+      if (chk == null) { toast.error("Indisponível offline"); return; }
       setIntegrity(chk);
       console.log("[RG_INTEGRITY_CHECK]", chk);
       const status = (chk as any)?.status;
@@ -52,10 +61,19 @@ function Page() {
 
   async function onReconcileIdempotent() {
     if (!confirm("Executar reconciliação idempotente (segura para repetir)?")) return;
+    if (!isOnline()) { toast.error("Operação requer conexão"); return; }
     setBusy(true);
     try {
-      const { data: r, error } = await supabase.rpc("reconcile_rg_integrity" as any);
-      if (error) throw error;
+      const r = await safeFetch<any>(
+        async () => {
+          const { data, error } = await supabase.rpc("reconcile_rg_integrity" as any);
+          if (error) throw error;
+          return data;
+        },
+        async () => null,
+        { label: "reconcile_rg_integrity" },
+      );
+      if (r == null) { toast.error("Indisponível offline"); return; }
       console.log("[RG_RECONCILE_IDEMPOTENT]", r);
       const m = r as any;
       toast.success(`✓ ${m?.blocks_linked ?? 0} boletins · ${m?.properties_linked ?? 0} imóveis · ${m?.orphans_removed ?? 0} órfãos`);
