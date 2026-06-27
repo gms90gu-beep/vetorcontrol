@@ -200,13 +200,16 @@ function RootComponent() {
   useEffect(() => {
     initNetworkMonitor();
     const unsub = onConnectivityChange(() => {});
+    console.log("[AFTER_BOOT]", { sinceBoot: sinceBoot(), online: navigator.onLine });
     return unsub;
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <PostBootErrorBoundary>
+          <Outlet />
+        </PostBootErrorBoundary>
         <SyncStatusBadge />
         <OfflineBanner />
       </AuthProvider>
