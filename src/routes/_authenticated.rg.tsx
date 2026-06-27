@@ -343,7 +343,11 @@ function RGPage() {
 
       // 2) Criar bloco se não existir
       if (!blockId) {
-        const { data: anySubarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+        const anySubarea = await safeSupabaseRead<any>(
+          () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
+          null,
+          "subareas",
+        );
         const { data: newBlock, error: blockErr } = await supabase
           .from("blocks")
           .insert({
