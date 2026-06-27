@@ -71,6 +71,8 @@ function OfflineAuditPage() {
   const { user } = useAuth();
   const [rc1, setRc1] = useState<RC1Report | null>(null);
   const [rc1Busy, setRc1Busy] = useState(false);
+  const [goLive, setGoLive] = useState<GoLiveReport | null>(null);
+  const [goLiveBusy, setGoLiveBusy] = useState(false);
   const [swActive, setSwActive] = useState<boolean>(false);
   const [swScope, setSwScope] = useState<string>("");
   const [cacheKeys, setCacheKeys] = useState<string[]>([]);
