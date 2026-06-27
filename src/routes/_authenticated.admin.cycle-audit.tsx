@@ -54,14 +54,26 @@ function CycleAuditPage() {
   const multipleInProgress = cycles.filter((c) => c.status === "in_progress").length > 1;
 
   async function runSync() {
-    setSyncing(true);
-    const { data, error } = await supabase.rpc("sync_cycle_statuses");
-    setSyncing(false);
-    if (error) {
-      toast.error(error.message);
+    if (!isOnline()) {
+      toast.error("Operação requer conexão");
       return;
     }
-    toast.success(`Sincronizado: ${JSON.stringify(data)}`);
+    setSyncing(true);
+    const result = await safeFetch(
+      async () => {
+        const { data, error } = await supabase.rpc("sync_cycle_statuses");
+        if (error) throw error;
+        return data;
+      },
+      async () => null,
+      { label: "sync_cycle_statuses" },
+    );
+    setSyncing(false);
+    if (result == null) {
+      toast.error("Sincronização indisponível");
+      return;
+    }
+    toast.success(`Sincronizado: ${JSON.stringify(result)}`);
     load();
   }
 
