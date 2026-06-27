@@ -43,12 +43,17 @@ export const Route = createFileRoute("/admin-master")({
       return;
     }
 
-    // Para outros usuários, verifica o role via RPC (SECURITY DEFINER — ignora RLS)
-    const { data: role, error } = await supabase.rpc("get_user_role", { u_id: user.id });
+    // Para outros usuários, verifica o role via cache offline-first.
+    let role: string | null = null;
+    let error: any = null;
+    try {
+      role = await getCachedUserRole(user.id);
+    } catch (e) {
+      error = e;
+    }
 
     console.debug("[Admin-Master Guard] User ID:", user.id);
-    console.debug("[Admin-Master Guard] Role via RPC:", role);
-    console.debug("[Admin-Master Guard] Erro RPC:", error);
+    console.debug("[Admin-Master Guard] Role via cache/RPC:", role);
 
     if (error) {
       console.error("[Admin-Master Guard] Erro ao validar role — redirecionando para dashboard:", error);
