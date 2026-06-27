@@ -72,15 +72,21 @@ export function ReportsDashboard() {
     setIsLoading(true);
     try {
       // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
-      let query = supabase.from("daily_work_records").select("*");
-
+      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
-      if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
-      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
-
-      const { data: records, error } = await query.order("work_date", { ascending: false });
-      if (error) throw error;
-      const rows = (records as any[]) || [];
+      const records = await listRemoteOrCache<any>({
+        name: "daily_work_records",
+        remote: async () => {
+          let query = supabase.from("daily_work_records").select("*");
+          if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
+          if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
+          return await query.order("work_date", { ascending: false });
+        },
+        filter: (r) =>
+          (!cycleFilter || r.cycle_id === cycleFilter) &&
+          (filters.agent === "all" || r.agent_id === filters.agent),
+      });
+      const rows = records || [];
       console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
 
       setDailies(rows);
