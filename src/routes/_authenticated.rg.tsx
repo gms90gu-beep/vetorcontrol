@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { db as offlineDb } from "@/lib/offline/db";
+import { safeSupabaseRead } from "@/lib/offline/repos";
 import { useRGRecords } from "@/hooks/useOfflineData";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -342,7 +343,11 @@ function RGPage() {
 
       // 2) Criar bloco se não existir
       if (!blockId) {
-        const { data: anySubarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+        const anySubarea = await safeSupabaseRead<any>(
+          () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
+          null,
+          "subareas",
+        );
         const { data: newBlock, error: blockErr } = await supabase
           .from("blocks")
           .insert({

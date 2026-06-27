@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { safeSupabaseRead, createOffline, updateOffline, removeOffline } from "@/lib/offline/repos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -335,7 +336,11 @@ function EditarBoletim() {
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
         } else {
-          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          const subarea = await safeSupabaseRead<any>(
+            () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
+            null,
+            "subareas",
+          );
           if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
           const insertBlockPayload = { ...blockPayload, subarea_id: subarea.id };
           console.log("[RG Editar] INSERT blocks payload:", insertBlockPayload);
@@ -389,13 +394,13 @@ function EditarBoletim() {
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       const deletePromise = toDelete.length > 0
-        ? supabase.from("properties").delete().in("id", toDelete)
+        ? Promise.all(toDelete.map((id) => removeOffline("properties", id))).then(() => ({ error: null } as any))
         : Promise.resolve({ error: null } as any);
 
       const dirtyUpdates = sortedImoveis.filter((im) => !im._deleted && !im._new && im.id && im._dirty);
       const updatePromises = dirtyUpdates.map((im) => {
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
-        return supabase.from("properties").update({
+        return updateOffline("properties", im.id!, {
           street_name: im.street_name || null,
           side: im.side || null,
           number: im.number,
@@ -407,7 +412,8 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           block_number: form.block_number || null,
           user_id: effectiveAgentId,
-        }).eq("id", im.id!).select("id").maybeSingle();
+          updated_at: new Date().toISOString(),
+        }).then(() => ({ error: null } as any));
       });
 
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
@@ -518,7 +524,11 @@ function EditarBoletim() {
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
         } else {
-          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          const subarea = await safeSupabaseRead<any>(
+            () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
+            null,
+            "subareas",
+          );
           if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
           const { data: createdBlock, error: blockError } = await supabase
             .from("blocks")
@@ -561,8 +571,13 @@ function EditarBoletim() {
         });
       }
 
-      const { error: insertError } = await supabase.from("properties").insert(payload);
-      if (insertError) throw insertError;
+      try {
+        for (const row of payload) {
+          await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+        }
+      } catch (insertError: any) {
+        throw insertError;
+      }
 
       toast.success(`${qty} imóveis criados com sucesso.`, { id: toastId });
       await load(false);

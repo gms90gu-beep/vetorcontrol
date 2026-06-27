@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useRouter, useLocation, redirect } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
 import { OperationalHeader } from "@/components/OperationalHeader";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -48,6 +48,8 @@ function AuthenticatedLayout() {
   const isLandscapeRaw = useOrientation();
   const isLandscape = isMobileDevice && isLandscapeRaw;
   const { isLoading: isOperationalLoading, userRole } = useOperationalDate();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -57,12 +59,12 @@ function AuthenticatedLayout() {
     }
   }, [isReady, router, user]);
 
-  if (!isReady || !user || isOperationalLoading) {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
+  if (!mounted || !isReady || !user || isOperationalLoading) {
+    if (typeof navigator !== "undefined" && !navigator.onLine && mounted && isReady && user) {
       // continua renderizando
     } else {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
+        <div suppressHydrationWarning className="flex min-h-screen items-center justify-center bg-background text-foreground">
           <RefreshCw className="mr-3 h-5 w-5 animate-spin text-primary" aria-hidden />
           <span className="text-sm font-medium">Carregando sessão...</span>
         </div>
