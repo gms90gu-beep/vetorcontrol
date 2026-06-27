@@ -32,11 +32,14 @@ function CycleAuditPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from("cycles")
-      .select("id,name,number,year,start_date,end_date,status")
-      .order("year", { ascending: false })
-      .order("number", { ascending: true });
+    const data = await listRemoteOrCache<Cycle>({
+      name: "cycles",
+      remote: async () => await supabase
+        .from("cycles")
+        .select("id,name,number,year,start_date,end_date,status")
+        .order("year", { ascending: false })
+        .order("number", { ascending: true }),
+    });
     setCycles((data as Cycle[]) || []);
     setLoading(false);
   }
