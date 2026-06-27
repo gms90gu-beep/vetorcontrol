@@ -10,17 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { requestCurrentPosition, savePropertyLocation } from "@/lib/geolocation";
-import { resolveAndApplyStreet, ENABLE_AUTO_STREET } from "@/lib/auto-street";
+import { requestCurrentPosition, savePropertyLocation, type Coords } from "@/lib/geolocation";
 
 interface Props {
   open: boolean;
   propertyId: string;
   actorId: string | null;
   propertyLabel?: string;
-  blockId?: string | null;
-  currentStreet?: string | null;
-  onClose: (saved: boolean) => void;
+  /** Callback recebe coords para que a tela decida sugerir o logradouro do quarteirão. */
+  onClose: (saved: boolean, coords?: Coords) => void;
 }
 
 export function GeolocationCaptureDialog({
