@@ -32,15 +32,22 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const online = navigator.onLine !== false;
-    console.log("[BOOT_START]", { online });
+    const t0 = (window as any).__BOOT_T0 ?? performance.now();
+    console.log("[BOOT_START]", { online, sinceBoot: Math.round(performance.now() - t0) });
     if (!online) console.log("[BOOT_OFFLINE] iniciando sem internet");
-    const valid = await hasValidLocalSession();
-    console.log("[BOOT_SESSION]", { valid });
-    if (!valid) {
-      console.log("[BOOT_BLOCKED] sem sessão local — indo para /login");
-      throw redirect({ to: "/login" });
+    try {
+      const valid = await hasValidLocalSession();
+      console.log("[BOOT_SESSION]", { valid, sinceBoot: Math.round(performance.now() - t0) });
+      if (!valid) {
+        console.log("[BOOT_BLOCKED] sem sessão local — indo para /login");
+        throw redirect({ to: "/login" });
+      }
+      console.log("[BOOT_OK] sessão local aceita");
+    } catch (e: any) {
+      // Erros de rede não bloqueiam — sessão local já é fonte da verdade.
+      if (e?.options?.to) throw e; // redirect — repropaga
+      console.log("[POST_BOOT_ERROR]", { where: "_authenticated.beforeLoad", message: String(e?.message || e) });
     }
-    console.log("[BOOT_OK] sessão local aceita");
   },
   component: AuthenticatedLayout,
 });
