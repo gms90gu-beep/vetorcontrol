@@ -1,6 +1,6 @@
 # Offline Audit Report
 
-> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T12:35:37.849Z
+> Gerado automaticamente por `scripts/audit-offline.ts` em 2026-06-27T13:32:04.874Z
 
 ## Resumo
 
@@ -9,10 +9,10 @@
 | Arquivos varridos | 228 |
 | Arquivos com `supabase.from/.rpc` | 40 |
 | Server-only (ignorados) | 8 |
-| **Client com fallback** | **4** |
-| **Client SEM fallback** | **28** |
+| **Client com fallback** | **8** |
+| **Client SEM fallback** | **24** |
 
-Score: **13%**
+Score: **25%**
 
 ## ❌ Sem fallback (prioridade alta)
 
@@ -21,8 +21,6 @@ Score: **13%**
 - `src/components/reports/ReportsFilters.tsx` — linhas 51, 52, 53, 54
 - `src/components/supervision/AdminMasterDashboard.tsx` — linhas 827
 - `src/components/supervision/CoordinatorDashboard.tsx` — linhas 44, 54
-- `src/components/supervision/OperationalDashboard.tsx` — linhas 42, 43, 44, 45
-- `src/components/supervision/SupervisionDashboard.tsx` — linhas 99
 - `src/hooks/useAuth.tsx` — linhas 78, 169
 - `src/lib/offline/sync.ts` — linhas 67, 72, 84, 90, 96, 103…
 - `src/lib/role-guards.ts` — linhas 36
@@ -37,8 +35,6 @@ Score: **13%**
 - `src/routes/_authenticated.coordenacao.tsx` — linhas 15
 - `src/routes/_authenticated.coordenador.tsx` — linhas 11
 - `src/routes/_authenticated.reports.tsx` — linhas 12
-- `src/routes/_authenticated.rg.editar.$id.tsx` — linhas 338, 392, 398, 521, 564
-- `src/routes/_authenticated.rg.tsx` — linhas 345
 - `src/routes/_authenticated.supervision.tsx` — linhas 15
 - `src/routes/_authenticated.supervisor.tsx` — linhas 11
 - `src/routes/admin-master.tsx` — linhas 47
@@ -48,9 +44,13 @@ Score: **13%**
 ## ✅ Com fallback
 
 - `src/components/DailyWorkCloser.tsx`
+- `src/components/supervision/OperationalDashboard.tsx`
+- `src/components/supervision/SupervisionDashboard.tsx`
 - `src/lib/geolocation.ts`
 - `src/routes/_authenticated.field-work.tsx`
 - `src/routes/_authenticated.property.$propertyId.tsx`
+- `src/routes/_authenticated.rg.editar.$id.tsx`
+- `src/routes/_authenticated.rg.tsx`
 
 ## Como corrigir
 
