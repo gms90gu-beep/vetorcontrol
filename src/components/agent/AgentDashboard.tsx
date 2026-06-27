@@ -208,6 +208,16 @@ export function AgentDashboard() {
           pendentes,
         });
       }
+      } catch (e: any) {
+        console.log("[POST_BOOT_SUPABASE]", {
+          where: "AgentDashboard",
+          name: e?.name,
+          message: String(e?.message || e),
+          online: navigator.onLine,
+          sinceBoot: Math.round(performance.now() - t0),
+        });
+        // silencioso — não bloqueia a UI, dados ficam vazios até reconectar
+      }
     })();
     return () => {
       cancelled = true;
