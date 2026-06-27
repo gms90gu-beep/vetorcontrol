@@ -172,27 +172,27 @@ function OfflineAuditPage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <KPICard
-          label="Score Geral"
+          title="Score Geral"
           value={`${score}%`}
-          icon={Activity}
-          tone={score >= 80 ? "success" : score >= 50 ? "warning" : "destructive"}
+          icon={<Activity className="h-4 w-4" />}
+          tone={score >= 80 ? "success" : score >= 50 ? "warning" : "danger"}
         />
         <KPICard
-          label="Conectividade"
+          title="Conectividade"
           value={online ? "Online" : "Offline"}
-          icon={online ? Wifi : WifiOff}
+          icon={online ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
           tone={online ? "success" : "warning"}
         />
         <KPICard
-          label="Registros em cache"
+          title="Registros em cache"
           value={totalRows.toLocaleString("pt-BR")}
-          icon={Database}
+          icon={<Database className="h-4 w-4" />}
         />
         <KPICard
-          label="Pendências de sync"
+          title="Pendências de sync"
           value={pending}
-          icon={HardDrive}
-          tone={pending === 0 ? "success" : pending < 10 ? "warning" : "destructive"}
+          icon={<HardDrive className="h-4 w-4" />}
+          tone={pending === 0 ? "success" : pending < 10 ? "warning" : "danger"}
         />
       </div>
 
