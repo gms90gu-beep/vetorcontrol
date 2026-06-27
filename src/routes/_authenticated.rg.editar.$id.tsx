@@ -524,7 +524,11 @@ function EditarBoletim() {
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
         } else {
-          const { data: subarea } = await supabase.from("subareas").select("id").limit(1).maybeSingle();
+          const subarea = await safeSupabaseRead<any>(
+            () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
+            null,
+            "subareas",
+          );
           if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
           const { data: createdBlock, error: blockError } = await supabase
             .from("blocks")
