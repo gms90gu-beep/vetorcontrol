@@ -11,6 +11,7 @@
  */
 import { runRC1Suite, type RC1Report, type RC1Status } from "./rc1-suite";
 import { db as offlineDb } from "@/lib/offline/db";
+import { pendingMutationCount } from "@/lib/offline/sync";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { supabase } from "@/integrations/supabase/client";
 
