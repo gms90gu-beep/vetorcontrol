@@ -51,6 +51,9 @@ for (const file of walk(ROOT)) {
   const src = readFileSync(file, "utf8");
   const rel = relative(process.cwd(), file);
   const isServer = /\.functions\.ts$|\.server\.ts$|routes\/api\//.test(file);
+  // Infra de sync/repos é a própria camada de rede — não precisa de fallback dela mesma.
+  const isSyncInfra = /lib\/offline\/(sync|repos|reconciler|safe-fetch|cleanup-ghosts|safe-auth|role-cache)|sync\/(syncEngine|networkMonitor)/.test(file);
+  if (isSyncInfra) continue;
   const lines: number[] = [];
   src.split("\n").forEach((l, i) => {
     if (/supabase\.from\s*\(/.test(l) || /supabase\.rpc\s*\(/.test(l)) lines.push(i + 1);
