@@ -83,7 +83,10 @@ export function AgentDashboard() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    const t0 = (window as any).__BOOT_T0 ?? performance.now();
+    console.log("[DASHBOARD_RENDER]", { sinceBoot: Math.round(performance.now() - t0) });
     (async () => {
+      try {
       const { data: p } = await supabase
         .from("profiles")
         .select("full_name, registration_number, city")
