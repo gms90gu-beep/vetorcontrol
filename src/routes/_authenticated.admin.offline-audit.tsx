@@ -24,7 +24,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { runRC1Suite, getLastRC1Report, type RC1Report } from "@/lib/audit/rc1-suite";
 import { downloadMarkdown, downloadPdf } from "@/lib/audit/rc1-report";
-import { FileDown, FileText, PlayCircle } from "lucide-react";
+import { runGoLive, getLastGoLiveReport, type GoLiveReport } from "@/lib/audit/go-live";
+import { downloadMarkdown as downloadGoLiveMd, downloadPdf as downloadGoLivePdf } from "@/lib/audit/go-live-report";
+import { FileDown, FileText, PlayCircle, Award } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/offline-audit")({
   ssr: false,
