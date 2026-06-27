@@ -30,10 +30,32 @@ export async function getLocalSession(): Promise<LocalSession | null> {
  */
 export async function hasValidLocalSession(): Promise<boolean> {
   const session = await getLocalSession();
-  if (!session) return false;
-  // Margem de 60s para evitar race condition na expiração
-  return session.expiresAt > Date.now() - 60_000;
+  if (session && session.expiresAt > Date.now() - 60_000) return true;
+  // Fallback: aceitar sessão persistida pelo próprio Supabase no localStorage.
+  // Cobre usuários que logaram antes do espelhamento Dexie estar ativo.
+  return hasSupabaseLocalStorageSession();
 }
+
+/**
+ * Lê de forma síncrona o token persistido pelo Supabase no localStorage.
+ * Não toca rede. Retorna true se houver token não expirado.
+ */
+export function hasSupabaseLocalStorageSession(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID as string | undefined;
+    if (!projectId) return false;
+    const raw = window.localStorage.getItem(`sb-${projectId}-auth-token`);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const expiresAt = (parsed?.expires_at ?? parsed?.currentSession?.expires_at) as number | undefined;
+    if (!expiresAt) return Boolean(parsed?.access_token || parsed?.currentSession?.access_token);
+    return expiresAt * 1000 > Date.now() - 60_000;
+  } catch {
+    return false;
+  }
+}
+
 
 // ─── Persistência de sessão ───────────────────────────────────────────────────
 
