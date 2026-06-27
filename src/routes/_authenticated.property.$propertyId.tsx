@@ -329,7 +329,7 @@ function PropertyVisitPage() {
       if (!user) return;
       const rows = await listRemoteOrCache<any>({
         name: "agents",
-        remote: () => supabase.from("agents").select("*").eq("profile_id", user.id),
+        remote: async () => await supabase.from("agents").select("*").eq("profile_id", user.id),
         filter: (r) => r.profile_id === user.id,
       });
       if (rows.length) setAgent(rows[0]);
