@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { db as offlineDb } from "@/lib/offline/db";
+import { safeSupabaseRead } from "@/lib/offline/repos";
 import { useRGRecords } from "@/hooks/useOfflineData";
 import { useAuth } from "@/hooks/useAuth";
 import {
