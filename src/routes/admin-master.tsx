@@ -1,6 +1,7 @@
 import { createFileRoute, redirect, useRouter, useNavigate } from "@tanstack/react-router";
 import { AdminMasterDashboard } from "@/components/supervision/AdminMasterDashboard";
 import { supabase } from "@/integrations/supabase/client";
+import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LogOut, ArrowLeft, X, Loader2 } from "lucide-react";
