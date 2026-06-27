@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { requestCurrentPosition, savePropertyLocation } from "@/lib/geolocation";
+import { resolveAndApplyStreet, ENABLE_AUTO_STREET } from "@/lib/auto-street";
 
 interface Props {
   open: boolean;
