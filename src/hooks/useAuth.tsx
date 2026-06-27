@@ -137,7 +137,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextAuthState.user);
       lastAuthUserIdRef.current = nextAuthState.user?.id ?? null;
       setIsReady(true);
+      console.log("[BOOT_SESSION]", { hasUser: !!nextAuthState.user });
+      // Espelha sessão Supabase → Dexie para boot offline futuro
+      if (nextAuthState.session) {
+        import("@/lib/auth").then((m) => m.saveSessionLocally(nextAuthState.session as any)).catch(() => {});
+      }
     });
+
+
 
     const {
       data: { subscription },
