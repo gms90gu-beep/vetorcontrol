@@ -26,8 +26,6 @@ export function GeolocationCaptureDialog({
   propertyId,
   actorId,
   propertyLabel,
-  blockId,
-  currentStreet,
   onClose,
 }: Props) {
   const [loading, setLoading] = useState(false);
@@ -37,17 +35,8 @@ export function GeolocationCaptureDialog({
     try {
       const coords = await requestCurrentPosition();
       await savePropertyLocation(propertyId, coords, actorId);
-      if (ENABLE_AUTO_STREET) {
-        // Isolado: erros não impedem confirmação da localização.
-        resolveAndApplyStreet({
-          propertyId,
-          coords,
-          blockId: blockId ?? null,
-          currentStreet: currentStreet ?? null,
-        }).catch((e) => console.warn("[AUTO_STREET_ERROR]", e));
-      }
       toast.success("✓ Localização do imóvel registrada com sucesso.");
-      onClose(true);
+      onClose(true, coords);
     } catch (err: any) {
       const code = err?.code;
       if (code === 1) toast.error("Permissão de localização negada pelo dispositivo.");
