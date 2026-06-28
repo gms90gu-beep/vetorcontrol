@@ -219,9 +219,7 @@ function RootComponent() {
   );
 }
 
-
-if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
-  });
-}
+// Nota: o registro do Service Worker é feito EXCLUSIVAMENTE por
+// `src/lib/pwa/register.ts` (registerPwa). Registrar manualmente aqui
+// causava registro duplo em produção e poderia bloquear a heurística de
+// instalabilidade do navegador (beforeinstallprompt nunca disparado).
