@@ -358,6 +358,7 @@ export function DailyWorkCloser({
 
   const handleCloseDay = async () => {
     console.log("[ENCERRAR] botão clicado");
+    try { (window as any).__vcSetJourneyActive?.(false); } catch {}
     console.log("[ENCERRAR] pendências", pendingCount);
     console.log("[ENCERRAR] quarteirão aberto", openBlock);
     console.log("[DIÁRIA] Encerramento iniciado");
