@@ -112,85 +112,92 @@ function BoletimView() {
     setLoading(true);
     setLoadError(null);
     try {
+      const { listRemoteOrCache, getLocal } = await import("@/lib/offline/repos");
+      const online = typeof navigator !== "undefined" ? navigator.onLine : true;
       let b: Boletim | null = null;
 
-      const { data: byBoletim, error: byBoletimErr } = await supabase
-        .from("boletins_rg")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (byBoletimErr) {
-        const msg = byBoletimErr.message || "";
+      // 1) Boletim por id (online → Supabase + hidrata Dexie; offline → Dexie)
+      try {
+        const rows = await listRemoteOrCache<any>({
+          name: "boletins_rg",
+          remote: () => supabase.from("boletins_rg").select("*").eq("id", id) as any,
+          filter: (r) => r.id === id,
+        });
+        if (rows && rows.length > 0) b = rows[0] as Boletim;
+      } catch (e: any) {
+        const msg = e?.message || "";
         if (/permission|denied|policy|rls/i.test(msg)) {
           setLoadError({ kind: "forbidden", message: "Você não possui acesso a este boletim." });
           return;
         }
-        throw byBoletimErr;
       }
 
-      if (byBoletim) {
-        b = byBoletim as Boletim;
-      } else {
-        const { data: byBlock } = await supabase
-          .from("boletins_rg")
-          .select("*")
-          .eq("block_id", id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      // 2) Fallback: id pode ser block_id
+      if (!b) {
+        try {
+          const rows = await listRemoteOrCache<any>({
+            name: "boletins_rg",
+            remote: () =>
+              supabase.from("boletins_rg").select("*").eq("block_id", id).order("created_at", { ascending: false }).limit(1) as any,
+            filter: (r) => r.block_id === id,
+          });
+          if (rows && rows.length > 0) {
+            b = [...rows].sort((x: any, y: any) => String(y.created_at || "").localeCompare(String(x.created_at || "")))[0] as Boletim;
+          }
+        } catch {}
+      }
 
-        if (byBlock) {
-          b = byBlock as Boletim;
-        } else {
-          const { data: { user } } = await safeGetUser();
-          if (!user) throw new Error("Não autenticado");
+      // 3) Online: criar boletim a partir do block. Offline: não criar.
+      if (!b && online) {
+        const { data: { user } } = await safeGetUser();
+        if (!user) throw new Error("Não autenticado");
 
-          const { data: blockRow } = await supabase
-            .from("blocks").select("*").eq("id", id).maybeSingle();
+        const { data: blockRow } = await supabase
+          .from("blocks").select("*").eq("id", id).maybeSingle();
 
-          if (!blockRow) {
-            setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
+        if (!blockRow) {
+          setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles").select("full_name, registration_number, city")
+          .eq("id", user.id).maybeSingle();
+
+        const { data: agentRow } = await supabase
+          .from("agents").select("name, registration_id, municipality")
+          .eq("profile_id", user.id).maybeSingle();
+
+        const insertPayload = {
+          block_id: blockRow.id,
+          block_number: blockRow.number ?? null,
+          agent_id: user.id,
+          uf: "CE",
+          municipality: agentRow?.municipality ?? profile?.city ?? null,
+          agent_name: agentRow?.name ?? profile?.full_name ?? null,
+          agent_registration: agentRow?.registration_id ?? profile?.registration_number ?? null,
+        };
+        const { data: created, error: createErr } = await supabase
+          .from("boletins_rg").insert(insertPayload).select().single();
+        if (createErr) {
+          if (/permission|denied|policy|rls/i.test(createErr.message)) {
+            setLoadError({ kind: "forbidden", message: "Você não possui acesso para criar este boletim." });
             return;
           }
-
-          const { data: profile } = await supabase
-            .from("profiles").select("full_name, registration_number, city")
-            .eq("id", user.id).maybeSingle();
-
-          const { data: agentRow } = await supabase
-            .from("agents").select("name, registration_id, municipality")
-            .eq("profile_id", user.id).maybeSingle();
-
-          const insertPayload = {
-            block_id: blockRow.id,
-            block_number: blockRow.number ?? null,
-            agent_id: user.id,
-            uf: "CE",
-            municipality: agentRow?.municipality ?? profile?.city ?? null,
-            agent_name: agentRow?.name ?? profile?.full_name ?? null,
-            agent_registration: agentRow?.registration_id ?? profile?.registration_number ?? null,
-          };
-          const { data: created, error: createErr } = await supabase
-            .from("boletins_rg").insert(insertPayload).select().single();
-          if (createErr) {
-            if (/permission|denied|policy|rls/i.test(createErr.message)) {
-              setLoadError({ kind: "forbidden", message: "Você não possui acesso para criar este boletim." });
-              return;
-            }
-            throw createErr;
-          }
-          b = created as Boletim;
+          throw createErr;
         }
+        b = created as Boletim;
       }
 
       if (!b) {
-        setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
+        setLoadError({
+          kind: "not_found",
+          message: online ? "Boletim não encontrado." : "Boletim indisponível no modo offline (sem cache local).",
+        });
         return;
       }
 
-      // ── Fallback robusto do número do quarteirão (offline/cache) ──
-      // Nunca substitui um valor existente por null/undefined/"".
+      // ── Fallback robusto do número do quarteirão ──
       try {
         const fromBoletim = (b as any).block_number;
         const fromQuarteirao = (b as any).quarteirao;
@@ -199,7 +206,6 @@ function BoletimView() {
           (fromQuarteirao !== null && fromQuarteirao !== undefined && fromQuarteirao !== "" ? fromQuarteirao : null);
         console.log("[RG_BLOCK]", { id: b.id, block_id: b.block_id, from_boletim: fromBoletim, from_quarteirao: fromQuarteirao });
         if (!resolved && b.block_id) {
-          const { getLocal } = await import("@/lib/offline/repos");
           const cachedBlock = await getLocal<any>("blocks", b.block_id);
           console.log("[RG_CACHE]", { block_id: b.block_id, cached: !!cachedBlock, number: cachedBlock?.number });
           if (cachedBlock?.number) resolved = cachedBlock.number;
@@ -214,13 +220,20 @@ function BoletimView() {
 
       setBoletim(b);
 
-      const { data: byBoletimLink } = await supabase
-        .from("properties")
-        .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status")
-        .eq("boletim_id", b.id)
-        .order("sequence", { ascending: true });
+      // 4) Imóveis (online → Supabase + hidrata; offline → Dexie filtrado por boletim_id)
+      const propsRaw = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () =>
+          supabase
+            .from("properties")
+            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id")
+            .eq("boletim_id", b!.id)
+            .order("sequence", { ascending: true }) as any,
+        filter: (p) => p.boletim_id === b!.id,
+      });
 
-      const props: Property[] = [...((byBoletimLink || []) as Property[])].sort(comparePropertyNumber);
+      const props: Property[] = [...((propsRaw || []) as Property[])].sort(comparePropertyNumber);
+      console.log("[RG_PROPS]", { boletim_id: b.id, count: props.length, online });
       setImoveis(props);
     } catch (e: any) {
       console.error("[BRG] erro ao carregar:", e);
