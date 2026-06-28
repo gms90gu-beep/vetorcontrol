@@ -213,6 +213,7 @@ function RootComponent() {
         </PostBootErrorBoundary>
         <SyncStatusBadge />
         <OfflineBanner />
+        <PwaUpdatePrompt />
       </AuthProvider>
     </QueryClientProvider>
   );
