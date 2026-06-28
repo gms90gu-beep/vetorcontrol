@@ -89,14 +89,31 @@ export async function registerPwa(): Promise<void> {
   if (!("serviceWorker" in navigator)) return;
   try {
     const { registerSW } = await import("virtual:pwa-register");
+    const { setPwaUpdateAvailable } = await import("./update-state");
     const updateSW = registerSW({
       immediate: true,
       onRegisteredSW(swUrl, reg) {
         console.log("[SW_VERSION]", { swUrl });
-        if (reg) attachLifecycleLogs(reg);
+        if (reg) {
+          attachLifecycleLogs(reg);
+          reg.addEventListener("updatefound", () => {
+            console.log("[PWA_UPDATE_FOUND]");
+            const sw = reg.installing;
+            sw?.addEventListener("statechange", () => {
+              if (sw.state === "installed" && navigator.serviceWorker.controller) {
+                console.log("[PWA_UPDATE_WAITING]");
+              }
+            });
+          });
+        }
       },
       onNeedRefresh() {
         console.log("[SW_WAITING]", { needRefresh: true });
+        // Expõe ao app: aplica = skipWaiting + reload automático (virtual:pwa-register
+        // escuta controllerchange e dispara window.location.reload()).
+        setPwaUpdateAvailable(async () => {
+          await updateSW(true);
+        });
       },
       onOfflineReady() {
         console.log("[SW_CACHE]", { offlineReady: true });
