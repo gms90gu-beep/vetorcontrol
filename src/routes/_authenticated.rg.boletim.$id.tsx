@@ -535,7 +535,7 @@ function BoletimView() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0 flex-1 truncate text-[13px] font-semibold tracking-tight">
-            BRG · FA-D-05 · Quarteirão {boletim.block_number || "—"}
+            BRG · FA-D-05 · Quarteirão {(boletim as any).block_number ?? (boletim as any).quarteirao ?? "-"}
           </div>
           <Button
             variant="outline"
