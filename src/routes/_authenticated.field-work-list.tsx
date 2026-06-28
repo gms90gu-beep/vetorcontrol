@@ -229,33 +229,42 @@ function FieldWorkListPage() {
           let cycleVisitsForAgent: any[] = [];
           let blockCycleVisits: any[] = [];
 
-          if (propertyIds.length > 0) {
-            let visitsQuery = supabase
-              .from("visits")
-              .select(visitColumns)
-              .eq("agent_id", user.id)
-              .in("property_id", propertyIds)
-              .order("visit_date", { ascending: false });
+          if (propertyIds.length > 0 && online) {
+            try {
+              let visitsQuery = supabase
+                .from("visits")
+                .select(visitColumns)
+                .eq("agent_id", user.id)
+                .in("property_id", propertyIds)
+                .order("visit_date", { ascending: false });
 
-            if (operationalCycleId) {
-              visitsQuery = visitsQuery.eq("cycle_id", operationalCycleId);
+              if (operationalCycleId) {
+                visitsQuery = visitsQuery.eq("cycle_id", operationalCycleId);
+              }
+
+              const { data: visitsData, error: visitsError } = await visitsQuery;
+              if (visitsError) console.error("[FieldWorkList] erro ao buscar visitas do ciclo:", visitsError);
+              blockCycleVisits = visitsData || [];
+            } catch (e) {
+              console.warn("[FWL] visitas offline:", e);
             }
-
-            const { data: visitsData, error: visitsError } = await visitsQuery;
-            if (visitsError) console.error("[FieldWorkList] erro ao buscar visitas do ciclo:", visitsError);
-            blockCycleVisits = visitsData || [];
           }
 
-          if (operationalCycleId) {
-            const { data: allCycleVisits, error: cycleVisitsError } = await supabase
-              .from("visits")
-              .select("id, property_id, cycle_id, visit_date, agent_id, status")
-              .eq("agent_id", user.id)
-              .eq("cycle_id", operationalCycleId);
+          if (operationalCycleId && online) {
+            try {
+              const { data: allCycleVisits, error: cycleVisitsError } = await supabase
+                .from("visits")
+                .select("id, property_id, cycle_id, visit_date, agent_id, status")
+                .eq("agent_id", user.id)
+                .eq("cycle_id", operationalCycleId);
 
-            if (cycleVisitsError) console.error("[FieldWorkList] erro no relatório de visitas do ciclo:", cycleVisitsError);
-            cycleVisitsForAgent = allCycleVisits || [];
+              if (cycleVisitsError) console.error("[FieldWorkList] erro no relatório de visitas do ciclo:", cycleVisitsError);
+              cycleVisitsForAgent = allCycleVisits || [];
+            } catch (e) {
+              console.warn("[FWL] cycle visits offline:", e);
+            }
           }
+
 
           const visitsByProperty = new Map<string, any[]>();
           blockCycleVisits.forEach((visit: any) => {
