@@ -1473,6 +1473,8 @@ export type Database = {
           id: string
           number: number
           start_date: string
+          status: Database["public"]["Enums"]["week_status"]
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1481,6 +1483,8 @@ export type Database = {
           id?: string
           number: number
           start_date: string
+          status?: Database["public"]["Enums"]["week_status"]
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1489,6 +1493,8 @@ export type Database = {
           id?: string
           number?: number
           start_date?: string
+          status?: Database["public"]["Enums"]["week_status"]
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1542,6 +1548,7 @@ export type Database = {
         Returns: undefined
       }
       cleanup_demo_data: { Args: never; Returns: Json }
+      close_week: { Args: { _week_id: string }; Returns: Json }
       data_audit_report: { Args: never; Returns: Json }
       ensure_annual_cycles: {
         Args: { target_year: number }
@@ -1550,6 +1557,26 @@ export type Database = {
       finalize_shift_pendencies: {
         Args: { p_agent_id: string; p_cycle_id: string; p_date: string }
         Returns: Json
+      }
+      get_current_cycle: {
+        Args: never
+        Returns: {
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          number: number | null
+          start_date: string
+          status: Database["public"]["Enums"]["cycle_status"]
+          updated_at: string | null
+          year: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cycles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_epi_week: { Args: { d: string }; Returns: number }
       get_user_role: { Args: { u_id: string }; Returns: string }
@@ -1561,6 +1588,18 @@ export type Database = {
         Returns: boolean
       }
       reconcile_rg_integrity: { Args: never; Returns: Json }
+      regenerate_cycle_weeks: {
+        Args: { _cycle_id: string }
+        Returns: undefined
+      }
+      resolve_cycle_week: {
+        Args: { _date: string }
+        Returns: {
+          cycle_id: string
+          week_id: string
+          week_number: number
+        }[]
+      }
       rg_integrity_check: { Args: never; Returns: Json }
       save_data_audit_snapshot: {
         Args: {
@@ -1610,6 +1649,7 @@ export type Database = {
         | "demolished"
       user_role_type: "admin_master" | "coordenador" | "supervisor" | "agente"
       visit_status: "visited" | "closed" | "refused" | "abandoned"
+      week_status: "open" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1777,6 +1817,7 @@ export const Constants = {
       ],
       user_role_type: ["admin_master", "coordenador", "supervisor", "agente"],
       visit_status: ["visited", "closed", "refused", "abandoned"],
+      week_status: ["open", "closed"],
     },
   },
 } as const
