@@ -201,14 +201,19 @@ function FieldWorkPage() {
   );
 
   const handleStartWork = async () => {
+    console.log("[WORK_START]", { blockId: selectedBlockId, cycleId: selectedCycleId, weekId: selectedWeekId, online: isOnline() });
     if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
       toast.error("Por favor, preencha todos os campos");
+      console.log("[WORK_ERROR]", { stage: "validate", reason: "missing-fields" });
       return;
     }
 
     try {
       const { data: { user } } = await safeGetUser();
-      if (!user) return;
+      if (!user) {
+        console.log("[WORK_ERROR]", { stage: "auth", reason: "no-user" });
+        return;
+      }
 
       const sessionDateStr = date.toISOString().split('T')[0];
 
@@ -226,83 +231,89 @@ function FieldWorkPage() {
       }
 
       // ── Validação: já existe jornada para esta data? ────────────
+      // Offline-safe: ignora silenciosamente se a rede falhar.
       try {
-        const { data: existing } = await supabase
-          .from("field_work_sessions")
-          .select("id, status, session_date")
-          .eq("user_id", user.id)
-          .eq("session_date", sessionDateStr)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (existing && existing.status === "in_progress") {
-          const cont = window.confirm(
-            "Já existe uma jornada para esta data. Deseja continuar a jornada existente?"
-          );
-          if (cont) {
-            navigate({ to: `/field-work-list` });
-            return;
+        if (isOnline()) {
+          const { data: existing } = await supabase
+            .from("field_work_sessions")
+            .select("id, status, session_date")
+            .eq("user_id", user.id)
+            .eq("session_date", sessionDateStr)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (existing && existing.status === "in_progress") {
+            const cont = window.confirm(
+              "Já existe uma jornada para esta data. Deseja continuar a jornada existente?"
+            );
+            if (cont) {
+              navigate({ to: `/field-work-list` });
+              return;
+            }
+            await updateOffline("field_work_sessions", existing.id, {
+              status: "closed",
+              updated_at: new Date().toISOString(),
+            });
           }
-          // se não quer continuar, encerra a anterior antes de abrir a nova
-          await updateOffline("field_work_sessions", existing.id, {
-            status: "closed",
-            updated_at: new Date().toISOString(),
-          });
         }
       } catch (e) {
-        console.warn("[FieldWork] Verificação de duplicidade falhou (provável offline):", e);
+        console.warn("[WORK_START] Verificação de duplicidade falhou (offline):", e);
       }
 
-      // VALIDAÇÃO DE CICLO ATIVO
-      const { data: activeCycleRow } = await supabase
-        .from("cycles")
-        .select("id, number, year")
-        .eq("status", "in_progress")
-        .maybeSingle();
-
-      if (!activeCycleRow) {
-        toast.error("Nenhum ciclo ativo no momento. Solicite ao supervisor que abra o ciclo.");
-        return;
-      }
-
-      const cycleIdToUse = activeCycleRow.id;
-
-      if (selectedCycleId && selectedCycleId !== cycleIdToUse) {
-        toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
-      }
-
-      // Encerra sessões anteriores vinculadas a OUTROS ciclos
-      try {
-        const { data: staleSessions } = await supabase
-          .from("field_work_sessions")
-          .select("id, cycle_id")
-          .eq("user_id", user.id)
-          .eq("status", "in_progress");
-        const staleIds = (staleSessions || [])
-          .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
-          .map((s: any) => s.id);
-        for (const sid of staleIds) {
-          await updateOffline("field_work_sessions", sid, { status: "closed", updated_at: new Date().toISOString() });
+      // ── VALIDAÇÃO DE CICLO ATIVO (offline-first) ────────────────
+      // Online: consulta Supabase. Offline: usa o ciclo selecionado pelo usuário
+      // (que já foi hidratado via listRemoteOrCache → Dexie).
+      let cycleIdToUse: string = selectedCycleId;
+      if (isOnline()) {
+        try {
+          const { data: activeCycleRow } = await supabase
+            .from("cycles")
+            .select("id, number, year")
+            .eq("status", "in_progress")
+            .maybeSingle();
+          if (activeCycleRow?.id) {
+            cycleIdToUse = activeCycleRow.id;
+            if (selectedCycleId && selectedCycleId !== cycleIdToUse) {
+              toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
+            }
+          }
+        } catch (e) {
+          console.warn("[WORK_START] Falha ao validar ciclo ativo — usando ciclo selecionado:", e);
         }
-        if (staleIds.length > 0) console.log("[FieldWork] Sessões de ciclos anteriores encerradas:", staleIds.length);
-      } catch (e) {
-        console.warn("[FieldWork] Não foi possível verificar sessões antigas (provável offline):", e);
+      } else {
+        console.log("[WORK_SESSION_CREATE]", { mode: "offline", cycleIdToUse });
       }
 
-      try {
-        const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
-        if (agent?.work_status === 'work_completed' && agent?.id) {
-          await updateOffline("agents", agent.id, { work_status: 'in_work' });
+      // Encerra sessões anteriores vinculadas a OUTROS ciclos (apenas online).
+      if (isOnline()) {
+        try {
+          const { data: staleSessions } = await supabase
+            .from("field_work_sessions")
+            .select("id, cycle_id")
+            .eq("user_id", user.id)
+            .eq("status", "in_progress");
+          const staleIds = (staleSessions || [])
+            .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
+            .map((s: any) => s.id);
+          for (const sid of staleIds) {
+            await updateOffline("field_work_sessions", sid, { status: "closed", updated_at: new Date().toISOString() });
+          }
+        } catch (e) {
+          console.warn("[WORK_START] Não foi possível verificar sessões antigas (offline):", e);
         }
-      } catch {}
+
+        try {
+          const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
+          if (agent?.work_status === 'work_completed' && agent?.id) {
+            await updateOffline("agents", agent.id, { work_status: 'in_work' });
+          }
+        } catch {}
+      }
 
       const { getEpiWeek } = await import("@/lib/cycle-week");
       const epi = getEpiWeek(new Date(`${sessionDateStr}T12:00:00`));
-      console.log("[SE]", { work_date: sessionDateStr, epi_week: epi.week, epi_year: epi.year });
-      console.log("[CICLO]", { work_date: sessionDateStr, cycle_id: cycleIdToUse });
-      console.log("[SEMANA_CICLO]", { work_date: sessionDateStr, cycle_id: cycleIdToUse, week_id: selectedWeekId });
 
-      await createOffline("field_work_sessions", {
+      const payload = {
         user_id: user.id,
         cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
@@ -314,24 +325,13 @@ function FieldWorkPage() {
         is_retroactive: isRetroactive,
         retroactive_reason: isRetroactive ? retroactiveReason : null,
         updated_at: new Date().toISOString(),
-      });
+      };
 
-      console.log("[JORNADA]", {
-        agent_id: user.id,
-        work_date: sessionDateStr,
-        cycle_id: cycleIdToUse,
-        week_id: selectedWeekId,
-        epi_week: epi.week,
-        epi_year: epi.year,
-      });
-      if (isRetroactive) {
-        console.log("[RETROATIVO]", {
-          agent_id: user.id,
-          work_date: sessionDateStr,
-          created_at: new Date().toISOString(),
-          reason: retroactiveReason,
-        });
-      }
+      console.log("[WORK_SESSION_CREATE]", { payload });
+      const saved = await createOffline("field_work_sessions", payload);
+      console.log("[WORK_DEXIE_SAVE]", { id: saved?.id });
+      console.log("[WORK_QUEUE]", { table: "field_work_sessions", op: "insert", online: isOnline() });
+      console.log("[WORK_READY]", { id: saved?.id, online: isOnline() });
 
       toast.success(
         isRetroactive
@@ -340,9 +340,11 @@ function FieldWorkPage() {
       );
       navigate({ to: `/field-work-list` });
     } catch (error: any) {
-      toast.error("Erro ao iniciar trabalho: " + error.message);
+      console.log("[WORK_ERROR]", { stage: "exception", message: String(error?.message || error) });
+      toast.error("Erro ao iniciar trabalho: " + (error?.message || error));
     }
   };
+
 
   const confirmRetroactive = () => {
     if (!retroDate) { toast.error("Selecione a data da produção."); return; }
