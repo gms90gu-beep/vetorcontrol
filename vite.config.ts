@@ -32,8 +32,12 @@ export default defineConfig({
           // Sem index.html (SSR). navegações usam NetworkFirst abaixo.
           navigateFallback: null,
           cleanupOutdatedCaches: true,
-          clientsClaim: true,
-          skipWaiting: true,
+          // ATUALIZAÇÃO ATÔMICA: novo SW só assume após todos os assets baixados
+          // (install completo) E após o usuário recarregar/fechar abas antigas.
+          // Evita "white screen" quando o usuário fica offline durante update.
+          clientsClaim: false,
+          skipWaiting: false,
+
           // SSR pode emitir documentos > 2 MB.
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [
