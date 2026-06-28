@@ -142,66 +142,95 @@ function AgentReports() {
   );
 
   const fetchDailies = useCallback(async (aId: string) => {
-    const { data, error } = await supabase
-      .from("daily_work_records")
-      .select(
-        "id, work_date, epi_week, epi_year, cycle_id, status, properties_worked, properties_closed, properties_refused, properties_recovered, deposits_inspected, deposits_treated, positive_foci, tubitos_collected, larvicide_amount, pending_visits"
-      )
-      .eq("agent_id", aId)
-      .order("work_date", { ascending: false })
-      .limit(180);
-    if (error) console.error("[RELATÓRIOS] erro ao buscar:", error);
-    setDailies((data || []) as Daily[]);
+    console.log("[REPORT_BOOT]", { agentId: aId });
+    try {
+      const { listRemoteOrCache } = await import("@/lib/offline/repos");
+      const rows = await listRemoteOrCache<Daily>({
+        name: "daily_work_records",
+        remote: () =>
+          supabase
+            .from("daily_work_records")
+            .select(
+              "id, work_date, epi_week, epi_year, cycle_id, status, properties_worked, properties_closed, properties_refused, properties_recovered, deposits_inspected, deposits_treated, positive_foci, tubitos_collected, larvicide_amount, pending_visits, agent_id, updated_at"
+            )
+            .eq("agent_id", aId)
+            .order("work_date", { ascending: false })
+            .limit(180) as any,
+        filter: (r: any) => r.agent_id === aId,
+      });
+      const sorted = [...(rows || [])].sort((a: any, b: any) =>
+        String(b.work_date || "").localeCompare(String(a.work_date || ""))
+      );
+      console.log("[REPORT_CACHE]", { count: sorted.length });
+      setDailies(sorted as Daily[]);
+    } catch (e) {
+      console.log("[REPORT_ERROR]", { stage: "fetchDailies", message: String((e as any)?.message || e) });
+      setDailies([]);
+    }
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          setLoading(false);
+          return;
+        }
+        setAuthId(session.user.id);
+
+        // profile + agent — offline-safe (não derruba a tela)
+        let profile: any = null;
+        let agent: any = null;
+        try {
+          const { safeSupabaseRead } = await import("@/lib/offline/repos");
+          profile = await safeSupabaseRead<any>(
+            () => supabase.from("profiles").select("full_name, registration_number, city").eq("id", session.user.id).maybeSingle() as any,
+            null,
+            "profiles"
+          );
+          agent = await safeSupabaseRead<any>(
+            () => supabase.from("agents").select("name, registration_id, municipality").eq("profile_id", session.user.id).maybeSingle() as any,
+            null,
+            "agents"
+          );
+        } catch (e) {
+          console.log("[REPORT_ERROR]", { stage: "profile/agent", message: String((e as any)?.message || e) });
+        }
+
+        setAgentId(session.user.id);
+        setAgentMeta({
+          name: agent?.name || profile?.full_name || "Agente",
+          registration: agent?.registration_id || profile?.registration_number || "—",
+          municipality: agent?.municipality || profile?.city || "—",
+        });
+        await fetchDailies(session.user.id);
+
+        try {
+          const { listRemoteOrCache } = await import("@/lib/offline/repos");
+          const cs = await listRemoteOrCache<any>({
+            name: "cycles",
+            remote: () => supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) as any,
+          });
+          console.log("[REPORT_REMOTE]", { cycles: cs?.length || 0 });
+          setCycles(cs || []);
+        } catch (e) {
+          console.log("[REPORT_ERROR]", { stage: "cycles", message: String((e as any)?.message || e) });
+          setCycles([]);
+        }
+      } catch (e) {
+        console.log("[REPORT_ERROR]", { stage: "boot", message: String((e as any)?.message || e) });
+      } finally {
         setLoading(false);
-        return;
       }
-      setAuthId(session.user.id);
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, registration_number, city")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      // DWR.agent_id == profile_id; agents só fornece metadados de cadastro
-      const { data: agent } = await supabase
-        .from("agents")
-        .select("name, registration_id, municipality")
-        .eq("profile_id", session.user.id)
-        .maybeSingle();
-
-      setAgentId(session.user.id);
-      setAgentMeta({
-        name: agent?.name || profile?.full_name || "Agente",
-        registration:
-          agent?.registration_id || profile?.registration_number || "—",
-        municipality: agent?.municipality || profile?.city || "—",
-      });
-      await fetchDailies(session.user.id);
-
-      const { data: cs } = await supabase
-        .from("cycles")
-        .select("id, number, name")
-        .order("number", { ascending: false });
-      setCycles(cs || []);
-
-      setLoading(false);
     })();
   }, [fetchDailies]);
 
   // Refetch on focus
   useEffect(() => {
     if (!agentId) return;
-    const onFocus = () => fetchDailies(agentId);
+    const onFocus = () => { fetchDailies(agentId).catch(() => {}); };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
     return () => {
@@ -210,26 +239,28 @@ function AgentReports() {
     };
   }, [agentId, fetchDailies]);
 
-  // Realtime
+  // Realtime — apenas online; falhas silenciosas
   useEffect(() => {
     if (!agentId) return;
-    const channel = supabase
-      .channel(`dwr-${agentId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "daily_work_records",
-          filter: `agent_id=eq.${agentId}`,
-        },
-        () => fetchDailies(agentId)
-      )
-      .subscribe();
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel(`dwr-${agentId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "daily_work_records", filter: `agent_id=eq.${agentId}` },
+          () => { fetchDailies(agentId).catch(() => {}); }
+        )
+        .subscribe();
+    } catch (e) {
+      console.log("[REPORT_ERROR]", { stage: "realtime", message: String((e as any)?.message || e) });
+    }
     return () => {
-      supabase.removeChannel(channel);
+      try { if (channel) supabase.removeChannel(channel); } catch {}
     };
   }, [agentId, fetchDailies]);
+
 
   const cycleMap = useMemo(() => {
     const m = new Map<string, string>();
