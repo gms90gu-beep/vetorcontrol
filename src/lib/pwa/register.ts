@@ -146,6 +146,7 @@ export async function registerPwa(): Promise<void> {
       },
       onRegisterError(err) {
         console.warn("[SW_ROLLBACK]", { stage: "register-error", message: String((err as any)?.message || err) });
+        console.warn("[PWA_SW_ERROR]", { message: String((err as any)?.message || err) });
       },
     });
     // expõe util para forçar atualização manualmente, se necessário
