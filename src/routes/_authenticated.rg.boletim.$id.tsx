@@ -188,6 +188,30 @@ function BoletimView() {
         setLoadError({ kind: "not_found", message: "Boletim não encontrado." });
         return;
       }
+
+      // ── Fallback robusto do número do quarteirão (offline/cache) ──
+      // Nunca substitui um valor existente por null/undefined/"".
+      try {
+        const fromBoletim = (b as any).block_number;
+        const fromQuarteirao = (b as any).quarteirao;
+        let resolved =
+          (fromBoletim !== null && fromBoletim !== undefined && fromBoletim !== "" ? fromBoletim : null) ??
+          (fromQuarteirao !== null && fromQuarteirao !== undefined && fromQuarteirao !== "" ? fromQuarteirao : null);
+        console.log("[RG_BLOCK]", { id: b.id, block_id: b.block_id, from_boletim: fromBoletim, from_quarteirao: fromQuarteirao });
+        if (!resolved && b.block_id) {
+          const { getLocal } = await import("@/lib/offline/repos");
+          const cachedBlock = await getLocal<any>("blocks", b.block_id);
+          console.log("[RG_CACHE]", { block_id: b.block_id, cached: !!cachedBlock, number: cachedBlock?.number });
+          if (cachedBlock?.number) resolved = cachedBlock.number;
+        }
+        if (resolved && !(b as any).block_number) {
+          (b as any).block_number = resolved;
+        }
+        console.log("[RG_HEADER]", { block_number: (b as any).block_number || "-" });
+      } catch (e) {
+        console.warn("[RG_BLOCK] fallback falhou:", e);
+      }
+
       setBoletim(b);
 
       const { data: byBoletimLink } = await supabase
@@ -205,6 +229,7 @@ function BoletimView() {
       setLoading(false);
     }
   }
+
 
   const totalFolhas = Math.max(1, Math.ceil(imoveis.length / LINHAS_POR_FOLHA));
   const folhas = useMemo(() => {
