@@ -120,6 +120,11 @@ export async function registerPwa(): Promise<void> {
         console.log("[SW_VERSION]", { swUrl });
         console.log("[PWA_SW_REGISTER]", { swUrl, scope: reg?.scope });
         if (reg?.active) console.log("[PWA_SW_ACTIVE]", { scriptURL: reg.active.scriptURL });
+        if (navigator.serviceWorker.controller) {
+          console.log("[PWA_CACHE_HIT]", { scriptURL: navigator.serviceWorker.controller.scriptURL });
+        } else {
+          console.log("[PWA_CACHE_MISS]", { reason: "no-controller-yet" });
+        }
         if (reg) {
           attachLifecycleLogs(reg);
           reg.addEventListener("updatefound", () => {
@@ -143,6 +148,7 @@ export async function registerPwa(): Promise<void> {
       },
       onOfflineReady() {
         console.log("[SW_CACHE]", { offlineReady: true });
+        console.log("[PWA_CACHE_INSTALL]", { offlineReady: true });
       },
       onRegisterError(err) {
         console.warn("[SW_ROLLBACK]", { stage: "register-error", message: String((err as any)?.message || err) });
