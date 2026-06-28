@@ -170,10 +170,7 @@ function FieldWorkListPage() {
           filter: (p) => String(p.block_number) === String(session.block_number),
         });
         console.log("[FWL_PROPS]", { block: session.block_number, count: propsRaw?.length || 0, online });
-        const error = null as any;
 
-
-        if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
 
         // Ordenação robusta: respeita a SEQUÊNCIA do RG (porta-a-porta).
         // Empates: rua → número → complemento → id. Garante que imóveis com
