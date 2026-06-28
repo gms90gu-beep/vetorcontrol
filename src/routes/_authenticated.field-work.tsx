@@ -332,6 +332,7 @@ function FieldWorkPage() {
       console.log("[WORK_DEXIE_SAVE]", { id: saved?.id });
       console.log("[WORK_QUEUE]", { table: "field_work_sessions", op: "insert", online: isOnline() });
       console.log("[WORK_READY]", { id: saved?.id, online: isOnline() });
+      try { (window as any).__vcSetJourneyActive?.(true); } catch {}
 
       toast.success(
         isRetroactive

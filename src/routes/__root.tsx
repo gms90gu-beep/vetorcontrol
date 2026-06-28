@@ -14,6 +14,7 @@ import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor"
 import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PostBootErrorBoundary } from "@/components/PostBootErrorBoundary";
+import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
 const __BOOT_T0 = typeof performance !== "undefined" ? performance.now() : Date.now();
 const sinceBoot = () => Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - __BOOT_T0);
@@ -212,6 +213,7 @@ function RootComponent() {
         </PostBootErrorBoundary>
         <SyncStatusBadge />
         <OfflineBanner />
+        <PwaUpdatePrompt />
       </AuthProvider>
     </QueryClientProvider>
   );
