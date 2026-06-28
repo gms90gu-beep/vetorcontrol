@@ -82,6 +82,30 @@ function attachLifecycleLogs(reg: ServiceWorkerRegistration) {
 }
 
 export async function registerPwa(): Promise<void> {
+  // Auditoria do manifest (independente do contexto)
+  try {
+    const res = await fetch("/manifest.webmanifest", { cache: "no-cache" });
+    if (!res.ok) {
+      console.warn("[PWA_MANIFEST_ERROR]", { status: res.status });
+    } else {
+      const m = await res.json();
+      const has192 = Array.isArray(m.icons) && m.icons.some((i: any) => String(i.sizes || "").includes("192x192"));
+      const has512 = Array.isArray(m.icons) && m.icons.some((i: any) => String(i.sizes || "").includes("512x512"));
+      const ok = !!(m.name && m.short_name && m.start_url && m.scope && m.display && has192 && has512);
+      console.log(ok ? "[PWA_MANIFEST_OK]" : "[PWA_MANIFEST_ERROR]", {
+        name: m.name,
+        short_name: m.short_name,
+        start_url: m.start_url,
+        scope: m.scope,
+        display: m.display,
+        has192,
+        has512,
+      });
+    }
+  } catch (e) {
+    console.warn("[PWA_MANIFEST_ERROR]", { message: String((e as any)?.message || e) });
+  }
+
   if (isRefusedContext()) {
     await unregisterAppSw();
     return;
