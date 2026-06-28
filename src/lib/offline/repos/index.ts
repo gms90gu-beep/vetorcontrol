@@ -45,23 +45,54 @@ export async function getLocal<T = any>(name: DexieTableName, id: string): Promi
   return (row?.data ?? null) as T | null;
 }
 
-/** Leitura genérica com fallback Dexie. */
+export type DataSource = "remote" | "cache" | "empty";
+export type ListResult<T> = T[] & { data: T[]; source: DataSource };
+
+/**
+ * Embala um array com metadados {data, source} mantendo 100% de compatibilidade
+ * com chamadores legados (Array.prototype: map/filter/length/destructuring).
+ * Não usamos subclasse de Array porque algumas iterações do Vite/SWC podem
+ * perder o protótipo após transformações; anexar props no Array nativo é
+ * sempre seguro.
+ */
+function withSource<T>(arr: T[], source: DataSource): ListResult<T> {
+  const out = arr.slice() as ListResult<T>;
+  Object.defineProperty(out, "data", { value: arr, enumerable: false });
+  Object.defineProperty(out, "source", { value: source, enumerable: false });
+  return out;
+}
+
+/**
+ * Leitura genérica com fallback Dexie.
+ * Retorna T[] enriquecido com { data, source } — compat total com chamadores
+ * existentes que tratam o retorno como array puro.
+ */
 export async function listRemoteOrCache<T = any>(opts: {
   name: DexieTableName;
   remote: () => Promise<{ data: T[] | null; error: any }>;
   filter?: (r: any) => boolean;
-}): Promise<T[]> {
-  return safeFetch<T[]>(
+}): Promise<ListResult<T>> {
+  let source: DataSource = "empty";
+  const arr = await safeFetch<T[]>(
     async () => {
       const { data, error } = await opts.remote();
       if (error) throw error;
       const rows = (data || []) as any[];
       await hydrate(opts.name, rows);
-      return (opts.filter ? rows.filter(opts.filter) : rows) as T[];
+      const out = (opts.filter ? rows.filter(opts.filter) : rows) as T[];
+      source = out.length ? "remote" : "empty";
+      console.log("[DATA_SOURCE]", { table: opts.name, source, count: out.length });
+      return out;
     },
-    async () => (await readCache(opts.name, opts.filter)) as T[],
+    async () => {
+      const out = (await readCache(opts.name, opts.filter)) as T[];
+      source = out.length ? "cache" : "empty";
+      console.log("[DATA_SOURCE]", { table: opts.name, source, count: out.length });
+      return out;
+    },
     { label: opts.name },
   );
+  return withSource(arr, source);
 }
 
 function genId() {
