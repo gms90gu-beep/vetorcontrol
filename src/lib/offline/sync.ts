@@ -198,6 +198,8 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     notify();
   }
   if (ok > 0 || failed > 0) console.log(`[SYNC] Sincronização concluída — ${ok} ok, ${failed} falhou`);
+  if (failed > 0) console.warn("[SYNC_ENGINE_ERROR]", { ok, failed, lastSyncAt });
+  else console.log("[SYNC_ENGINE_SUCCESS]", { ok, lastSyncAt });
   return { ok, failed };
 }
 
