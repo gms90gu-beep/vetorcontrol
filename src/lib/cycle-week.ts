@@ -87,29 +87,30 @@ export async function resolveCycleWeek(
 }
 
 /**
- * Formato canônico: "Ciclo 3 • Semana 6 • SE 24/2026".
- * - Ciclo: cycle.number
- * - Semana: número da semana DO CICLO (tabela `weeks`)
- * - SE: semana epidemiológica derivada da data
+ * Formato canônico do sistema: "Ciclo X • Semana Y/8".
+ * Cada ciclo possui obrigatoriamente 8 semanas epidemiológicas.
+ * A SE SINAN é mantida internamente apenas para exportações oficiais.
  */
 export function formatCycleWeekLabel(info: CycleWeekInfo): string {
   const cyc = info.cycle?.number != null ? `Ciclo ${info.cycle.number}` : "Ciclo —";
-  const cw = info.cycleWeek?.number != null ? `Semana ${info.cycleWeek.number}` : "Semana —";
-  const se = `SE ${String(info.se.week).padStart(2, "0")}/${info.se.year}`;
-  return `${cyc} • ${cw} • ${se}`;
+  const cw = info.cycleWeek?.number != null ? `Semana ${info.cycleWeek.number}/8` : "Semana —/8";
+  return `${cyc} • ${cw}`;
+}
+
+/** Mantido para PDFs/exports institucionais que exigem SE SINAN explícita. */
+export function formatSinanLabel(info: CycleWeekInfo): string {
+  return `SE ${String(info.se.week).padStart(2, "0")}/${info.se.year}`;
 }
 
 export function logCycleWeekAudit(info: CycleWeekInfo) {
-  console.log("[CICLO]", {
+  console.log("[CYCLE_CURRENT]", {
     cycle_id: info.cycle?.id ?? null,
     cycle_number: info.cycle?.number ?? null,
   });
-  console.log("[SEMANA_CICLO]", {
+  console.log("[EPID_WEEK_CURRENT]", {
     week_id: info.cycleWeek?.id ?? null,
     week_number: info.cycleWeek?.number ?? null,
+    of: 8,
   });
-  console.log("[SE]", {
-    epi_week: info.se.week,
-    epi_year: info.se.year,
-  });
+  console.log("[SE]", { epi_week: info.se.week, epi_year: info.se.year });
 }
