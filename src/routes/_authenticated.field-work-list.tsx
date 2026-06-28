@@ -126,21 +126,31 @@ function FieldWorkListPage() {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
 
-      const { data: session } = await supabase
-        .from("field_work_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const { listRemoteOrCache } = await import("@/lib/offline/repos");
+      const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+
+      const sessions = await listRemoteOrCache<any>({
+        name: "field_work_sessions",
+        remote: () =>
+          supabase
+            .from("field_work_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("status", "in_progress")
+            .order("created_at", { ascending: false })
+            .limit(1) as any,
+        filter: (s) => s.user_id === user.id && s.status === "in_progress",
+      });
+      const session = [...(sessions || [])].sort((a: any, b: any) =>
+        String(b.created_at || "").localeCompare(String(a.created_at || ""))
+      )[0] || null;
       
       if (session) {
         setActiveSession(session);
 
-        // Resolver ciclo operacional: prioriza o ciclo da sessão; senão, busca o ciclo "in_progress"
+        // Resolver ciclo operacional
         let operationalCycleId: string | null = session.cycle_id ?? null;
-        if (!operationalCycleId) {
+        if (!operationalCycleId && online) {
           const { data: currentCycle } = await supabase
             .from("cycles")
             .select("id")
@@ -149,11 +159,19 @@ function FieldWorkListPage() {
           operationalCycleId = currentCycle?.id ?? null;
         }
 
-        const { data: propsRaw, error } = await supabase
-          .from("properties")
-          .select("*")
-          .eq("block_number", session.block_number)
-          .order("sequence", { ascending: true, nullsFirst: false });
+        const propsRaw = await listRemoteOrCache<any>({
+          name: "properties",
+          remote: () =>
+            supabase
+              .from("properties")
+              .select("*")
+              .eq("block_number", session.block_number)
+              .order("sequence", { ascending: true, nullsFirst: false }) as any,
+          filter: (p) => String(p.block_number) === String(session.block_number),
+        });
+        console.log("[FWL_PROPS]", { block: session.block_number, count: propsRaw?.length || 0, online });
+        const error = null as any;
+
 
         if (error) console.error("[FieldWorkList] erro ao buscar imóveis:", error);
 
