@@ -36,7 +36,7 @@ import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Calendar as CalendarLucide } from "lucide-react";
 import { PwaManagerSection } from "@/components/pwa/PwaManagerSection";
 
-const APP_VERSION = "2.1.0";
+
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
