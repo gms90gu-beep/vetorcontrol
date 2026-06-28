@@ -16,12 +16,27 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     cachedPrompt = e as BIPEvent;
+    console.log("[PWA_BEFOREINSTALLPROMPT]", { fired: true });
+    console.log("[PWA_INSTALL_AVAILABLE]");
     notify();
   });
   window.addEventListener("appinstalled", () => {
     cachedPrompt = null;
+    console.log("[PWA_INSTALLED]");
     notify();
   });
+  // Diagnóstico: se após 8s o evento não disparou, registramos motivo provável.
+  setTimeout(() => {
+    if (!cachedPrompt && !(window.matchMedia?.("(display-mode: standalone)").matches)) {
+      console.log("[PWA_INSTALL_BLOCKED]", {
+        reason:
+          "beforeinstallprompt não disparou em 8s — checar manifest (ícones 192/512), Service Worker ativo controlando start_url, HTTPS, e se o app já está instalado.",
+        online: navigator.onLine,
+        hasSW: "serviceWorker" in navigator,
+        controller: !!navigator.serviceWorker?.controller,
+      });
+    }
+  }, 8000);
 }
 
 function detectStandalone(): boolean {

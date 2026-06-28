@@ -82,6 +82,30 @@ function attachLifecycleLogs(reg: ServiceWorkerRegistration) {
 }
 
 export async function registerPwa(): Promise<void> {
+  // Auditoria do manifest (independente do contexto)
+  try {
+    const res = await fetch("/manifest.webmanifest", { cache: "no-cache" });
+    if (!res.ok) {
+      console.warn("[PWA_MANIFEST_ERROR]", { status: res.status });
+    } else {
+      const m = await res.json();
+      const has192 = Array.isArray(m.icons) && m.icons.some((i: any) => String(i.sizes || "").includes("192x192"));
+      const has512 = Array.isArray(m.icons) && m.icons.some((i: any) => String(i.sizes || "").includes("512x512"));
+      const ok = !!(m.name && m.short_name && m.start_url && m.scope && m.display && has192 && has512);
+      console.log(ok ? "[PWA_MANIFEST_OK]" : "[PWA_MANIFEST_ERROR]", {
+        name: m.name,
+        short_name: m.short_name,
+        start_url: m.start_url,
+        scope: m.scope,
+        display: m.display,
+        has192,
+        has512,
+      });
+    }
+  } catch (e) {
+    console.warn("[PWA_MANIFEST_ERROR]", { message: String((e as any)?.message || e) });
+  }
+
   if (isRefusedContext()) {
     await unregisterAppSw();
     return;
@@ -94,6 +118,8 @@ export async function registerPwa(): Promise<void> {
       immediate: true,
       onRegisteredSW(swUrl, reg) {
         console.log("[SW_VERSION]", { swUrl });
+        console.log("[PWA_SW_REGISTER]", { swUrl, scope: reg?.scope });
+        if (reg?.active) console.log("[PWA_SW_ACTIVE]", { scriptURL: reg.active.scriptURL });
         if (reg) {
           attachLifecycleLogs(reg);
           reg.addEventListener("updatefound", () => {
@@ -120,6 +146,7 @@ export async function registerPwa(): Promise<void> {
       },
       onRegisterError(err) {
         console.warn("[SW_ROLLBACK]", { stage: "register-error", message: String((err as any)?.message || err) });
+        console.warn("[PWA_SW_ERROR]", { message: String((err as any)?.message || err) });
       },
     });
     // expõe util para forçar atualização manualmente, se necessário
