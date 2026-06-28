@@ -118,6 +118,8 @@ export async function registerPwa(): Promise<void> {
       immediate: true,
       onRegisteredSW(swUrl, reg) {
         console.log("[SW_VERSION]", { swUrl });
+        console.log("[PWA_SW_REGISTER]", { swUrl, scope: reg?.scope });
+        if (reg?.active) console.log("[PWA_SW_ACTIVE]", { scriptURL: reg.active.scriptURL });
         if (reg) {
           attachLifecycleLogs(reg);
           reg.addEventListener("updatefound", () => {
