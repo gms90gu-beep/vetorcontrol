@@ -188,7 +188,6 @@ export function OperationalHeader() {
                <ConnectivityBadge />
                <CycleWeekBadge
                  className="text-[9px] font-black text-slate-300 uppercase"
-                 date={activeSession?.session_date ? new Date(`${activeSession.session_date}T12:00:00`) : undefined}
                />
                <span className="text-[10px] font-bold text-slate-300">
                  {activeSession?.session_date
