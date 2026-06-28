@@ -146,6 +146,7 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
   if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: 0, failed: 0 };
   running = true;
   syncingFlag = true;
+  console.log("[SYNC_ENGINE_START]", { ts: Date.now() });
   notify();
   let ok = 0;
   let failed = 0;
