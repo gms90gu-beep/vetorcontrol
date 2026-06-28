@@ -3,6 +3,13 @@
 //  - NUNCA registrar em dev, dentro de iframe, em previews da Lovable,
 //    nem se a URL tiver ?sw=off.
 //  - Em qualquer contexto recusado, fazer unregister de SWs antigos em /sw.js.
+//
+// Estratégia de atualização ATÔMICA:
+//  - Workbox configurado com skipWaiting:false / clientsClaim:false.
+//  - O novo SW só assume após install completo (todos os assets precacheados)
+//    E após uma navegação/reload do usuário. Enquanto isso, a versão antiga
+//    continua servindo a aplicação — garante que o app funcione offline mesmo
+//    durante uma atualização parcial.
 
 const APP_SW_URL = "/sw.js";
 
@@ -39,12 +46,39 @@ async function unregisterAppSw() {
       const url = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || "";
       if (url.endsWith(APP_SW_URL)) {
         await r.unregister();
-        console.log("[PWA] Service worker desregistrado:", url);
+        console.log("[SW_ROLLBACK]", { url, reason: "refused-context" });
       }
     }
   } catch (e) {
-    console.warn("[PWA] Falha ao desregistrar SW antigo:", e);
+    console.warn("[SW_ROLLBACK] Falha ao desregistrar SW antigo:", e);
   }
+}
+
+function attachLifecycleLogs(reg: ServiceWorkerRegistration) {
+  const log = (sw: ServiceWorker | null, label: string) => {
+    if (!sw) return;
+    console.log(label, { state: sw.state, scriptURL: sw.scriptURL });
+    sw.addEventListener("statechange", () => {
+      console.log(label, { state: sw.state, scriptURL: sw.scriptURL });
+      if (sw.state === "installed" && navigator.serviceWorker.controller) {
+        console.log("[SW_WAITING]", {
+          message: "Nova versão pronta. Será ativada no próximo reload.",
+        });
+      }
+      if (sw.state === "activated") {
+        console.log("[SW_ACTIVATE]", { scriptURL: sw.scriptURL });
+      }
+    });
+  };
+
+  log(reg.installing, "[SW_INSTALL]");
+  log(reg.waiting, "[SW_WAITING]");
+  log(reg.active, "[SW_ACTIVATE]");
+
+  reg.addEventListener("updatefound", () => {
+    console.log("[SW_INSTALL]", { stage: "updatefound" });
+    log(reg.installing, "[SW_INSTALL]");
+  });
 }
 
 export async function registerPwa(): Promise<void> {
@@ -55,9 +89,25 @@ export async function registerPwa(): Promise<void> {
   if (!("serviceWorker" in navigator)) return;
   try {
     const { registerSW } = await import("virtual:pwa-register");
-    registerSW({ immediate: true });
-    console.log("[PWA] Service worker registrado");
+    const updateSW = registerSW({
+      immediate: true,
+      onRegisteredSW(swUrl, reg) {
+        console.log("[SW_VERSION]", { swUrl });
+        if (reg) attachLifecycleLogs(reg);
+      },
+      onNeedRefresh() {
+        console.log("[SW_WAITING]", { needRefresh: true });
+      },
+      onOfflineReady() {
+        console.log("[SW_CACHE]", { offlineReady: true });
+      },
+      onRegisterError(err) {
+        console.warn("[SW_ROLLBACK]", { stage: "register-error", message: String((err as any)?.message || err) });
+      },
+    });
+    // expõe util para forçar atualização manualmente, se necessário
+    (window as any).__applySwUpdate = () => updateSW(true);
   } catch (e) {
-    console.warn("[PWA] Falha ao registrar SW:", e);
+    console.warn("[SW_ROLLBACK] Falha ao registrar SW:", e);
   }
 }
