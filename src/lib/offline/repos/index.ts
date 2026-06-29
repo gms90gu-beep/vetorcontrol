@@ -23,11 +23,20 @@ export type DexieTableName =
 
 
 async function hydrate(name: DexieTableName, rows: any[]) {
-  if (!rows?.length) return;
+  if (!rows?.length) return 0;
   const mapped: CachedRow[] = rows
     .filter((r) => r && r.id)
     .map((r) => ({ id: r.id, data: r, updatedAt: r.updated_at }));
-  try { await (db as any)[name].bulkPut(mapped); } catch (e) { console.warn(`[OFFLINE] hydrate ${name} falhou`, e); }
+  if (name === "boletins_rg") {
+    mapped.forEach((row) => console.log("[RG_DEXIE_SAVE]", row.data));
+  }
+  try {
+    await (db as any)[name].bulkPut(mapped);
+    return mapped.length;
+  } catch (e) {
+    console.warn(`[OFFLINE] hydrate ${name} falhou`, e);
+    return 0;
+  }
 }
 
 async function readCache(name: DexieTableName, filter?: (r: any) => boolean) {
@@ -75,10 +84,13 @@ export async function listRemoteOrCache<T = any>(opts: {
   let source: DataSource = "empty";
   const arr = await safeFetch<T[]>(
     async () => {
+      if (opts.name === "boletins_rg") console.log("[RG_SYNC_START]");
       const { data, error } = await opts.remote();
       if (error) throw error;
       const rows = (data || []) as any[];
-      await hydrate(opts.name, rows);
+      if (opts.name === "boletins_rg") console.log("[RG_SYNC_RECEIVED]", rows.length);
+      const written = await hydrate(opts.name, rows);
+      if (opts.name === "boletins_rg") console.log("[RG_SYNC_WRITTEN]", written);
       const out = (opts.filter ? rows.filter(opts.filter) : rows) as T[];
       source = out.length ? "remote" : "empty";
       console.log("[DATA_SOURCE]", { table: opts.name, source, count: out.length });
