@@ -51,6 +51,12 @@ export async function safeFetch<T>(
     return await tryFallback();
   }
   try {
+    // Guard: detecta invocação remota quando navegador perdeu rede entre o check e a chamada
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      const stack = new Error("offline-remote-call").stack;
+      console.warn("[RG_DIRECT_SUPABASE]", { label, online: false, stack });
+      return await tryFallback();
+    }
     const data = await remote();
     if (opts?.hydrate) {
       try { await opts.hydrate(data); } catch (e) { console.warn("[OFFLINE] hydrate falhou:", e); }
