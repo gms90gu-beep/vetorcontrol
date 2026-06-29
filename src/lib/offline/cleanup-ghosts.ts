@@ -102,7 +102,10 @@ export async function cleanupGhosts(userId: string): Promise<GhostReport> {
     ts: Date.now(),
   };
 
+  console.log('[RG_CLEANUP_START]', { userId, ts: report.ts });
+
   // 1. sem agent_id
+
   report.removedNoOwner += await pruneNoOwner(offlineDb.boletins_rg, 'agent_id');
   report.removedNoOwner += await pruneNoOwner(offlineDb.daily_work_records, 'agent_id');
 
