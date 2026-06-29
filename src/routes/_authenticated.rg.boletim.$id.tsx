@@ -221,19 +221,45 @@ function BoletimView() {
       setBoletim(b);
 
       // 4) Imóveis (online → Supabase + hidrata; offline → Dexie filtrado por boletim_id)
-      const propsRaw = await listRemoteOrCache<any>({
+      let propsRaw = await listRemoteOrCache<any>({
         name: "properties",
         remote: () =>
           supabase
             .from("properties")
-            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id")
+            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
             .eq("boletim_id", b!.id)
             .order("sequence", { ascending: true }) as any,
         filter: (p) => p.boletim_id === b!.id,
       });
+      const viewerSource = (propsRaw as any)?.source || "remote";
+      console.log(viewerSource === "remote" ? "[RG_VIEWER_REMOTE]" : "[RG_VIEWER_LOCAL]", { boletim_id: b.id, count: propsRaw?.length || 0 });
+
+      // Fallback offline: se não houver match por boletim_id no cache, tentar block_id e block_number
+      if ((!propsRaw || propsRaw.length === 0) && !online) {
+        const byBlockId = b.block_id
+          ? await listRemoteOrCache<any>({
+              name: "properties",
+              remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
+              filter: (p) => p.block_id === b!.block_id,
+            })
+          : [];
+        if (byBlockId && byBlockId.length) {
+          propsRaw = byBlockId as any;
+          console.log("[RG_VIEWER_LOCAL]", { fallback: "block_id", count: byBlockId.length });
+        } else if (b.block_number) {
+          const byNumber = await listRemoteOrCache<any>({
+            name: "properties",
+            remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
+            filter: (p) => String(p.block_number) === String(b!.block_number),
+          });
+          propsRaw = byNumber as any;
+          console.log("[RG_VIEWER_LOCAL]", { fallback: "block_number", count: byNumber.length });
+        }
+      }
 
       const props: Property[] = [...((propsRaw || []) as Property[])].sort(comparePropertyNumber);
       console.log("[RG_PROPS]", { boletim_id: b.id, count: props.length, online });
+      if (!props.length) console.log("[RG_VIEWER_EMPTY]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number, online });
       setImoveis(props);
     } catch (e: any) {
       console.error("[BRG] erro ao carregar:", e);
