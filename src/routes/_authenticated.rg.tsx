@@ -747,6 +747,7 @@ function RGPage() {
             viewBusy={viewBusy}
             editBusy={editBusy}
             deleteBusy={deleteBusy}
+            uiDiagnostics={uiDiagnostics}
             onView={handleView}
             onPDF={handlePDF}
             onEdit={handleEdit}
@@ -803,7 +804,7 @@ function RGPage() {
   );
 }
 
-function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, emptyFallback, onView, onPDF, onEdit, onDelete }: {
+function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, emptyFallback, onView, onPDF, onEdit, onDelete, uiDiagnostics }: {
   boletins: BoletimRow[];
   pdfBusy: string | null;
   viewBusy: string | null;
