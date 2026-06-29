@@ -250,28 +250,36 @@ function RGPage() {
     console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
     setBoletins(normalized);
 
-    // T1 — Resolver block_number offline via Dexie quando ausente
+    // T1 — Resolver número do quarteirão via Dexie quando ausente.
+    // Ordem: boletins_rg.block_id → Dexie.blocks.id → blocks.number → blocks.block_number
+    //        (boletins_rg.block_number / boletins_rg.quarteirao já são tratados em normalizeBoletimRow)
     (async () => {
       try {
-        const missing = normalized.filter((r) => !r.block_number && r.block_id);
-        if (!missing.length) {
-          console.log("[RG_OFFLINE_BLOCK]", { resolved: 0, pending: 0 });
-          return;
-        }
-        const { getLocal } = await import("@/lib/offline/repos");
+        const missing = normalized.filter((r) => !r.block_number);
+        console.log("[RG_BLOCK_LOOKUP]", { total: normalized.length, missing: missing.length });
+        if (!missing.length) return;
         const patches = new Map<string, string>();
         for (const r of missing) {
-          const cached = await getLocal<any>("blocks", r.block_id as string);
-          console.log("[RG_BLOCK_CACHE]", { id: r.id, block_id: r.block_id, hit: !!cached, number: cached?.number ?? null });
-          if (cached?.number) patches.set(r.id, String(cached.number));
-          else console.log("[RG_BLOCK_FALLBACK]", { id: r.id, block_id: r.block_id, reason: "no cache" });
+          let found: string | null = null;
+          const origin: "Dexie" | "Remote" = "Dexie";
+          if (r.block_id) {
+            const cached = await offlineDb.blocks.get(r.block_id);
+            const blk: any = cached?.data ?? null;
+            const num = blk?.number ?? blk?.block_number ?? null;
+            if (num !== null && num !== undefined && num !== "") found = String(num);
+          }
+          if (found) {
+            patches.set(r.id, found);
+            console.log("[RG_BLOCK_FOUND]", { id: r.id, block_id: r.block_id, number: found, origin });
+          } else {
+            console.log("[RG_BLOCK_NOT_FOUND]", { id: r.id, block_id: r.block_id });
+          }
         }
         if (patches.size) {
           setBoletins((prev) => prev.map((b) => patches.has(b.id) ? { ...b, block_number: patches.get(b.id)! } : b));
-          console.log("[RG_OFFLINE_BLOCK]", { resolved: patches.size, pending: missing.length - patches.size });
         }
       } catch (e) {
-        console.warn("[RG_OFFLINE_BLOCK] falhou:", e);
+        console.warn("[RG_BLOCK_LOOKUP] falhou:", e);
       }
     })();
   }, [rgData]);
