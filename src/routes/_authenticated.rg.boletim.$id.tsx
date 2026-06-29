@@ -220,8 +220,16 @@ function BoletimView() {
 
       setBoletim(b);
 
-      // 4) Imóveis (online → Supabase + hidrata; offline → Dexie filtrado por boletim_id)
-      let propsRaw = await listRemoteOrCache<any>({
+      // 4) Imóveis — resolução em cadeia (boletim_id → block_id → block_number).
+      //    Qualquer relacionamento que produzir resultado é utilizado.
+      console.log("[RG_VIEWER_LOOKUP]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number });
+
+      let usedRel: "boletim_id" | "block_id" | "block_number" | "none" = "none";
+      let propsRaw: any[] = [];
+      let viewerSource: string = "remote";
+
+      // (a) por boletim_id
+      const byBoletim = await listRemoteOrCache<any>({
         name: "properties",
         remote: () =>
           supabase
@@ -231,34 +239,50 @@ function BoletimView() {
             .order("sequence", { ascending: true }) as any,
         filter: (p) => p.boletim_id === b!.id,
       });
-      const viewerSource = (propsRaw as any)?.source || "remote";
-      console.log(viewerSource === "remote" ? "[RG_VIEWER_REMOTE]" : "[RG_VIEWER_LOCAL]", { boletim_id: b.id, count: propsRaw?.length || 0 });
+      viewerSource = (byBoletim as any)?.source || "remote";
+      if (byBoletim && byBoletim.length) {
+        propsRaw = byBoletim as any[];
+        usedRel = "boletim_id";
+      }
 
-      // Fallback offline: se não houver match por boletim_id no cache, tentar block_id e block_number
-      if ((!propsRaw || propsRaw.length === 0) && !online) {
-        const byBlockId = b.block_id
-          ? await listRemoteOrCache<any>({
-              name: "properties",
-              remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
-              filter: (p) => p.block_id === b!.block_id,
-            })
-          : [];
+      // (b) fallback por block_id (Dexie + remoto)
+      if (!propsRaw.length && b.block_id) {
+        const byBlockId = await listRemoteOrCache<any>({
+          name: "properties",
+          remote: () =>
+            supabase
+              .from("properties")
+              .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
+              .eq("block_id", b!.block_id as string)
+              .order("sequence", { ascending: true }) as any,
+          filter: (p) => p.block_id === b!.block_id,
+        });
         if (byBlockId && byBlockId.length) {
-          propsRaw = byBlockId as any;
-          console.log("[RG_VIEWER_LOCAL]", { fallback: "block_id", count: byBlockId.length });
-        } else if (b.block_number) {
-          const byNumber = await listRemoteOrCache<any>({
-            name: "properties",
-            remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
-            filter: (p) => String(p.block_number) === String(b!.block_number),
-          });
-          propsRaw = byNumber as any;
-          console.log("[RG_VIEWER_LOCAL]", { fallback: "block_number", count: byNumber.length });
+          propsRaw = byBlockId as any[];
+          usedRel = "block_id";
+          viewerSource = (byBlockId as any)?.source || viewerSource;
+        }
+        console.log("[RG_VIEWER_BLOCK]", { block_id: b.block_id, count: byBlockId?.length || 0 });
+      }
+
+      // (c) fallback por block_number (cache local; resolve também o block_id pelo número)
+      if (!propsRaw.length && b.block_number) {
+        const byNumber = await listRemoteOrCache<any>({
+          name: "properties",
+          remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
+          filter: (p) => String(p.block_number) === String(b!.block_number),
+        });
+        if (byNumber && byNumber.length) {
+          propsRaw = byNumber as any[];
+          usedRel = "block_number";
+          viewerSource = (byNumber as any)?.source || "cache";
         }
       }
 
+      console.log("[RG_VIEWER_PROPERTIES]", { boletim_id: b.id, relationship: usedRel, count: propsRaw.length, source: viewerSource });
+
       const props: Property[] = [...((propsRaw || []) as Property[])].sort(comparePropertyNumber);
-      console.log("[RG_PROPS]", { boletim_id: b.id, count: props.length, online });
+      console.log("[RG_VIEWER_RESULT]", { boletim_id: b.id, count: props.length, relationship: usedRel, source: viewerSource, online });
       if (!props.length) console.log("[RG_VIEWER_EMPTY]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number, online });
       setImoveis(props);
     } catch (e: any) {
