@@ -62,19 +62,35 @@ function AuthenticatedLayout() {
   const isLandscape = isMobileDevice && isLandscapeRaw;
   const { isLoading: isOperationalLoading, userRole } = useOperationalDate();
   const [mounted, setMounted] = useState(false);
+  const [bootElapsed, setBootElapsed] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // T4 — Safety timeout: nunca bloquear a UI mais de 2s aguardando role/sessão.
+  // Após 2s usa sessão + role do cache local (qualquer um já hidratou).
+  useEffect(() => {
+    console.log("[PENDING_BOOT]", { mounted, isReady, hasUser: !!user, isOperationalLoading });
+    const t = setTimeout(() => {
+      setBootElapsed(true);
+      console.log("[PENDING_TIMEOUT]", { isReady, hasUser: !!user, role: userRole, isOperationalLoading });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
     if (!user) {
       console.warn("[Protected Layout] Auth pronto sem usuário; redirecionando para login.");
       router.navigate({ to: "/login", replace: true });
+    } else {
+      console.log("[PENDING_AUTH]", { userId: user.id, role: userRole });
     }
-  }, [isReady, router, user]);
+  }, [isReady, router, user, userRole]);
 
   const online = typeof navigator !== "undefined" ? navigator.onLine !== false : true;
   // Offline: nunca bloquear pelo loading operacional (role) — usa cache local imediatamente.
-  const stillBlocking = !mounted || !isReady || !user || (isOperationalLoading && online);
+  // T4: após 2s libera mesmo online (cache de role/sessão já é fonte da verdade).
+  const operationalBlock = isOperationalLoading && online && !bootElapsed;
+  const stillBlocking = !mounted || !isReady || !user || operationalBlock;
   if (stillBlocking) {
     return (
       <div suppressHydrationWarning className="flex min-h-screen items-center justify-center bg-background text-foreground">
@@ -83,6 +99,8 @@ function AuthenticatedLayout() {
       </div>
     );
   }
+  console.log("[PENDING_READY]", { userId: user.id, role: userRole, online });
+  console.log("[PENDING_CACHE]", { source: bootElapsed && isOperationalLoading ? "cache_timeout" : "live" });
 
 
   const handleLogout = async () => {

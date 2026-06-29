@@ -159,7 +159,7 @@ function FieldWorkListPage() {
           operationalCycleId = currentCycle?.id ?? null;
         }
 
-        const propsRaw = await listRemoteOrCache<any>({
+        let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
           remote: () =>
             supabase
@@ -169,6 +169,34 @@ function FieldWorkListPage() {
               .order("sequence", { ascending: true, nullsFirst: false }) as any,
           filter: (p) => String(p.block_number) === String(session.block_number),
         });
+        const fwlSource = (propsRaw as any)?.source || "remote";
+        console.log("[FIELD_BLOCK]", { block_number: session.block_number, block_id: session.block_id ?? null, online });
+        console.log(fwlSource === "remote" ? "[FIELD_REMOTE]" : "[FIELD_CACHE]", { count: propsRaw?.length || 0 });
+
+        // Fallback offline por block_id quando não houver match por block_number no cache
+        if ((!propsRaw || propsRaw.length === 0) && !online) {
+          let blockIdGuess: string | null = session.block_id ?? null;
+          if (!blockIdGuess && session.block_number) {
+            const blocks = await listRemoteOrCache<any>({
+              name: "blocks",
+              remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
+              filter: (bk) => String(bk.number) === String(session.block_number),
+            });
+            blockIdGuess = blocks?.[0]?.id ?? null;
+          }
+          if (blockIdGuess) {
+            const byBlockId = await listRemoteOrCache<any>({
+              name: "properties",
+              remote: () => Promise.resolve({ data: [] as any[], error: null }) as any,
+              filter: (p) => p.block_id === blockIdGuess,
+            });
+            if (byBlockId?.length) {
+              propsRaw = byBlockId as any;
+              console.log("[FIELD_CACHE]", { fallback: "block_id", block_id: blockIdGuess, count: byBlockId.length });
+            }
+          }
+        }
+        console.log("[FIELD_PROPERTIES]", { count: propsRaw?.length || 0, online });
         console.log("[FWL_PROPS]", { block: session.block_number, count: propsRaw?.length || 0, online });
 
 
