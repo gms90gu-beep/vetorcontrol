@@ -136,6 +136,7 @@ export async function cleanupGhosts(userId: string): Promise<GhostReport> {
 
   await offlineDb.meta.put({ key: CLEANUP_KEY, value: report });
   console.log('[CLEANUP_GHOSTS]', report);
+  console.log('[RG_CLEANUP_FINISH]', report);
   return report;
 }
 
