@@ -249,6 +249,31 @@ function RGPage() {
     console.log('[RG_NORMALIZED_COUNT]', normalized.length);
     console.log(`Após filtros restaram ${normalized.length} boletins`, normalized[0]);
     setBoletins(normalized);
+
+    // T1 — Resolver block_number offline via Dexie quando ausente
+    (async () => {
+      try {
+        const missing = normalized.filter((r) => !r.block_number && r.block_id);
+        if (!missing.length) {
+          console.log("[RG_OFFLINE_BLOCK]", { resolved: 0, pending: 0 });
+          return;
+        }
+        const { getLocal } = await import("@/lib/offline/repos");
+        const patches = new Map<string, string>();
+        for (const r of missing) {
+          const cached = await getLocal<any>("blocks", r.block_id as string);
+          console.log("[RG_BLOCK_CACHE]", { id: r.id, block_id: r.block_id, hit: !!cached, number: cached?.number ?? null });
+          if (cached?.number) patches.set(r.id, String(cached.number));
+          else console.log("[RG_BLOCK_FALLBACK]", { id: r.id, block_id: r.block_id, reason: "no cache" });
+        }
+        if (patches.size) {
+          setBoletins((prev) => prev.map((b) => patches.has(b.id) ? { ...b, block_number: patches.get(b.id)! } : b));
+          console.log("[RG_OFFLINE_BLOCK]", { resolved: patches.size, pending: missing.length - patches.size });
+        }
+      } catch (e) {
+        console.warn("[RG_OFFLINE_BLOCK] falhou:", e);
+      }
+    })();
   }, [rgData]);
 
   // Contagem de imóveis por boletim — fonte única: boletim_id.
