@@ -29,11 +29,19 @@ export interface GhostReport {
 const CLEANUP_KEY = 'cleanup:last';
 const AUTO_FLAG = 'offline_v2_cleanup_ghosts';
 
-const RG_REQUIRED = ['block_id', 'record_date'] as const;
+// Critérios mínimos reais de corrupção — NUNCA incluir campos opcionais (ex.: record_date)
+// que não existem no schema oficial de boletins_rg.
+const RG_REQUIRED = ['id', 'block_id'] as const;
 
 async function pruneNoOwner(store: any, ownerKey: string): Promise<number> {
   const rows: CachedRow[] = await store.toArray();
   const bad = rows.filter((r) => !r.data?.[ownerKey]).map((r) => r.id);
+  const total = rows.length;
+  console.warn('[RG_CLEANUP_DELETE]', bad.length, 'de', total, `(noOwner:${ownerKey})`);
+  if (total > 0 && (bad.length === total || bad.length > total * 0.8)) {
+    console.warn('[RG_CLEANUP_ABORT]', `noOwner:${ownerKey}`, bad.length, '/', total);
+    return 0;
+  }
   if (bad.length) await store.bulkDelete(bad);
   return bad.length;
 }
@@ -50,17 +58,28 @@ async function pruneDuplicates(store: any): Promise<number> {
     if (a > b) { dupIds.push(cur.id); byId.set(r.id, r); }
     else dupIds.push(r.id);
   }
-  // Dexie keys são únicos — duplicados em-disco não existem, mas chamamos
-  // bulkPut do "vencedor" para garantir e bulkDelete dos perdedores não tem efeito real.
-  // Mantemos o contador para visibilidade.
   return dupIds.length;
 }
 
 async function pruneInconsistentRG(): Promise<number> {
   const rows: CachedRow[] = await offlineDb.boletins_rg.toArray();
+  const total = rows.length;
+  console.log('[RG_CLEANUP_CHECK]', 'total=', total, 'required=', RG_REQUIRED);
   const bad = rows
-    .filter((r) => RG_REQUIRED.some((k) => !r.data?.[k]))
+    .filter((r) => {
+      if (!r || !r.data || typeof r.data !== 'object') return true;
+      if (!r.id) return true;
+      const d: any = r.data;
+      // Corrupção real: sem qualquer referência a quarteirão (nem block_id nem block_number)
+      if (!d.block_id && !d.block_number) return true;
+      return false;
+    })
     .map((r) => r.id);
+  console.warn('[RG_CLEANUP_DELETE]', bad.length, 'de', total, '(inconsistentRG)');
+  if (total > 0 && (bad.length === total || bad.length > total * 0.8)) {
+    console.warn('[RG_CLEANUP_ABORT]', 'inconsistentRG', bad.length, '/', total);
+    return 0;
+  }
   if (bad.length) await offlineDb.boletins_rg.bulkDelete(bad);
   return bad.length;
 }
@@ -83,7 +102,10 @@ export async function cleanupGhosts(userId: string): Promise<GhostReport> {
     ts: Date.now(),
   };
 
+  console.log('[RG_CLEANUP_START]', { userId, ts: report.ts });
+
   // 1. sem agent_id
+
   report.removedNoOwner += await pruneNoOwner(offlineDb.boletins_rg, 'agent_id');
   report.removedNoOwner += await pruneNoOwner(offlineDb.daily_work_records, 'agent_id');
 
@@ -114,6 +136,7 @@ export async function cleanupGhosts(userId: string): Promise<GhostReport> {
 
   await offlineDb.meta.put({ key: CLEANUP_KEY, value: report });
   console.log('[CLEANUP_GHOSTS]', report);
+  console.log('[RG_CLEANUP_FINISH]', report);
   return report;
 }
 
