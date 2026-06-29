@@ -117,6 +117,16 @@ type Boletim = {
 
 type BoletimRow = Boletim & { total_imoveis: number };
 
+type RGUIDiagnostics = Record<string, {
+  block: Record<string, any> | null;
+  properties: Record<string, any>[];
+  filters: {
+    boletim_id: string;
+    block_id: string | null;
+    block_number: string | null;
+  };
+}>;
+
 function safeFormatDate(value: unknown, pattern: string, fallback = "—") {
   if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) return fallback;
   const date = value instanceof Date ? value : new Date(value);
@@ -172,6 +182,7 @@ function RGPage() {
   const { data: rgData, loading: rgLoading, error: rgError, refresh: refreshRGRecords } = useRGRecords(userId);
 
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
+  const [uiDiagnostics, setUiDiagnostics] = useState<RGUIDiagnostics>({});
   const loading = rgLoading;
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [viewBusy, setViewBusy] = useState<string | null>(null);
@@ -286,6 +297,56 @@ function RGPage() {
 
   // Contagem de imóveis por boletim — fonte única: boletim_id.
   // Não usar fallback por block_id: após reconciliação, todo imóvel possui boletim_id.
+  useEffect(() => {
+    if (!boletins.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [cachedBlocks, cachedProperties] = await Promise.all([
+          offlineDb.blocks.toArray(),
+          offlineDb.properties.toArray(),
+        ]);
+        if (cancelled) return;
+
+        const blocksById = new Map<string, any>();
+        for (const row of cachedBlocks as any[]) {
+          const block = row?.data ?? row;
+          if (block?.id) blocksById.set(String(block.id), block);
+        }
+
+        const diagnostics: RGUIDiagnostics = {};
+        for (const record of boletins) {
+          const blockId = record.block_id ? String(record.block_id) : null;
+          const blockNumber = record.block_number ? String(record.block_number) : null;
+          const block = blockId ? blocksById.get(blockId) ?? null : null;
+          const properties = (cachedProperties as any[])
+            .map((row) => row?.data ?? row)
+            .filter((property) => {
+              if (!property) return false;
+              if (property.boletim_id && String(property.boletim_id) === String(record.id)) return true;
+              if (blockId && property.block_id && String(property.block_id) === blockId) return true;
+              if (blockNumber && property.block_number && String(property.block_number) === blockNumber) return true;
+              return false;
+            });
+
+          diagnostics[record.id] = {
+            block,
+            properties,
+            filters: {
+              boletim_id: record.id,
+              block_id: blockId,
+              block_number: blockNumber,
+            },
+          };
+        }
+        setUiDiagnostics(diagnostics);
+      } catch (error) {
+        console.warn("[RG_UI_DIAGNOSTICS_ERROR]", error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [boletins]);
+
   useEffect(() => {
     if (!boletins.length) return;
     let cancelled = false;
@@ -753,6 +814,7 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, em
   onPDF: (b: BoletimRow) => void;
   onEdit: (b: BoletimRow) => void;
   onDelete: (b: BoletimRow) => void;
+  uiDiagnostics?: RGUIDiagnostics;
 }) {
   console.log("[RG_COMPONENT_RENDER]", boletins.length);
   console.log("[RG_IDS]", boletins.map((b) => b.id));
@@ -799,6 +861,7 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, em
         <BoletimCard
           key={b.id}
           b={b}
+          diagnostic={uiDiagnostics?.[b.id]}
           pdfBusy={pdfBusy === b.id}
           viewBusy={viewBusy === b.id}
           editBusy={editBusy === b.id}
@@ -813,8 +876,9 @@ function BoletimCardList({ boletins, pdfBusy, viewBusy, editBusy, deleteBusy, em
   );
 }
 
-function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
+function BoletimCard({ b, diagnostic, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF, onEdit, onDelete }: {
   b: BoletimRow;
+  diagnostic?: RGUIDiagnostics[string];
   pdfBusy: boolean;
   viewBusy: boolean;
   editBusy: boolean;
@@ -824,6 +888,24 @@ function BoletimCard({ b, pdfBusy, viewBusy, editBusy, deleteBusy, onView, onPDF
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const uiBlock = diagnostic?.block ?? null;
+  const uiProperties = diagnostic?.properties ?? [];
+  console.log("[RG_UI_RECORD]", b);
+  console.log("[RG_UI_BLOCK]", uiBlock);
+  console.log("[RG_UI_PROPERTIES]", uiProperties);
+  console.log("[RG_UI_RECORD_KEYS]", Object.keys(b ?? {}));
+  console.log("[RG_UI_BLOCK_KEYS]", Object.keys(uiBlock ?? {}));
+  console.log("[RG_UI_PROPERTIES_KEYS]", Object.keys(uiProperties[0] ?? {}));
+  console.log("[RG_UI_FIELDS]", {
+    id: b.id,
+    block_id: (b as any).block_id ?? null,
+    block_number: (b as any).block_number ?? null,
+    number: (b as any).number ?? null,
+    quarteirao: (b as any).quarteirao ?? null,
+    block: (b as any).block ?? null,
+    renderedQtrValue: (b as any).block_number || (b as any).quarteirao || (b as any).block || (b as any).block_id || "-",
+    diagnosticFilters: diagnostic?.filters ?? null,
+  });
   const status = b.finalized_at ? "Finalizado" : "Em aberto";
   const statusBg = b.finalized_at ? "#dcfce7" : C.blueBg;
   const statusFg = b.finalized_at ? "#15803d" : C.blue;
