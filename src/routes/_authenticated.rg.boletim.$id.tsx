@@ -85,6 +85,8 @@ function BoletimView() {
   const [loading, setLoading] = useState(true);
   const [boletim, setBoletim] = useState<Boletim | null>(null);
   const [imoveis, setImoveis] = useState<Property[]>([]);
+  const [viewerBlock, setViewerBlock] = useState<Record<string, any> | null>(null);
+  const [viewerFilters, setViewerFilters] = useState<Record<string, any> | null>(null);
   const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +113,8 @@ function BoletimView() {
   async function load() {
     setLoading(true);
     setLoadError(null);
+      setViewerBlock(null);
+      setViewerFilters(null);
     try {
       const { listRemoteOrCache, getLocal } = await import("@/lib/offline/repos");
       const online = typeof navigator !== "undefined" ? navigator.onLine : true;
@@ -218,11 +222,16 @@ function BoletimView() {
         console.warn("[RG_BLOCK] fallback falhou:", e);
       }
 
+      const blockForUi = b.block_id ? await getLocal<any>("blocks", b.block_id) : null;
+      setViewerBlock(blockForUi);
+
       setBoletim(b);
 
       // 4) Imóveis — resolução em cadeia (boletim_id → block_id → block_number).
       //    Qualquer relacionamento que produzir resultado é utilizado.
-      console.log("[RG_VIEWER_LOOKUP]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number });
+      const lookupFilters = { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number };
+      setViewerFilters(lookupFilters);
+      console.log("[RG_VIEWER_LOOKUP]", lookupFilters);
 
       let usedRel: "boletim_id" | "block_id" | "block_number" | "none" = "none";
       let propsRaw: any[] = [];
@@ -262,7 +271,7 @@ function BoletimView() {
           usedRel = "block_id";
           viewerSource = (byBlockId as any)?.source || viewerSource;
         }
-        console.log("[RG_VIEWER_BLOCK]", { block_id: b.block_id, count: byBlockId?.length || 0 });
+        console.log("[RG_VIEWER_BLOCK_FILTER]", { block_id: b.block_id, count: byBlockId?.length || 0 });
       }
 
       // (c) fallback por block_number (cache local; resolve também o block_id pelo número)
@@ -283,7 +292,10 @@ function BoletimView() {
 
       const props: Property[] = [...((propsRaw || []) as Property[])].sort(comparePropertyNumber);
       console.log("[RG_VIEWER_RESULT]", { boletim_id: b.id, count: props.length, relationship: usedRel, source: viewerSource, online });
-      if (!props.length) console.log("[RG_VIEWER_EMPTY]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number, online });
+      if (!props.length) {
+        console.log("[RG_VIEWER_EMPTY]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number, online });
+        console.log("[RG_VIEWER_EMPTY_FILTER]", lookupFilters);
+      }
       setImoveis(props);
     } catch (e: any) {
       console.error("[BRG] erro ao carregar:", e);
@@ -534,6 +546,14 @@ function BoletimView() {
       </div>
     );
   }
+
+  console.log("[RG_VIEWER_INPUT]", boletim);
+  console.log("[RG_VIEWER_BLOCK]", viewerBlock);
+  console.log("[RG_VIEWER_PROPERTIES]", imoveis);
+  console.log("[RG_VIEWER_INPUT_KEYS]", Object.keys(boletim ?? {}));
+  console.log("[RG_VIEWER_BLOCK_KEYS]", Object.keys(viewerBlock ?? {}));
+  console.log("[RG_VIEWER_PROPERTIES_KEYS]", Object.keys(imoveis[0] ?? {}));
+  if (imoveis.length === 0) console.log("[RG_VIEWER_EMPTY_FILTER_RENDER]", viewerFilters);
 
   return (
     <div className="min-h-screen bg-muted/40 brg-screen">
