@@ -45,6 +45,24 @@ function toRGRecord(r: any): RGRecord {
 
 const RG_MIGRATION_KEY = 'rg_cache_v2_drop_appdb';
 
+async function logDexieRGSnapshot(context: string) {
+  try {
+    console.log('[DEXIE_TABLES]', offlineDb.tables.map((t) => t.name));
+    console.log('[DEXIE_DB_INFO]', {
+      context,
+      name: offlineDb.name,
+      version: offlineDb.verno,
+      schema: offlineDb.tables.map((t) => ({ name: t.name, schema: t.schema.primKey.src, indexes: t.schema.indexes.map((i) => i.src) })),
+    });
+    const total = await offlineDb.boletins_rg.count();
+    console.log('[DEXIE_RG_TOTAL]', total);
+    const all = await offlineDb.boletins_rg.limit(5).toArray();
+    console.log('[DEXIE_RG_SAMPLE]', all);
+  } catch (e) {
+    console.warn('[DEXIE_RG_DIAGNOSTIC_ERROR]', { context, error: e });
+  }
+}
+
 /** One-shot: zera o cache legado AppDB.rg. A partir daqui, RG vive só em offlineDb.boletins_rg. */
 async function dropLegacyAppDbRG() {
   try {
@@ -74,6 +92,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      await logDexieRGSnapshot('useRGRecords:diagnostic-effect:before-cache-read');
       const rows = userId ? await offlineDb.boletins_rg.toArray() : [];
       if (cancelled) return;
       const cache = rows
@@ -96,6 +115,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
   const data = useLiveQuery(
     async () => {
       console.log('[RG_LIVEQUERY_RUN]', { userId });
+      await logDexieRGSnapshot('useRGRecords:liveQuery:before-cache-read');
       if (!userId) {
         console.log('[RG_CACHE]', 0);
         console.log('[RG_REMOTE]', serverCount ?? 0);
@@ -156,6 +176,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
     try {
       await dropLegacyAppDbRG();
 
+      console.log('[RG_SYNC_START]');
       const { data: rows, error: apiError } = await (supabase as any)
         .from('boletins_rg')
         .select('*')
@@ -164,15 +185,17 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
       if (apiError) throw apiError;
 
       const serverRows = rows ?? [];
+      console.log('[RG_SYNC_RECEIVED]', serverRows.length);
       setServerCount(serverRows.length);
 
-      await reconcile({
+      const report = await reconcile({
         module: 'rg',
         userId,
         serverRows,
         localStore: offlineDb.boletins_rg,
         ownerKey: 'agent_id',
       });
+      console.log('[RG_SYNC_WRITTEN]', report.inserted + report.updated);
 
       setIsStale(false);
     } catch (e) {

@@ -132,7 +132,9 @@ export async function reconcile({
   }
 
   if (inserted.length) await localStore.bulkPut(inserted);
+  if (inserted.length && module === 'rg') inserted.forEach((row) => console.log('[RG_DEXIE_SAVE]', row.data));
   if (updated.length) await localStore.bulkPut(updated);
+  if (updated.length && module === 'rg') updated.forEach((row) => console.log('[RG_DEXIE_SAVE]', row.data));
   if (deletedIds.length) await localStore.bulkDelete(deletedIds);
   if (conflicts.length) await appendConflicts(conflicts);
 
