@@ -894,6 +894,9 @@ function BoletimCard({ b, diagnostic, pdfBusy, viewBusy, editBusy, deleteBusy, o
   console.log("[RG_UI_RECORD]", b);
   console.log("[RG_UI_BLOCK]", uiBlock);
   console.log("[RG_UI_PROPERTIES]", uiProperties);
+  console.log("[RG_UI_RECORD_JSON]", JSON.stringify(b, null, 2));
+  console.log("[RG_UI_BLOCK_JSON]", JSON.stringify(uiBlock, null, 2));
+  console.log("[RG_UI_PROPERTIES_JSON]", JSON.stringify(uiProperties, null, 2));
   console.log("[RG_UI_RECORD_KEYS]", Object.keys(b ?? {}));
   console.log("[RG_UI_BLOCK_KEYS]", Object.keys(uiBlock ?? {}));
   console.log("[RG_UI_PROPERTIES_KEYS]", Object.keys(uiProperties[0] ?? {}));
