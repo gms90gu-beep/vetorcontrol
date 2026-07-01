@@ -90,11 +90,64 @@ const EMPTY_SNAPSHOT: DailySnapshot = {
   strategicPointsWorked: 0,
 };
 
-async function buildDailySnapshot(userId: string, opDateStr: string): Promise<DailySnapshot> {
+export interface SessionScope {
+  sessionId?: string | null;
+  blockNumber?: string | null;
+  blockId?: string | null;
+  startedAt?: string | null; // ISO — só considera visitas criadas a partir daqui
+}
+
+async function buildDailySnapshot(
+  userId: string,
+  opDateStr: string,
+  scope?: SessionScope,
+): Promise<DailySnapshot> {
+  // Mapeia property → block para filtrar por quarteirão da jornada ativa
+  const propsAll = await listLocal<any>("properties");
+  const propBlockNumber = new Map<string, string>();
+  const propBlockId = new Map<string, string>();
+  for (const p of propsAll) {
+    if (p?.id) {
+      if (p.block_number != null) propBlockNumber.set(p.id, String(p.block_number));
+      if (p.block_id != null) propBlockId.set(p.id, String(p.block_id));
+    }
+  }
+
+  const startedAtMs = scope?.startedAt ? new Date(scope.startedAt).getTime() : 0;
+  const scopeBlockNumber = scope?.blockNumber != null ? String(scope.blockNumber) : null;
+  const scopeBlockId = scope?.blockId != null ? String(scope.blockId) : null;
+
   const allVisits = await listLocal<any>(
     "visits",
-    (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === opDateStr,
+    (v) => {
+      if (v.agent_id !== userId) return false;
+      if (String(v.visit_date || "").slice(0, 10) !== opDateStr) return false;
+      // Filtro por sessão explícita (quando disponível)
+      if (scope?.sessionId && v.field_work_session_id && v.field_work_session_id !== scope.sessionId) return false;
+      // Filtro por quarteirão da jornada ativa
+      if (scopeBlockId) {
+        const pb = propBlockId.get(v.property_id);
+        if (pb && pb !== scopeBlockId) return false;
+      } else if (scopeBlockNumber) {
+        const pn = propBlockNumber.get(v.property_id);
+        if (pn && pn !== scopeBlockNumber) return false;
+      }
+      // Filtro por janela temporal (visitas criadas após início da jornada)
+      if (startedAtMs > 0) {
+        const created = new Date(v.created_at || v.updated_at || 0).getTime();
+        if (created && created + 1000 < startedAtMs) return false;
+      }
+      return true;
+    },
   );
+  console.log("[SESSION_VISITS_FOUND]", {
+    session_id: scope?.sessionId ?? null,
+    block: scopeBlockNumber,
+    started_at: scope?.startedAt ?? null,
+    count: allVisits.length,
+    visit_ids: allVisits.map((v: any) => v.id),
+    source: "dexie",
+  });
   const allDeposits = await listLocal<any>("visit_deposits");
   const depByVisit = new Map<string, any[]>();
   for (const d of allDeposits) {
