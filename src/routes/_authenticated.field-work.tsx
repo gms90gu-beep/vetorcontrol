@@ -318,7 +318,6 @@ function FieldWorkPage() {
         user_id: user.id,
         cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
-        block_id: selectedBlock?.id || null,
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
