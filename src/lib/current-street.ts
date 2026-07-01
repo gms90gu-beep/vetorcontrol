@@ -122,14 +122,25 @@ export async function detectFromGPS(coords: {
     /* ignore */
   }
 
-  if (!isOnline()) return { street: null, source: "none" };
+  if (!isOnline()) {
+    console.warn("[GPS_REVERSE_ERROR]", { reason: "offline" });
+    return { street: null, source: "none" };
+  }
 
+  console.log("[GPS_REVERSE_START]", { latitude: coords.latitude, longitude: coords.longitude });
   try {
     const res = await reverseGeocode({
       data: { lat: coords.latitude, lng: coords.longitude },
     });
-    if (!res.ok || !res.address) return { street: null, source: "none" };
-    console.log("[CURRENT_STREET_GPS_DETECTED]", res.address);
+    if (!res.ok || !res.address) {
+      console.warn("[GPS_REVERSE_ERROR]", { reason: res.reason || "no_address", res });
+      return { street: null, source: "none" };
+    }
+    console.log("[GPS_REVERSE_SUCCESS]", {
+      street: res.address,
+      neighborhood: res.neighborhood,
+      city: res.city,
+    });
     try {
       await cacheDb.streets.put({
         key: cacheKey(coords.latitude, coords.longitude),
@@ -149,8 +160,8 @@ export async function detectFromGPS(coords: {
       city: res.city,
       source: "reverse",
     };
-  } catch (e) {
-    console.warn("[CURRENT_STREET_GPS_ERROR]", e);
+  } catch (e: any) {
+    console.warn("[GPS_REVERSE_ERROR]", { reason: e?.message || String(e) });
     return { street: null, source: "none" };
   }
 }
