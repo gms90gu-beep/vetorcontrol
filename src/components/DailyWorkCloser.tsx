@@ -366,7 +366,12 @@ export function DailyWorkCloser({
           .lte("visit_date", endOfDay.toISOString());
         
         // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
-        const snap = await buildDailySnapshot(user.id, opDateStr);
+        const snap = await buildDailySnapshot(user.id, opDateStr, {
+          sessionId: activeSession?.id ?? null,
+          blockNumber: (activeSession as any)?.block_number ?? null,
+          blockId: (activeSession as any)?.block_id ?? null,
+          startedAt: (activeSession as any)?.created_at ?? null,
+        });
         setSnapshot(snap);
 
         setLocalStats({
