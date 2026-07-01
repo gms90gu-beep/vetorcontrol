@@ -460,8 +460,31 @@ export function DailyWorkCloser({
         console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });
       }
 
-      // Snapshot único — Dexie é fonte autoritativa local
-      const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+      console.log("[SESSION_CLOSE_START]", {
+        session_id: activeSessionForClose?.id ?? null,
+        block_number: activeSessionForClose?.block_number ?? null,
+        block_id: (activeSessionForClose as any)?.block_id ?? null,
+        agent_id: currentAgent.id,
+        work_date: operationalWorkDate,
+      });
+
+      // Snapshot único — Dexie é fonte autoritativa local, escopado à jornada ativa
+      const snap = await buildDailySnapshot(user.id, operationalWorkDate, {
+        sessionId: activeSessionForClose?.id ?? null,
+        blockNumber: activeSessionForClose?.block_number ?? null,
+        blockId: (activeSessionForClose as any)?.block_id ?? null,
+        startedAt: activeSessionForClose?.created_at ?? null,
+      });
+      console.log("[SESSION_TOTAL_VISITS]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_TOTAL_PROPERTIES]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_SUMMARY]", {
+        session_id: activeSessionForClose?.id ?? null,
+        worked: snap.workedCount,
+        closed: snap.closedCount,
+        refused: snap.refusedCount,
+        visited: snap.visitedCount,
+        focus: snap.focusCount,
+      });
 
       // Reconciliação oficial: agrupamentos por tipo são fonte de verdade.
       const { reconcileIntegrity } = await import("@/lib/daily-integrity");
