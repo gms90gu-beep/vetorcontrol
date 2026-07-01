@@ -616,6 +616,25 @@ export function DailyWorkCloser({
           updated_at: new Date().toISOString(),
         });
       }
+      const closedSessionId = activeSessionForClose?.id ?? null;
+      const closedBlockId = (activeSessionForClose as any)?.block_id ?? activeSessionForClose?.block_number ?? null;
+      console.log("[SESSION_END]", { session_id: closedSessionId, block_id: closedBlockId });
+
+      // 5) Limpeza completa do estado operacional local
+      setActiveSessionId(null);
+      setOpenBlock(null);
+      setJornadaDate(null);
+      setSessionRetro({ retro: false, reason: null, createdAt: null });
+      try {
+        // Limpa quaisquer chaves temporárias de jornada (se existirem)
+        Object.keys(localStorage)
+          .filter((k) => /^vc_(active_session|current_block|selected_block|current_property)/.test(k))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent("vc:session-cleared", { detail: { session_id: closedSessionId } })); } catch {}
+      console.log("[SESSION_STATE_CLEARED]", { session_id: closedSessionId });
+      console.log("[SESSION_CLOSE_FINISH]", { session_id: closedSessionId, ok: true });
+      console.log("[RC4_SESSION_OK]");
 
       console.log("[ENCERRAR] concluído");
       const msg = isOnline()
