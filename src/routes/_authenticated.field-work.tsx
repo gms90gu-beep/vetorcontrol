@@ -313,6 +313,7 @@ function FieldWorkPage() {
       const { getEpiWeek } = await import("@/lib/cycle-week");
       const epi = getEpiWeek(new Date(`${sessionDateStr}T12:00:00`));
 
+      const nowIso = new Date().toISOString();
       const payload = {
         user_id: user.id,
         cycle_id: cycleIdToUse,
@@ -324,14 +325,18 @@ function FieldWorkPage() {
         status: "in_progress",
         is_retroactive: isRetroactive,
         retroactive_reason: isRetroactive ? retroactiveReason : null,
-        updated_at: new Date().toISOString(),
+        created_at: nowIso,
+        updated_at: nowIso,
       };
 
+      console.log("[NEW_SESSION_START]", { block_id: selectedBlock?.id || null, block_number: selectedBlock?.number, cycle_id: cycleIdToUse });
+      console.log("[NEW_BLOCK_SELECTED]", { block_id: selectedBlock?.id || null, block_number: selectedBlock?.number });
       console.log("[WORK_SESSION_CREATE]", { payload });
       const saved = await createOffline("field_work_sessions", payload);
       console.log("[WORK_DEXIE_SAVE]", { id: saved?.id });
       console.log("[WORK_QUEUE]", { table: "field_work_sessions", op: "insert", online: isOnline() });
       console.log("[WORK_READY]", { id: saved?.id, online: isOnline() });
+      console.log("[NEW_SESSION_READY]", { session_id: saved?.id, block_number: selectedBlock?.number });
       try { (window as any).__vcSetJourneyActive?.(true); } catch {}
 
       toast.success(

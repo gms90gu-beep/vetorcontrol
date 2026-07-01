@@ -90,11 +90,64 @@ const EMPTY_SNAPSHOT: DailySnapshot = {
   strategicPointsWorked: 0,
 };
 
-async function buildDailySnapshot(userId: string, opDateStr: string): Promise<DailySnapshot> {
+export interface SessionScope {
+  sessionId?: string | null;
+  blockNumber?: string | null;
+  blockId?: string | null;
+  startedAt?: string | null; // ISO — só considera visitas criadas a partir daqui
+}
+
+async function buildDailySnapshot(
+  userId: string,
+  opDateStr: string,
+  scope?: SessionScope,
+): Promise<DailySnapshot> {
+  // Mapeia property → block para filtrar por quarteirão da jornada ativa
+  const propsAll = await listLocal<any>("properties");
+  const propBlockNumber = new Map<string, string>();
+  const propBlockId = new Map<string, string>();
+  for (const p of propsAll) {
+    if (p?.id) {
+      if (p.block_number != null) propBlockNumber.set(p.id, String(p.block_number));
+      if (p.block_id != null) propBlockId.set(p.id, String(p.block_id));
+    }
+  }
+
+  const startedAtMs = scope?.startedAt ? new Date(scope.startedAt).getTime() : 0;
+  const scopeBlockNumber = scope?.blockNumber != null ? String(scope.blockNumber) : null;
+  const scopeBlockId = scope?.blockId != null ? String(scope.blockId) : null;
+
   const allVisits = await listLocal<any>(
     "visits",
-    (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === opDateStr,
+    (v) => {
+      if (v.agent_id !== userId) return false;
+      if (String(v.visit_date || "").slice(0, 10) !== opDateStr) return false;
+      // Filtro por sessão explícita (quando disponível)
+      if (scope?.sessionId && v.field_work_session_id && v.field_work_session_id !== scope.sessionId) return false;
+      // Filtro por quarteirão da jornada ativa
+      if (scopeBlockId) {
+        const pb = propBlockId.get(v.property_id);
+        if (pb && pb !== scopeBlockId) return false;
+      } else if (scopeBlockNumber) {
+        const pn = propBlockNumber.get(v.property_id);
+        if (pn && pn !== scopeBlockNumber) return false;
+      }
+      // Filtro por janela temporal (visitas criadas após início da jornada)
+      if (startedAtMs > 0) {
+        const created = new Date(v.created_at || v.updated_at || 0).getTime();
+        if (created && created + 1000 < startedAtMs) return false;
+      }
+      return true;
+    },
   );
+  console.log("[SESSION_VISITS_FOUND]", {
+    session_id: scope?.sessionId ?? null,
+    block: scopeBlockNumber,
+    started_at: scope?.startedAt ?? null,
+    count: allVisits.length,
+    visit_ids: allVisits.map((v: any) => v.id),
+    source: "dexie",
+  });
   const allDeposits = await listLocal<any>("visit_deposits");
   const depByVisit = new Map<string, any[]>();
   for (const d of allDeposits) {
@@ -109,9 +162,8 @@ async function buildDailySnapshot(userId: string, opDateStr: string): Promise<Da
   };
 
   // Mapeia property_id → type para detectar Pontos Estratégicos
-  const allProperties = await listLocal<any>("properties");
   const propType = new Map<string, string>();
-  for (const p of allProperties) propType.set(p.id, String(p.type || ""));
+  for (const p of propsAll) propType.set(p.id, String(p.type || ""));
   const strategicPropIds = new Set<string>();
 
   for (const v of allVisits) {
@@ -314,7 +366,12 @@ export function DailyWorkCloser({
           .lte("visit_date", endOfDay.toISOString());
         
         // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
-        const snap = await buildDailySnapshot(user.id, opDateStr);
+        const snap = await buildDailySnapshot(user.id, opDateStr, {
+          sessionId: activeSession?.id ?? null,
+          blockNumber: (activeSession as any)?.block_number ?? null,
+          blockId: (activeSession as any)?.block_id ?? null,
+          startedAt: (activeSession as any)?.created_at ?? null,
+        });
         setSnapshot(snap);
 
         setLocalStats({
@@ -403,8 +460,31 @@ export function DailyWorkCloser({
         console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });
       }
 
-      // Snapshot único — Dexie é fonte autoritativa local
-      const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+      console.log("[SESSION_CLOSE_START]", {
+        session_id: activeSessionForClose?.id ?? null,
+        block_number: activeSessionForClose?.block_number ?? null,
+        block_id: (activeSessionForClose as any)?.block_id ?? null,
+        agent_id: currentAgent.id,
+        work_date: operationalWorkDate,
+      });
+
+      // Snapshot único — Dexie é fonte autoritativa local, escopado à jornada ativa
+      const snap = await buildDailySnapshot(user.id, operationalWorkDate, {
+        sessionId: activeSessionForClose?.id ?? null,
+        blockNumber: activeSessionForClose?.block_number ?? null,
+        blockId: (activeSessionForClose as any)?.block_id ?? null,
+        startedAt: activeSessionForClose?.created_at ?? null,
+      });
+      console.log("[SESSION_TOTAL_VISITS]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_TOTAL_PROPERTIES]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_SUMMARY]", {
+        session_id: activeSessionForClose?.id ?? null,
+        worked: snap.workedCount,
+        closed: snap.closedCount,
+        refused: snap.refusedCount,
+        visited: snap.visitedCount,
+        focus: snap.focusCount,
+      });
 
       // Reconciliação oficial: agrupamentos por tipo são fonte de verdade.
       const { reconcileIntegrity } = await import("@/lib/daily-integrity");
@@ -536,6 +616,25 @@ export function DailyWorkCloser({
           updated_at: new Date().toISOString(),
         });
       }
+      const closedSessionId = activeSessionForClose?.id ?? null;
+      const closedBlockId = (activeSessionForClose as any)?.block_id ?? activeSessionForClose?.block_number ?? null;
+      console.log("[SESSION_END]", { session_id: closedSessionId, block_id: closedBlockId });
+
+      // 5) Limpeza completa do estado operacional local
+      setActiveSessionId(null);
+      setOpenBlock(null);
+      setJornadaDate(null);
+      setSessionRetro({ retro: false, reason: null, createdAt: null });
+      try {
+        // Limpa quaisquer chaves temporárias de jornada (se existirem)
+        Object.keys(localStorage)
+          .filter((k) => /^vc_(active_session|current_block|selected_block|current_property)/.test(k))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent("vc:session-cleared", { detail: { session_id: closedSessionId } })); } catch {}
+      console.log("[SESSION_STATE_CLEARED]", { session_id: closedSessionId });
+      console.log("[SESSION_CLOSE_FINISH]", { session_id: closedSessionId, ok: true });
+      console.log("[RC4_SESSION_OK]");
 
       console.log("[ENCERRAR] concluído");
       const msg = isOnline()
