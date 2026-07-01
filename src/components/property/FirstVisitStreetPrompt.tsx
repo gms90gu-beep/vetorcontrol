@@ -18,6 +18,7 @@ import {
   propagateToEmptyProperties,
   isSameStreet,
 } from "@/lib/current-street";
+import { requestCurrentPosition } from "@/lib/geolocation";
 
 interface Props {
   open: boolean;
