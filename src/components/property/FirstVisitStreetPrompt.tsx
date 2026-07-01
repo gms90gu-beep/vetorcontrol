@@ -55,15 +55,59 @@ export function FirstVisitStreetPrompt({
   }, [open, detectedStreet]);
 
   async function handleDetectGps() {
-    if (!coords) {
-      toast.error("Localização indisponível para detectar a rua.");
-      return;
-    }
+    console.log("[GPS_BUTTON_CLICK]", { hasCoords: !!coords, blockId });
     setDetecting(true);
     try {
-      const r = await detectFromGPS(coords);
-      if (r.street) setDetected(r.street);
-      else toast.info("Não foi possível detectar a rua pelo GPS agora.");
+      // Permissões
+      try {
+        const perm: any =
+          (navigator as any).permissions &&
+          (await (navigator as any).permissions.query({ name: "geolocation" }));
+        console.log("[GPS_PERMISSION]", { state: perm?.state ?? "unknown" });
+        if (perm?.state === "denied") {
+          toast.error("Permissão de localização negada. Ative-a nas configurações do navegador.");
+          return;
+        }
+      } catch (e) {
+        console.log("[GPS_PERMISSION]", { state: "query_unsupported" });
+      }
+
+      // Captura coordenadas (usa as passadas ou requisita novas)
+      let useCoords = coords ?? null;
+      if (!useCoords) {
+        try {
+          useCoords = await requestCurrentPosition();
+        } catch (err: any) {
+          console.warn("[GPS_POSITION]", { error: err?.message, code: err?.code });
+          const code = err?.code;
+          if (code === 1) toast.error("Permissão de localização negada.");
+          else if (code === 2) toast.error("Localização indisponível no momento.");
+          else if (code === 3) toast.error("Tempo esgotado ao obter GPS.");
+          else toast.error("Não foi possível obter a localização.");
+          return;
+        }
+      }
+      console.log("[GPS_POSITION]", {
+        latitude: useCoords.latitude,
+        longitude: useCoords.longitude,
+        accuracy: (useCoords as any).accuracy ?? null,
+      });
+
+      // Reverse geocoding
+      const r = await detectFromGPS(useCoords);
+      if (r.street) {
+        setDetected(r.street);
+        setManual(r.street);
+        console.log("[GPS_AUTOSTREET_FILLED]", {
+          street: r.street,
+          source: r.source,
+          latitude: useCoords.latitude,
+          longitude: useCoords.longitude,
+        });
+        toast.success(`Rua detectada: ${r.street}`);
+      } else {
+        toast.info("Não foi possível detectar a rua pelo GPS agora.");
+      }
     } finally {
       setDetecting(false);
     }
