@@ -162,9 +162,8 @@ async function buildDailySnapshot(
   };
 
   // Mapeia property_id → type para detectar Pontos Estratégicos
-  const allProperties = await listLocal<any>("properties");
   const propType = new Map<string, string>();
-  for (const p of allProperties) propType.set(p.id, String(p.type || ""));
+  for (const p of propsAll) propType.set(p.id, String(p.type || ""));
   const strategicPropIds = new Set<string>();
 
   for (const v of allVisits) {
