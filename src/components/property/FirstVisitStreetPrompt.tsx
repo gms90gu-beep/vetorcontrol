@@ -199,7 +199,7 @@ export function FirstVisitStreetPrompt({
             </section>
           )}
 
-          {mode === "first-visit" && !detected && coords && (
+          {mode === "first-visit" && !detected && (
             <Button
               variant="secondary"
               className="w-full"
