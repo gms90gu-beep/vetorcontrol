@@ -122,6 +122,7 @@ function FieldWorkListPage() {
 
   const fetchSessionAndProperties = async () => {
     setIsLoading(true);
+    console.log("[SESSION_RESTORE_START]");
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
@@ -144,9 +145,16 @@ function FieldWorkListPage() {
       const session = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
       )[0] || null;
-      
+
       if (session) {
         setActiveSession(session);
+        console.log("[SESSION_RESTORE_SESSION]", {
+          session_id: session.id,
+          block_id: session.block_id ?? null,
+          block_number: session.block_number,
+          session_date: session.session_date,
+          created_at: session.created_at,
+        });
 
         // Resolver ciclo operacional
         let operationalCycleId: string | null = session.cycle_id ?? null;
@@ -158,6 +166,11 @@ function FieldWorkListPage() {
             .maybeSingle();
           operationalCycleId = currentCycle?.id ?? null;
         }
+
+        console.log("[SESSION_RESTORE_BLOCK]", {
+          block_id: session.block_id ?? null,
+          block_number: session.block_number,
+        });
 
         let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
@@ -174,7 +187,7 @@ function FieldWorkListPage() {
         console.log(fwlSource === "remote" ? "[FIELD_REMOTE]" : "[FIELD_CACHE]", { count: propsRaw?.length || 0 });
 
         // Fallback offline por block_id quando não houver match por block_number no cache
-        if ((!propsRaw || propsRaw.length === 0) && !online) {
+        if ((!propsRaw || propsRaw.length === 0)) {
           let blockIdGuess: string | null = session.block_id ?? null;
           if (!blockIdGuess && session.block_number) {
             const blocks = await listRemoteOrCache<any>({
@@ -197,12 +210,12 @@ function FieldWorkListPage() {
           }
         }
         console.log("[FIELD_PROPERTIES]", { count: propsRaw?.length || 0, online });
-        console.log("[FWL_PROPS]", { block: session.block_number, count: propsRaw?.length || 0, online });
+        console.log("[SESSION_RESTORE_PROPERTIES]", {
+          session_id: session.id,
+          block_id: session.block_id ?? null,
+          count: propsRaw?.length || 0,
+        });
 
-
-        // Ordenação robusta: respeita a SEQUÊNCIA do RG (porta-a-porta).
-        // Empates: rua → número → complemento → id. Garante que imóveis com
-        // complemento (ex.: 100, 100A, 100B) e mesma sequência não sejam pulados.
         const seqKey = (s: any) => {
           if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
           const v = Number(s);
@@ -224,11 +237,36 @@ function FieldWorkListPage() {
           if (ca !== cb) return ca < cb ? -1 : 1;
           return String(a.id).localeCompare(String(b.id));
         });
-        console.log("[FIELD_WORK_LIST] imóveis ordenados por sequência:", props.length,
-          props.slice(0, 5).map((p: any) => ({ seq: p.sequence, n: p.number, c: p.complement })));
 
         if (props) {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
+          const propertyIdSet = new Set(propertyIds);
+
+          // ─── Carregar visitas da JORNADA (RC-5) ─────────────────────
+          // Escopo estrito: field_work_session_id === session.id
+          // OU (fallback) block_id/block_number da sessão + agent_id + cycle_id
+          // NUNCA usar todas as visitas do agente sem filtro de escopo.
+          const sessionCreatedAt = session.created_at
+            ? new Date(session.created_at).getTime()
+            : 0;
+          const inScope = (v: any) => {
+            if (!v) return false;
+            if (v.agent_id && v.agent_id !== user.id) return false;
+            if (v.field_work_session_id && v.field_work_session_id === session.id) return true;
+            // Fallback quando o cliente antigo não gravou field_work_session_id
+            const matchesBlock =
+              (session.block_id && v.block_id === session.block_id) ||
+              (v.property_id && propertyIdSet.has(v.property_id));
+            if (!matchesBlock) return false;
+            if (operationalCycleId && v.cycle_id && v.cycle_id !== operationalCycleId) return false;
+            if (sessionCreatedAt && v.visit_date) {
+              // aceita visitas do mesmo dia da sessão
+              const vd = new Date(v.visit_date).getTime();
+              if (vd < sessionCreatedAt - 86400000) return false;
+            }
+            return true;
+          };
+
           const visitColumns = `
             id,
             status,
@@ -244,6 +282,8 @@ function FieldWorkListPage() {
             agent_id,
             cycle_id,
             property_id,
+            field_work_session_id,
+            block_id,
             visit_deposits (
               id,
               is_positive,
@@ -251,45 +291,32 @@ function FieldWorkListPage() {
             )
           `;
 
-          let cycleVisitsForAgent: any[] = [];
+          // Online + Offline: listRemoteOrCache alimenta Dexie e mescla cache
           let blockCycleVisits: any[] = [];
-
-          if (propertyIds.length > 0 && online) {
-            try {
-              let visitsQuery = supabase
-                .from("visits")
-                .select(visitColumns)
-                .eq("agent_id", user.id)
-                .in("property_id", propertyIds)
-                .order("visit_date", { ascending: false });
-
-              if (operationalCycleId) {
-                visitsQuery = visitsQuery.eq("cycle_id", operationalCycleId);
-              }
-
-              const { data: visitsData, error: visitsError } = await visitsQuery;
-              if (visitsError) console.error("[FieldWorkList] erro ao buscar visitas do ciclo:", visitsError);
-              blockCycleVisits = visitsData || [];
-            } catch (e) {
-              console.warn("[FWL] visitas offline:", e);
-            }
+          try {
+            const visitsAll = await listRemoteOrCache<any>({
+              name: "visits",
+              remote: () => {
+                let q = supabase
+                  .from("visits")
+                  .select(visitColumns)
+                  .eq("agent_id", user.id)
+                  .in("property_id", propertyIds);
+                if (operationalCycleId) q = q.eq("cycle_id", operationalCycleId);
+                return q.order("visit_date", { ascending: false }) as any;
+              },
+              filter: inScope,
+            });
+            blockCycleVisits = (visitsAll || []).filter(inScope);
+          } catch (e) {
+            console.warn("[SESSION_RESTORE_VISITS] fallback empty:", e);
           }
 
-          if (operationalCycleId && online) {
-            try {
-              const { data: allCycleVisits, error: cycleVisitsError } = await supabase
-                .from("visits")
-                .select("id, property_id, cycle_id, visit_date, agent_id, status")
-                .eq("agent_id", user.id)
-                .eq("cycle_id", operationalCycleId);
-
-              if (cycleVisitsError) console.error("[FieldWorkList] erro no relatório de visitas do ciclo:", cycleVisitsError);
-              cycleVisitsForAgent = allCycleVisits || [];
-            } catch (e) {
-              console.warn("[FWL] cycle visits offline:", e);
-            }
-          }
-
+          console.log("[SESSION_RESTORE_VISITS]", {
+            session_id: session.id,
+            count: blockCycleVisits.length,
+            source: online ? "remote+cache" : "cache",
+          });
 
           const visitsByProperty = new Map<string, any[]>();
           blockCycleVisits.forEach((visit: any) => {
@@ -303,7 +330,7 @@ function FieldWorkListPage() {
             const latestVisit = propertyVisits.length > 0
               ? [...propertyVisits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
-            
+
             return {
               ...p,
               status: latestVisit?.status || "not_visited",
@@ -314,25 +341,12 @@ function FieldWorkListPage() {
             };
           });
 
-          const visibleVisitIds = new Set(normalizedProps.map((p: any) => p.latest_visit?.id).filter(Boolean));
-          const ignoredBlockVisits = blockCycleVisits
-            .filter((visit: any) => !visibleVisitIds.has(visit.id))
-            .map((visit: any) => ({
-              property_id: visit.property_id,
-              cycle_id: visit.cycle_id,
-              visit_date: visit.visit_date,
-              agent_id: visit.agent_id,
-              motivo: "visita anterior do mesmo imóvel; a tela mostra o último status válido do ciclo"
-            }));
-
-          console.log("[FieldWorkList] relatório de visitas do ciclo:", {
-            filtro_aplicado: "agent_id + cycle_id + imóveis do quarteirão; sem filtro por session_date, visit_date ou created_at",
-            sessao: { id: session.id, block: session.block_number, cycle_id: operationalCycleId, status: session.status },
-            visitas_existentes_no_ciclo_do_agente: cycleVisitsForAgent.length,
-            visitas_do_ciclo_no_quarteirao: blockCycleVisits.length,
-            visitas_exibidas_no_quarteirao: visibleVisitIds.size,
-            visitas_ignoradas_no_quarteirao: ignoredBlockVisits.length,
-            ignoradas: ignoredBlockVisits
+          const markedCount = normalizedProps.filter((p: any) => p.latest_visit).length;
+          console.log("[SESSION_RESTORE_MARKED]", {
+            session_id: session.id,
+            properties_loaded: normalizedProps.length,
+            properties_marked: markedCount,
+            visits_found: blockCycleVisits.length,
           });
 
           normalizedProps.sort((a: any, b: any) => {
@@ -344,10 +358,22 @@ function FieldWorkListPage() {
             return na - nb;
           });
           setProperties(normalizedProps);
+
+          console.log("[SESSION_RESTORE_FINISH]", {
+            session_id: session.id,
+            block_id: session.block_id ?? null,
+            block_number: session.block_number,
+            properties_loaded: normalizedProps.length,
+            visits_found: blockCycleVisits.length,
+            properties_marked: markedCount,
+          });
+          console.log("[RC5_SESSION_RESTORE_OK]");
         }
+      } else {
+        console.log("[SESSION_RESTORE_FINISH]", { session_id: null, reason: "no_active_session" });
       }
     } catch (error) {
-      console.error("Error fetching session:", error);
+      console.error("[SESSION_RESTORE_ERROR]", error);
     } finally {
       setIsLoading(false);
     }
