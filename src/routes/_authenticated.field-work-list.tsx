@@ -384,6 +384,10 @@ function FieldWorkListPage() {
             properties_marked: markedCount,
           });
           console.log("[RC5_SESSION_RESTORE_OK]");
+          console.log("[RC7_CYCLE_CONTINUITY_OK]", {
+            session_id: session.id,
+            session_cycle_id: session.cycle_id ?? null,
+          });
         }
       } else {
         console.log("[SESSION_RESTORE_FINISH]", { session_id: null, reason: "no_active_session" });
