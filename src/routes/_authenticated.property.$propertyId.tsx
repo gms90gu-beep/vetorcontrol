@@ -597,9 +597,20 @@ function PropertyVisitPage() {
       };
 
 
+      console.log("[VISIT_SAVE_START]", {
+        property_id: visitPayload.property_id,
+        block_number: (property as any)?.block_number,
+        block_id: visitPayload.block_id,
+        cycle_id: visitPayload.cycle_id,
+        field_work_session_id: visitPayload.field_work_session_id,
+        visit_type: visitPayload.activity_type,
+        agent_id: visitPayload.agent_id,
+      });
       if (currentVisitId) {
+        console.log("[VISIT_SAVE_CALL]", { existingId: currentVisitId, visitPayload, deposits: [] });
         await updateOffline("visits", currentVisitId, visitPayload);
       } else {
+        console.log("[VISIT_SAVE_CALL]", { existingId: null, visitPayload, deposits: [] });
         const id = await saveVisitOffline(null, visitPayload as any, []);
         setCurrentVisitId(id);
       }
@@ -694,6 +705,16 @@ function PropertyVisitPage() {
           }))
         : [];
 
+      console.log("[VISIT_SAVE_START]", {
+        property_id: visitPayload.property_id,
+        block_number: (property as any)?.block_number,
+        block_id: visitPayload.block_id,
+        cycle_id: visitPayload.cycle_id,
+        field_work_session_id: visitPayload.field_work_session_id,
+        visit_type: visitPayload.activity_type,
+        agent_id: visitPayload.agent_id,
+      });
+      console.log("[VISIT_SAVE_CALL]", { existingId: currentVisitId, visitPayload, deposits: selectedDeposits });
       const visitId = await saveVisitOffline(currentVisitId, visitPayload as any, selectedDeposits as any);
       setCurrentVisitId(visitId);
 
