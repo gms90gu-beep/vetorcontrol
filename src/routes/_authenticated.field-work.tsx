@@ -236,7 +236,7 @@ function FieldWorkPage() {
         if (isOnline()) {
           const { data: openSessions } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_number, block_id")
+            .select("id, status, session_date, cycle_id, week_id, block_number")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("session_date", { ascending: false })
