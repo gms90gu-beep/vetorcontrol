@@ -1236,9 +1236,11 @@ export type Database = {
         Row: {
           activity_type: Database["public"]["Enums"]["activity_type"]
           agent_id: string
+          block_id: string | null
           cycle_id: string
           elimination_amount: number | null
           elimination_done: boolean | null
+          field_work_session_id: string | null
           guidance_given: boolean | null
           has_focus: boolean | null
           id: string
@@ -1260,9 +1262,11 @@ export type Database = {
         Insert: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
           agent_id: string
+          block_id?: string | null
           cycle_id: string
           elimination_amount?: number | null
           elimination_done?: boolean | null
+          field_work_session_id?: string | null
           guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
@@ -1284,9 +1288,11 @@ export type Database = {
         Update: {
           activity_type?: Database["public"]["Enums"]["activity_type"]
           agent_id?: string
+          block_id?: string | null
           cycle_id?: string
           elimination_amount?: number | null
           elimination_done?: boolean | null
+          field_work_session_id?: string | null
           guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
@@ -1307,6 +1313,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "visits_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visits_cycle_id_fkey"
             columns: ["cycle_id"]
             isOneToOne: false
@@ -1318,6 +1331,13 @@ export type Database = {
             columns: ["cycle_id"]
             isOneToOne: false
             referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_field_work_session_id_fkey"
+            columns: ["field_work_session_id"]
+            isOneToOne: false
+            referencedRelation: "field_work_sessions"
             referencedColumns: ["id"]
           },
           {
@@ -1335,6 +1355,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      visits_backfill_report: {
+        Row: {
+          agent_id: string | null
+          block_id: string | null
+          created_at: string
+          cycle_id: string | null
+          id: string
+          property_id: string | null
+          reason: string
+          visit_date: string | null
+          visit_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          block_id?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          id?: string
+          property_id?: string | null
+          reason: string
+          visit_date?: string | null
+          visit_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          block_id?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          id?: string
+          property_id?: string | null
+          reason?: string
+          visit_date?: string | null
+          visit_id?: string
+        }
+        Relationships: []
       }
       weekly_bulletins: {
         Row: {
