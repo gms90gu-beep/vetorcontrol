@@ -230,35 +230,70 @@ function FieldWorkPage() {
         return;
       }
 
-      // ── Validação: já existe jornada para esta data? ────────────
-      // Offline-safe: ignora silenciosamente se a rede falhar.
+      // ── Seleção da jornada ativa (RC-10) ─────────────────────────
+      // Separa jornada do dia × retroativa × nova.
       try {
         if (isOnline()) {
-          const { data: existing } = await supabase
+          const { data: openSessions } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date")
+            .select("id, status, session_date, cycle_id, week_id, block_number, block_id")
             .eq("user_id", user.id)
-            .eq("session_date", sessionDateStr)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (existing && existing.status === "in_progress") {
-            const cont = window.confirm(
-              "Já existe uma jornada para esta data. Deseja continuar a jornada existente?"
-            );
+            .eq("status", "in_progress")
+            .order("session_date", { ascending: false })
+            .order("created_at", { ascending: false });
+
+          const open = openSessions || [];
+          console.log("[SESSION_SELECTOR]", { total: open.length, sessions: open });
+
+          const todaySession = open.find((s: any) => s.session_date === sessionDateStr);
+          const retroSession = open.find((s: any) => s.session_date !== sessionDateStr);
+
+          if (todaySession) {
+            console.log("[SESSION_TODAY]", { id: todaySession.id, session_date: todaySession.session_date });
+            const cont = window.confirm("Deseja continuar sua jornada de hoje?");
             if (cont) {
+              console.log("[SESSION_SELECTED]", { reason: "today", id: todaySession.id });
               navigate({ to: `/field-work-list` });
               return;
             }
-            await updateOffline("field_work_sessions", existing.id, {
+            // Usuário optou por não continuar → encerra a jornada de hoje.
+            await updateOffline("field_work_sessions", todaySession.id, {
               status: "closed",
               updated_at: new Date().toISOString(),
             });
+          } else if (retroSession) {
+            console.log("[SESSION_RETROACTIVE]", {
+              id: retroSession.id,
+              session_date: retroSession.session_date,
+              cycle_id: retroSession.cycle_id,
+              week_id: retroSession.week_id,
+              block_number: retroSession.block_number,
+            });
+            const dtBR = new Date(`${retroSession.session_date}T12:00:00`).toLocaleDateString("pt-BR");
+            const msg =
+              `Existe uma jornada retroativa em aberto.\n\n` +
+              `Data: ${dtBR}\n` +
+              `Quarteirão: ${retroSession.block_number ?? "—"}\n\n` +
+              `OK   → Continuar Jornada Retroativa\n` +
+              `Cancelar → Iniciar Jornada de Hoje`;
+            const continueRetro = window.confirm(msg);
+            if (continueRetro) {
+              console.log("[SESSION_SELECTED]", { reason: "retroactive", id: retroSession.id });
+              navigate({ to: `/field-work-list` });
+              return;
+            }
+            // Usuário optou por iniciar jornada de hoje — apenas uma jornada aberta permitida.
+            console.log("[SESSION_SELECTED]", { reason: "new_session", blocked_by: retroSession.id });
+            toast.error("Finalize primeiro a jornada retroativa ou continue a jornada existente.");
+            return;
+          } else {
+            console.log("[SESSION_SELECTED]", { reason: "new_session" });
           }
         }
       } catch (e) {
-        console.warn("[WORK_START] Verificação de duplicidade falhou (offline):", e);
+        console.warn("[SESSION_SELECTOR] Verificação falhou (offline):", e);
       }
+
 
       // ── VALIDAÇÃO DE CICLO ATIVO (offline-first) ────────────────
       // Online: consulta Supabase. Offline: usa o ciclo selecionado pelo usuário
