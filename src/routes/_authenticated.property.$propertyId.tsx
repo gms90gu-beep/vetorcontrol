@@ -589,10 +589,13 @@ function PropertyVisitPage() {
         agent_id: user.id,
         cycle_id: activeSession.cycle_id as string,
         week_id: activeSession.week_id as string,
+        field_work_session_id: activeSession.id as string,
+        block_id: (property?.block_id ?? null) as string | null,
         status: newStatus as any,
         activity_type: (activityMap[activity] || "routine") as any,
         visit_date: operationalVisitDate,
       };
+
 
       if (currentVisitId) {
         await updateOffline("visits", currentVisitId, visitPayload);
