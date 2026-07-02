@@ -242,30 +242,10 @@ function FieldWorkListPage() {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
           const propertyIdSet = new Set(propertyIds);
 
-          // ─── Carregar visitas da JORNADA (RC-5) ─────────────────────
-          // Escopo estrito: field_work_session_id === session.id
-          // OU (fallback) block_id/block_number da sessão + agent_id + cycle_id
-          // NUNCA usar todas as visitas do agente sem filtro de escopo.
-          const sessionCreatedAt = session.created_at
-            ? new Date(session.created_at).getTime()
-            : 0;
-          const inScope = (v: any) => {
-            if (!v) return false;
-            if (v.agent_id && v.agent_id !== user.id) return false;
-            if (v.field_work_session_id && v.field_work_session_id === session.id) return true;
-            // Fallback quando o cliente antigo não gravou field_work_session_id
-            const matchesBlock =
-              (session.block_id && v.block_id === session.block_id) ||
-              (v.property_id && propertyIdSet.has(v.property_id));
-            if (!matchesBlock) return false;
-            if (operationalCycleId && v.cycle_id && v.cycle_id !== operationalCycleId) return false;
-            if (sessionCreatedAt && v.visit_date) {
-              // aceita visitas do mesmo dia da sessão
-              const vd = new Date(v.visit_date).getTime();
-              if (vd < sessionCreatedAt - 86400000) return false;
-            }
-            return true;
-          };
+          // ─── Carregar visitas da JORNADA (RC-6) ─────────────────────
+          // Escopo ESTRITO: field_work_session_id === session.id
+          // Sem heurísticas por data/propriedade/block_number.
+          const inScope = (v: any) => !!v && v.field_work_session_id === session.id;
 
           const visitColumns = `
             id,
@@ -291,20 +271,16 @@ function FieldWorkListPage() {
             )
           `;
 
-          // Online + Offline: listRemoteOrCache alimenta Dexie e mescla cache
           let blockCycleVisits: any[] = [];
           try {
             const visitsAll = await listRemoteOrCache<any>({
               name: "visits",
-              remote: () => {
-                let q = supabase
+              remote: () =>
+                supabase
                   .from("visits")
                   .select(visitColumns)
-                  .eq("agent_id", user.id)
-                  .in("property_id", propertyIds);
-                if (operationalCycleId) q = q.eq("cycle_id", operationalCycleId);
-                return q.order("visit_date", { ascending: false }) as any;
-              },
+                  .eq("field_work_session_id", session.id)
+                  .order("visit_date", { ascending: false }) as any,
               filter: inScope,
             });
             blockCycleVisits = (visitsAll || []).filter(inScope);
@@ -317,6 +293,7 @@ function FieldWorkListPage() {
             count: blockCycleVisits.length,
             source: online ? "remote+cache" : "cache",
           });
+
 
           const visitsByProperty = new Map<string, any[]>();
           blockCycleVisits.forEach((visit: any) => {
