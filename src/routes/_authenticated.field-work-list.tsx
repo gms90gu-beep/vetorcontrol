@@ -254,6 +254,17 @@ function FieldWorkListPage() {
           block_id: session.block_id ?? null,
           count: propsRaw?.length || 0,
         });
+        console.log("[RESTORE_PROPERTIES]", {
+          quantity: propsRaw?.length || 0,
+          block_id: session.block_id ?? null,
+          block_number: session.block_number ?? null,
+          first10_property_ids: (propsRaw || []).slice(0, 10).map((p: any) => ({
+            id: p.id,
+            id_type: typeof p.id,
+            number: p.number,
+          })),
+        });
+
 
         const seqKey = (s: any) => {
           if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
