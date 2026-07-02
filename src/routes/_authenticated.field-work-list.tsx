@@ -345,12 +345,76 @@ function FieldWorkListPage() {
           });
 
 
+          console.log("[RESTORE_VISITS]", {
+            quantity: blockCycleVisits.length,
+            first10: blockCycleVisits.slice(0, 10).map((v: any) => ({
+              id: v.id,
+              property_id: v.property_id,
+              property_id_type: typeof v.property_id,
+              field_work_session_id: v.field_work_session_id,
+              cycle_id: v.cycle_id,
+              block_id: v.block_id,
+            })),
+          });
+
+          // RC-8 audit: per-visit match against loaded properties
+          const propIndex = new Map<string, any>();
+          props.forEach((p: any) => propIndex.set(String(p.id), p));
+          let matches = 0;
+          let nomatches = 0;
+          const mismatchExamples: Array<{ visit_property_id: any; visit_id: string; sample_property_ids: string[] }> = [];
+          blockCycleVisits.forEach((v: any) => {
+            const key = String(v.property_id);
+            const found = propIndex.has(key);
+            if (found) {
+              matches++;
+              console.log("[RESTORE_MATCH]", {
+                visit_id: v.id,
+                visit_property_id: v.property_id,
+                property_id: key,
+                result: "MATCH",
+              });
+            } else {
+              nomatches++;
+              console.log("[RESTORE_MATCH]", {
+                visit_id: v.id,
+                visit_property_id: v.property_id,
+                visit_property_id_type: typeof v.property_id,
+                result: "NO_MATCH",
+              });
+              if (mismatchExamples.length < 10) {
+                mismatchExamples.push({
+                  visit_property_id: v.property_id,
+                  visit_id: v.id,
+                  sample_property_ids: props.slice(0, 5).map((p: any) => p.id),
+                });
+              }
+            }
+          });
+          console.log("[RESTORE_MATCH_TOTALS]", { MATCHS: matches, NO_MATCHS: nomatches });
+          if (blockCycleVisits.length > 0 && matches === 0) {
+            console.warn("[RESTORE_MISMATCH_SIDE_BY_SIDE]", mismatchExamples);
+            console.warn("[RESTORE_TYPE_CHECK]", {
+              visit_sample: blockCycleVisits.slice(0, 5).map((v: any) => ({
+                property_id: v.property_id,
+                type: typeof v.property_id,
+                length: String(v.property_id ?? "").length,
+              })),
+              property_sample: props.slice(0, 5).map((p: any) => ({
+                id: p.id,
+                type: typeof p.id,
+                length: String(p.id ?? "").length,
+              })),
+            });
+          }
+
           const visitsByProperty = new Map<string, any[]>();
           blockCycleVisits.forEach((visit: any) => {
             const list = visitsByProperty.get(visit.property_id) || [];
             list.push(visit);
             visitsByProperty.set(visit.property_id, list);
           });
+
 
           const normalizedProps = props.map(p => {
             const propertyVisits = visitsByProperty.get(p.id) || [];
