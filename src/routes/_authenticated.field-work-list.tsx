@@ -458,6 +458,15 @@ function FieldWorkListPage() {
             visits_found: blockCycleVisits.length,
             properties_marked: markedCount,
           });
+          console.log("[RESTORE_RESULT]", {
+            properties_loaded: normalizedProps.length,
+            properties_marked: markedCount,
+            visits_loaded: blockCycleVisits.length,
+            matches_found: matches,
+            no_matches: nomatches,
+            percentage: normalizedProps.length > 0 ? Math.round((markedCount / normalizedProps.length) * 100) : 0,
+          });
+
           console.log("[RC5_SESSION_RESTORE_OK]");
           console.log("[RC7_CYCLE_CONTINUITY_OK]", {
             session_id: session.id,
