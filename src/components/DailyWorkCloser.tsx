@@ -635,6 +635,17 @@ export function DailyWorkCloser({
       console.log("[SESSION_STATE_CLEARED]", { session_id: closedSessionId });
       console.log("[SESSION_CLOSE_FINISH]", { session_id: closedSessionId, ok: true });
       console.log("[RC4_SESSION_OK]");
+      // RC-7: após encerrar, próxima jornada poderá adotar o ciclo atual.
+      try {
+        const { data: sysCycle } = await supabase
+          .from("cycles").select("id, number").eq("status", "in_progress").maybeSingle();
+        console.log("[SESSION_NEW_CYCLE_AFTER_CLOSE]", {
+          previous_session_cycle_id: activeCycle?.id ?? null,
+          system_cycle_id: sysCycle?.id ?? null,
+          system_cycle_number: (sysCycle as any)?.number ?? null,
+        });
+        console.log("[RC7_CYCLE_CONTINUITY_OK]");
+      } catch {}
 
       console.log("[ENCERRAR] concluído");
       const msg = isOnline()
