@@ -662,9 +662,12 @@ function PropertyVisitPage() {
         agent_id: user.id,
         cycle_id: activeSession.cycle_id as string,
         week_id: activeSession.week_id as string,
+        field_work_session_id: activeSession.id as string,
+        block_id: (property?.block_id ?? null) as string | null,
         status: status as any,
         activity_type: (activityMap[activity] || "routine") as any,
         visit_date: operationalVisitDate,
+
         has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
         sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
