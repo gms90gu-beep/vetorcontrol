@@ -156,15 +156,54 @@ function FieldWorkListPage() {
           created_at: session.created_at,
         });
 
-        // Resolver ciclo operacional
+        // ─── RC-7: preservar ciclo original da jornada ─────────────
+        // Enquanto a jornada estiver IN_PROGRESS, ignoramos o ciclo
+        // atual do sistema. cycle_id / week_id / block_id da jornada
+        // são a única fonte de verdade até o encerramento.
         let operationalCycleId: string | null = session.cycle_id ?? null;
-        if (!operationalCycleId && online) {
+        let currentSystemCycleId: string | null = null;
+        if (online) {
           const { data: currentCycle } = await supabase
             .from("cycles")
-            .select("id")
+            .select("id, number")
             .eq("status", "in_progress")
             .maybeSingle();
-          operationalCycleId = currentCycle?.id ?? null;
+          currentSystemCycleId = currentCycle?.id ?? null;
+          console.log("[SESSION_CURRENT_CYCLE]", {
+            system_cycle_id: currentSystemCycleId,
+            system_cycle_number: (currentCycle as any)?.number ?? null,
+          });
+        }
+
+        if (operationalCycleId) {
+          const kept = !!currentSystemCycleId && currentSystemCycleId !== operationalCycleId;
+          console.log("[SESSION_RESTORE_CYCLE]", {
+            session_cycle_id: operationalCycleId,
+            system_cycle_id: currentSystemCycleId,
+            decision: kept ? "keep_session_cycle" : "same_cycle",
+          });
+          if (kept) {
+            console.log("[SESSION_KEEP_ORIGINAL_CYCLE]", {
+              session_cycle_id: operationalCycleId,
+              system_cycle_id: currentSystemCycleId,
+              message: "Jornada mantida no ciclo original até encerramento.",
+            });
+          }
+          // Sobrescreve ciclo/semana exibidos usando o da jornada.
+          const { data: sessionCycle } = await supabase
+            .from("cycles")
+            .select("*")
+            .eq("id", operationalCycleId)
+            .maybeSingle();
+          if (sessionCycle) {
+            setActiveCycle(sessionCycle);
+            const wk = session.week_id
+              ? (await supabase.from("weeks").select("*").eq("id", session.week_id).maybeSingle()).data
+              : await resolveCycleWeek(operationalCycleId, new Date(session.created_at || Date.now()));
+            if (wk) setActiveWeek(wk as any);
+          }
+        } else if (!operationalCycleId && currentSystemCycleId) {
+          operationalCycleId = currentSystemCycleId;
         }
 
         console.log("[SESSION_RESTORE_BLOCK]", {
