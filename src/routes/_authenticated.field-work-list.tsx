@@ -550,6 +550,7 @@ function FieldWorkListPage() {
       console.error("[SESSION_RESTORE_ERROR]", error);
     } finally {
       setIsLoading(false);
+      console.log("[SESSION_RENDER_READY]");
     }
   };
 
