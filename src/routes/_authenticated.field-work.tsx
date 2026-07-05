@@ -294,6 +294,7 @@ function FieldWorkPage() {
             const cont = window.confirm("Deseja continuar sua jornada de hoje?");
             if (cont) {
               console.log("[SESSION_SELECTED]", { reason: "today", id: todaySession.id });
+              console.log("[SELECTED_SESSION]", todaySession);
               await autoRecoverSession(todaySession.id);
               navigate({ to: `/field-work-list` });
               return;
