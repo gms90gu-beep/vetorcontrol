@@ -41,6 +41,7 @@ import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
+import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -95,6 +96,8 @@ function FieldWorkPage() {
   const [retroOtherText, setRetroOtherText] = useState<string>("");
   const [isRetroactive, setIsRetroactive] = useState(false);
   const [retroactiveReason, setRetroactiveReason] = useState<string | null>(null);
+  const [openSession, setOpenSession] = useState<OpenSessionInfo | null>(null);
+  const [openSessionModal, setOpenSessionModal] = useState(false);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
@@ -260,84 +263,40 @@ function FieldWorkPage() {
         return;
       }
 
-      // ── Seleção da jornada ativa (RC-10) ─────────────────────────
-      // Separa jornada do dia × retroativa × nova.
+      // ── Verificação de jornada aberta (RC-13) ─────────────────────
+      // Regra: apenas UMA jornada in_progress por agente. Se existir,
+      // abrimos o modal para o usuário escolher Continuar / Encerrar / Cancelar.
       try {
         if (isOnline()) {
           const { data: openSessions } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_number")
+            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("session_date", { ascending: false })
             .order("created_at", { ascending: false });
 
           const open = openSessions || [];
-          console.log(
-            "[OPEN_SESSIONS]",
-            open.map((s: any) => ({
-              id: s.id,
-              status: s.status,
-              block_number: s.block_number,
-              block_id: (s as any).block_id ?? null,
-              session_date: s.session_date,
-              created_at: (s as any).created_at ?? null,
-            }))
-          );
-          console.log("[SESSION_SELECTOR]", { total: open.length, sessions: open });
+          console.log("[OPEN_SESSIONS]", open.map((s: any) => ({
+            id: s.id, status: s.status, block_number: s.block_number,
+            block_id: (s as any).block_id ?? null, session_date: s.session_date,
+            created_at: s.created_at ?? null,
+          })));
 
-          const todaySession = open.find((s: any) => s.session_date === sessionDateStr);
-          const retroSession = open.find((s: any) => s.session_date !== sessionDateStr);
-
-          if (todaySession) {
-            console.log("[SESSION_TODAY]", { id: todaySession.id, session_date: todaySession.session_date });
-            const cont = window.confirm("Deseja continuar sua jornada de hoje?");
-            if (cont) {
-              console.log("[SESSION_SELECTED]", { reason: "today", id: todaySession.id });
-              console.log("[SELECTED_SESSION]", todaySession);
-              await autoRecoverSession(todaySession.id);
-              navigate({ to: `/field-work-list` });
-              return;
-            }
-            // Usuário optou por não continuar → encerra a jornada de hoje.
-            await updateOffline("field_work_sessions", todaySession.id, {
-              status: "closed",
-              updated_at: new Date().toISOString(),
-            });
-          } else if (retroSession) {
-            console.log("[SESSION_RETROACTIVE]", {
-              id: retroSession.id,
-              session_date: retroSession.session_date,
-              cycle_id: retroSession.cycle_id,
-              week_id: retroSession.week_id,
-              block_number: retroSession.block_number,
-            });
-            const dtBR = new Date(`${retroSession.session_date}T12:00:00`).toLocaleDateString("pt-BR");
-            const msg =
-              `Existe uma jornada retroativa em aberto.\n\n` +
-              `Data: ${dtBR}\n` +
-              `Quarteirão: ${retroSession.block_number ?? "—"}\n\n` +
-              `OK   → Continuar Jornada Retroativa\n` +
-              `Cancelar → Iniciar Jornada de Hoje`;
-            const continueRetro = window.confirm(msg);
-            if (continueRetro) {
-              console.log("[SESSION_SELECTED]", { reason: "retroactive", id: retroSession.id });
-              console.log("[SELECTED_SESSION]", retroSession);
-              await autoRecoverSession(retroSession.id);
-              navigate({ to: `/field-work-list` });
-              return;
-            }
-            // Usuário optou por iniciar jornada de hoje — apenas uma jornada aberta permitida.
-            console.log("[SESSION_SELECTED]", { reason: "new_session", blocked_by: retroSession.id });
-            toast.error("Finalize primeiro a jornada retroativa ou continue a jornada existente.");
+          if (open.length > 0) {
+            const existing = open[0] as OpenSessionInfo;
+            console.log("[SESSION_FOUND]", { id: existing.id, session_date: existing.session_date, block_number: existing.block_number });
+            console.log("[SESSION_MODAL_OPEN]", { id: existing.id });
+            setOpenSession(existing);
+            setOpenSessionModal(true);
             return;
-          } else {
-            console.log("[SESSION_SELECTED]", { reason: "new_session" });
           }
+          console.log("[SESSION_NEW_ALLOWED]");
         }
       } catch (e) {
         console.warn("[SESSION_SELECTOR] Verificação falhou (offline):", e);
       }
+
 
 
       // ── VALIDAÇÃO DE CICLO ATIVO (offline-first) ────────────────
@@ -803,6 +762,27 @@ function FieldWorkPage() {
         </div>
       </div>
 
+      <OpenSessionModal
+        open={openSessionModal}
+        session={openSession}
+        cycleLabel={openSession ? (cycles.find((c) => c.id === openSession.cycle_id)?.number ? `Ciclo ${cycles.find((c) => c.id === openSession.cycle_id)?.number}` : "—") : undefined}
+        weekLabel={openSession ? (weeks.find((w) => w.id === openSession.week_id)?.number ? `Semana ${weeks.find((w) => w.id === openSession.week_id)?.number}/8` : "—") : undefined}
+        onContinue={async (s) => {
+          setOpenSessionModal(false);
+          await autoRecoverSession(s.id);
+          try { (window as any).__vcSetJourneyActive?.(true); } catch {}
+          navigate({ to: `/field-work-list` });
+        }}
+        onFinished={() => {
+          setOpenSessionModal(false);
+          setOpenSession(null);
+          toast.info("Você já pode iniciar uma nova jornada.");
+        }}
+        onCancel={() => {
+          setOpenSessionModal(false);
+        }}
+      />
     </div>
   );
 }
+
