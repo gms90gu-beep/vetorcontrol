@@ -129,9 +129,9 @@ function FieldWorkListPage() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchSessionAndProperties = async () => {
+  const fetchSessionAndProperties = async (preferSessionId?: string) => {
     setIsLoading(true);
-    console.log("[SESSION_RESTORE_START]");
+    console.log("[SESSION_RESTORE_START]", { preferSessionId: preferSessionId ?? null });
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
@@ -148,12 +148,16 @@ function FieldWorkListPage() {
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("created_at", { ascending: false })
-            .limit(1) as any,
+            .limit(5) as any,
         filter: (s) => s.user_id === user.id && s.status === "in_progress",
       });
-      const session = [...(sessions || [])].sort((a: any, b: any) =>
+      const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
-      )[0] || null;
+      );
+      const session =
+        (preferSessionId && sorted.find((s: any) => s.id === preferSessionId)) ||
+        sorted[0] ||
+        null;
 
       if (session) {
         setActiveSession(session);
