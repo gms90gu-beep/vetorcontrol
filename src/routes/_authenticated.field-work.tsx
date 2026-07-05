@@ -322,6 +322,7 @@ function FieldWorkPage() {
             const continueRetro = window.confirm(msg);
             if (continueRetro) {
               console.log("[SESSION_SELECTED]", { reason: "retroactive", id: retroSession.id });
+              console.log("[SELECTED_SESSION]", retroSession);
               await autoRecoverSession(retroSession.id);
               navigate({ to: `/field-work-list` });
               return;
