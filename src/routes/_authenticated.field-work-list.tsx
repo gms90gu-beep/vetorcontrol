@@ -210,6 +210,16 @@ function FieldWorkListPage() {
           block_id: session.block_id ?? null,
           block_number: session.block_number,
         });
+        console.log("[BLOCK_RESTORE]", {
+          session_id: session.id,
+          session_block_number: session.block_number,
+          session_block_id: session.block_id ?? null,
+        });
+        console.log("[BLOCK_SELECTED]", {
+          selectedBlock: session.block_number,
+          currentBlock: session.block_number,
+          block_id: session.block_id ?? null,
+        });
 
         // Restringe as propriedades ao agente atual: mesmo block_number pode existir
         // em múltiplos blocks (localidades/ruas diferentes). Filtrar por boletim_id
@@ -222,6 +232,12 @@ function FieldWorkListPage() {
         });
         const myBoletimIds = (myBoletins ?? []).map((b: any) => b.id);
         console.log("[FIELD_SCOPE]", { boletim_count: myBoletimIds.length });
+        console.log("[BLOCK_QUERY]", {
+          query_block_number: session.block_number,
+          query_block_id: session.block_id ?? null,
+          filter_boletim_ids: myBoletimIds,
+          online,
+        });
 
         let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
@@ -266,6 +282,26 @@ function FieldWorkListPage() {
           }
         }
         console.log("[FIELD_PROPERTIES]", { count: propsRaw?.length || 0, online });
+        const _propsArr = (propsRaw as any[]) || [];
+        console.log("[BLOCK_PROPERTIES]", {
+          count: _propsArr.length,
+          session_block_number: session.block_number,
+          session_block_id: session.block_id ?? null,
+          first: _propsArr[0]
+            ? { id: _propsArr[0].id, number: _propsArr[0].number, block_number: _propsArr[0].block_number, block_id: _propsArr[0].block_id, boletim_id: _propsArr[0].boletim_id }
+            : null,
+          last: _propsArr.length
+            ? { id: _propsArr[_propsArr.length - 1].id, number: _propsArr[_propsArr.length - 1].number, block_number: _propsArr[_propsArr.length - 1].block_number, block_id: _propsArr[_propsArr.length - 1].block_id, boletim_id: _propsArr[_propsArr.length - 1].boletim_id }
+            : null,
+          distinct_block_numbers: Array.from(new Set(_propsArr.map((p: any) => p.block_number))),
+          distinct_block_ids: Array.from(new Set(_propsArr.map((p: any) => p.block_id))),
+        });
+        console.log("[BLOCK_FINAL_RENDER]", {
+          session_id: session.id,
+          rendered_block_number: session.block_number,
+          rendered_block_id: session.block_id ?? null,
+          property_count: _propsArr.length,
+        });
         console.log("[SESSION_RESTORE_PROPERTIES]", {
           session_id: session.id,
           block_id: session.block_id ?? null,
