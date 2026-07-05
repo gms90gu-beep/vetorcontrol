@@ -211,15 +211,32 @@ function FieldWorkListPage() {
           block_number: session.block_number,
         });
 
+        // Restringe as propriedades ao agente atual: mesmo block_number pode existir
+        // em múltiplos blocks (localidades/ruas diferentes). Filtrar por boletim_id
+        // do próprio agente evita "puxar dados de outro quarteirão".
+        const myBoletins = await listRemoteOrCache<any>({
+          name: "boletins_rg",
+          remote: () =>
+            supabase.from("boletins_rg").select("id, agent_id").eq("agent_id", user.id) as any,
+          filter: (b) => b.agent_id === user.id,
+        });
+        const myBoletimIds = (myBoletins ?? []).map((b: any) => b.id);
+        console.log("[FIELD_SCOPE]", { boletim_count: myBoletimIds.length });
+
         let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
           remote: () =>
-            supabase
-              .from("properties")
-              .select("*")
-              .eq("block_number", session.block_number)
-              .order("sequence", { ascending: true, nullsFirst: false }) as any,
-          filter: (p) => String(p.block_number) === String(session.block_number),
+            (myBoletimIds.length
+              ? supabase
+                  .from("properties")
+                  .select("*")
+                  .eq("block_number", session.block_number)
+                  .in("boletim_id", myBoletimIds)
+                  .order("sequence", { ascending: true, nullsFirst: false })
+              : Promise.resolve({ data: [] as any[], error: null })) as any,
+          filter: (p) =>
+            String(p.block_number) === String(session.block_number) &&
+            myBoletimIds.includes(p.boletim_id),
         });
         const fwlSource = (propsRaw as any)?.source || "remote";
         console.log("[FIELD_BLOCK]", { block_number: session.block_number, block_id: session.block_id ?? null, online });
