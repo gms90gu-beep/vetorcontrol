@@ -273,6 +273,17 @@ function FieldWorkPage() {
             .order("created_at", { ascending: false });
 
           const open = openSessions || [];
+          console.log(
+            "[OPEN_SESSIONS]",
+            open.map((s: any) => ({
+              id: s.id,
+              status: s.status,
+              block_number: s.block_number,
+              block_id: (s as any).block_id ?? null,
+              session_date: s.session_date,
+              created_at: (s as any).created_at ?? null,
+            }))
+          );
           console.log("[SESSION_SELECTOR]", { total: open.length, sessions: open });
 
           const todaySession = open.find((s: any) => s.session_date === sessionDateStr);
