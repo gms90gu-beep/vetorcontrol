@@ -771,7 +771,8 @@ function FieldWorkPage() {
           setOpenSessionModal(false);
           await autoRecoverSession(s.id);
           try { (window as any).__vcSetJourneyActive?.(true); } catch {}
-          navigate({ to: `/field-work-list` });
+          console.log("[SESSION_AUTO_REFRESH]", { session_id: s.id });
+          navigate({ to: `/field-work-list`, search: { restore: s.id, ts: Date.now() } as any });
         }}
         onFinished={() => {
           setOpenSessionModal(false);

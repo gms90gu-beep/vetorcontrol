@@ -56,10 +56,15 @@ import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
+  validateSearch: (s: Record<string, unknown>) => ({
+    restore: typeof s.restore === "string" ? s.restore : undefined,
+    ts: typeof s.ts === "number" ? s.ts : typeof s.ts === "string" ? Number(s.ts) : undefined,
+  }),
   component: FieldWorkListPage,
 });
 
 function FieldWorkListPage() {
+  const search = Route.useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -77,9 +82,13 @@ function FieldWorkListPage() {
   const [userRole, setUserRole] = useState<string>("agent");
 
   useEffect(() => {
-    fetchSessionAndProperties();
+    if (search.restore) {
+      console.log("[SESSION_AUTO_REFRESH]", { restore: search.restore, ts: search.ts });
+    }
+    fetchSessionAndProperties(search.restore);
     fetchAgentAndPeriod();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.restore, search.ts]);
 
   const fetchAgentAndPeriod = async () => {
     try {
@@ -120,9 +129,9 @@ function FieldWorkListPage() {
     } catch (e) { console.error(e); }
   };
 
-  const fetchSessionAndProperties = async () => {
+  const fetchSessionAndProperties = async (preferSessionId?: string) => {
     setIsLoading(true);
-    console.log("[SESSION_RESTORE_START]");
+    console.log("[SESSION_RESTORE_START]", { preferSessionId: preferSessionId ?? null });
     try {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
@@ -139,12 +148,16 @@ function FieldWorkListPage() {
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("created_at", { ascending: false })
-            .limit(1) as any,
+            .limit(5) as any,
         filter: (s) => s.user_id === user.id && s.status === "in_progress",
       });
-      const session = [...(sessions || [])].sort((a: any, b: any) =>
+      const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
-      )[0] || null;
+      );
+      const session =
+        (preferSessionId && sorted.find((s: any) => s.id === preferSessionId)) ||
+        sorted[0] ||
+        null;
 
       if (session) {
         setActiveSession(session);
@@ -502,6 +515,10 @@ function FieldWorkListPage() {
             return na - nb;
           });
           setProperties(normalizedProps);
+          console.log("[SESSION_PROPERTIES_READY]", { count: normalizedProps.length });
+          console.log("[SESSION_VISITS_READY]", { count: blockCycleVisits.length, marked: markedCount });
+          console.log("[SESSION_STATE_UPDATED]", { session_id: session.id, block_number: session.block_number });
+          console.log("[SESSION_RESTORE_FINISHED]", { session_id: session.id });
 
           console.log("[SESSION_RESTORE_FINISH]", {
             session_id: session.id,
@@ -533,6 +550,7 @@ function FieldWorkListPage() {
       console.error("[SESSION_RESTORE_ERROR]", error);
     } finally {
       setIsLoading(false);
+      console.log("[SESSION_RENDER_READY]");
     }
   };
 
