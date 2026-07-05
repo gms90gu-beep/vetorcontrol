@@ -762,6 +762,27 @@ function FieldWorkPage() {
         </div>
       </div>
 
+      <OpenSessionModal
+        open={openSessionModal}
+        session={openSession}
+        cycleLabel={openSession ? (cycles.find((c) => c.id === openSession.cycle_id)?.number ? `Ciclo ${cycles.find((c) => c.id === openSession.cycle_id)?.number}` : "—") : undefined}
+        weekLabel={openSession ? (weeks.find((w) => w.id === openSession.week_id)?.number ? `Semana ${weeks.find((w) => w.id === openSession.week_id)?.number}/8` : "—") : undefined}
+        onContinue={async (s) => {
+          setOpenSessionModal(false);
+          await autoRecoverSession(s.id);
+          try { (window as any).__vcSetJourneyActive?.(true); } catch {}
+          navigate({ to: `/field-work-list` });
+        }}
+        onFinished={() => {
+          setOpenSessionModal(false);
+          setOpenSession(null);
+          toast.info("Você já pode iniciar uma nova jornada.");
+        }}
+        onCancel={() => {
+          setOpenSessionModal(false);
+        }}
+      />
     </div>
   );
 }
+
