@@ -232,6 +232,12 @@ function FieldWorkListPage() {
         });
         const myBoletimIds = (myBoletins ?? []).map((b: any) => b.id);
         console.log("[FIELD_SCOPE]", { boletim_count: myBoletimIds.length });
+        console.log("[BLOCK_QUERY]", {
+          query_block_number: session.block_number,
+          query_block_id: session.block_id ?? null,
+          filter_boletim_ids: myBoletimIds,
+          online,
+        });
 
         let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
