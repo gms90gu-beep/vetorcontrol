@@ -253,6 +253,7 @@ function FieldWorkPage() {
             const cont = window.confirm("Deseja continuar sua jornada de hoje?");
             if (cont) {
               console.log("[SESSION_SELECTED]", { reason: "today", id: todaySession.id });
+              await autoRecoverSession(todaySession.id);
               navigate({ to: `/field-work-list` });
               return;
             }
@@ -279,6 +280,7 @@ function FieldWorkPage() {
             const continueRetro = window.confirm(msg);
             if (continueRetro) {
               console.log("[SESSION_SELECTED]", { reason: "retroactive", id: retroSession.id });
+              await autoRecoverSession(retroSession.id);
               navigate({ to: `/field-work-list` });
               return;
             }
