@@ -210,6 +210,16 @@ function FieldWorkListPage() {
           block_id: session.block_id ?? null,
           block_number: session.block_number,
         });
+        console.log("[BLOCK_RESTORE]", {
+          session_id: session.id,
+          session_block_number: session.block_number,
+          session_block_id: session.block_id ?? null,
+        });
+        console.log("[BLOCK_SELECTED]", {
+          selectedBlock: session.block_number,
+          currentBlock: session.block_number,
+          block_id: session.block_id ?? null,
+        });
 
         // Restringe as propriedades ao agente atual: mesmo block_number pode existir
         // em múltiplos blocks (localidades/ruas diferentes). Filtrar por boletim_id
