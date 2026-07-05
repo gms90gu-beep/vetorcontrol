@@ -41,6 +41,7 @@ import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
+import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
