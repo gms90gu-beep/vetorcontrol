@@ -96,6 +96,8 @@ function FieldWorkPage() {
   const [retroOtherText, setRetroOtherText] = useState<string>("");
   const [isRetroactive, setIsRetroactive] = useState(false);
   const [retroactiveReason, setRetroactiveReason] = useState<string | null>(null);
+  const [openSession, setOpenSession] = useState<OpenSessionInfo | null>(null);
+  const [openSessionModal, setOpenSessionModal] = useState(false);
   const navigate = useNavigate();
   const { allowWeekend } = useOperationalDate();
 
