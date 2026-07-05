@@ -56,10 +56,15 @@ import { translate } from "@/lib/translations";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
+  validateSearch: (s: Record<string, unknown>) => ({
+    restore: typeof s.restore === "string" ? s.restore : undefined,
+    ts: typeof s.ts === "number" ? s.ts : typeof s.ts === "string" ? Number(s.ts) : undefined,
+  }),
   component: FieldWorkListPage,
 });
 
 function FieldWorkListPage() {
+  const search = Route.useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -77,9 +82,13 @@ function FieldWorkListPage() {
   const [userRole, setUserRole] = useState<string>("agent");
 
   useEffect(() => {
-    fetchSessionAndProperties();
+    if (search.restore) {
+      console.log("[SESSION_AUTO_REFRESH]", { restore: search.restore, ts: search.ts });
+    }
+    fetchSessionAndProperties(search.restore);
     fetchAgentAndPeriod();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.restore, search.ts]);
 
   const fetchAgentAndPeriod = async () => {
     try {
