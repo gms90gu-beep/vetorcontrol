@@ -1644,6 +1644,7 @@ export type Database = {
         Returns: boolean
       }
       reconcile_rg_integrity: { Args: never; Returns: Json }
+      recover_session_visits: { Args: { _session_id: string }; Returns: Json }
       regenerate_cycle_weeks: {
         Args: { _cycle_id: string }
         Returns: undefined
