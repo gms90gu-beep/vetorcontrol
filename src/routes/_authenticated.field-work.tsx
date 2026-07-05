@@ -47,6 +47,36 @@ export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
+async function autoRecoverSession(sessionId: string) {
+  if (!isOnline()) {
+    console.log("[SESSION_AUTO_RECOVER_START]", { session: sessionId, skipped: "offline" });
+    return;
+  }
+  try {
+    console.log("[SESSION_AUTO_RECOVER_START]", { session: sessionId });
+    const { data, error } = await supabase.rpc("recover_session_visits" as any, { _session_id: sessionId });
+    if (error) {
+      console.warn("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, error: error.message });
+      return;
+    }
+    const status = (data as any)?.status;
+    if (status === "not_needed") {
+      console.log("[SESSION_AUTO_RECOVER_NOT_NEEDED]", { session: sessionId });
+    } else {
+      console.log("[SESSION_AUTO_RECOVER_FOUND]", { session: sessionId, updated: (data as any)?.updated });
+      if ((data as any)?.updated > 0) {
+        console.log("[SESSION_AUTO_RECOVER_UPDATED]", { session: sessionId, updated: (data as any).updated });
+      }
+      if ((data as any)?.dwr_generated) {
+        console.log("[SESSION_AUTO_RECOVER_DWR]", { session: sessionId, dwr_generated: true });
+      }
+    }
+    console.log("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, result: data });
+  } catch (e: any) {
+    console.warn("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, error: e?.message });
+  }
+}
+
 function FieldWorkPage() {
   const [date, setDate] = useState<Date>(new Date());
   const [blocks, setBlocks] = useState<any[]>([]);
@@ -253,6 +283,7 @@ function FieldWorkPage() {
             const cont = window.confirm("Deseja continuar sua jornada de hoje?");
             if (cont) {
               console.log("[SESSION_SELECTED]", { reason: "today", id: todaySession.id });
+              await autoRecoverSession(todaySession.id);
               navigate({ to: `/field-work-list` });
               return;
             }
@@ -279,6 +310,7 @@ function FieldWorkPage() {
             const continueRetro = window.confirm(msg);
             if (continueRetro) {
               console.log("[SESSION_SELECTED]", { reason: "retroactive", id: retroSession.id });
+              await autoRecoverSession(retroSession.id);
               navigate({ to: `/field-work-list` });
               return;
             }
