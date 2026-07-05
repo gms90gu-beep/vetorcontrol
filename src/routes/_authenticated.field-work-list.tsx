@@ -515,6 +515,10 @@ function FieldWorkListPage() {
             return na - nb;
           });
           setProperties(normalizedProps);
+          console.log("[SESSION_PROPERTIES_READY]", { count: normalizedProps.length });
+          console.log("[SESSION_VISITS_READY]", { count: blockCycleVisits.length, marked: markedCount });
+          console.log("[SESSION_STATE_UPDATED]", { session_id: session.id, block_number: session.block_number });
+          console.log("[SESSION_RESTORE_FINISHED]", { session_id: session.id });
 
           console.log("[SESSION_RESTORE_FINISH]", {
             session_id: session.id,
