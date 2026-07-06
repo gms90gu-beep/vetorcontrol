@@ -282,6 +282,10 @@ export function bootSyncEngine() {
   });
   // Boot inicial
   setTimeout(tryFlush, 1500);
+  // Gatilho 3: limpeza no boot (24h + guardas)
+  setTimeout(() => {
+    import("./cache-cleanup").then(({ cleanupOnBoot }) => void cleanupOnBoot()).catch(() => {});
+  }, 8000);
   // Polling defensivo
   intervalId = setInterval(tryFlush, 15_000);
 }
