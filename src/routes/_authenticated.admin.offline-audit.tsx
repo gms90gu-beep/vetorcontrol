@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { KPICard } from "@/components/ui/kpi-card";
 import { db } from "@/lib/offline/db";
 import { pendingMutationCount, pendingByTable, getLastSyncAt, flushMutations } from "@/lib/offline/sync";
+import { cleanupOrphanCache } from "@/lib/offline/cache-cleanup";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -190,6 +191,28 @@ function OfflineAuditPage() {
     await refresh();
   };
 
+  const doCacheCleanup = async () => {
+    setBusy(true);
+    const t0 = performance.now();
+    try {
+      const report = await cleanupOrphanCache();
+      const ms = Math.round(performance.now() - t0);
+      console.log("[CACHE_CLEANUP_MANUAL]", { ...report, durationMs: ms });
+      if (report.aborted) {
+        toast.warning(`Limpeza abortada: ${report.aborted}`);
+      } else {
+        const checked = Object.values(report.perTable).reduce((a, b) => a + b.checked, 0);
+        const removed = Object.values(report.perTable).reduce((a, b) => a + b.removed, 0);
+        toast.success(`Cache: ${checked} verificados, ${removed} removidos em ${ms}ms`);
+      }
+      await refresh();
+    } catch (e: any) {
+      toast.error(`Falha na limpeza: ${e?.message ?? e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="container mx-auto max-w-6xl space-y-6 px-4 py-6">
       <PageHeader
@@ -204,6 +227,9 @@ function OfflineAuditPage() {
             </Button>
             <Button size="sm" onClick={doSync} disabled={busy || !online}>
               Sincronizar agora
+            </Button>
+            <Button size="sm" variant="secondary" onClick={doCacheCleanup} disabled={busy || !online}>
+              🧹 Limpar Cache Órfão
             </Button>
           </div>
         }
