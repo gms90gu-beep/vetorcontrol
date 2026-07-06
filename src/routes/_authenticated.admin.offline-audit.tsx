@@ -228,6 +228,9 @@ function OfflineAuditPage() {
             <Button size="sm" onClick={doSync} disabled={busy || !online}>
               Sincronizar agora
             </Button>
+            <Button size="sm" variant="secondary" onClick={doCacheCleanup} disabled={busy || !online}>
+              🧹 Limpar Cache Órfão
+            </Button>
           </div>
         }
       />
