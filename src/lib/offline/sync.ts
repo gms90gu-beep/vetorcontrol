@@ -198,8 +198,19 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     notify();
   }
   if (ok > 0 || failed > 0) console.log(`[SYNC] Sincronização concluída — ${ok} ok, ${failed} falhou`);
-  if (failed > 0) console.warn("[SYNC_ENGINE_ERROR]", { ok, failed, lastSyncAt });
-  else console.log("[SYNC_ENGINE_SUCCESS]", { ok, lastSyncAt });
+  if (failed > 0) {
+    console.warn("[SYNC_ENGINE_ERROR]", { ok, failed, lastSyncAt });
+  } else {
+    console.log("[SYNC_ENGINE_SUCCESS]", { ok, lastSyncAt });
+    console.log("[SYNC_SUCCESS]", { ok, lastSyncAt });
+    // Gatilho 1: limpeza automática pós-sync (com todas as guardas internas)
+    try {
+      const { cleanupAfterSync } = await import("./cache-cleanup");
+      void cleanupAfterSync();
+    } catch (e) {
+      console.warn("[CACHE_CLEANUP] falha ao agendar pós-sync", e);
+    }
+  }
   return { ok, failed };
 }
 
