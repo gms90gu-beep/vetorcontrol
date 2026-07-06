@@ -268,23 +268,105 @@ function FieldWorkPage() {
       // abrimos o modal para o usuário escolher Continuar / Encerrar / Cancelar.
       try {
         if (isOnline()) {
-          const { data: openSessions } = await supabase
+          const nowIso = new Date().toISOString();
+          const todayStr = nowIso.slice(0, 10);
+          console.log("[SESSION_QUERY_START]", {
+            user_id: user.id,
+            now: nowIso,
+            today: todayStr,
+            cycle_id: selectedCycleId ?? null,
+            week_id: selectedWeekId ?? null,
+            select:
+              "from(field_work_sessions).select(id,status,session_date,cycle_id,week_id,block_id,block_number,property_count,street_name,created_at,updated_at,user_id).eq(user_id).eq(status,in_progress).order(session_date desc).order(created_at desc)",
+          });
+
+          const { data: openSessions, error: openErr } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at")
+            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, user_id")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("session_date", { ascending: false })
             .order("created_at", { ascending: false });
 
+          if (openErr) console.warn("[SESSION_QUERY_ERROR]", openErr);
+
           const open = openSessions || [];
-          console.log("[OPEN_SESSIONS]", open.map((s: any) => ({
-            id: s.id, status: s.status, block_number: s.block_number,
-            block_id: (s as any).block_id ?? null, session_date: s.session_date,
-            created_at: s.created_at ?? null,
-          })));
+          console.log("[SESSION_QUERY_RESULT]", {
+            count: open.length,
+            rows: open.map((s: any) => ({
+              id: s.id,
+              status: s.status,
+              session_date: s.session_date,
+              created_at: s.created_at,
+              updated_at: s.updated_at,
+              block_number: s.block_number,
+              block_id: s.block_id,
+              cycle_id: s.cycle_id,
+              week_id: s.week_id,
+              user_id: s.user_id,
+            })),
+          });
+
+          if (open.length > 1) {
+            console.warn("[MULTIPLE_OPEN_SESSIONS]", {
+              user_id: user.id,
+              count: open.length,
+              ids: open.map((s: any) => s.id),
+              detail: open,
+            });
+          }
 
           if (open.length > 0) {
             const existing = open[0] as OpenSessionInfo;
+            console.log("[SESSION_SELECTED]", {
+              id: existing.id,
+              position: 0,
+              algorithm: "order by session_date DESC, created_at DESC → first row",
+              reason: "sessão mais recente por session_date/created_at entre as in_progress do agente",
+              session_date: existing.session_date,
+              created_at: (existing as any).created_at ?? null,
+              block_number: existing.block_number,
+              block_id: (existing as any).block_id ?? null,
+              cycle_id: existing.cycle_id,
+              week_id: existing.week_id,
+            });
+
+            // Auditoria de visitas da sessão escolhida
+            try {
+              const { data: vRows } = await supabase
+                .from("visits")
+                .select("id, status")
+                .eq("field_work_session_id", existing.id);
+              const v = vRows || [];
+              const count = (s: string) => v.filter((r: any) => r.status === s).length;
+              console.log("[SESSION_VISITS]", {
+                session_id: existing.id,
+                total: v.length,
+                visited: count("visited"),
+                closed: count("closed"),
+                refused: count("refused"),
+                pending: v.filter((r: any) => !["visited", "closed", "refused"].includes(r.status)).length,
+              });
+            } catch (e) {
+              console.warn("[SESSION_VISITS_ERROR]", e);
+            }
+
+            // Sanity check
+            const sDate = existing.session_date;
+            console.log("[SESSION_SANITY]", {
+              id: existing.id,
+              has_block_id: !!(existing as any).block_id,
+              has_block_number: !!existing.block_number,
+              has_cycle_id: !!existing.cycle_id,
+              has_week_id: !!existing.week_id,
+              session_date: sDate,
+              date_in_future: sDate ? sDate > todayStr : false,
+              date_mismatch_today: sDate ? sDate !== todayStr : true,
+              missing_property_count: !existing.property_count,
+              suspected_orphan:
+                !((existing as any).block_id) || !existing.cycle_id || !existing.block_number,
+            });
+
             console.log("[SESSION_FOUND]", { id: existing.id, session_date: existing.session_date, block_number: existing.block_number });
             console.log("[SESSION_MODAL_OPEN]", { id: existing.id });
             setOpenSession(existing);
@@ -296,6 +378,7 @@ function FieldWorkPage() {
       } catch (e) {
         console.warn("[SESSION_SELECTOR] Verificação falhou (offline):", e);
       }
+
 
 
 
