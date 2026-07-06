@@ -143,3 +143,42 @@ export async function cleanupOrphanCache(): Promise<CacheCleanupReport> {
 export async function getLastCacheCleanupReport(): Promise<CacheCleanupReport | null> {
   return ((await offlineDb.meta.get('cache_cleanup:last'))?.value as CacheCleanupReport) ?? null;
 }
+
+async function hasActiveSession(): Promise<boolean> {
+  const rows: any[] = await offlineDb.field_work_sessions.toArray();
+  return rows.some((r) => (r?.data?.status ?? r?.status) === 'in_progress');
+}
+
+/** Gatilho pós-sync: só roda se não houver mutações nem jornada ativa. */
+export async function cleanupAfterSync(): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const pending = await offlineDb.mutations.count();
+  if (pending > 0) {
+    console.log('[CACHE_CLEANUP_SKIPPED_PENDING_MUTATIONS]', { pending });
+    return;
+  }
+  if (await hasActiveSession()) {
+    console.log('[CACHE_CLEANUP_SKIPPED_ACTIVE_SESSION]');
+    return;
+  }
+  await cleanupOrphanCache();
+}
+
+const BOOT_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/** Gatilho de inicialização: pelo menos 24h desde a última execução. */
+export async function cleanupOnBoot(): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  const pending = await offlineDb.mutations.count();
+  if (pending > 0) {
+    console.log('[CACHE_CLEANUP_SKIPPED_PENDING_MUTATIONS]', { pending });
+    return;
+  }
+  if (await hasActiveSession()) {
+    console.log('[CACHE_CLEANUP_SKIPPED_ACTIVE_SESSION]');
+    return;
+  }
+  const last = await getLastCacheCleanupReport();
+  if (last && Date.now() - last.ts < BOOT_MIN_INTERVAL_MS) return;
+  await cleanupOrphanCache();
+}
