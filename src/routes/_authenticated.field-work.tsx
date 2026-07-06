@@ -282,7 +282,7 @@ function FieldWorkPage() {
 
           const { data: openSessions, error: openErr } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, updated_at, user_id")
+            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, user_id")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
             .order("session_date", { ascending: false })
