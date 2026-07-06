@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { KPICard } from "@/components/ui/kpi-card";
 import { db } from "@/lib/offline/db";
 import { pendingMutationCount, pendingByTable, getLastSyncAt, flushMutations } from "@/lib/offline/sync";
+import { cleanupOrphanCache } from "@/lib/offline/cache-cleanup";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
