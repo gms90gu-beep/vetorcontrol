@@ -619,8 +619,46 @@ function EditarBoletim() {
         });
       }
 
+      // ─── RC-13 Audit: divergência boletim × imóvel (batch) ──────────────
+      const { data: boletimSnap } = await supabase
+        .from("boletins_rg")
+        .select("id, block_id, block_number")
+        .eq("id", boletimId!)
+        .maybeSingle();
+      console.log("[PROPERTY_ADD_START]", {
+        boletim_id: boletimSnap?.id ?? boletimId,
+        boletim_block_id: boletimSnap?.block_id ?? null,
+        boletim_block_number: boletimSnap?.block_number ?? null,
+        form_block_number: form.block_number,
+        effectiveBlockId,
+        qty,
+      });
+      console.log("[PROPERTY_STATE]", { blockId, agentId, form_block_number: form.block_number, boletimId });
+      console.log("[PROPERTY_SOURCE]", {
+        effectiveBlockId,
+        from_blockId_state: blockId === effectiveBlockId,
+        from_boletim: boletimSnap?.block_id === effectiveBlockId,
+      });
+      console.log("[PROPERTY_BLOCK_COMPARE]", {
+        boletim_block_id: boletimSnap?.block_id ?? null,
+        property_block_id: effectiveBlockId,
+        activeSession_block_id: null,
+        divergent: !!(boletimSnap?.block_id && boletimSnap.block_id !== effectiveBlockId),
+      });
+      if (boletimSnap?.block_id && boletimSnap.block_id !== effectiveBlockId) {
+        console.error("[PROPERTY_ERROR]", {
+          file: "src/routes/_authenticated.rg.editar.$id.tsx",
+          fn: "addBatchProperties",
+          line: 606,
+          expected_block_id: boletimSnap.block_id,
+          received_block_id: effectiveBlockId,
+          reason: "block_id do imóvel difere do boletim",
+        });
+      }
+
       try {
         for (const row of payload) {
+          console.log("[PROPERTY_SAVE_PAYLOAD]", { payload: row });
           await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
         }
       } catch (insertError: any) {
