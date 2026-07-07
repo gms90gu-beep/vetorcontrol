@@ -307,64 +307,73 @@ function FieldWorkPage() {
             })),
           });
 
-          if (open.length > 1) {
-            console.warn("[MULTIPLE_OPEN_SESSIONS]", {
-              user_id: user.id,
-              count: open.length,
-              ids: open.map((s: any) => s.id),
-              detail: open,
-            });
-          }
+          // ── REGRA 2: nenhuma jornada aberta → segue direto ──────────
+          if (open.length === 0) {
+            console.log("[SESSION_NONE_OPEN]", { user_id: user.id });
+            console.log("[SESSION_NEW_ALLOWED]");
+            // não abre modal — continua o fluxo normal abaixo
+          } else {
+            // ── REGRA 4: múltiplas jornadas → inspecionar visitas ────
+            let chosen: any = null;
 
-          if (open.length > 0) {
-            const existing = open[0] as OpenSessionInfo;
-            console.log("[SESSION_SELECTED]", {
-              id: existing.id,
-              position: 0,
-              algorithm: "order by session_date DESC, created_at DESC → first row",
-              reason: "sessão mais recente por session_date/created_at entre as in_progress do agente",
-              session_date: existing.session_date,
-              created_at: (existing as any).created_at ?? null,
-              block_number: existing.block_number,
-              block_id: (existing as any).block_id ?? null,
-              cycle_id: existing.cycle_id,
-              week_id: existing.week_id,
-            });
-
-            // Auditoria de visitas da sessão escolhida
-            try {
-              const { data: vRows } = await supabase
-                .from("visits")
-                .select("id, status")
-                .eq("field_work_session_id", existing.id);
-              const v = vRows || [];
-              const count = (s: string) => v.filter((r: any) => r.status === s).length;
-              console.log("[SESSION_VISITS]", {
-                session_id: existing.id,
-                total: v.length,
-                visited: count("visited"),
-                closed: count("closed"),
-                refused: count("refused"),
-                pending: v.filter((r: any) => !["visited", "closed", "refused"].includes(r.status)).length,
+            if (open.length > 1) {
+              console.warn("[MULTIPLE_OPEN_SESSIONS]", {
+                user_id: user.id,
+                count: open.length,
+                ids: open.map((s: any) => s.id),
+                detail: open,
               });
-            } catch (e) {
-              console.warn("[SESSION_VISITS_ERROR]", e);
+
+              const withCounts: Array<{ s: any; visits: number }> = [];
+              for (const s of open) {
+                try {
+                  const { count } = await supabase
+                    .from("visits")
+                    .select("id", { count: "exact", head: true })
+                    .eq("field_work_session_id", s.id);
+                  withCounts.push({ s, visits: count || 0 });
+                } catch {
+                  withCounts.push({ s, visits: 0 });
+                }
+              }
+              console.log("[SESSION_VISITS_PER_OPEN]", withCounts.map((x) => ({ id: x.s.id, visits: x.visits, block: x.s.block_number, session_date: x.s.session_date })));
+
+              const valid = withCounts.filter((x) => x.visits > 0);
+              if (valid.length === 1) {
+                chosen = valid[0].s;
+                console.log("[SESSION_AUTO_SELECTED]", {
+                  id: chosen.id,
+                  reason: "única jornada com visitas entre múltiplas in_progress",
+                  visits: valid[0].visits,
+                });
+              } else if (valid.length === 0) {
+                // todas órfãs → escolhe a mais recente (fluxo antigo)
+                chosen = open[0];
+                console.log("[SESSION_AUTO_SELECTED]", {
+                  id: chosen.id,
+                  reason: "todas órfãs (0 visitas) — selecionada mais recente",
+                });
+              } else {
+                console.error("[SESSION_INCONSISTENT]", {
+                  user_id: user.id,
+                  valid_sessions: valid.map((x) => ({ id: x.s.id, visits: x.visits, block: x.s.block_number })),
+                });
+                toast.error(
+                  "Inconsistência: múltiplas jornadas em aberto com visitas. Procure o administrador."
+                );
+                return;
+              }
+            } else {
+              chosen = open[0];
             }
 
-            // Sanity check
-            const sDate = existing.session_date;
-            console.log("[SESSION_SANITY]", {
+            const existing = chosen as OpenSessionInfo;
+            console.log("[SESSION_SELECTED]", {
               id: existing.id,
-              has_block_id: !!(existing as any).block_id,
-              has_block_number: !!existing.block_number,
-              has_cycle_id: !!existing.cycle_id,
-              has_week_id: !!existing.week_id,
-              session_date: sDate,
-              date_in_future: sDate ? sDate > todayStr : false,
-              date_mismatch_today: sDate ? sDate !== todayStr : true,
-              missing_property_count: !existing.property_count,
-              suspected_orphan:
-                !((existing as any).block_id) || !existing.cycle_id || !existing.block_number,
+              session_date: existing.session_date,
+              block_number: existing.block_number,
+              cycle_id: existing.cycle_id,
+              week_id: existing.week_id,
             });
 
             console.log("[SESSION_FOUND]", { id: existing.id, session_date: existing.session_date, block_number: existing.block_number });
@@ -373,11 +382,11 @@ function FieldWorkPage() {
             setOpenSessionModal(true);
             return;
           }
-          console.log("[SESSION_NEW_ALLOWED]");
         }
       } catch (e) {
         console.warn("[SESSION_SELECTOR] Verificação falhou (offline):", e);
       }
+
 
 
 
