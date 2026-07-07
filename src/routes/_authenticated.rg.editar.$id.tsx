@@ -664,9 +664,15 @@ function EditarBoletim() {
       }
 
       try {
-        for (const row of payload) {
-          console.log("[PROPERTY_SAVE_PAYLOAD]", { payload: row });
-          await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+        const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
+        if (isOnline) {
+          const { error: insErr } = await supabase.from("properties").insert(payload);
+          if (insErr) throw insErr;
+        } else {
+          for (const row of payload) {
+            console.log("[PROPERTY_SAVE_PAYLOAD]", { payload: row });
+            await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+          }
         }
       } catch (insertError: any) {
         throw insertError;
