@@ -398,12 +398,14 @@ function EditarBoletim() {
         : Promise.resolve({ error: null } as any);
 
       const dirtyUpdates = sortedImoveis.filter((im) => !im._deleted && !im._new && im.id && im._dirty);
+      const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
       const updatePromises = dirtyUpdates.map((im) => {
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
-        return updateOffline("properties", im.id!, {
+        const numero = (im.number || "").trim() || "S/N";
+        const patch = {
           street_name: im.street_name || null,
           side: im.side || null,
-          number: im.number,
+          number: numero,
           sequence: im.sequence,
           complement: im.complement || null,
           type: im.type,
@@ -412,8 +414,13 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           block_number: form.block_number || null,
           user_id: effectiveAgentId,
-          updated_at: new Date().toISOString(),
-        }).then(() => ({ error: null } as any));
+        };
+        if (isOnline) {
+          // Online → grava direto no Supabase para garantir persistência antes do reload.
+          return supabase.from("properties").update(patch).eq("id", im.id!).then((r) => ({ error: (r as any).error }));
+        }
+        return updateOffline("properties", im.id!, { ...patch, updated_at: new Date().toISOString() })
+          .then(() => ({ error: null as any }));
       });
 
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
@@ -657,9 +664,15 @@ function EditarBoletim() {
       }
 
       try {
-        for (const row of payload) {
-          console.log("[PROPERTY_SAVE_PAYLOAD]", { payload: row });
-          await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+        const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
+        if (isOnline) {
+          const { error: insErr } = await supabase.from("properties").insert(payload);
+          if (insErr) throw insErr;
+        } else {
+          for (const row of payload) {
+            console.log("[PROPERTY_SAVE_PAYLOAD]", { payload: row });
+            await createOffline("properties", { ...row, updated_at: new Date().toISOString() });
+          }
         }
       } catch (insertError: any) {
         throw insertError;
