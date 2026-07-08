@@ -696,7 +696,30 @@ function BoletimView() {
             tone="info"
           />
         </div>
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex rounded-lg border border-border bg-background p-0.5 text-xs">
+            {(
+              [
+                { key: "all", label: `Todos (${gpsStats.total})` },
+                { key: "geo", label: `🟢 Georref. (${gpsStats.geo})` },
+                { key: "pending", label: `🔴 Pendentes (${gpsStats.pendentes})` },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setGeoFilter(opt.key)}
+                className={
+                  "rounded-md px-2.5 py-1 font-semibold transition " +
+                  (geoFilter === opt.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted")
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -707,6 +730,7 @@ function BoletimView() {
           </Button>
         </div>
       </div>
+
 
       <BlockMapDialog
         open={mapOpen}
