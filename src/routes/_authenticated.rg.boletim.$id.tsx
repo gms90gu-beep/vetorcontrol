@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { BlockMapDialog } from "@/components/rg/BlockMapDialog";
+import { GeorefButton } from "@/components/property/GeorefButton";
 
 export const Route = createFileRoute("/_authenticated/rg/boletim/$id")({
   component: BoletimView,
