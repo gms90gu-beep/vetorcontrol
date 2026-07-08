@@ -252,23 +252,39 @@ function FieldWorkListPage() {
           online,
         });
 
+        // REGRA: filtrar SEMPRE por block_id. block_number é apenas para exibição.
+        // Quarteirões sequenciais (4, 4/1, 4/2) são blocks distintos e não devem
+        // ser misturados via block_number.
+        let sessionBlockId: string | null = session.block_id ?? null;
+        if (!sessionBlockId && session.block_number) {
+          const blocks = await listRemoteOrCache<any>({
+            name: "blocks",
+            remote: () =>
+              supabase.from("blocks").select("id, number").eq("number", String(session.block_number)) as any,
+            filter: (bk) => String(bk.number) === String(session.block_number),
+          });
+          sessionBlockId = blocks?.[0]?.id ?? null;
+          console.log("[BLOCK_ID_RESOLVED]", { from_block_number: session.block_number, resolved_block_id: sessionBlockId });
+        }
+
         let propsRaw = await listRemoteOrCache<any>({
           name: "properties",
           remote: () =>
-            (myBoletimIds.length
+            (sessionBlockId && myBoletimIds.length
               ? supabase
                   .from("properties")
                   .select("*")
-                  .eq("block_number", session.block_number)
+                  .eq("block_id", sessionBlockId)
                   .in("boletim_id", myBoletimIds)
                   .order("sequence", { ascending: true, nullsFirst: false })
               : Promise.resolve({ data: [] as any[], error: null })) as any,
           filter: (p) =>
-            String(p.block_number) === String(session.block_number) &&
+            !!sessionBlockId &&
+            p.block_id === sessionBlockId &&
             myBoletimIds.includes(p.boletim_id),
         });
         const fwlSource = (propsRaw as any)?.source || "remote";
-        console.log("[FIELD_BLOCK]", { block_number: session.block_number, block_id: session.block_id ?? null, online });
+        console.log("[FIELD_BLOCK]", { block_number: session.block_number, block_id: sessionBlockId, online, filter_key: "block_id" });
         console.log(fwlSource === "remote" ? "[FIELD_REMOTE]" : "[FIELD_CACHE]", { count: propsRaw?.length || 0 });
 
         // ────── AUDITORIA DIVERGÊNCIA RG × SELEÇÃO × JORNADA ──────
