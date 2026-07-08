@@ -556,6 +556,7 @@ export type Database = {
           property_count: number
           retroactive_reason: string | null
           session_date: string
+          started_at: string | null
           status: string
           street_name: string
           updated_at: string
@@ -572,6 +573,7 @@ export type Database = {
           property_count: number
           retroactive_reason?: string | null
           session_date?: string
+          started_at?: string | null
           status?: string
           street_name: string
           updated_at?: string
@@ -588,6 +590,7 @@ export type Database = {
           property_count?: number
           retroactive_reason?: string | null
           session_date?: string
+          started_at?: string | null
           status?: string
           street_name?: string
           updated_at?: string
