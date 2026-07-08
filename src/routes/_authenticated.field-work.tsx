@@ -115,6 +115,38 @@ function FieldWorkPage() {
     })();
   }, []);
 
+  // ── Fase 1: painel operacional quando existe jornada em andamento ──
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await safeGetUser();
+        if (!user) { setCheckingSession(false); return; }
+        if (isOnline()) {
+          const { data } = await supabase
+            .from("field_work_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("status", "in_progress")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) setActiveSession(data);
+        } else {
+          const { listLocal } = await import("@/lib/offline/repos");
+          const local = await listLocal<any>("field_work_sessions", (s: any) =>
+            s.user_id === user.id && s.status === "in_progress");
+          const sorted = [...(local || [])].sort((a: any, b: any) =>
+            String(b.created_at || "").localeCompare(String(a.created_at || "")));
+          if (sorted[0]) setActiveSession(sorted[0]);
+        }
+      } finally {
+        setCheckingSession(false);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
