@@ -316,14 +316,30 @@ function BoletimView() {
   }
 
 
-  const totalFolhas = Math.max(1, Math.ceil(imoveis.length / LINHAS_POR_FOLHA));
+  const imoveisFiltrados = useMemo(() => {
+    if (geoFilter === "all") return imoveis;
+    if (geoFilter === "geo") return imoveis.filter((p) => p.latitude != null && p.longitude != null);
+    return imoveis.filter((p) => p.latitude == null || p.longitude == null);
+  }, [imoveis, geoFilter]);
+
+  const totalFolhas = Math.max(1, Math.ceil(imoveisFiltrados.length / LINHAS_POR_FOLHA));
   const folhas = useMemo(() => {
     const out: Property[][] = [];
     for (let i = 0; i < totalFolhas; i++) {
-      out.push(imoveis.slice(i * LINHAS_POR_FOLHA, (i + 1) * LINHAS_POR_FOLHA));
+      out.push(imoveisFiltrados.slice(i * LINHAS_POR_FOLHA, (i + 1) * LINHAS_POR_FOLHA));
     }
     return out;
-  }, [imoveis, totalFolhas]);
+  }, [imoveisFiltrados, totalFolhas]);
+
+  function handleGeorefUpdate(propertyId: string, lat: number, lng: number) {
+    setImoveis((prev) =>
+      prev.map((p) =>
+        p.id === propertyId
+          ? { ...p, latitude: lat, longitude: lng, geocoded_at: new Date().toISOString() }
+          : p,
+      ),
+    );
+  }
 
   const counts = useMemo(() => {
     const c = { R: 0, C: 0, TB: 0, PE: 0, O: 0 };
