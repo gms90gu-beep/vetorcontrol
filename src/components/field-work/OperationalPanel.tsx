@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   MapPin, Calendar, Clock, Home, CheckCircle2, XCircle, DoorClosed,
   AlertTriangle, Bug, FlaskConical, Droplets, Search, Map as MapIcon,
   FileText, ClipboardList, Plus, Flag, RefreshCw, Cloud, CloudOff,
-  Navigation, ChevronRight, Circle
+  Navigation, ChevronRight, ChevronDown, ChevronUp, Circle
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,10 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "nogeo", label: "Sem GPS" },
 ];
 
+const audit = (tag: string, data?: any) => {
+  try { console.info(`[${tag}]`, data ?? ""); } catch {}
+};
+
 function typeLabel(t?: string | null) {
   const map: Record<string, string> = {
     R: "Residência", C: "Comércio", TB: "Terreno Baldio",
@@ -43,6 +47,20 @@ function typeLabel(t?: string | null) {
   };
   if (!t) return "—";
   return map[t] || t;
+}
+
+// Ordenação inteligente: número, sequência, complemento (natural)
+function smartCompare(a: any, b: any) {
+  const na = parseInt(String(a.number ?? "").replace(/\D/g, ""), 10);
+  const nb = parseInt(String(b.number ?? "").replace(/\D/g, ""), 10);
+  const nA = isNaN(na) ? Number.MAX_SAFE_INTEGER : na;
+  const nB = isNaN(nb) ? Number.MAX_SAFE_INTEGER : nb;
+  if (nA !== nB) return nA - nB;
+  const sa = a.sequence ?? 0;
+  const sb = b.sequence ?? 0;
+  if (sa !== sb) return sa - sb;
+  const ca = String(a.complement ?? "").localeCompare(String(b.complement ?? ""), "pt-BR", { numeric: true, sensitivity: "base" });
+  return ca;
 }
 
 interface Props {
@@ -65,63 +83,119 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [query, setQuery] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollKey = `op_panel_scroll_${session?.id ?? "none"}`;
+  const filterKey = `op_panel_filter_${session?.id ?? "none"}`;
+
+  // Restaura filtro
+  useEffect(() => {
+    try {
+      const f = sessionStorage.getItem(filterKey) as FilterKey | null;
+      if (f) setFilter(f);
+    } catch {}
+  }, [filterKey]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(filterKey, filter); } catch {}
+  }, [filter, filterKey]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, []);
 
+  const loadAll = useCallback(async () => {
+    if (!session?.user_id) return;
+    audit("OP_PANEL_LOAD", { session: session.id });
+
+    const [{ data: ag }, { data: cy }, { data: wk }] = await Promise.all([
+      supabase.from("agents").select("name, registration_id, municipality")
+        .eq("profile_id", session.user_id).maybeSingle(),
+      session.cycle_id
+        ? supabase.from("cycles").select("id, number, year, name").eq("id", session.cycle_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+      session.week_id
+        ? supabase.from("weeks").select("id, number, start_date, end_date").eq("id", session.week_id).maybeSingle()
+        : Promise.resolve({ data: null } as any),
+    ]);
+    setAgent(ag); setCycle(cy); setWeek(wk);
+
+    if (session.block_id) {
+      const props = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () => supabase.from("properties").select("*").eq("block_id", session.block_id)
+          .order("sequence", { ascending: true, nullsFirst: false }) as any,
+        filter: (p) => p.block_id === session.block_id,
+      });
+      const sorted = [...(props || [])].sort(smartCompare);
+      setProperties(sorted);
+      try { sessionStorage.setItem(`op_panel_order_${session.block_id}`, JSON.stringify(sorted.map((p) => p.id))); } catch {}
+
+      const propIds = sorted.map((p) => p.id);
+      if (propIds.length) {
+        const { data: pend } = await supabase.from("property_pendencies")
+          .select("property_id, current_status, resolved_at")
+          .in("property_id", propIds);
+        setPendencies(pend || []);
+      }
+    }
+
+    const dayStart = `${session.session_date}T00:00:00`;
+    const dayEnd = `${session.session_date}T23:59:59.999`;
+    const vsRes = await supabase.from("visits")
+      .select("id, property_id, status, has_focus, treatment_amount, visit_date")
+      .eq("agent_id", session.user_id)
+      .gte("visit_date", dayStart).lte("visit_date", dayEnd);
+    const vs = vsRes.data || [];
+    setVisits(vs);
+
+    if (vs.length) {
+      const { data: deps } = await supabase.from("visit_deposits")
+        .select("id, visit_id, type_code, quantity, is_positive")
+        .in("visit_id", vs.map((v: any) => v.id));
+      setDeposits(deps || []);
+    } else {
+      setDeposits([]);
+    }
+    audit("OP_PANEL_REFRESH", { properties: (properties || []).length });
+  }, [session?.id, session?.block_id, session?.session_date, session?.user_id, session?.cycle_id, session?.week_id]);
+
+  useEffect(() => { loadAll(); }, [loadAll, refreshTick]);
+
+  // Realtime: escuta visitas/depósitos/pendências e recarrega
   useEffect(() => {
-    (async () => {
-      if (!session?.user_id) return;
+    if (!session?.user_id || !session?.block_id) return;
+    const channel = supabase
+      .channel(`op_panel_${session.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "visits", filter: `agent_id=eq.${session.user_id}` },
+        () => { audit("OP_PANEL_PROPERTY_CHANGE", { src: "visits" }); setRefreshTick((n) => n + 1); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "properties", filter: `block_id=eq.${session.block_id}` },
+        () => { audit("OP_PANEL_PROPERTY_CHANGE", { src: "properties" }); setRefreshTick((n) => n + 1); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "property_pendencies" },
+        () => setRefreshTick((n) => n + 1))
+      .on("postgres_changes", { event: "*", schema: "public", table: "visit_deposits" },
+        () => setRefreshTick((n) => n + 1))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.id, session?.user_id, session?.block_id]);
 
-      const [{ data: ag }, { data: cy }, { data: wk }] = await Promise.all([
-        supabase.from("agents").select("name, registration_id, municipality")
-          .eq("profile_id", session.user_id).maybeSingle(),
-        session.cycle_id
-          ? supabase.from("cycles").select("id, number, year, name").eq("id", session.cycle_id).maybeSingle()
-          : Promise.resolve({ data: null } as any),
-        session.week_id
-          ? supabase.from("weeks").select("id, number, start_date, end_date").eq("id", session.week_id).maybeSingle()
-          : Promise.resolve({ data: null } as any),
-      ]);
-      setAgent(ag); setCycle(cy); setWeek(wk);
+  // Refresh quando sync termina (pending vira 0)
+  const prevPendingRef = useRef(pending);
+  useEffect(() => {
+    if (prevPendingRef.current > 0 && pending === 0) setRefreshTick((n) => n + 1);
+    prevPendingRef.current = pending;
+  }, [pending]);
 
-      if (session.block_id) {
-        const props = await listRemoteOrCache<any>({
-          name: "properties",
-          remote: () => supabase.from("properties").select("*").eq("block_id", session.block_id)
-            .order("sequence", { ascending: true, nullsFirst: false }) as any,
-          filter: (p) => p.block_id === session.block_id,
-        });
-        setProperties(props || []);
-
-        const propIds = (props || []).map((p: any) => p.id);
-        if (propIds.length) {
-          const { data: pend } = await supabase.from("property_pendencies")
-            .select("property_id, current_status, resolved_at")
-            .in("property_id", propIds);
-          setPendencies(pend || []);
-        }
-      }
-
-      const dayStart = `${session.session_date}T00:00:00`;
-      const dayEnd = `${session.session_date}T23:59:59.999`;
-      const vsRes = await supabase.from("visits")
-        .select("id, property_id, status, has_focus, treatment_amount, visit_date")
-        .eq("agent_id", session.user_id)
-        .gte("visit_date", dayStart).lte("visit_date", dayEnd);
-      const vs = vsRes.data || [];
-      setVisits(vs);
-
-      if (vs.length) {
-        const { data: deps } = await supabase.from("visit_deposits")
-          .select("id, visit_id, type_code, quantity, is_positive")
-          .in("visit_id", vs.map((v: any) => v.id));
-        setDeposits(deps || []);
-      }
-    })();
-  }, [session?.id, session?.block_id, session?.session_date, session?.user_id]);
+  // Refresh quando janela volta ao foco / online
+  useEffect(() => {
+    const onFocus = () => setRefreshTick((n) => n + 1);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
+    return () => { window.removeEventListener("focus", onFocus); window.removeEventListener("online", onFocus); };
+  }, []);
 
   // ── Derived state ───────────────────────────────────────────────
   const total = properties.length || session?.property_count || 0;
@@ -149,10 +223,13 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     const larvicida = visits.reduce((a, v) => a + (Number(v.treatment_amount) || 0), 0);
     const depositos = deposits.length;
     const pendenciasAbertas = pendencies.filter((p) => !p.resolved_at).length;
-    return { visited, closed, refused, focus, done, pendingCount, larvicida, depositos, pendenciasAbertas };
+    const semGeo = properties.filter((p) => p.latitude == null || p.longitude == null).length;
+    return { visited, closed, refused, focus, done, pendingCount, larvicida, depositos, pendenciasAbertas, semGeo };
   }, [properties, lastVisitByProp, visits, deposits, pendencies, total]);
 
   const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
+  useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total }); }, [progress, stats.done, total]);
+
   const startedMs = session?.started_at ? new Date(session.started_at).getTime() : now;
   const durationMin = Math.max(0, Math.round((now - startedMs) / 60000));
   const avgMin = stats.done > 0 ? Math.round(durationMin / stats.done) : 0;
@@ -185,6 +262,39 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     });
   }, [properties, lastVisitByProp, filter, query]);
 
+  // ── Scroll restore ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!properties.length) return;
+    try {
+      const y = Number(sessionStorage.getItem(scrollKey) || "0");
+      if (y > 0 && scrollRef.current) {
+        requestAnimationFrame(() => {
+          scrollRef.current?.scrollTo(0, y);
+          audit("OP_PANEL_SCROLL_RESTORE", { y });
+        });
+      }
+    } catch {}
+  }, [properties.length, scrollKey]);
+
+  const onListScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const y = (e.target as HTMLDivElement).scrollTop;
+    try { sessionStorage.setItem(scrollKey, String(y)); } catch {}
+  }, [scrollKey]);
+
+  const goToProperty = useCallback((id: string) => {
+    try { sessionStorage.setItem(scrollKey, String(scrollRef.current?.scrollTop ?? 0)); } catch {}
+    navigate({ to: `/property/${id}` });
+  }, [navigate, scrollKey]);
+
+  // ── Virtualização ──────────────────────────────────────────────
+  const useVirtual = filtered.length > 60;
+  const rowVirtualizer = useVirtualizer({
+    count: useVirtual ? filtered.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 76,
+    overscan: 8,
+  });
+
   // ── Header helpers ──────────────────────────────────────────────
   const productionDate = session?.session_date
     ? format(new Date(`${session.session_date}T12:00:00`), "dd/MM/yyyy", { locale: ptBR })
@@ -203,12 +313,22 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       : { label: "Em andamento", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40" };
 
   const connBadge = !online
-    ? { icon: CloudOff, label: "Offline", cls: "text-red-300" }
+    ? { icon: CloudOff, label: "Offline", cls: "text-red-300", pill: "bg-red-500/15 text-red-300 border-red-500/40" }
     : syncing
-      ? { icon: RefreshCw, label: "Sincronizando", cls: "text-amber-300 animate-spin" }
+      ? { icon: RefreshCw, label: "Sincronizando", cls: "text-amber-300 animate-spin", pill: "bg-amber-500/15 text-amber-300 border-amber-500/40" }
       : pending > 0
-        ? { icon: Cloud, label: `${pending} pend.`, cls: "text-amber-300" }
-        : { icon: Cloud, label: "Online", cls: "text-emerald-300" };
+        ? { icon: Cloud, label: `${pending} pendentes`, cls: "text-amber-300", pill: "bg-amber-500/15 text-amber-300 border-amber-500/40" }
+        : { icon: Cloud, label: "Online", cls: "text-emerald-300", pill: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40" };
+
+  const alerts: { icon: any; text: string; action?: () => void; actionLabel?: string }[] = [];
+  if (stats.pendingCount > 0) alerts.push({ icon: AlertTriangle, text: `${stats.pendingCount} imóveis pendentes.` });
+  if (pending > 0) alerts.push({ icon: CloudOff, text: `${pending} alterações aguardando sincronização.` });
+  if (stats.semGeo > 0) alerts.push({
+    icon: Navigation,
+    text: `${stats.semGeo} imóveis sem georreferenciamento.`,
+    action: () => setFilter("nogeo"),
+    actionLabel: "Ver",
+  });
 
   return (
     <div className="pb-28 -mx-4 -mt-4">
@@ -216,10 +336,14 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       <div className="bg-slate-950 text-white px-4 pt-4 pb-5 rounded-b-3xl shadow-xl">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge className={cn("border font-bold uppercase text-[9px] tracking-widest", statusBadge.cls)}>
                 <Circle className="h-2 w-2 mr-1 fill-current" />
                 {statusBadge.label}
+              </Badge>
+              <Badge className={cn("border font-bold uppercase text-[9px] tracking-widest", connBadge.pill)}>
+                <connBadge.icon className={cn("h-3 w-3 mr-1", syncing && "animate-spin")} />
+                {connBadge.label}
               </Badge>
               {session?.is_retroactive && (
                 <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/40 text-[9px] uppercase tracking-widest">
@@ -234,10 +358,6 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
               {agent?.name || "Agente"} · {agent?.municipality || "—"}
             </p>
           </div>
-          <div className={cn("flex flex-col items-end gap-1 text-[10px] font-bold", connBadge.cls)}>
-            <connBadge.icon className="h-4 w-4" />
-            <span className="uppercase tracking-widest">{connBadge.label}</span>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 mt-4 text-[10px]">
@@ -250,39 +370,69 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         </div>
       </div>
 
-      {/* ── Progress card ───────────────────────────────────── */}
+      {/* ── Alertas ─────────────────────────────────────────── */}
+      {alerts.length > 0 && (
+        <div className="px-4 mt-3 space-y-1.5">
+          {alerts.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] font-bold text-amber-800">
+              <a.icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">{a.text}</span>
+              {a.action && (
+                <button onClick={a.action} className="text-amber-900 underline underline-offset-2 text-[10px] uppercase tracking-widest">
+                  {a.actionLabel}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Progress card (recolhível) ──────────────────────── */}
       <div className="px-4 mt-4">
         <Card className="border-none shadow-lg rounded-3xl overflow-hidden">
           <CardContent className="p-5">
-            <div className="flex items-end justify-between mb-2">
+            <button
+              onClick={() => setSummaryOpen((s) => !s)}
+              className="w-full flex items-end justify-between mb-2 text-left"
+              aria-label={summaryOpen ? "Recolher resumo" : "Expandir resumo"}
+            >
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Progresso da Jornada</p>
-                <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  {summaryOpen ? "Progresso da Jornada" : `${total} imóveis · ${stats.visited} visitados · ${stats.pendingCount} pendentes`}
+                </p>
+                {summaryOpen && <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>}
               </div>
-              <span className="text-3xl font-black text-blue-600">{progress}%</span>
-            </div>
+              <div className="flex items-center gap-2">
+                {summaryOpen && <span className="text-3xl font-black text-blue-600">{progress}%</span>}
+                {summaryOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+              </div>
+            </button>
             <Progress value={progress} className="h-3" />
-            <div className="grid grid-cols-4 gap-2 mt-4 text-center">
-              <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
-              <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
-              <MiniStat label="Tempo" value={fmtDur(durationMin)} tone="slate" small />
-              <MiniStat label="Média/im." value={stats.done ? `${avgMin}m` : "—"} tone="slate" small />
-            </div>
+            {summaryOpen && (
+              <div className="grid grid-cols-4 gap-2 mt-4 text-center">
+                <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
+                <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
+                <MiniStat label="Tempo" value={fmtDur(durationMin)} tone="slate" small />
+                <MiniStat label="Média/im." value={stats.done ? `${avgMin}m` : "—"} tone="slate" small />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* ── Summary cards ───────────────────────────────────── */}
-      <div className="px-4 mt-4 grid grid-cols-4 gap-2">
-        <SumCard icon={Home} label="Imóveis" value={total} color="text-slate-700" />
-        <SumCard icon={CheckCircle2} label="Visitados" value={stats.visited} color="text-emerald-600" />
-        <SumCard icon={AlertTriangle} label="Pendentes" value={stats.pendingCount} color="text-amber-600" />
-        <SumCard icon={DoorClosed} label="Fechados" value={stats.closed} color="text-slate-600" />
-        <SumCard icon={XCircle} label="Recusas" value={stats.refused} color="text-red-600" />
-        <SumCard icon={Bug} label="Focos" value={stats.focus} color="text-red-500" />
-        <SumCard icon={FlaskConical} label="Depósitos" value={stats.depositos} color="text-purple-600" />
-        <SumCard icon={Droplets} label="Larvicida" value={`${stats.larvicida}g`} color="text-blue-600" small />
-      </div>
+      {summaryOpen && (
+        <div className="px-4 mt-4 grid grid-cols-4 gap-2">
+          <SumCard icon={Home} label="Imóveis" value={total} color="text-slate-700" />
+          <SumCard icon={CheckCircle2} label="Visitados" value={stats.visited} color="text-emerald-600" />
+          <SumCard icon={AlertTriangle} label="Pendentes" value={stats.pendingCount} color="text-amber-600" />
+          <SumCard icon={DoorClosed} label="Fechados" value={stats.closed} color="text-slate-600" />
+          <SumCard icon={XCircle} label="Recusas" value={stats.refused} color="text-red-600" />
+          <SumCard icon={Bug} label="Focos" value={stats.focus} color="text-red-500" />
+          <SumCard icon={FlaskConical} label="Depósitos" value={stats.depositos} color="text-purple-600" />
+          <SumCard icon={Droplets} label="Larvicida" value={`${stats.larvicida}g`} color="text-blue-600" small />
+        </div>
+      )}
 
       {/* ── Filters + search ────────────────────────────────── */}
       <div className="px-4 mt-5 space-y-3">
@@ -322,49 +472,54 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
             {filtered.length} de {total} imóveis
           </p>
         </div>
+
         {filtered.length === 0 ? (
           <div className="text-center py-10 text-slate-400 font-bold text-sm">
             Nenhum imóvel encontrado.
           </div>
-        ) : (
-          filtered.map((p) => {
-            const v = lastVisitByProp.get(p.id);
-            const hasGeo = p.latitude != null && p.longitude != null;
-            const hasPend = pendenciesByProp.has(p.id);
-            const synced = !String(p.id).startsWith("tmp_");
-            const statusInfo = statusChip(v?.status, !!v);
-            return (
-              <button
-                key={p.id}
-                onClick={() => navigate({ to: `/property/${p.id}` })}
-                className="w-full bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex items-center gap-3 active:scale-[0.99] transition text-left"
-              >
-                <div className="h-11 w-11 rounded-xl bg-slate-100 grid place-items-center shrink-0">
-                  <span className="text-sm font-black text-slate-700">{p.number || "—"}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-black text-slate-800 truncate">
-                      {p.number} {p.complement ? `· ${p.complement}` : ""}
-                    </p>
-                    <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded", statusInfo.cls)}>
-                      {statusInfo.label}
-                    </span>
+        ) : useVirtual ? (
+          <div
+            ref={scrollRef}
+            onScroll={onListScroll}
+            className="relative overflow-auto rounded-2xl"
+            style={{ height: "60vh" }}
+          >
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+              {rowVirtualizer.getVirtualItems().map((vi) => {
+                const p = filtered[vi.index];
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      position: "absolute",
+                      top: 0, left: 0, right: 0,
+                      transform: `translateY(${vi.start}px)`,
+                      padding: "4px 0",
+                    }}
+                  >
+                    <PropertyRow
+                      p={p}
+                      visit={lastVisitByProp.get(p.id)}
+                      hasPend={pendenciesByProp.has(p.id)}
+                      onOpen={() => goToProperty(p.id)}
+                    />
                   </div>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">
-                    {typeLabel(p.type)} {p.street_name ? `· ${p.street_name}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <IconPill Icon={Navigation} on={hasGeo} onColor="text-emerald-600" offColor="text-slate-300" title={hasGeo ? "Georreferenciado" : "Sem GPS"} />
-                  <IconPill Icon={Bug} on={!!v?.has_focus} onColor="text-red-500" offColor="text-slate-200" title="Foco" />
-                  <IconPill Icon={Flag} on={hasPend} onColor="text-amber-600" offColor="text-slate-200" title="Pendência" />
-                  <IconPill Icon={synced ? Cloud : CloudOff} on={true} onColor={synced ? "text-emerald-500" : "text-amber-500"} offColor="text-slate-300" title={synced ? "Sincronizado" : "Aguardando sync"} />
-                  <ChevronRight className="h-4 w-4 text-slate-300" />
-                </div>
-              </button>
-            );
-          })
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div ref={scrollRef} onScroll={onListScroll} className="space-y-2">
+            {filtered.map((p) => (
+              <PropertyRow
+                key={p.id}
+                p={p}
+                visit={lastVisitByProp.get(p.id)}
+                hasPend={pendenciesByProp.has(p.id)}
+                onOpen={() => goToProperty(p.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
 
@@ -381,6 +536,46 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     </div>
   );
 }
+
+// ── Property row (memoized) ───────────────────────────────────
+const PropertyRow = memo(function PropertyRow({
+  p, visit, hasPend, onOpen,
+}: { p: any; visit: any; hasPend: boolean; onOpen: () => void }) {
+  const hasGeo = p.latitude != null && p.longitude != null;
+  const synced = !String(p.id).startsWith("tmp_");
+  const statusInfo = statusChip(visit?.status, !!visit);
+  return (
+    <button
+      onClick={onOpen}
+      className="w-full bg-white rounded-2xl shadow-sm border border-slate-100 p-3 flex items-center gap-3 active:scale-[0.99] transition text-left min-h-[64px]"
+    >
+      <div className="h-11 w-11 rounded-xl bg-slate-100 grid place-items-center shrink-0">
+        <span className="text-sm font-black text-slate-700">{p.number || "—"}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-black text-slate-800 truncate">
+            {p.number}{p.sequence ? ` · seq ${p.sequence}` : ""}{p.complement ? ` · ${p.complement}` : ""}
+          </p>
+          <span className={cn("text-[9px] font-black uppercase px-1.5 py-0.5 rounded flex items-center gap-1", statusInfo.cls)}>
+            <Circle className="h-1.5 w-1.5 fill-current" />
+            {statusInfo.label}
+          </span>
+        </div>
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">
+          {typeLabel(p.type)}{p.street_name ? ` · ${p.street_name}` : ""}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <IconPill Icon={Navigation} on={hasGeo} onColor="text-emerald-600" offColor="text-slate-300" title={hasGeo ? "Georreferenciado" : "Sem GPS"} />
+        <IconPill Icon={Bug} on={!!visit?.has_focus} onColor="text-red-500" offColor="text-slate-200" title="Foco" />
+        <IconPill Icon={Flag} on={hasPend} onColor="text-amber-600" offColor="text-slate-200" title="Pendência" />
+        <IconPill Icon={synced ? Cloud : CloudOff} on={true} onColor={synced ? "text-emerald-500" : "text-amber-500"} offColor="text-slate-300" title={synced ? "Sincronizado" : "Aguardando sync"} />
+        <ChevronRight className="h-4 w-4 text-slate-300" />
+      </div>
+    </button>
+  );
+});
 
 // ── Small UI helpers ──────────────────────────────────────────
 function MetaItem({ icon: Icon, label, value, accent }: any) {
@@ -422,7 +617,7 @@ function SumCard({ icon: Icon, label, value, color, small }: any) {
 
 function IconPill({ Icon, on, onColor, offColor, title }: any) {
   return (
-    <span title={title} className="grid place-items-center h-6 w-6">
+    <span title={title} aria-label={title} className="grid place-items-center h-6 w-6">
       <Icon className={cn("h-3.5 w-3.5", on ? onColor : offColor)} />
     </span>
   );
@@ -433,7 +628,7 @@ function BottomAction({ Icon, label, onClick, primary }: any) {
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 py-2 rounded-xl transition active:scale-95",
+        "flex flex-col items-center gap-1 py-2 rounded-xl transition active:scale-95 min-h-[52px]",
         primary ? "bg-emerald-600 text-white shadow-md" : "text-slate-700 hover:bg-slate-100"
       )}
     >
