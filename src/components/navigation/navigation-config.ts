@@ -106,6 +106,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
     { key: "agt-home", label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard", group: "operacao", primary: true },
     { key: "agt-cycles", label: "Ciclos", icon: Layers, to: "/cycles", group: "operacao" },
     { key: "agt-field", label: "Trabalho", icon: CheckSquare, to: "/field-work", group: "operacao", primary: true },
+    { key: "agt-my-sessions", label: "Minhas Jornadas", icon: CalendarDays, to: "/minhas-jornadas", group: "operacao" },
     { key: "agt-rg", label: "RG", icon: MapPin, to: "/rg", group: "operacao", primary: true },
     { key: "agt-pendencias", label: "Pendências", icon: AlertTriangle, to: "/pending", group: "operacao", badge: "pendencias" },
     { key: "agt-weekly", label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison", group: "operacao", badge: "weekly" },
