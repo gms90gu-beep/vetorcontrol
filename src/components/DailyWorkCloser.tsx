@@ -1547,8 +1547,7 @@ export function DailyWorkCloser({
     </Dialog>
   );
 }
-  );
-}
+
 
 function SummaryItem({ icon: Icon, label, value, color }: any) {
   return (
