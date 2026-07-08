@@ -325,116 +325,39 @@ function FieldWorkPage() {
       // abrimos o modal para o usuário escolher Continuar / Encerrar / Cancelar.
       try {
         if (isOnline()) {
-          const nowIso = new Date().toISOString();
-          const todayStr = nowIso.slice(0, 10);
-          console.log("[SESSION_QUERY_START]", {
+          console.log("[SESSION_QUERY_BY_DATE]", {
             user_id: user.id,
-            now: nowIso,
-            today: todayStr,
-            cycle_id: selectedCycleId ?? null,
-            week_id: selectedWeekId ?? null,
-            select:
-              "from(field_work_sessions).select(id,status,session_date,cycle_id,week_id,block_id,block_number,property_count,street_name,created_at,updated_at,user_id).eq(user_id).eq(status,in_progress).order(session_date desc).order(created_at desc)",
+            session_date: sessionDateStr,
           });
 
           const { data: openSessions, error: openErr } = await supabase
             .from("field_work_sessions")
             .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, user_id")
             .eq("user_id", user.id)
+            .eq("session_date", sessionDateStr)
             .eq("status", "in_progress")
-            .order("session_date", { ascending: false })
             .order("created_at", { ascending: false });
 
           if (openErr) console.warn("[SESSION_QUERY_ERROR]", openErr);
 
           const open = openSessions || [];
-          console.log("[SESSION_QUERY_RESULT]", {
+          console.log("[SESSION_QUERY_BY_DATE]", {
+            user_id: user.id,
+            session_date: sessionDateStr,
             count: open.length,
-            rows: open.map((s: any) => ({
-              id: s.id,
-              status: s.status,
-              session_date: s.session_date,
-              created_at: s.created_at,
-              updated_at: s.updated_at,
-              block_number: s.block_number,
-              block_id: s.block_id,
-              cycle_id: s.cycle_id,
-              week_id: s.week_id,
-              user_id: s.user_id,
-            })),
           });
 
-          // ── REGRA 2: nenhuma jornada aberta → segue direto ──────────
           if (open.length === 0) {
-            console.log("[SESSION_NONE_OPEN]", { user_id: user.id });
-            console.log("[SESSION_NEW_ALLOWED]");
-            // não abre modal — continua o fluxo normal abaixo
+            console.log("[SESSION_NOT_FOUND_FOR_DATE]", { user_id: user.id, session_date: sessionDateStr });
+            // segue direto — nova jornada permitida
           } else {
-            // ── REGRA 4: múltiplas jornadas → inspecionar visitas ────
-            let chosen: any = null;
-
-            if (open.length > 1) {
-              console.warn("[MULTIPLE_OPEN_SESSIONS]", {
-                user_id: user.id,
-                count: open.length,
-                ids: open.map((s: any) => s.id),
-                detail: open,
-              });
-
-              const withCounts: Array<{ s: any; visits: number }> = [];
-              for (const s of open) {
-                try {
-                  const { count } = await supabase
-                    .from("visits")
-                    .select("id", { count: "exact", head: true })
-                    .eq("field_work_session_id", s.id);
-                  withCounts.push({ s, visits: count || 0 });
-                } catch {
-                  withCounts.push({ s, visits: 0 });
-                }
-              }
-              console.log("[SESSION_VISITS_PER_OPEN]", withCounts.map((x) => ({ id: x.s.id, visits: x.visits, block: x.s.block_number, session_date: x.s.session_date })));
-
-              const valid = withCounts.filter((x) => x.visits > 0);
-              if (valid.length === 1) {
-                chosen = valid[0].s;
-                console.log("[SESSION_AUTO_SELECTED]", {
-                  id: chosen.id,
-                  reason: "única jornada com visitas entre múltiplas in_progress",
-                  visits: valid[0].visits,
-                });
-              } else if (valid.length === 0) {
-                // todas órfãs → escolhe a mais recente (fluxo antigo)
-                chosen = open[0];
-                console.log("[SESSION_AUTO_SELECTED]", {
-                  id: chosen.id,
-                  reason: "todas órfãs (0 visitas) — selecionada mais recente",
-                });
-              } else {
-                console.error("[SESSION_INCONSISTENT]", {
-                  user_id: user.id,
-                  valid_sessions: valid.map((x) => ({ id: x.s.id, visits: x.visits, block: x.s.block_number })),
-                });
-                toast.error(
-                  "Inconsistência: múltiplas jornadas em aberto com visitas. Procure o administrador."
-                );
-                return;
-              }
-            } else {
-              chosen = open[0];
-            }
-
+            const chosen: any = open[0];
             const existing = chosen as OpenSessionInfo;
-            console.log("[SESSION_SELECTED]", {
-              id: existing.id,
+            console.log("[SESSION_FOUND_FOR_DATE]", {
+              session_id: existing.id,
               session_date: existing.session_date,
               block_number: existing.block_number,
-              cycle_id: existing.cycle_id,
-              week_id: existing.week_id,
             });
-
-            console.log("[SESSION_FOUND]", { id: existing.id, session_date: existing.session_date, block_number: existing.block_number });
-            console.log("[SESSION_MODAL_OPEN]", { id: existing.id });
             setOpenSession(existing);
             setOpenSessionModal(true);
             return;
