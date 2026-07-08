@@ -82,7 +82,7 @@ function MySessionsPage() {
     setLoading(true);
     console.log("[MY_SESSIONS_LOAD]", { started: true });
     try {
-      const user = await safeGetUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) { toast.error("Sessão expirada."); return; }
 
       let remote: SessionRow[] = [];
