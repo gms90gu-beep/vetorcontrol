@@ -48,6 +48,9 @@ export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
+/** Número máximo de dias retroativos permitidos para "Data da Produção". */
+const MAX_RETROACTIVE_DAYS = 5;
+
 async function autoRecoverSession(sessionId: string) {
   if (!isOnline()) {
     console.log("[SESSION_AUTO_RECOVER_START]", { session: sessionId, skipped: "offline" });
