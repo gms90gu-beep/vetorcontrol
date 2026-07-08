@@ -502,7 +502,9 @@ function FieldWorkPage() {
         user_id: user.id,
         cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
-        block_id: selectedBlock?.id || null,
+        // NOTE: field_work_sessions has no block_id column (schema).
+        // The block relationship is kept via block_number only.
+
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
