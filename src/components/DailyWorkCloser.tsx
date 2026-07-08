@@ -298,7 +298,72 @@ export function DailyWorkCloser({
   const [jornadaDate, setJornadaDate] = useState<string | null>(null);
   const [sessionRetro, setSessionRetro] = useState<{ retro: boolean; reason: string | null; createdAt: string | null }>({ retro: false, reason: null, createdAt: null });
 
+  const [validation, setValidation] = useState<ShiftValidationReport | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const [validating, setValidating] = useState(false);
+
   const stats = externalStats || localStats;
+
+  const handlePreClose = async () => {
+    console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
+    setValidating(true);
+    try {
+      const { data: { user } } = await safeGetUser();
+      if (!user) {
+        toast.error("Usuário não autenticado.");
+        return;
+      }
+      const localSessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.status === "in_progress",
+      );
+      const active = localSessions
+        .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
+      const workDate: string = active?.session_date ?? new Date().toISOString().split("T")[0];
+
+      const report = await runShiftValidation({
+        userId: user.id,
+        sessionId: active?.id ?? null,
+        blockId: (active as any)?.block_id ?? null,
+        blockNumber: active?.block_number ?? null,
+        workDate,
+      });
+      setValidation(report);
+
+      if (report.ok) {
+        console.log("[SHIFT_CLOSE_VALIDATION_OK]");
+        await handleCloseDay();
+      } else {
+        console.warn("[SHIFT_CLOSE_VALIDATION_BLOCKED]", report.issues);
+        setShowValidation(true);
+      }
+    } catch (e) {
+      console.error("[SHIFT_CLOSE_VALIDATION_ERROR]", e);
+      toast.error("Falha ao validar jornada.");
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleSyncNow = async () => {
+    setValidating(true);
+    try {
+      await retryFailedMutations();
+      const { ok, failed } = await flushMutations();
+      toast.success(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+      await handlePreClose();
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleForceClose = async () => {
+    console.warn("[SHIFT_CLOSE_FORCED]", { role: userRole });
+    setShowValidation(false);
+    await handleCloseDay();
+  };
+
+
 
   const fetchDailyContext = useCallback(async () => {
     if (externalStats) return;
