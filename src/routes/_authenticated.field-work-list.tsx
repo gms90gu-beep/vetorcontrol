@@ -592,8 +592,11 @@ function FieldWorkListPage() {
           `;
 
           let blockCycleVisits: any[] = [];
+          let matchStrategy: "SESSION" | "CYCLE" | "LEGACY_DATE" | "NONE" = "NONE";
           try {
-            const visitsAll = await listRemoteOrCache<any>({
+            // Carrega superset (todas visitas dos property_ids) uma única vez,
+            // depois aplica a hierarquia SESSION → CYCLE → LEGACY_DATE.
+            const visitsAll = (await listRemoteOrCache<any>({
               name: "visits",
               remote: () =>
                 supabase
@@ -602,17 +605,93 @@ function FieldWorkListPage() {
                   .in("property_id", propertyIds)
                   .order("visit_date", { ascending: false }) as any,
               filter: inScope,
-            });
-            blockCycleVisits = (visitsAll || []).filter(inScope);
+            })) || [];
+            const inScopeVisits = visitsAll.filter(inScope);
+
+            // Estratégia 1: SESSION (fonte mais confiável)
+            console.log("[VISIT_MATCH_STRATEGY]", { strategy: "SESSION", session_id: session.id });
+            const bySession = inScopeVisits.filter(
+              (v: any) => v.field_work_session_id && String(v.field_work_session_id) === String(session.id),
+            );
+            if (bySession.length > 0) {
+              blockCycleVisits = bySession;
+              matchStrategy = "SESSION";
+              console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
+            } else {
+              console.log("[VISIT_MATCH_FALLBACK]", {
+                from: "SESSION",
+                to: "CYCLE",
+                reason: "0 visitas com field_work_session_id=session.id",
+              });
+
+              // Estratégia 2: CYCLE (mesmo ciclo da jornada) — jamais remover filtro de ciclo
+              const sessionCycleId = session.cycle_id ?? null;
+              console.log("[VISIT_MATCH_STRATEGY]", { strategy: "CYCLE", cycle_id: sessionCycleId });
+              const byCycle = sessionCycleId
+                ? inScopeVisits.filter(
+                    (v: any) => v.cycle_id && String(v.cycle_id) === String(sessionCycleId),
+                  )
+                : [];
+              if (byCycle.length > 0) {
+                blockCycleVisits = byCycle;
+                matchStrategy = "CYCLE";
+                console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
+              } else {
+                console.log("[VISIT_MATCH_FALLBACK]", {
+                  from: "CYCLE",
+                  to: "LEGACY_DATE",
+                  reason: sessionCycleId
+                    ? "0 visitas com cycle_id=session.cycle_id"
+                    : "session sem cycle_id",
+                });
+
+                // Estratégia 3: LEGACY_DATE — apenas para jornadas antigas
+                const startTs = session.session_date
+                  ? new Date(`${session.session_date}T00:00:00`).getTime()
+                  : null;
+                const endTs = session.closed_at
+                  ? new Date(session.closed_at).getTime()
+                  : Date.now();
+                console.log("[VISIT_MATCH_STRATEGY]", {
+                  strategy: "LEGACY_DATE",
+                  from: startTs ? new Date(startTs).toISOString() : null,
+                  to: new Date(endTs).toISOString(),
+                });
+                const byDate = startTs
+                  ? inScopeVisits.filter((v: any) => {
+                      if (!v.visit_date) return false;
+                      const t = new Date(v.visit_date).getTime();
+                      return t >= startTs && t <= endTs;
+                    })
+                  : [];
+                if (byDate.length > 0) {
+                  blockCycleVisits = byDate;
+                  matchStrategy = "LEGACY_DATE";
+                  console.log("[VISIT_MATCH_RESULT]", { strategy: "LEGACY_DATE", found: byDate.length });
+                } else {
+                  blockCycleVisits = [];
+                  matchStrategy = "NONE";
+                  console.log("[VISIT_MATCH_RESULT]", { strategy: "NONE", found: 0 });
+                }
+              }
+            }
           } catch (e) {
             console.warn("[SESSION_RESTORE_VISITS] fallback empty:", e);
           }
+
+          console.log("[VISIT_MATCH_FINAL]", {
+            session_id: session.id,
+            strategy: matchStrategy,
+            visits: blockCycleVisits.length,
+            marked_properties: new Set(blockCycleVisits.map((v: any) => String(v.property_id))).size,
+          });
 
           console.log("[VISITS_LOADED]", {
             session_id: session.id,
             count: blockCycleVisits.length,
             ids: blockCycleVisits.map((v: any) => v.id),
             property_ids: blockCycleVisits.map((v: any) => v.property_id),
+            strategy: matchStrategy,
             source: online ? "remote+cache" : "cache",
           });
 
