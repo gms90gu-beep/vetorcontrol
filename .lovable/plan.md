@@ -1,131 +1,52 @@
-# Fases D–G — Estabilização Final do Pipeline RG
+# Fase 2 — Inteligência Operacional (plano)
 
-Continuação do plano "Estabilização Offline". Fases A–C já entregues
-(`reconciler.ts`, `/admin/rg-pipeline` básico, `useRGRecords` refatorado).
+Escopo grande. Proponho quebrar em **5 entregas incrementais**, cada uma estável antes da próxima. Todas usam tabelas existentes (`field_work_sessions`, `properties`, `visits`, `boletins_rg`, `daily_work_records`, `blocks`), relacionamento por `block_id`, e **zero mudança** em Sync Engine / SafeFetch / Repos / Dexie / RLS.
 
-Princípio mantido: **1 módulo = 1 tabela servidor = 1 store local oficial**.
+Sem registro de horário por visita, sem tempo por imóvel — confirmado.
 
----
+## Entrega 2.A — Mapa Operacional do Quarteirão
+- Novo componente `BlockOperationalMap.tsx` em `src/components/field-work/`, usando `@/components/map/shared` (`SharedMap` + `SharedMarkerLayer`).
+- Fonte: `properties` do `block_id` da jornada em `in_progress`, cruzando com `visits` (visitado / foco / pendente) e `type` (PE / terreno).
+- Cores: verde=visitado, vermelho=foco, laranja=pendente, azul=PE, cinza=não iniciado.
+- Popup: número, complemento, tipo, situação, foco, pendência, coords, botão "Abrir Visita" (navega para `/property/$id`), botão "🧭 Navegar" (abre `https://www.google.com/maps/dir/?api=1&destination=lat,lng`).
+- Filtros: Todos, Visitados, Pendentes, Focos, PE, Terrenos, Sem GPS.
+- Heatmap opcional (toggle) via `leaflet.heat` já disponível no projeto de mapas.
+- Integração: novo botão "Mapa" na barra fixa do `OperationalPanel` abre em `Dialog` fullscreen.
 
-## Fase D — Painel `/admin/rg-pipeline` expandido
+## Entrega 2.B — Assistente Operacional (regras, sem IA)
+- Componente `SmartAssistantCard.tsx` no topo colapsável do painel.
+- Regras derivadas dos dados já carregados: pendentes, sem GPS, focos sem visita fechada, depósitos sem foco vinculado, % concluído.
+- Mensagens estáticas em pt-BR + botão de ação ("Ir para o primeiro pendente", "Georreferenciar", etc.).
 
-Refatorar `src/routes/_authenticated.admin.rg-pipeline.tsx` para exibir
-contadores cruzados em três níveis:
+## Entrega 2.C — Histórico Territorial do Imóvel
+- Nova aba/seção "Histórico" em `_authenticated.property.$propertyId.tsx`.
+- Query: todas as `visits` do `property_id` ordenadas por ciclo/semana, com agente, foco, coords, fotos (se houver).
+- Timeline vertical simples (ciclo → resultado).
 
-```text
-Visão               Servidor   Oficial   Legado   Renderizados
-Total (usuário)     N          N         0        N
-Por agente          tabela com 1 linha por agent_id
-Por boletim         tabela id_boletim · servidor · local · render
-Por quarteirão      tabela block_id · servidor · local · render
-```
+## Entrega 2.D — Checklist Inteligente de Encerramento
+- Estender `src/lib/shift-validation.ts` + `DailyWorkCloser.tsx`.
+- Verificações extras: GPS ausente, focos/depósitos/larvicida vinculados, DWR gerado.
+- Modal com lista de inconsistências e botões: Corrigir (deep-link), Sincronizar, Finalizar mesmo assim (apenas supervisor/admin).
 
-Detalhes:
-- Seletor "Escopo": `meu usuário` (default) ou `todos` (apenas admin/coordenador via `has_role`).
-- Fontes:
-  - Servidor: `supabase.from('boletins_rg').select('id,agent_id,block_id,updated_at')`.
-  - Oficial: `offlineDb.boletins_rg.toArray()`.
-  - Legado: `appDb.rg.count()` + amostra dos 5 primeiros para diagnóstico.
-  - Renderizados: contagem via `useRGRecords({ scope })` montado no painel.
-- Botões: **Atualizar**, **Reconciliar agora**, **Limpar conflitos**, **Executar limpeza (Fase E)**.
-- Status pill verde quando `servidor == oficial == render` em todas as linhas.
+## Entrega 2.E — UX Avançada
+- Swipe esquerda/direita para navegar entre imóveis na tela de visita.
+- Botões rápidos "Ir para primeiro pendente/foco/PE/sem GPS" no assistente.
+- Long-press na lista → menu com Abrir/Georref/Editar/Histórico/Mapa.
+- Fotos rápidas (imóvel/foco/depósito) reutilizando componentes existentes.
 
-Critério de pronto: divergência em qualquer nível aparece destacada em
-amarelo com o `id` que falta.
-
----
-
-## Fase E — Limpeza de fantasmas (migração one-shot)
-
-Novo arquivo `src/lib/offline/cleanup-ghosts.ts`:
-
-```ts
-export async function cleanupGhosts(userId: string): Promise<GhostReport>
-```
-
-Etapas, em ordem, dentro de uma única transação Dexie:
-1. **sem userId / agent_id** → remover linhas de `boletins_rg`, `field_work_records`, `pending_records` cujo `data.agent_id` é falsy.
-2. **duplicados** → para mesmo `id`, manter a de `updated_at` mais novo.
-3. **órfãos do usuário atual** → IDs locais ausentes no servidor (reusa `reconcile()` com `serverRows` recém-buscados).
-4. **inconsistentes** → linhas sem `block_id` ou sem `record_date` (campos obrigatórios do schema).
-5. **legado** → `appDb.rg.clear()` se ainda houver registros.
-
-Gatilho: botão "Executar limpeza" no painel + flag `offline_v2_cleanup_ghosts` no `localStorage` para garantir execução única automática no boot.
-
-Saída (`GhostReport`):
-```ts
-{ removedNoOwner, removedDuplicates, removedOrphans, removedInconsistent, clearedLegacy, ts }
-```
-Persistir último relatório em `offlineDb.meta` chave `cleanup:last`.
-
-Critério de pronto: rodar duas vezes seguidas → segunda execução retorna todos contadores em 0.
-
----
-
-## Fase F — Auditoria territorial
-
-Novo arquivo `src/lib/audit/territory.ts` com função `auditTerritory(userId)`:
-
-Para cada `block_id` referenciado em `boletins_rg` do usuário, validar:
-- existe em `blocks`?
-- tem ao menos 1 `properties` ligado?
-- aparece no cache local (`offlineDb.blocks`)?
-
-Saída: lista `{ block_id, inServer, inProperties, inLocal, renderedCount }`.
-
-Exibir no painel (`Fase D`) como aba "Auditoria territorial". Realçar em
-vermelho qualquer `block_id` com `inServer=true` mas `renderedCount=0` —
-é exatamente o caso "quarteirão sumiu da tela mas existe no banco".
-
-Sem mudanças de schema. Sem migração SQL.
-
-Critério de pronto: para Gustavo, todos os 11 boletins têm linha verde
-(server + properties + local + render).
-
----
-
-## Fase G — Teste operacional multi-agente
-
-Adicionar no painel um modo **"Snapshot operacional"** que, quando
-acionado por um admin, percorre uma lista fixa de `user_id`s
-(`Gustavo`, `Marineide`, `Maria Olga` — IDs configurados em
-`src/lib/audit/operational-agents.ts`) e gera tabela:
-
-```text
-Agente         Servidor   Offline   Render   Status
-Gustavo        11         11        11       ✓
-Marineide      …          …         …        …
-Maria Olga     …          …         …        …
-```
-
-`Offline` é simulado: aplicar `reconcile()` com `serverRows = cache local`
-para detectar drift sem precisar derrubar a rede.
-
-Critério de pronto: três linhas verdes simultâneas → fechar épico.
-
----
+## Ordem sugerida
+1. **2.A Mapa** (maior valor visível, isolado)
+2. **2.B Assistente** (baixo risco, curto)
+3. **2.E UX** (polimento em cima do painel)
+4. **2.C Histórico** (mudança na tela de imóvel)
+5. **2.D Checklist** (mais crítico, por último para estabilizar)
 
 ## Detalhes técnicos
+- Mapa: `SharedMap` já resolve tiles, cluster, fallback. `MARKER_COLORS` já cobre a paleta.
+- Google Maps navigation: link externo puro (`window.open`), sem API key.
+- Long-press: hook `usePointerLongPress` simples (sem lib).
+- Swipe: `@use-gesture/react` (já no bundle? — verificar; senão, handler pointer nativo).
+- Nada de novas tabelas, nenhuma migração, nenhum edge function.
 
-**Arquivos novos**
-- `src/lib/offline/cleanup-ghosts.ts`
-- `src/lib/audit/territory.ts`
-- `src/lib/audit/operational-agents.ts`
-
-**Arquivos refatorados**
-- `src/routes/_authenticated.admin.rg-pipeline.tsx` — abas: *Resumo*, *Por agente*, *Por boletim*, *Por quarteirão*, *Auditoria territorial*, *Snapshot operacional*.
-- `src/hooks/useOfflineData.ts` — `useRGRecords` aceita `{ scope: 'self' | 'all' }` para alimentar o painel.
-
-**Sem alterações no banco.** Toda a Fase D–G é client-side.
-
----
-
-## Ordem de execução
-
-1. Fase D — painel multi-nível.
-2. Fase E — `cleanupGhosts` + botão + auto-trigger one-shot.
-3. Fase F — `auditTerritory` + aba.
-4. Fase G — snapshot multi-agente.
-5. Validação final: três agentes em verde → encerrar épico.
-
-Nada novo de produto entra antes do passo 5 passar.
+## Pergunta
+Confirma esta divisão em 5 entregas nessa ordem, ou prefere entregar tudo de uma vez / mudar a ordem?
