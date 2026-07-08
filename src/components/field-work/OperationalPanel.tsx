@@ -86,6 +86,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const [now, setNow] = useState(Date.now());
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [mapOpen, setMapOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollKey = `op_panel_scroll_${session?.id ?? "none"}`;
@@ -527,13 +528,21 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       {/* ── Fixed bottom bar ────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <div className="max-w-3xl mx-auto grid grid-cols-5 gap-1 px-2 py-2">
-          <BottomAction Icon={MapIcon} label="Mapa" onClick={() => navigate({ to: "/map" })} />
+          <BottomAction Icon={MapIcon} label="Mapa" onClick={() => setMapOpen(true)} />
           <BottomAction Icon={ClipboardList} label="Resumo" onClick={() => navigate({ to: "/field-work-list" })} />
           <BottomAction Icon={FileText} label="RG" onClick={() => navigate({ to: "/rg" })} />
           <BottomAction Icon={Plus} label="Add. Imóvel" onClick={() => navigate({ to: "/field-work-list" })} />
           <BottomAction Icon={CheckCircle2} label="Finalizar" primary onClick={() => (onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list" }))} />
         </div>
       </div>
+
+      <BlockOperationalMap
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        blockNumber={session?.block_number}
+        properties={properties}
+        visits={visits}
+      />
     </div>
   );
 }
