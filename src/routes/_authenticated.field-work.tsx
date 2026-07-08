@@ -395,23 +395,10 @@ function FieldWorkPage() {
         console.log("[WORK_SESSION_CREATE]", { mode: "offline", cycleIdToUse });
       }
 
-      // Encerra sessões anteriores vinculadas a OUTROS ciclos (apenas online).
-      if (isOnline()) {
-        try {
-          const { data: staleSessions } = await supabase
-            .from("field_work_sessions")
-            .select("id, cycle_id")
-            .eq("user_id", user.id)
-            .eq("status", "in_progress");
-          const staleIds = (staleSessions || [])
-            .filter((s: any) => s.cycle_id && s.cycle_id !== cycleIdToUse)
-            .map((s: any) => s.id);
-          for (const sid of staleIds) {
-            await updateOffline("field_work_sessions", sid, { status: "closed", updated_at: new Date().toISOString() });
-          }
-        } catch (e) {
-          console.warn("[WORK_START] Não foi possível verificar sessões antigas (offline):", e);
-        }
+      // Nota: não encerramos mais sessões abertas de OUTRAS datas — cada
+      // Data da Produção é independente. Uma jornada aberta de 07/07 não
+      // interfere com uma nova jornada de 08/07.
+
 
         try {
           const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
