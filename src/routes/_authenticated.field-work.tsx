@@ -332,7 +332,7 @@ function FieldWorkPage() {
 
           const { data: openSessions, error: openErr } = await supabase
             .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, user_id")
+            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, started_at, user_id")
             .eq("user_id", user.id)
             .eq("session_date", sessionDateStr)
             .eq("status", "in_progress")
@@ -435,6 +435,7 @@ function FieldWorkPage() {
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
         session_date: sessionDateStr,
+        started_at: nowIso,
         status: "in_progress",
         is_retroactive: isRetroactive,
         retroactive_reason: isRetroactive ? retroactiveReason : null,
@@ -442,6 +443,8 @@ function FieldWorkPage() {
         updated_at: nowIso,
       };
 
+      console.log("[SESSION_PRODUCTION_DATE]", { session_date: sessionDateStr });
+      console.log("[SESSION_STARTED_AT]", { started_at: nowIso });
       console.log("[NEW_SESSION_CREATE]", { payload });
       const saved = await createOffline("field_work_sessions", payload);
       console.log("[NEW_SESSION_CREATED]", {

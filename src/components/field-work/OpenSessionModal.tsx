@@ -17,6 +17,7 @@ export interface OpenSessionInfo {
   property_count?: number | null;
   street_name?: string | null;
   created_at?: string | null;
+  started_at?: string | null;
 }
 
 interface Stats {
@@ -112,9 +113,14 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
   if (!session) return null;
 
   const dateBR = new Date(`${session.session_date}T12:00:00`).toLocaleDateString("pt-BR");
-  const startTime = session.created_at
-    ? new Date(session.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+  const startSource = session.started_at || session.created_at;
+  const startTime = startSource
+    ? new Date(startSource).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "—";
+  if (session.started_at && session.created_at) {
+    const dur = Math.max(0, Date.now() - new Date(session.started_at).getTime());
+    console.log("[SESSION_DURATION]", { minutes: Math.round(dur / 60000) });
+  }
 
   const handleContinue = () => {
     console.log("[SESSION_CONTINUE]", { id: session.id, cycle_id: session.cycle_id, week_id: session.week_id, block_number: session.block_number });
@@ -185,8 +191,9 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
 
         {view === "main" ? (
           <div className="grid grid-cols-2 gap-3 py-2 text-sm">
-            <Info label="Data" value={dateBR} />
-            <Info label="Início" value={startTime} />
+            <Info label="Data da Produção" value={dateBR} />
+            <Info label="Jornada iniciada" value={startTime} />
+
             <Info label="Ciclo" value={cycleLabel || "—"} />
             <Info label="Semana" value={weekLabel || "—"} />
             <Info label="Quarteirão" value={session.block_number || "—"} />
