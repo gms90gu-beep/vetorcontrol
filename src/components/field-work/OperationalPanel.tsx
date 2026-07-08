@@ -401,45 +401,26 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
             <button
               onClick={() => setSummaryOpen((s) => !s)}
               className="w-full flex items-end justify-between mb-2 text-left"
-              aria-label={summaryOpen ? "Recolher resumo" : "Expandir resumo"}
-            >
+      {/* ── Progress bar ─────────────────────────────────────── */}
+      <div className="px-4 mt-4">
+        <Card className="border-none shadow-lg rounded-3xl overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-end justify-between mb-2">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {summaryOpen ? "Progresso da Jornada" : `${total} imóveis · ${stats.visited} visitados · ${stats.pendingCount} pendentes`}
-                </p>
-                {summaryOpen && <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>}
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Progresso da Jornada</p>
+                <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>
               </div>
-              <div className="flex items-center gap-2">
-                {summaryOpen && <span className="text-3xl font-black text-blue-600">{progress}%</span>}
-                {summaryOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
-              </div>
-            </button>
+              <span className="text-3xl font-black text-blue-600">{progress}%</span>
+            </div>
             <Progress value={progress} className="h-3" />
-            {summaryOpen && (
-              <div className="grid grid-cols-4 gap-2 mt-4 text-center">
-                <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
-                <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
-                <MiniStat label="Tempo" value={fmtDur(durationMin)} tone="slate" small />
-                <MiniStat label="Média/im." value={stats.done ? `${avgMin}m` : "—"} tone="slate" small />
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+              <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
+              <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
+              <MiniStat label="Concluído" value={`${progress}%`} tone="slate" small />
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* ── Summary cards ───────────────────────────────────── */}
-      {summaryOpen && (
-        <div className="px-4 mt-4 grid grid-cols-4 gap-2">
-          <SumCard icon={Home} label="Imóveis" value={total} color="text-slate-700" />
-          <SumCard icon={CheckCircle2} label="Visitados" value={stats.visited} color="text-emerald-600" />
-          <SumCard icon={AlertTriangle} label="Pendentes" value={stats.pendingCount} color="text-amber-600" />
-          <SumCard icon={DoorClosed} label="Fechados" value={stats.closed} color="text-slate-600" />
-          <SumCard icon={XCircle} label="Recusas" value={stats.refused} color="text-red-600" />
-          <SumCard icon={Bug} label="Focos" value={stats.focus} color="text-red-500" />
-          <SumCard icon={FlaskConical} label="Depósitos" value={stats.depositos} color="text-purple-600" />
-          <SumCard icon={Droplets} label="Larvicida" value={`${stats.larvicida}g`} color="text-blue-600" small />
-        </div>
-      )}
 
       {/* ── Filters + search ────────────────────────────────── */}
       <div className="px-4 mt-5 space-y-3">
