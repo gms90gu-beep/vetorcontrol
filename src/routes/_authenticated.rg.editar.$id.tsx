@@ -914,7 +914,7 @@ function EditarBoletim() {
                     className="md:col-span-2"
                   />
                   <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
-                  <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
+                  <Field label="Número" value={im.number ?? ""} onChange={(v) => updateImovel(i, { number: v })} />
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
                   <Field
                     label="Sequência"
