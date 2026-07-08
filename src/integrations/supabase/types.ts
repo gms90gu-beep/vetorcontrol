@@ -547,6 +547,7 @@ export type Database = {
       }
       field_work_sessions: {
         Row: {
+          block_id: string | null
           block_number: string
           created_at: string
           cycle_id: string | null
@@ -562,6 +563,7 @@ export type Database = {
           week_id: string | null
         }
         Insert: {
+          block_id?: string | null
           block_number: string
           created_at?: string
           cycle_id?: string | null
@@ -577,6 +579,7 @@ export type Database = {
           week_id?: string | null
         }
         Update: {
+          block_id?: string | null
           block_number?: string
           created_at?: string
           cycle_id?: string | null
@@ -592,6 +595,13 @@ export type Database = {
           week_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "field_work_sessions_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "blocks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "field_work_sessions_cycle_id_fkey"
             columns: ["cycle_id"]
