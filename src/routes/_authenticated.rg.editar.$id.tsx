@@ -134,7 +134,20 @@ function EditarBoletim() {
         .order("sequence", { ascending: true });
 
       console.log("Imóveis carregados:", props?.length || 0);
-      setImoveis((props || []) as Imovel[]);
+      const normalized = ((props || []) as Imovel[]).map((p) => {
+        const raw = (p as any).number;
+        console.log("[PROPERTY_NUMBER_RAW]", {
+          id: p.id, raw, type: raw === null ? "null" : typeof raw,
+          jsonRaw: JSON.stringify(raw),
+        });
+        const normalizedNumber = typeof raw === "string" ? (raw.trim() || "S/N") : (raw == null ? "S/N" : String(raw));
+        console.log("[PROPERTY_EDIT_START]", {
+          property_id: p.id, number: normalizedNumber,
+          block_id: p.block_id, boletim_id: data.id,
+        });
+        return { ...p, number: normalizedNumber } as Imovel;
+      });
+      setImoveis(normalized);
 
       // Load block location data (hybrid GPS / manual address)
       if (data.block_id) {
