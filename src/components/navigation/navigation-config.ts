@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Users,
   BarChart3,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 
