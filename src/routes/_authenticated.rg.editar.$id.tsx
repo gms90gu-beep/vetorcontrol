@@ -497,15 +497,21 @@ function EditarBoletim() {
           .then((res) => ({ res, im }));
       });
 
-      const [bRes, locRes, delRes, updResults, insResults] = await Promise.all([
-        boletimUpdate,
+      // IMPORTANT: atualizar o boletim ANTES das properties. O trigger
+      // validate_property_boletim_block_match lê boletim.block_id no momento
+      // do INSERT/UPDATE do imóvel; se as duas escritas correrem em paralelo,
+      // o trigger enxerga o block_id antigo do boletim e rejeita com divergência.
+      const bRes = await boletimUpdate;
+      if ((bRes as any).error) throw (bRes as any).error;
+
+      const [locRes, delRes, updResults, insResults] = await Promise.all([
         blockUpdatePromise,
         deletePromise,
         Promise.all(updatePromises),
         Promise.all(insertPromises),
       ]);
 
-      if ((bRes as any).error) throw (bRes as any).error;
+
       if ((locRes as any).error) console.warn("[RG Editar] Falha ao salvar localização:", (locRes as any).error);
       if ((delRes as any).error) throw (delRes as any).error;
       for (const u of updResults) {
