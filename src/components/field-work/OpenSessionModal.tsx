@@ -191,8 +191,9 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
 
         {view === "main" ? (
           <div className="grid grid-cols-2 gap-3 py-2 text-sm">
-            <Info label="Data" value={dateBR} />
-            <Info label="Início" value={startTime} />
+            <Info label="Data da Produção" value={dateBR} />
+            <Info label="Jornada iniciada" value={startTime} />
+
             <Info label="Ciclo" value={cycleLabel || "—"} />
             <Info label="Semana" value={weekLabel || "—"} />
             <Info label="Quarteirão" value={session.block_number || "—"} />
