@@ -359,7 +359,7 @@ export function DailyWorkCloser({
 
         const { data: todayVisits } = await supabase
           .from("visits")
-          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, larvicide_unit, tubitos_coletados, sample_collected, visit_date, created_at, field_work_session_id")
+          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, larvicide_unit, tubitos_coletados, sample_collected, visit_date, field_work_session_id")
           .eq("cycle_id", cycle.id)
           .eq("agent_id", user.id)
           .gte("visit_date", startOfDay.toISOString())
