@@ -823,7 +823,7 @@ function FieldWorkPage() {
                         locale={ptBR}
                         disabled={(d) => {
                           const today = new Date(); today.setHours(0,0,0,0);
-                          const min = new Date(today); min.setDate(min.getDate() - 7);
+                          const min = new Date(today); min.setDate(min.getDate() - MAX_RETROACTIVE_DAYS);
                           const t = new Date(d); t.setHours(0,0,0,0);
                           return t > today || t < min;
                         }}
