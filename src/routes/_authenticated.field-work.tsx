@@ -314,10 +314,11 @@ function FieldWorkPage() {
         toast.error("Não é permitido registrar jornadas em datas futuras.");
         return;
       }
-      if (diffDays > 7) {
-        toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+      if (diffDays > MAX_RETROACTIVE_DAYS) {
+        toast.error(`Só é permitido lançar produção referente aos últimos ${MAX_RETROACTIVE_DAYS} dias.`);
         return;
       }
+      console.log("[PRODUCTION_DATE_SELECTED]", { date: sessionDateStr, diffDays });
 
       // ── Verificação de jornada aberta (RC-13) ─────────────────────
       // Regra: apenas UMA jornada in_progress por agente. Se existir,
