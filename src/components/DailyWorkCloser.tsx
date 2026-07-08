@@ -359,7 +359,7 @@ export function DailyWorkCloser({
 
         const { data: todayVisits } = await supabase
           .from("visits")
-          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus")
+          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, larvicide_unit, tubitos_coletados, sample_collected, visit_date, created_at, field_work_session_id")
           .eq("cycle_id", cycle.id)
           .eq("agent_id", user.id)
           .gte("visit_date", startOfDay.toISOString())
@@ -376,12 +376,85 @@ export function DailyWorkCloser({
         });
 
         // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
-        const snap = await buildDailySnapshot(user.id, opDateStr, {
+        let snap = await buildDailySnapshot(user.id, opDateStr, {
           sessionId: activeSession?.id ?? null,
           blockNumber: (activeSession as any)?.block_number ?? null,
           blockId: (activeSession as any)?.block_id ?? null,
           startedAt: (activeSession as any)?.created_at ?? null,
         });
+
+        // Fallback Supabase: se o Dexie está vazio mas o servidor tem visitas
+        // da jornada, reconstrói o snapshot (inclui detalhamento por tipo)
+        // direto do Supabase para que o resumo nunca fique zerado.
+        if (snap.workedCount === 0 && (todayVisits?.length ?? 0) > 0) {
+          const visitIds = (todayVisits || []).map((v: any) => v.id);
+          const { data: remoteDeposits } = await supabase
+            .from("visit_deposits")
+            .select("visit_id, type_code, quantity, is_positive, is_treated, is_eliminated")
+            .in("visit_id", visitIds);
+          const depByVisit = new Map<string, any[]>();
+          for (const d of remoteDeposits || []) {
+            const arr = depByVisit.get(d.visit_id) || [];
+            arr.push(d);
+            depByVisit.set(d.visit_id, arr);
+          }
+          const rebuilt: DailySnapshot = {
+            ...EMPTY_SNAPSHOT,
+            depByType: { ...EMPTY_DEP_MAP },
+            fociByType: { ...EMPTY_DEP_MAP },
+          };
+          const byProp = new Map<string, any[]>();
+          for (const v of todayVisits || []) {
+            rebuilt.workedCount++;
+            if (v.status === "closed") rebuilt.closedCount++;
+            if (v.status === "refused") rebuilt.refusedCount++;
+            if (v.status === "visited") rebuilt.visitedCount++;
+            if (v.has_focus) { rebuilt.focusCount++; rebuilt.positiveProps++; }
+            const deps = depByVisit.get(v.id) || [];
+            const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+            rebuilt.depExisting += q;
+            rebuilt.depInspected += q;
+            rebuilt.depTreated += deps.filter((d: any) => d.is_treated)
+              .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+            rebuilt.depEliminated += deps.filter((d: any) => d.is_eliminated)
+              .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+            for (const d of deps) {
+              const code = String(d.type_code || "").toUpperCase().trim() as DepKey;
+              const qty = Number(d.quantity) || 0;
+              if (code in rebuilt.depByType) {
+                rebuilt.depByType[code] += qty;
+                if (d.is_positive) rebuilt.fociByType[code] += qty;
+              }
+            }
+            const treatAmt = Number(v.treatment_amount) || 0;
+            rebuilt.larvicideAmount += treatAmt;
+            if (v.larvicide_unit) rebuilt.larvicideUnit = v.larvicide_unit;
+            const unit = String(v.larvicide_unit || "").toLowerCase();
+            if (unit.includes("tubito")) rebuilt.tubitosUsed += treatAmt;
+            else if (unit.includes("carga")) rebuilt.cargasCollected += treatAmt;
+            else if (unit.includes("larva")) rebuilt.larvaeCollected += treatAmt;
+            const tub = Number(v.tubitos_coletados) || 0;
+            rebuilt.tubitos += tub;
+            if (tub > 0) rebuilt.tubitosProps++;
+            if (v.sample_collected) rebuilt.samples++;
+            if (treatAmt > 0 || (Number(v.treated_deposits) || 0) > 0) rebuilt.treatedPropsCount++;
+            const arr = byProp.get(v.property_id) || [];
+            arr.push(v);
+            byProp.set(v.property_id, arr);
+          }
+          for (const [, list] of byProp) {
+            const last = list.sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)))[0];
+            if (last && (last.status === "closed" || last.status === "refused")) rebuilt.pendingLocal++;
+          }
+          console.log("[SESSION_SUMMARY_FALLBACK]", {
+            reason: "dexie empty; rebuilt from supabase",
+            worked: rebuilt.workedCount,
+            depByType: rebuilt.depByType,
+            fociByType: rebuilt.fociByType,
+            remoteDepositsCount: remoteDeposits?.length ?? 0,
+          });
+          snap = rebuilt;
+        }
         setSnapshot(snap);
 
         // Cálculo paralelo direto do Supabase (mesma fórmula do Dashboard)
