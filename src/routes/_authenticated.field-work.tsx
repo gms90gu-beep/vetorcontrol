@@ -173,7 +173,7 @@ function FieldWorkPage() {
           console.warn("[NEW_JOURNEY_DEBUG]", { stage: "no-boletins", note: "agent has no RG assigned" });
           setBlocks([]);
         } else {
-          let blocksData = await listRemoteOrCache<any>({
+          let blocksData: any[] = await listRemoteOrCache<any>({
             name: "blocks",
             remote: () =>
               supabase
