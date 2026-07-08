@@ -92,6 +92,15 @@ function BoletimView() {
   const [mapOpen, setMapOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [geoFilter, setGeoFilter] = useState<"all" | "geo" | "pending">("all");
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await safeGetUser();
+      setCurrentUserId(user?.id ?? null);
+    })();
+  }, []);
 
   useEffect(() => {
     load();
