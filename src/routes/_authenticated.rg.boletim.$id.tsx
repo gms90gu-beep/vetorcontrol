@@ -802,32 +802,52 @@ function BoletimView() {
                 <table className="brg-table">
                   <thead>
                     <tr>
-                      <th style={{ width: "38%" }}>Rua ou Logradouro</th>
-                      <th style={{ width: "8%" }}>Lado</th>
-                      <th style={{ width: "12%" }}>Número</th>
-                      <th style={{ width: "8%" }}>SEQ</th>
-                      <th style={{ width: "14%" }}>Comp.</th>
-                      <th style={{ width: "10%" }}>Tipo</th>
-                      <th style={{ width: "10%" }}>Hab.</th>
+                      <th style={{ width: "34%" }}>Rua ou Logradouro</th>
+                      <th style={{ width: "6%" }}>Lado</th>
+                      <th style={{ width: "10%" }}>Número</th>
+                      <th style={{ width: "6%" }}>SEQ</th>
+                      <th style={{ width: "12%" }}>Comp.</th>
+                      <th style={{ width: "8%" }}>Tipo</th>
+                      <th style={{ width: "8%" }}>Hab.</th>
+                      <th className="brg-no-print" style={{ width: "16%" }}>GPS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {folha.length === 0 ? (
-                      <tr><td colSpan={7} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
-                    ) : folha.map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.street_name || ""}</td>
-                        <td className="text-center">{p.side || ""}</td>
-                        <td className="text-center font-bold">{p.number}</td>
-                        <td className="text-center">{p.sequence ?? ""}</td>
-                        <td className="text-center">{p.complement || ""}</td>
-                        <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
-                        <td className="text-center">{p.inhabitants ?? 0}</td>
-                      </tr>
-                    ))}
+                      <tr><td colSpan={8} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
+                    ) : folha.map((p) => {
+                      const hasCoords = p.latitude != null && p.longitude != null;
+                      return (
+                        <tr key={p.id}>
+                          <td>{p.street_name || ""}</td>
+                          <td className="text-center">{p.side || ""}</td>
+                          <td className="text-center font-bold">{p.number}</td>
+                          <td className="text-center">{p.sequence ?? ""}</td>
+                          <td className="text-center">{p.complement || ""}</td>
+                          <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
+                          <td className="text-center">{p.inhabitants ?? 0}</td>
+                          <td className="brg-no-print text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span
+                                title={hasCoords ? "Georreferenciado" : "Pendente"}
+                                className={"inline-block h-2 w-2 rounded-full " + (hasCoords ? "bg-emerald-500" : "bg-rose-500")}
+                              />
+                              <GeorefButton
+                                propertyId={p.id}
+                                actorId={currentUserId}
+                                hasCoords={hasCoords}
+                                onDone={(lat, lng) => handleGeorefUpdate(p.id, lat, lng)}
+                                label={hasCoords ? "Atualizar" : "Georref."}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
 
               {isLast && (
                 <>
