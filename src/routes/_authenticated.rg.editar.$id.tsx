@@ -134,7 +134,20 @@ function EditarBoletim() {
         .order("sequence", { ascending: true });
 
       console.log("Imóveis carregados:", props?.length || 0);
-      setImoveis((props || []) as Imovel[]);
+      const normalized = ((props || []) as Imovel[]).map((p) => {
+        const raw = (p as any).number;
+        console.log("[PROPERTY_NUMBER_RAW]", {
+          id: p.id, raw, type: raw === null ? "null" : typeof raw,
+          jsonRaw: JSON.stringify(raw),
+        });
+        const normalizedNumber = typeof raw === "string" ? (raw.trim() || "S/N") : (raw == null ? "S/N" : String(raw));
+        console.log("[PROPERTY_EDIT_START]", {
+          property_id: p.id, number: normalizedNumber,
+          block_id: p.block_id, boletim_id: data.id,
+        });
+        return { ...p, number: normalizedNumber } as Imovel;
+      });
+      setImoveis(normalized);
 
       // Load block location data (hybrid GPS / manual address)
       if (data.block_id) {
@@ -169,6 +182,9 @@ function EditarBoletim() {
   }
 
   function updateImovel(i: number, patch: Partial<Imovel>) {
+    if (Object.prototype.hasOwnProperty.call(patch, "number")) {
+      console.log("[PROPERTY_EDIT_FORM]", { index: i, newNumber: (patch as any).number });
+    }
     setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch, _dirty: true } : im)));
   }
 
@@ -414,12 +430,17 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           user_id: effectiveAgentId,
         };
+        console.log("[PROPERTY_EDIT_SAVE]", { id: im.id, number: numero, payload: patch });
         if (isOnline) {
           // Online → grava direto no Supabase para garantir persistência antes do reload.
-          return supabase.from("properties").update(patch).eq("id", im.id!).then((r) => ({ error: (r as any).error }));
+          return supabase.from("properties").update(patch).eq("id", im.id!).then((r) => {
+            if ((r as any).error) console.error("[PROPERTY_EDIT_ERROR]", { id: im.id, number: numero, error: (r as any).error });
+            return { error: (r as any).error };
+          });
         }
         return updateOffline("properties", im.id!, { ...patch, updated_at: new Date().toISOString() })
-          .then(() => ({ error: null as any }));
+          .then(() => ({ error: null as any }))
+          .catch((err) => { console.error("[PROPERTY_EDIT_ERROR]", { id: im.id, number: numero, error: err }); throw err; });
       });
 
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
@@ -893,7 +914,7 @@ function EditarBoletim() {
                     className="md:col-span-2"
                   />
                   <Field label="Lado" value={im.side || ""} onChange={(v) => updateImovel(i, { side: v })} />
-                  <Field label="Número" value={im.number} onChange={(v) => updateImovel(i, { number: v })} />
+                  <Field label="Número" value={im.number ?? ""} onChange={(v) => updateImovel(i, { number: v })} />
                   <Field label="Compl." value={im.complement || ""} onChange={(v) => updateImovel(i, { complement: v })} />
                   <Field
                     label="Sequência"
