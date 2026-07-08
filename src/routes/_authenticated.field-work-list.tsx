@@ -271,6 +271,101 @@ function FieldWorkListPage() {
         console.log("[FIELD_BLOCK]", { block_number: session.block_number, block_id: session.block_id ?? null, online });
         console.log(fwlSource === "remote" ? "[FIELD_REMOTE]" : "[FIELD_CACHE]", { count: propsRaw?.length || 0 });
 
+        // ────── AUDITORIA DIVERGÊNCIA RG × SELEÇÃO × JORNADA ──────
+        try {
+          console.log("[FIELD_PROPERTIES_QUERY]", {
+            table: "properties",
+            filters: {
+              block_number: session.block_number,
+              boletim_id_in: myBoletimIds,
+              block_id: session.block_id ?? null,
+              cycle_id: null,
+              week_id: null,
+              active: "n/a",
+              deleted: "n/a",
+              finalized: "n/a",
+            },
+            order: "sequence asc nullsFirst=false",
+            source: fwlSource,
+          });
+
+          const jornadaIds = ((propsRaw as any[]) || []).map((p: any) => p.id);
+          console.log("[FIELD_PROPERTIES_RESULT]", { total: jornadaIds.length, ids: jornadaIds });
+          console.log("[FIELD_PROPERTIES_SOURCE]", {
+            source: fwlSource,
+            online,
+            path: online ? "Supabase→Dexie(listRemoteOrCache)" : "Dexie(cache)",
+          });
+
+          // RG: todos os imóveis dos boletins do agente (sem filtro de block_number)
+          const rgAll = await listRemoteOrCache<any>({
+            name: "properties",
+            remote: () =>
+              (myBoletimIds.length
+                ? supabase.from("properties").select("id,block_id,block_number,boletim_id").in("boletim_id", myBoletimIds)
+                : Promise.resolve({ data: [] as any[], error: null })) as any,
+            filter: (p) => myBoletimIds.includes(p.boletim_id),
+          });
+          const rgOfBlock = (rgAll || []).filter(
+            (p: any) => String(p.block_number) === String(session.block_number),
+          );
+          console.log("[RG_PROPERTIES]", {
+            boletim_ids: myBoletimIds,
+            block_id: session.block_id ?? null,
+            block_number: session.block_number,
+            total: rgOfBlock.length,
+            ids: rgOfBlock.map((p: any) => p.id),
+          });
+
+          // BLOCO: consulta por block_id (mesma fonte usada na seleção)
+          let blockProps: any[] = [];
+          if (session.block_id) {
+            blockProps = await listRemoteOrCache<any>({
+              name: "properties",
+              remote: () =>
+                supabase.from("properties").select("id,block_id,block_number,boletim_id").eq("block_id", session.block_id) as any,
+              filter: (p) => p.block_id === session.block_id,
+            }) || [];
+          }
+          console.log("[BLOCK_PROPERTIES]", {
+            block_id: session.block_id ?? null,
+            block_number: session.block_number,
+            total: blockProps.length,
+            ids: blockProps.map((p: any) => p.id),
+          });
+
+          const rgIds = new Set(rgOfBlock.map((p: any) => p.id));
+          const selIds = new Set(blockProps.map((p: any) => p.id));
+          const jIds = new Set(jornadaIds);
+          const missingInJornada = [...rgIds].filter((id) => !jIds.has(id));
+          const extraInJornada = [...jIds].filter((id) => !rgIds.has(id));
+          console.log("[FIELD_PROPERTIES_COMPARE]", {
+            total_rg: rgIds.size,
+            total_selecao: selIds.size,
+            total_jornada: jIds.size,
+            missing_in_jornada: missingInJornada,
+            extra_in_jornada: extraInJornada,
+          });
+
+          // Por qual filtro cada faltante foi eliminado
+          const missingDetails = missingInJornada.map((id) => {
+            const p = (rgAll || []).find((x: any) => x.id === id) || {};
+            const reasons: string[] = [];
+            if (String(p.block_number) !== String(session.block_number)) reasons.push(`block_number(${p.block_number}!=${session.block_number})`);
+            if (!myBoletimIds.includes(p.boletim_id)) reasons.push(`boletim_id(${p.boletim_id} fora do escopo)`);
+            if (session.block_id && p.block_id && p.block_id !== session.block_id) reasons.push(`block_id(${p.block_id}!=${session.block_id})`);
+            return { id, block_id: p.block_id, block_number: p.block_number, boletim_id: p.boletim_id, filtered_by: reasons };
+          });
+          console.log("[FIELD_PROPERTIES_FILTER]", {
+            eliminated: missingDetails.length,
+            details: missingDetails,
+            active_filters: ["block_number=session.block_number", "boletim_id IN myBoletimIds"],
+          });
+        } catch (auditErr) {
+          console.warn("[FIELD_PROPERTIES_AUDIT_ERROR]", auditErr);
+        }
+
+
         // Fallback offline por block_id quando não houver match por block_number no cache
         if ((!propsRaw || propsRaw.length === 0)) {
           let blockIdGuess: string | null = session.block_id ?? null;
