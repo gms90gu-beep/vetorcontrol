@@ -42,6 +42,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle } from "lucide-react";
 import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
+import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -111,6 +112,38 @@ function FieldWorkPage() {
     (async () => {
       const { data: { user } } = await safeGetUser();
       if (user) setUserId(user.id);
+    })();
+  }, []);
+
+  // ── Fase 1: painel operacional quando existe jornada em andamento ──
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await safeGetUser();
+        if (!user) { setCheckingSession(false); return; }
+        if (isOnline()) {
+          const { data } = await supabase
+            .from("field_work_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("status", "in_progress")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (data) setActiveSession(data);
+        } else {
+          const { listLocal } = await import("@/lib/offline/repos");
+          const local = await listLocal<any>("field_work_sessions", (s: any) =>
+            s.user_id === user.id && s.status === "in_progress");
+          const sorted = [...(local || [])].sort((a: any, b: any) =>
+            String(b.created_at || "").localeCompare(String(a.created_at || "")));
+          if (sorted[0]) setActiveSession(sorted[0]);
+        }
+      } finally {
+        setCheckingSession(false);
+      }
     })();
   }, []);
 
@@ -564,6 +597,18 @@ function FieldWorkPage() {
     setRetroactiveReason(null);
     setDate(new Date());
   };
+
+  if (checkingSession) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (activeSession) {
+    return <OperationalPanel session={activeSession} onCloseSessionRoute={() => navigate({ to: "/field-work-list" })} />;
+  }
 
   return (
     <div className="pb-24 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
