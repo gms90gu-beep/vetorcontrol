@@ -430,12 +430,17 @@ function EditarBoletim() {
           block_id: effectiveBlockId,
           user_id: effectiveAgentId,
         };
+        console.log("[PROPERTY_EDIT_SAVE]", { id: im.id, number: numero, payload: patch });
         if (isOnline) {
           // Online → grava direto no Supabase para garantir persistência antes do reload.
-          return supabase.from("properties").update(patch).eq("id", im.id!).then((r) => ({ error: (r as any).error }));
+          return supabase.from("properties").update(patch).eq("id", im.id!).then((r) => {
+            if ((r as any).error) console.error("[PROPERTY_EDIT_ERROR]", { id: im.id, number: numero, error: (r as any).error });
+            return { error: (r as any).error };
+          });
         }
         return updateOffline("properties", im.id!, { ...patch, updated_at: new Date().toISOString() })
-          .then(() => ({ error: null as any }));
+          .then(() => ({ error: null as any }))
+          .catch((err) => { console.error("[PROPERTY_EDIT_ERROR]", { id: im.id, number: numero, error: err }); throw err; });
       });
 
       const toInsert = sortedImoveis.filter((i) => i._new && !i._deleted);
