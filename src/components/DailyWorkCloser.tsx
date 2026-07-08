@@ -42,6 +42,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
+import {
+  runShiftValidation,
+  canForceClose,
+  type ShiftValidationReport,
+} from "@/lib/shift-validation";
+import { flushMutations, retryFailedMutations } from "@/lib/offline/sync";
+import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 
 type DepKey = "A1" | "A2" | "B" | "C" | "D1" | "D2" | "E";
 
