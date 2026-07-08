@@ -264,6 +264,11 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     });
   }, [properties, lastVisitByProp, filter, query]);
 
+  const pendingList = useMemo(
+    () => properties.filter((p) => !lastVisitByProp.get(p.id)),
+    [properties, lastVisitByProp],
+  );
+
   // ── Scroll restore ──────────────────────────────────────────────
   useEffect(() => {
     if (!properties.length) return;
