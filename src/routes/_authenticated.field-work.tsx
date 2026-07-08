@@ -598,6 +598,18 @@ function FieldWorkPage() {
     setDate(new Date());
   };
 
+  if (checkingSession) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (activeSession) {
+    return <OperationalPanel session={activeSession} onCloseSessionRoute={() => navigate({ to: "/field-work-list" })} />;
+  }
+
   return (
     <div className="pb-24 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
