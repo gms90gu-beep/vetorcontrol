@@ -182,6 +182,9 @@ function EditarBoletim() {
   }
 
   function updateImovel(i: number, patch: Partial<Imovel>) {
+    if (Object.prototype.hasOwnProperty.call(patch, "number")) {
+      console.log("[PROPERTY_EDIT_FORM]", { index: i, newNumber: (patch as any).number });
+    }
     setImoveis((arr) => arr.map((im, idx) => (idx === i ? { ...im, ...patch, _dirty: true } : im)));
   }
 
