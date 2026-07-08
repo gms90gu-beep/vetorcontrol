@@ -561,10 +561,11 @@ function FieldWorkListPage() {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
           const propertyIdSet = new Set(propertyIds);
 
-          // ─── Carregar visitas da JORNADA (RC-6) ─────────────────────
-          // Escopo ESTRITO: field_work_session_id === session.id
-          // Sem heurísticas por data/propriedade/block_number.
-          const inScope = (v: any) => !!v && v.field_work_session_id === session.id;
+          // ─── Carregar visitas dos IMÓVEIS da jornada (RC-7) ─────────
+          // A marcação depende APENAS de visit.property_id === property.id.
+          // Não filtrar por session_id/cycle_id/week_id/status para não
+          // esconder visitas feitas em sessões anteriores no mesmo quarteirão.
+          const inScope = (v: any) => !!v && propertyIdSet.has(String(v.property_id));
 
           const visitColumns = `
             id,
@@ -598,7 +599,7 @@ function FieldWorkListPage() {
                 supabase
                   .from("visits")
                   .select(visitColumns)
-                  .eq("field_work_session_id", session.id)
+                  .in("property_id", propertyIds)
                   .order("visit_date", { ascending: false }) as any,
               filter: inScope,
             });
@@ -607,11 +608,20 @@ function FieldWorkListPage() {
             console.warn("[SESSION_RESTORE_VISITS] fallback empty:", e);
           }
 
-          console.log("[SESSION_RESTORE_VISITS]", {
+          console.log("[VISITS_LOADED]", {
             session_id: session.id,
             count: blockCycleVisits.length,
+            ids: blockCycleVisits.map((v: any) => v.id),
+            property_ids: blockCycleVisits.map((v: any) => v.property_id),
             source: online ? "remote+cache" : "cache",
           });
+
+          console.log("[PROPERTIES_LOADED]", {
+            quantity: propertyIds.length,
+            ids: propertyIds,
+          });
+
+
 
 
           console.log("[RESTORE_VISITS]", {
