@@ -53,6 +53,8 @@ export async function savePropertyLocation(
     geocoded_by: actorId ?? null,
   };
 
+  console.log("[GEO_SAVE]", { property_id: propertyId, payload: patch });
+
   // Atualiza cache local imediatamente
   const cached = await db.properties.get(propertyId);
   if (cached) {
@@ -64,12 +66,13 @@ export async function savePropertyLocation(
   }
 
   if (isOnline()) {
+    console.log("[GEO_SYNC]", { property_id: propertyId, mode: "online" });
     const { error } = await supabase.from("properties").update(patch).eq("id", propertyId);
     if (error) throw error;
     return;
   }
 
-  // Offline: enfileira para sync
+  console.log("[GEO_SYNC]", { property_id: propertyId, mode: "offline-queue" });
   await enqueueMutation({
     table: "properties",
     op: "update",
@@ -77,3 +80,31 @@ export async function savePropertyLocation(
     payload: patch,
   });
 }
+
+/**
+ * Função única de georreferenciamento — reutilizada por RG, Jornada e Primeira Visita.
+ * NÃO cria visita, NÃO altera status, NÃO altera produtividade.
+ * Apenas grava latitude/longitude/geocoded_at/geocoded_by no imóvel.
+ */
+export async function georeferenceProperty(
+  propertyId: string,
+  actorId: string | null,
+): Promise<Coords> {
+  console.log("[GEO_START]", { property_id: propertyId });
+  try {
+    const coords = await requestCurrentPosition();
+    console.log("[GEO_POSITION]", {
+      property_id: propertyId,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracy: coords.accuracy,
+    });
+    await savePropertyLocation(propertyId, coords, actorId);
+    console.log("[GEO_FINISH]", { property_id: propertyId, ok: true });
+    return coords;
+  } catch (err: any) {
+    console.log("[GEO_FINISH]", { property_id: propertyId, ok: false, error: err?.message || String(err) });
+    throw err;
+  }
+}
+
