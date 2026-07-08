@@ -27,6 +27,7 @@ import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
+import { Route as AuthenticatedMinhasJornadasRouteImport } from './routes/_authenticated.minhas-jornadas'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
 import { Route as AuthenticatedHeatmapRouteImport } from './routes/_authenticated.heatmap'
 import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authenticated.field-work-list'
@@ -146,6 +147,12 @@ const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
   path: '/pending',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMinhasJornadasRoute =
+  AuthenticatedMinhasJornadasRouteImport.update({
+    id: '/minhas-jornadas',
+    path: '/minhas-jornadas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
   id: '/map',
   path: '/map',
@@ -319,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/heatmap': typeof AuthenticatedHeatmapRoute
   '/map': typeof AuthenticatedMapRoute
+  '/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -364,6 +372,7 @@ export interface FileRoutesByTo {
   '/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/heatmap': typeof AuthenticatedHeatmapRoute
   '/map': typeof AuthenticatedMapRoute
+  '/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/pending': typeof AuthenticatedPendingRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -412,6 +421,7 @@ export interface FileRoutesById {
   '/_authenticated/field-work-list': typeof AuthenticatedFieldWorkListRoute
   '/_authenticated/heatmap': typeof AuthenticatedHeatmapRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
+  '/_authenticated/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -461,6 +471,7 @@ export interface FileRouteTypes {
     | '/field-work-list'
     | '/heatmap'
     | '/map'
+    | '/minhas-jornadas'
     | '/pending'
     | '/relatorios'
     | '/reports'
@@ -506,6 +517,7 @@ export interface FileRouteTypes {
     | '/field-work-list'
     | '/heatmap'
     | '/map'
+    | '/minhas-jornadas'
     | '/pending'
     | '/relatorios'
     | '/reports'
@@ -553,6 +565,7 @@ export interface FileRouteTypes {
     | '/_authenticated/field-work-list'
     | '/_authenticated/heatmap'
     | '/_authenticated/map'
+    | '/_authenticated/minhas-jornadas'
     | '/_authenticated/pending'
     | '/_authenticated/relatorios'
     | '/_authenticated/reports'
@@ -719,6 +732,13 @@ declare module '@tanstack/react-router' {
       path: '/pending'
       fullPath: '/pending'
       preLoaderRoute: typeof AuthenticatedPendingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/minhas-jornadas': {
+      id: '/_authenticated/minhas-jornadas'
+      path: '/minhas-jornadas'
+      fullPath: '/minhas-jornadas'
+      preLoaderRoute: typeof AuthenticatedMinhasJornadasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/map': {
@@ -938,6 +958,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedFieldWorkListRoute: typeof AuthenticatedFieldWorkListRoute
   AuthenticatedHeatmapRoute: typeof AuthenticatedHeatmapRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
+  AuthenticatedMinhasJornadasRoute: typeof AuthenticatedMinhasJornadasRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -977,6 +998,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedFieldWorkListRoute: AuthenticatedFieldWorkListRoute,
   AuthenticatedHeatmapRoute: AuthenticatedHeatmapRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
+  AuthenticatedMinhasJornadasRoute: AuthenticatedMinhasJornadasRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
