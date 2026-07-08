@@ -398,8 +398,7 @@ function FieldWorkPage() {
       // Nota: não encerramos mais sessões abertas de OUTRAS datas — cada
       // Data da Produção é independente. Uma jornada aberta de 07/07 não
       // interfere com uma nova jornada de 08/07.
-
-
+      if (isOnline()) {
         try {
           const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
           if (agent?.work_status === 'work_completed' && agent?.id) {
