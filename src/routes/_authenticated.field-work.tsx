@@ -799,7 +799,7 @@ function FieldWorkPage() {
                   Jornada Retroativa
                 </DialogTitle>
                 <DialogDescription className="text-xs">
-                  Registre uma produção de até <b>7 dias anteriores</b>. Para datas mais antigas, procure seu supervisor.
+                  Registre uma produção de até <b>{MAX_RETROACTIVE_DAYS} dias anteriores</b>. Para datas mais antigas, procure seu supervisor.
                 </DialogDescription>
               </DialogHeader>
 
