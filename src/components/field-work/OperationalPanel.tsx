@@ -394,14 +394,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         </div>
       )}
 
-      {/* ── Progress card (recolhível) ──────────────────────── */}
-      <div className="px-4 mt-4">
-        <Card className="border-none shadow-lg rounded-3xl overflow-hidden">
-          <CardContent className="p-5">
-            <button
-              onClick={() => setSummaryOpen((s) => !s)}
-              className="w-full flex items-end justify-between mb-2 text-left"
-      {/* ── Progress bar ─────────────────────────────────────── */}
+      
       <div className="px-4 mt-4">
         <Card className="border-none shadow-lg rounded-3xl overflow-hidden">
           <CardContent className="p-4">
