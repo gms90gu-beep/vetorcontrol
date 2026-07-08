@@ -118,6 +118,7 @@ function FieldWorkPage() {
 
   async function fetchInitialData() {
     setIsLoading(true);
+    const online = isOnline();
     try {
       // Fetch cycles (offline-first)
       const cyclesData = await listRemoteOrCache<any>({
@@ -131,11 +132,13 @@ function FieldWorkPage() {
         filter: (c) => c.year === new Date().getFullYear(),
       });
 
+      let activeCycleId: string | null = null;
       if (cyclesData?.length) {
         const sorted = [...cyclesData].sort((a, b) => (a.number || 0) - (b.number || 0));
         setCycles(sorted);
         const activeCycle = sorted.find((c: any) => c.status === "in_progress") || sorted[0];
         if (activeCycle) {
+          activeCycleId = activeCycle.id;
           setSelectedCycleId(activeCycle.id);
           fetchWeeks(activeCycle.id);
         }
@@ -144,6 +147,12 @@ function FieldWorkPage() {
       // Only show blocks that have properties linked to a boletim RG
       // belonging to the CURRENT agent.
       const { data: { user: currentUser } } = await safeGetUser();
+      console.log("[NEW_JOURNEY_DEBUG]", {
+        stage: "start",
+        user_id: currentUser?.id ?? null,
+        cycle_id: activeCycleId,
+        online,
+      });
       if (currentUser) {
         const myBoletins = await listRemoteOrCache<any>({
           name: "boletins_rg",
@@ -153,11 +162,18 @@ function FieldWorkPage() {
         });
 
         const boletimIds = (myBoletins ?? []).map((b: any) => b.id);
+        console.log("[NEW_JOURNEY_DEBUG]", {
+          stage: "boletins",
+          count: boletimIds.length,
+          ids: boletimIds,
+          source: online ? "supabase+cache" : "dexie",
+        });
 
         if (boletimIds.length === 0) {
+          console.warn("[NEW_JOURNEY_DEBUG]", { stage: "no-boletins", note: "agent has no RG assigned" });
           setBlocks([]);
         } else {
-          const blocksData = await listRemoteOrCache<any>({
+          let blocksData = await listRemoteOrCache<any>({
             name: "blocks",
             remote: () =>
               supabase
@@ -167,17 +183,54 @@ function FieldWorkPage() {
                 .order("number", { ascending: true }) as any,
           });
 
+          let source: "remote-join" | "dexie-cache" | "supabase-fallback" = online ? "remote-join" : "dexie-cache";
+
+          // Fallback: if the primary query returned nothing and we're online,
+          // rebuild the block list from properties → block_id (avoids
+          // Supabase embedded-filter quirks and stale/empty Dexie caches).
+          if (online && (!blocksData || blocksData.length === 0)) {
+            console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-empty-primary", trying: "supabase-fallback" });
+            const { data: props, error: propsErr } = await supabase
+              .from("properties")
+              .select("block_id, boletim_id")
+              .in("boletim_id", boletimIds);
+            if (propsErr) console.warn("[NEW_JOURNEY_DEBUG]", { stage: "props-error", error: propsErr.message });
+            const blockIds = Array.from(new Set((props ?? []).map((p: any) => p.block_id).filter(Boolean)));
+            console.log("[NEW_JOURNEY_DEBUG]", { stage: "fallback-props", properties: props?.length ?? 0, unique_blocks: blockIds.length });
+            if (blockIds.length > 0) {
+              const { data: bl, error: blErr } = await supabase
+                .from("blocks")
+                .select("*")
+                .in("id", blockIds)
+                .order("number", { ascending: true });
+              if (blErr) console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-fallback-error", error: blErr.message });
+              blocksData = bl ?? [];
+              source = "supabase-fallback";
+            }
+          }
+
           if (blocksData) {
             const seen = new Set<string>();
             const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
             uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
+            console.log("[NEW_JOURNEY_DEBUG]", {
+              stage: "blocks-final",
+              total: uniq.length,
+              source,
+              numbers: uniq.map((b: any) => b.number).slice(0, 30),
+            });
             setBlocks(uniq);
+          } else {
+            console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-null", source });
+            setBlocks([]);
           }
         }
+      } else {
+        console.warn("[NEW_JOURNEY_DEBUG]", { stage: "no-user" });
       }
 
     } catch (error) {
-      console.error("Error fetching initial data:", error);
+      console.error("[NEW_JOURNEY_DEBUG]", { stage: "exception", error: String((error as any)?.message || error) });
     } finally {
       setIsLoading(false);
     }
