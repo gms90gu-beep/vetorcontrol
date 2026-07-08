@@ -512,8 +512,8 @@ function FieldWorkPage() {
     const chosen = new Date(retroDate); chosen.setHours(0, 0, 0, 0);
     const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
     if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
-    if (diffDays > 7) {
-      toast.error("Para registrar produções mais antigas (>7 dias), procure seu supervisor.");
+    if (diffDays > MAX_RETROACTIVE_DAYS) {
+      toast.error(`Só é permitido lançar produção referente aos últimos ${MAX_RETROACTIVE_DAYS} dias.`);
       return;
     }
     const reasonFinal = retroReason === "Outro" ? (retroOtherText.trim() || "Outro") : retroReason;
