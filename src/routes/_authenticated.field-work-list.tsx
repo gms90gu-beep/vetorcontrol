@@ -361,9 +361,101 @@ function FieldWorkListPage() {
             details: missingDetails,
             active_filters: ["block_number=session.block_number", "boletim_id IN myBoletimIds"],
           });
+
+          // ────── AUDITORIA DIRETA NO BANCO (bypass Dexie/filtros) ──────
+          try {
+            // 1) Todos os imóveis do block_id da sessão (sem qualquer filtro adicional)
+            const dbById = session.block_id
+              ? await supabase
+                  .from("properties")
+                  .select("id, number, block_id, block_number, boletim_id")
+                  .eq("block_id", session.block_id)
+              : { data: [] as any[], error: null };
+            // 2) Todos os imóveis com o mesmo block_number (independente de block_id/boletim)
+            const dbByNumber = await supabase
+              .from("properties")
+              .select("id, number, block_id, block_number, boletim_id")
+              .eq("block_number", session.block_number);
+
+            const dbRows = [
+              ...(((dbById as any).data || []) as any[]),
+              ...(((dbByNumber as any).data || []) as any[]),
+            ];
+            const dedup = Array.from(new Map(dbRows.map((r) => [r.id, r])).values());
+            const parseNum = (n: any) => {
+              const m = String(n ?? "").match(/\d+/);
+              return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
+            };
+            dedup.sort((a, b) => parseNum(a.number) - parseNum(b.number));
+
+            console.log("[DB_BLOCK_PROPERTIES]", {
+              session_block_id: session.block_id ?? null,
+              session_block_number: session.block_number,
+              total: dedup.length,
+              rows: dedup.map((p) => ({
+                id: p.id,
+                number: p.number,
+                block_id: p.block_id,
+                block_number: p.block_number,
+                boletim_id: p.boletim_id,
+              })),
+            });
+
+            const groups = new Map<string, { block_id: any; block_number: any; boletim_id: any; count: number; ids: string[] }>();
+            for (const p of dedup) {
+              const k = `${p.block_id}|${p.block_number}|${p.boletim_id}`;
+              const g = groups.get(k) ?? { block_id: p.block_id, block_number: p.block_number, boletim_id: p.boletim_id, count: 0, ids: [] };
+              g.count += 1;
+              g.ids.push(p.id);
+              groups.set(k, g);
+            }
+            console.log("[DB_BLOCK_SUMMARY]", {
+              groups: [...groups.values()].sort((a, b) => b.count - a.count),
+            });
+
+            console.log("[QUERY_USED_BY_FIELD_WORK]", {
+              sql: `SELECT * FROM properties
+ WHERE block_number = $1
+   AND boletim_id IN ($2)
+ ORDER BY sequence ASC NULLS LAST`,
+              values: {
+                $1_block_number: session.block_number,
+                $2_boletim_ids: myBoletimIds,
+              },
+              where: [
+                `block_number = '${session.block_number}'`,
+                `boletim_id IN (${myBoletimIds.length} ids do agente)`,
+              ],
+              joins: "nenhum (leitura direta em properties)",
+              note: "block_id da sessão NÃO é usado como filtro; escopo é block_number + boletins do agente",
+            });
+
+            const returnedIds = new Set(((propsRaw as any[]) || []).map((p: any) => p.id));
+            const dbIds = dedup.map((p) => p.id);
+            const discarded = dbIds.filter((id) => !returnedIds.has(id));
+            const discardedDetails = discarded.map((id) => {
+              const p = dedup.find((x) => x.id === id)!;
+              const reasons: string[] = [];
+              if (String(p.block_number) !== String(session.block_number)) reasons.push(`block_number(${p.block_number}!=${session.block_number})`);
+              if (!myBoletimIds.includes(p.boletim_id)) reasons.push(`boletim_id fora do escopo do agente (${p.boletim_id})`);
+              if (session.block_id && p.block_id !== session.block_id) reasons.push(`block_id divergente (${p.block_id}!=${session.block_id})`);
+              if (!reasons.length) reasons.push("desconhecido — presente no DB e no filtro, mas não retornado");
+              return { id, number: p.number, block_id: p.block_id, block_number: p.block_number, boletim_id: p.boletim_id, motivo: reasons };
+            });
+            console.log("[QUERY_RESULT_COMPARE]", {
+              total_no_banco: dedup.length,
+              total_retornado_jornada: returnedIds.size,
+              descartados: discarded.length,
+              ids_descartados: discarded,
+              detalhes_descarte: discardedDetails,
+            });
+          } catch (dbAuditErr) {
+            console.warn("[DB_AUDIT_ERROR]", dbAuditErr);
+          }
         } catch (auditErr) {
           console.warn("[FIELD_PROPERTIES_AUDIT_ERROR]", auditErr);
         }
+
 
 
         // Fallback offline por block_id quando não houver match por block_number no cache
