@@ -426,6 +426,38 @@ function FieldWorkPage() {
         return;
       }
 
+      // ── VERIFICAÇÃO DE UNICIDADE (user_id + session_date + block_id) ──
+      if (isOnline()) {
+        console.log("[SESSION_DUPLICATE_CHECK]", {
+          user_id: user.id,
+          session_date: sessionDateStr,
+          block_id: selectedBlock.id,
+        });
+        const { data: dupes, error: dupErr } = await supabase
+          .from("field_work_sessions")
+          .select("id, status, session_date, block_number, block_id, cycle_id, week_id, property_count, street_name, created_at, started_at")
+          .eq("user_id", user.id)
+          .eq("session_date", sessionDateStr)
+          .eq("block_id", selectedBlock.id)
+          .in("status", ["in_progress", "closed"])
+          .order("created_at", { ascending: false });
+        if (dupErr) console.warn("[SESSION_DUPLICATE_CHECK] erro", dupErr);
+        if ((dupes || []).length > 0) {
+          const existing = dupes![0] as any as OpenSessionInfo;
+          console.log("[SESSION_DUPLICATE_FOUND]", {
+            session_id: existing.id,
+            status: (existing as any).status,
+            block_number: existing.block_number,
+          });
+          console.log("[SESSION_DUPLICATE_BLOCKED]", { block_id: selectedBlock.id, session_date: sessionDateStr });
+          setOpenSession(existing);
+          setOpenSessionModal(true);
+          toast.warning("Já existe uma jornada para este quarteirão nesta data.");
+          return;
+        }
+      }
+
+
       const payload = {
         user_id: user.id,
         cycle_id: cycleIdToUse,
