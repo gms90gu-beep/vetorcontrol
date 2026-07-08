@@ -3,7 +3,7 @@ import { MapPin, RefreshCw, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isManagerRole } from "@/lib/role-guards";
-import { requestCurrentPosition, savePropertyLocation } from "@/lib/geolocation";
+import { georeferenceProperty } from "@/lib/geolocation";
 
 interface Props {
   property: {
@@ -26,11 +26,10 @@ export function PropertyLocationSection({ property, role, actorId, onUpdated }: 
 
   async function handleUpdate() {
     if (!canEdit) return;
-    if (!window.confirm("Substituir a localização registrada deste imóvel?")) return;
+    if (hasCoords && !window.confirm("Substituir a localização registrada deste imóvel?")) return;
     setBusy(true);
     try {
-      const coords = await requestCurrentPosition();
-      await savePropertyLocation(property.id, coords, actorId);
+      const coords = await georeferenceProperty(property.id, actorId);
       toast.success("Localização atualizada.");
       onUpdated?.(coords.latitude, coords.longitude);
     } catch (err: any) {
@@ -39,6 +38,7 @@ export function PropertyLocationSection({ property, role, actorId, onUpdated }: 
       setBusy(false);
     }
   }
+
 
   return (
     <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm space-y-3">

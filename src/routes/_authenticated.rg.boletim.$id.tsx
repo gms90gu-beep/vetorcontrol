@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { BlockMapDialog } from "@/components/rg/BlockMapDialog";
+import { GeorefButton } from "@/components/property/GeorefButton";
 
 export const Route = createFileRoute("/_authenticated/rg/boletim/$id")({
   component: BoletimView,
@@ -91,6 +92,15 @@ function BoletimView() {
   const [mapOpen, setMapOpen] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [geoFilter, setGeoFilter] = useState<"all" | "geo" | "pending">("all");
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await safeGetUser();
+      setCurrentUserId(user?.id ?? null);
+    })();
+  }, []);
 
   useEffect(() => {
     load();
@@ -306,14 +316,30 @@ function BoletimView() {
   }
 
 
-  const totalFolhas = Math.max(1, Math.ceil(imoveis.length / LINHAS_POR_FOLHA));
+  const imoveisFiltrados = useMemo(() => {
+    if (geoFilter === "all") return imoveis;
+    if (geoFilter === "geo") return imoveis.filter((p) => p.latitude != null && p.longitude != null);
+    return imoveis.filter((p) => p.latitude == null || p.longitude == null);
+  }, [imoveis, geoFilter]);
+
+  const totalFolhas = Math.max(1, Math.ceil(imoveisFiltrados.length / LINHAS_POR_FOLHA));
   const folhas = useMemo(() => {
     const out: Property[][] = [];
     for (let i = 0; i < totalFolhas; i++) {
-      out.push(imoveis.slice(i * LINHAS_POR_FOLHA, (i + 1) * LINHAS_POR_FOLHA));
+      out.push(imoveisFiltrados.slice(i * LINHAS_POR_FOLHA, (i + 1) * LINHAS_POR_FOLHA));
     }
     return out;
-  }, [imoveis, totalFolhas]);
+  }, [imoveisFiltrados, totalFolhas]);
+
+  function handleGeorefUpdate(propertyId: string, lat: number, lng: number) {
+    setImoveis((prev) =>
+      prev.map((p) =>
+        p.id === propertyId
+          ? { ...p, latitude: lat, longitude: lng, geocoded_at: new Date().toISOString() }
+          : p,
+      ),
+    );
+  }
 
   const counts = useMemo(() => {
     const c = { R: 0, C: 0, TB: 0, PE: 0, O: 0 };
@@ -670,7 +696,30 @@ function BoletimView() {
             tone="info"
           />
         </div>
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex rounded-lg border border-border bg-background p-0.5 text-xs">
+            {(
+              [
+                { key: "all", label: `Todos (${gpsStats.total})` },
+                { key: "geo", label: `🟢 Georref. (${gpsStats.geo})` },
+                { key: "pending", label: `🔴 Pendentes (${gpsStats.pendentes})` },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setGeoFilter(opt.key)}
+                className={
+                  "rounded-md px-2.5 py-1 font-semibold transition " +
+                  (geoFilter === opt.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted")
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -681,6 +730,7 @@ function BoletimView() {
           </Button>
         </div>
       </div>
+
 
       <BlockMapDialog
         open={mapOpen}
@@ -752,32 +802,52 @@ function BoletimView() {
                 <table className="brg-table">
                   <thead>
                     <tr>
-                      <th style={{ width: "38%" }}>Rua ou Logradouro</th>
-                      <th style={{ width: "8%" }}>Lado</th>
-                      <th style={{ width: "12%" }}>Número</th>
-                      <th style={{ width: "8%" }}>SEQ</th>
-                      <th style={{ width: "14%" }}>Comp.</th>
-                      <th style={{ width: "10%" }}>Tipo</th>
-                      <th style={{ width: "10%" }}>Hab.</th>
+                      <th style={{ width: "34%" }}>Rua ou Logradouro</th>
+                      <th style={{ width: "6%" }}>Lado</th>
+                      <th style={{ width: "10%" }}>Número</th>
+                      <th style={{ width: "6%" }}>SEQ</th>
+                      <th style={{ width: "12%" }}>Comp.</th>
+                      <th style={{ width: "8%" }}>Tipo</th>
+                      <th style={{ width: "8%" }}>Hab.</th>
+                      <th className="brg-no-print" style={{ width: "16%" }}>GPS</th>
                     </tr>
                   </thead>
                   <tbody>
                     {folha.length === 0 ? (
-                      <tr><td colSpan={7} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
-                    ) : folha.map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.street_name || ""}</td>
-                        <td className="text-center">{p.side || ""}</td>
-                        <td className="text-center font-bold">{p.number}</td>
-                        <td className="text-center">{p.sequence ?? ""}</td>
-                        <td className="text-center">{p.complement || ""}</td>
-                        <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
-                        <td className="text-center">{p.inhabitants ?? 0}</td>
-                      </tr>
-                    ))}
+                      <tr><td colSpan={8} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
+                    ) : folha.map((p) => {
+                      const hasCoords = p.latitude != null && p.longitude != null;
+                      return (
+                        <tr key={p.id}>
+                          <td>{p.street_name || ""}</td>
+                          <td className="text-center">{p.side || ""}</td>
+                          <td className="text-center font-bold">{p.number}</td>
+                          <td className="text-center">{p.sequence ?? ""}</td>
+                          <td className="text-center">{p.complement || ""}</td>
+                          <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
+                          <td className="text-center">{p.inhabitants ?? 0}</td>
+                          <td className="brg-no-print text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span
+                                title={hasCoords ? "Georreferenciado" : "Pendente"}
+                                className={"inline-block h-2 w-2 rounded-full " + (hasCoords ? "bg-emerald-500" : "bg-rose-500")}
+                              />
+                              <GeorefButton
+                                propertyId={p.id}
+                                actorId={currentUserId}
+                                hasCoords={hasCoords}
+                                onDone={(lat, lng) => handleGeorefUpdate(p.id, lat, lng)}
+                                label={hasCoords ? "Atualizar" : "Georref."}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
 
               {isLast && (
                 <>
