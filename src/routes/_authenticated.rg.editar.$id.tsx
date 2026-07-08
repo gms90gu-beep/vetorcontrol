@@ -412,7 +412,6 @@ function EditarBoletim() {
           inhabitants: im.inhabitants ?? 0,
           boletim_id: boletimId,
           block_id: effectiveBlockId,
-          block_number: form.block_number || null,
           user_id: effectiveAgentId,
         };
         if (isOnline) {
@@ -485,7 +484,6 @@ function EditarBoletim() {
           inhabitants: im.inhabitants ?? 0,
           boletim_id: boletimId,
           block_id: effectiveBlockId,
-          block_number: form.block_number || null,
           user_id: effectiveAgentId,
         };
         console.log("[PROPERTY_SAVE_PAYLOAD]", { payload });
@@ -627,7 +625,6 @@ function EditarBoletim() {
           inhabitants: 0,
           boletim_id: boletimId,
           block_id: effectiveBlockId,
-          block_number: form.block_number || null,
           user_id: effectiveAgentId,
         });
       }
