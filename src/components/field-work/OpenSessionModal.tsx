@@ -17,6 +17,7 @@ export interface OpenSessionInfo {
   property_count?: number | null;
   street_name?: string | null;
   created_at?: string | null;
+  started_at?: string | null;
 }
 
 interface Stats {
