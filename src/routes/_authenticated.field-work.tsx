@@ -498,13 +498,26 @@ function FieldWorkPage() {
       const epi = getEpiWeek(new Date(`${sessionDateStr}T12:00:00`));
 
       const nowIso = new Date().toISOString();
+
+      // ── AUDIT: bloco selecionado ─────────────────────────────────
+      console.log("[NEW_SESSION_SELECTED_BLOCK]", {
+        block_id: selectedBlock?.id ?? null,
+        block_number: selectedBlock?.number ?? null,
+        total_properties: selectedBlock?.total_properties ?? null,
+        boletim_id: (selectedBlock as any)?.properties?.[0]?.boletim_id ?? null,
+      });
+
+      if (!selectedBlock?.id) {
+        console.error("[NEW_SESSION_ABORT]", { reason: "selectedBlock.id ausente — não é permitido criar jornada sem block_id" });
+        toast.error("Quarteirão inválido: id ausente. Recarregue a página.");
+        return;
+      }
+
       const payload = {
         user_id: user.id,
         cycle_id: cycleIdToUse,
         week_id: selectedWeekId,
-        // NOTE: field_work_sessions has no block_id column (schema).
-        // The block relationship is kept via block_number only.
-
+        block_id: selectedBlock.id,
         block_number: selectedBlock?.number || "",
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
@@ -516,10 +529,50 @@ function FieldWorkPage() {
         updated_at: nowIso,
       };
 
-      console.log("[NEW_SESSION_START]", { block_id: selectedBlock?.id || null, block_number: selectedBlock?.number, cycle_id: cycleIdToUse });
-      console.log("[NEW_BLOCK_SELECTED]", { block_id: selectedBlock?.id || null, block_number: selectedBlock?.number });
-      console.log("[WORK_SESSION_CREATE]", { payload });
+      console.log("[NEW_SESSION_CREATE]", { payload });
       const saved = await createOffline("field_work_sessions", payload);
+      console.log("[NEW_SESSION_CREATED]", {
+        session_id: saved?.id,
+        block_id: saved?.block_id,
+        block_number: saved?.block_number,
+        cycle_id: saved?.cycle_id,
+        week_id: saved?.week_id,
+        user_id: saved?.user_id,
+      });
+
+      // ── AUDIT: consulta de imóveis com o mesmo filtro que field-work-list ──
+      try {
+        console.log("[NEW_SESSION_PROPERTIES_QUERY]", {
+          table: "properties",
+          filter: ".eq('block_id', ...)",
+          block_id: saved?.block_id ?? selectedBlock.id,
+        });
+        if (isOnline()) {
+          const { data: propsCheck, error: propsErr } = await supabase
+            .from("properties")
+            .select("id, block_id, block_number, boletim_id")
+            .eq("block_id", selectedBlock.id);
+          if (propsErr) console.warn("[NEW_SESSION_PROPERTIES_ERROR]", propsErr.message);
+          console.log("[NEW_SESSION_PROPERTIES_RESULT]", {
+            count: propsCheck?.length ?? 0,
+            first10: (propsCheck ?? []).slice(0, 10).map((p: any) => ({
+              id: p.id, block_id: p.block_id, block_number: p.block_number, boletim_id: p.boletim_id,
+            })),
+          });
+          console.log("[NEW_SESSION_COMPARE]", {
+            selected: { block_id: selectedBlock.id, block_number: selectedBlock.number },
+            session:  { block_id: saved?.block_id, block_number: saved?.block_number },
+            match: {
+              block_id: selectedBlock.id === saved?.block_id,
+              block_number: String(selectedBlock.number) === String(saved?.block_number),
+            },
+            properties_found: propsCheck?.length ?? 0,
+          });
+        }
+      } catch (e: any) {
+        console.warn("[NEW_SESSION_PROPERTIES_EXC]", e?.message ?? e);
+      }
+
       console.log("[WORK_DEXIE_SAVE]", { id: saved?.id });
       console.log("[WORK_QUEUE]", { table: "field_work_sessions", op: "insert", online: isOnline() });
       console.log("[WORK_READY]", { id: saved?.id, online: isOnline() });
