@@ -561,10 +561,11 @@ function FieldWorkListPage() {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
           const propertyIdSet = new Set(propertyIds);
 
-          // ─── Carregar visitas da JORNADA (RC-6) ─────────────────────
-          // Escopo ESTRITO: field_work_session_id === session.id
-          // Sem heurísticas por data/propriedade/block_number.
-          const inScope = (v: any) => !!v && v.field_work_session_id === session.id;
+          // ─── Carregar visitas dos IMÓVEIS da jornada (RC-7) ─────────
+          // A marcação depende APENAS de visit.property_id === property.id.
+          // Não filtrar por session_id/cycle_id/week_id/status para não
+          // esconder visitas feitas em sessões anteriores no mesmo quarteirão.
+          const inScope = (v: any) => !!v && propertyIdSet.has(String(v.property_id));
 
           const visitColumns = `
             id,
@@ -598,7 +599,7 @@ function FieldWorkListPage() {
                 supabase
                   .from("visits")
                   .select(visitColumns)
-                  .eq("field_work_session_id", session.id)
+                  .in("property_id", propertyIds)
                   .order("visit_date", { ascending: false }) as any,
               filter: inScope,
             });
@@ -607,11 +608,20 @@ function FieldWorkListPage() {
             console.warn("[SESSION_RESTORE_VISITS] fallback empty:", e);
           }
 
-          console.log("[SESSION_RESTORE_VISITS]", {
+          console.log("[VISITS_LOADED]", {
             session_id: session.id,
             count: blockCycleVisits.length,
+            ids: blockCycleVisits.map((v: any) => v.id),
+            property_ids: blockCycleVisits.map((v: any) => v.property_id),
             source: online ? "remote+cache" : "cache",
           });
+
+          console.log("[PROPERTIES_LOADED]", {
+            quantity: propertyIds.length,
+            ids: propertyIds,
+          });
+
+
 
 
           console.log("[RESTORE_VISITS]", {
@@ -678,18 +688,33 @@ function FieldWorkListPage() {
           }
 
           const visitsByProperty = new Map<string, any[]>();
+          const visitedPropertyIds = new Set<string>();
           blockCycleVisits.forEach((visit: any) => {
-            const list = visitsByProperty.get(visit.property_id) || [];
+            const key = String(visit.property_id);
+            const list = visitsByProperty.get(key) || [];
             list.push(visit);
-            visitsByProperty.set(visit.property_id, list);
+            visitsByProperty.set(key, list);
+            visitedPropertyIds.add(key);
           });
 
+          console.log("[VISITED_PROPERTIES]", {
+            size: visitedPropertyIds.size,
+            ids: Array.from(visitedPropertyIds),
+          });
 
           const normalizedProps = props.map(p => {
-            const propertyVisits = visitsByProperty.get(p.id) || [];
+            const key = String(p.id);
+            const propertyVisits = visitsByProperty.get(key) || [];
             const latestVisit = propertyVisits.length > 0
               ? [...propertyVisits].sort((a: any, b: any) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime())[0]
               : null;
+
+            const visited = !!latestVisit;
+            console.log("[PROPERTY_MARK]", {
+              property_id: key,
+              visited,
+              reason: visited ? `visit ${latestVisit.id} (${latestVisit.status})` : "sem visita para property_id",
+            });
 
             return {
               ...p,
@@ -702,12 +727,14 @@ function FieldWorkListPage() {
           });
 
           const markedCount = normalizedProps.filter((p: any) => p.latest_visit).length;
-          console.log("[SESSION_RESTORE_MARKED]", {
+          console.log("[RESTORE_SUMMARY]", {
             session_id: session.id,
-            properties_loaded: normalizedProps.length,
-            properties_marked: markedCount,
-            visits_found: blockCycleVisits.length,
+            imoveis: normalizedProps.length,
+            visitas: blockCycleVisits.length,
+            marcados: markedCount,
+            nao_marcados: normalizedProps.length - markedCount,
           });
+
 
           normalizedProps.sort((a: any, b: any) => {
             const na = parseInt(a.number, 10);
