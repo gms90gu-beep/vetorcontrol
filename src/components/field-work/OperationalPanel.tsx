@@ -264,6 +264,11 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     });
   }, [properties, lastVisitByProp, filter, query]);
 
+  const pendingList = useMemo(
+    () => properties.filter((p) => !lastVisitByProp.get(p.id)),
+    [properties, lastVisitByProp],
+  );
+
   // ── Scroll restore ──────────────────────────────────────────────
   useEffect(() => {
     if (!properties.length) return;
@@ -364,11 +369,16 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
         <div className="grid grid-cols-2 gap-2 mt-4 text-[10px]">
           <MetaItem icon={Calendar} label="Data da produção" value={productionDate} accent />
-          <MetaItem icon={Clock} label="Abertura" value={openedDate} />
+          <MetaItem icon={Home} label="Imóveis" value={String(total)} />
           <MetaItem icon={FlaskConical} label="Ciclo" value={cycle?.number ? `Ciclo ${cycle.number}` : "—"} />
           <MetaItem icon={ClipboardList} label="Semana" value={week?.number ? `Semana ${week.number}/8` : (epi ? `SE ${epi.week}/${epi.year}` : "—")} />
-          <MetaItem icon={Home} label="Imóveis" value={String(total)} />
-          <MetaItem icon={MapPin} label="Localidade" value={session?.street_name || "—"} />
+        </div>
+
+        {/* Ações rápidas */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <QuickAction icon={Calendar} label="Alterar Data" onClick={() => navigate({ to: "/field-work-list" })} />
+          <QuickAction icon={ClipboardList} label="Calendário" onClick={() => navigate({ to: "/calendario-producao" })} />
+          <QuickAction icon={FileText} label="Minhas Jornadas" onClick={() => navigate({ to: "/minhas-jornadas" })} />
         </div>
       </div>
 
@@ -389,52 +399,26 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         </div>
       )}
 
-      {/* ── Progress card (recolhível) ──────────────────────── */}
+      
       <div className="px-4 mt-4">
         <Card className="border-none shadow-lg rounded-3xl overflow-hidden">
-          <CardContent className="p-5">
-            <button
-              onClick={() => setSummaryOpen((s) => !s)}
-              className="w-full flex items-end justify-between mb-2 text-left"
-              aria-label={summaryOpen ? "Recolher resumo" : "Expandir resumo"}
-            >
+          <CardContent className="p-4">
+            <div className="flex items-end justify-between mb-2">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {summaryOpen ? "Progresso da Jornada" : `${total} imóveis · ${stats.visited} visitados · ${stats.pendingCount} pendentes`}
-                </p>
-                {summaryOpen && <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>}
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Progresso da Jornada</p>
+                <p className="text-2xl font-black text-slate-900">{stats.done} / {total}</p>
               </div>
-              <div className="flex items-center gap-2">
-                {summaryOpen && <span className="text-3xl font-black text-blue-600">{progress}%</span>}
-                {summaryOpen ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
-              </div>
-            </button>
+              <span className="text-3xl font-black text-blue-600">{progress}%</span>
+            </div>
             <Progress value={progress} className="h-3" />
-            {summaryOpen && (
-              <div className="grid grid-cols-4 gap-2 mt-4 text-center">
-                <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
-                <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
-                <MiniStat label="Tempo" value={fmtDur(durationMin)} tone="slate" small />
-                <MiniStat label="Média/im." value={stats.done ? `${avgMin}m` : "—"} tone="slate" small />
-              </div>
-            )}
+            <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+              <MiniStat label="Visitados" value={stats.visited} tone="emerald" />
+              <MiniStat label="Pendentes" value={stats.pendingCount} tone="amber" />
+              <MiniStat label="Concluído" value={`${progress}%`} tone="slate" small />
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* ── Summary cards ───────────────────────────────────── */}
-      {summaryOpen && (
-        <div className="px-4 mt-4 grid grid-cols-4 gap-2">
-          <SumCard icon={Home} label="Imóveis" value={total} color="text-slate-700" />
-          <SumCard icon={CheckCircle2} label="Visitados" value={stats.visited} color="text-emerald-600" />
-          <SumCard icon={AlertTriangle} label="Pendentes" value={stats.pendingCount} color="text-amber-600" />
-          <SumCard icon={DoorClosed} label="Fechados" value={stats.closed} color="text-slate-600" />
-          <SumCard icon={XCircle} label="Recusas" value={stats.refused} color="text-red-600" />
-          <SumCard icon={Bug} label="Focos" value={stats.focus} color="text-red-500" />
-          <SumCard icon={FlaskConical} label="Depósitos" value={stats.depositos} color="text-purple-600" />
-          <SumCard icon={Droplets} label="Larvicida" value={`${stats.larvicida}g`} color="text-blue-600" small />
-        </div>
-      )}
 
       {/* ── Filters + search ────────────────────────────────── */}
       <div className="px-4 mt-5 space-y-3">
@@ -529,9 +513,13 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <div className="max-w-3xl mx-auto grid grid-cols-5 gap-1 px-2 py-2">
           <BottomAction Icon={MapIcon} label="Mapa" onClick={() => setMapOpen(true)} />
-          <BottomAction Icon={ClipboardList} label="Resumo" onClick={() => navigate({ to: "/field-work-list" })} />
           <BottomAction Icon={FileText} label="RG" onClick={() => navigate({ to: "/rg" })} />
-          <BottomAction Icon={Plus} label="Add. Imóvel" onClick={() => navigate({ to: "/field-work-list" })} />
+          <BottomAction Icon={ChevronUp} label="Anterior" onClick={() => {
+            const p = pendingList[0]; if (p) goToProperty(p.id);
+          }} />
+          <BottomAction Icon={ChevronDown} label="Próximo" onClick={() => {
+            const p = pendingList[0]; if (p) goToProperty(p.id);
+          }} />
           <BottomAction Icon={CheckCircle2} label="Finalizar" primary onClick={() => (onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list" }))} />
         </div>
       </div>
@@ -657,6 +645,18 @@ function statusChip(status?: string | null, visited?: boolean) {
     case "abandoned": return { label: "Abandonado", cls: "bg-amber-100 text-amber-700" };
     default: return { label: status || "—", cls: "bg-slate-100 text-slate-600" };
   }
+}
+
+function QuickAction({ icon: Icon, label, onClick }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center gap-1.5 rounded-xl bg-white/10 border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest text-white active:scale-95 transition"
+    >
+      <Icon className="h-3.5 w-3.5" />
+      <span className="truncate">{label}</span>
+    </button>
+  );
 }
 
 function fmtDur(min: number) {
