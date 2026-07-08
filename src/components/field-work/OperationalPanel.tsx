@@ -364,11 +364,16 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
         <div className="grid grid-cols-2 gap-2 mt-4 text-[10px]">
           <MetaItem icon={Calendar} label="Data da produção" value={productionDate} accent />
-          <MetaItem icon={Clock} label="Abertura" value={openedDate} />
+          <MetaItem icon={Home} label="Imóveis" value={String(total)} />
           <MetaItem icon={FlaskConical} label="Ciclo" value={cycle?.number ? `Ciclo ${cycle.number}` : "—"} />
           <MetaItem icon={ClipboardList} label="Semana" value={week?.number ? `Semana ${week.number}/8` : (epi ? `SE ${epi.week}/${epi.year}` : "—")} />
-          <MetaItem icon={Home} label="Imóveis" value={String(total)} />
-          <MetaItem icon={MapPin} label="Localidade" value={session?.street_name || "—"} />
+        </div>
+
+        {/* Ações rápidas */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <QuickAction icon={Calendar} label="Alterar Data" onClick={() => navigate({ to: "/field-work-list" })} />
+          <QuickAction icon={ClipboardList} label="Calendário" onClick={() => navigate({ to: "/calendario-producao" })} />
+          <QuickAction icon={FileText} label="Minhas Jornadas" onClick={() => navigate({ to: "/minhas-jornadas" })} />
         </div>
       </div>
 
