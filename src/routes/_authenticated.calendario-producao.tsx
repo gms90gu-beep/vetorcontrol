@@ -58,8 +58,8 @@ function ProductionCalendarPage() {
 
   useEffect(() => {
     (async () => {
-      const u = await safeGetUser();
-      if (u?.id) setUserId(u.id);
+      const res = await safeGetUser();
+      if (res.data.user?.id) setUserId(res.data.user.id);
     })();
   }, []);
 
