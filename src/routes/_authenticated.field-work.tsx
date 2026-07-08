@@ -435,6 +435,7 @@ function FieldWorkPage() {
         street_name: "Logradouro",
         property_count: selectedBlock?.total_properties || 0,
         session_date: sessionDateStr,
+        started_at: nowIso,
         status: "in_progress",
         is_retroactive: isRetroactive,
         retroactive_reason: isRetroactive ? retroactiveReason : null,
@@ -442,6 +443,8 @@ function FieldWorkPage() {
         updated_at: nowIso,
       };
 
+      console.log("[SESSION_PRODUCTION_DATE]", { session_date: sessionDateStr });
+      console.log("[SESSION_STARTED_AT]", { started_at: nowIso });
       console.log("[NEW_SESSION_CREATE]", { payload });
       const saved = await createOffline("field_work_sessions", payload);
       console.log("[NEW_SESSION_CREATED]", {
