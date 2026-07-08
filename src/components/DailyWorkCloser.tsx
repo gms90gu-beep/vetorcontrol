@@ -365,6 +365,16 @@ export function DailyWorkCloser({
           .gte("visit_date", startOfDay.toISOString())
           .lte("visit_date", endOfDay.toISOString());
         
+        // === INSTRUMENTAÇÃO: comparar fontes do resumo ===
+        console.log("[SESSION_SUMMARY_INPUT]", {
+          session_id: activeSession?.id ?? null,
+          op_date: opDateStr,
+          block_id: (activeSession as any)?.block_id ?? null,
+          block_number: (activeSession as any)?.block_number ?? null,
+          supabase_visits_count: todayVisits?.length ?? 0,
+          supabase_visits_ids: (todayVisits || []).map((v: any) => v.id),
+        });
+
         // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
         const snap = await buildDailySnapshot(user.id, opDateStr, {
           sessionId: activeSession?.id ?? null,
@@ -373,6 +383,56 @@ export function DailyWorkCloser({
           startedAt: (activeSession as any)?.created_at ?? null,
         });
         setSnapshot(snap);
+
+        // Cálculo paralelo direto do Supabase (mesma fórmula do Dashboard)
+        const dashClosed = (todayVisits || []).filter((v: any) => v.status === "closed").length;
+        const dashRefused = (todayVisits || []).filter((v: any) => v.status === "refused").length;
+        const dashFocus = (todayVisits || []).filter((v: any) => v.has_focus).length;
+        const dashLarvicida = Math.round((todayVisits || []).reduce((s: number, v: any) => s + Number(v.treatment_amount || 0), 0));
+        const dashTreatedDep = (todayVisits || []).reduce((s: number, v: any) => s + Number(v.treated_deposits || 0), 0);
+        const dashEliminated = (todayVisits || []).reduce((s: number, v: any) => s + Number(v.elimination_amount || 0), 0);
+
+        console.log("[SESSION_SUMMARY_CALC]", {
+          source: "dexie/buildDailySnapshot",
+          trabalhados: snap.workedCount,
+          fechados: snap.closedCount,
+          recusas: snap.refusedCount,
+          pendencias: snap.pendingLocal,
+          depositos_tratados: snap.depTreated,
+          depositos_eliminados: snap.depEliminated,
+          focos: snap.focusCount,
+          larvicida: snap.larvicideAmount,
+          tipos: snap.depByType,
+        });
+        console.log("[DASHBOARD_SUMMARY]", {
+          source: "supabase/visits",
+          trabalhados: todayVisits?.length ?? 0,
+          fechados: dashClosed,
+          recusas: dashRefused,
+          focos: dashFocus,
+          depositos_tratados: dashTreatedDep,
+          depositos_eliminados: dashEliminated,
+          larvicida: dashLarvicida,
+        });
+        console.log("[SUMMARY_COMPARE]", {
+          trabalhados: { jornada: snap.workedCount, dashboard: todayVisits?.length ?? 0 },
+          fechados:    { jornada: snap.closedCount, dashboard: dashClosed },
+          recusas:     { jornada: snap.refusedCount, dashboard: dashRefused },
+          focos:       { jornada: snap.focusCount,   dashboard: dashFocus },
+          dep_tratados:{ jornada: snap.depTreated,   dashboard: dashTreatedDep },
+          larvicida:   { jornada: snap.larvicideAmount, dashboard: dashLarvicida },
+        });
+        console.log("[SUMMARY_FUNCTION]", {
+          jornada:   { fn: "buildDailySnapshot", file: "src/components/DailyWorkCloser.tsx", line: 100 },
+          dashboard: { fn: "AgentDashboard useEffect", file: "src/components/agent/AgentDashboard.tsx", line: 85 },
+        });
+        console.log("[SUMMARY_SOURCE]", {
+          jornada: "dexie (listLocal 'visits' + 'visit_deposits')",
+          dashboard: "supabase.visits (Data API)",
+          note: snap.workedCount === 0 && (todayVisits?.length ?? 0) > 0
+            ? "⚠️ worked cai no fallback Supabase; demais campos permanecem 0 pois vêm só do snapshot Dexie — Dexie não tem visitas para a jornada"
+            : "sem fallback",
+        });
 
         setLocalStats({
           worked: snap.workedCount || (todayVisits?.length ?? 0),
