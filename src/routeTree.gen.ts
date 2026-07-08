@@ -37,6 +37,7 @@ import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
 import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenticated.coordenacao'
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
+import { Route as AuthenticatedCalendarioProducaoRouteImport } from './routes/_authenticated.calendario-producao'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
@@ -201,6 +202,12 @@ const AuthenticatedCampoRoute = AuthenticatedCampoRouteImport.update({
   path: '/campo',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCalendarioProducaoRoute =
+  AuthenticatedCalendarioProducaoRouteImport.update({
+    id: '/calendario-producao',
+    path: '/calendario-producao',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
   id: '/agente',
   path: '/agente',
@@ -317,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
@@ -363,6 +371,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/coordenador': typeof AuthenticatedCoordenadorRoute
@@ -412,6 +421,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/_authenticated/agente': typeof AuthenticatedAgenteRoute
+  '/_authenticated/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/_authenticated/campo': typeof AuthenticatedCampoRoute
   '/_authenticated/coordenacao': typeof AuthenticatedCoordenacaoRoute
   '/_authenticated/coordenador': typeof AuthenticatedCoordenadorRoute
@@ -462,6 +472,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
     | '/coordenador'
@@ -508,6 +519,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
     | '/coordenador'
@@ -556,6 +568,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/_authenticated/agente'
+    | '/_authenticated/calendario-producao'
     | '/_authenticated/campo'
     | '/_authenticated/coordenacao'
     | '/_authenticated/coordenador'
@@ -804,6 +817,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/calendario-producao': {
+      id: '/_authenticated/calendario-producao'
+      path: '/calendario-producao'
+      fullPath: '/calendario-producao'
+      preLoaderRoute: typeof AuthenticatedCalendarioProducaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/agente': {
       id: '/_authenticated/agente'
       path: '/agente'
@@ -949,6 +969,7 @@ const AuthenticatedRgRouteWithChildren = AuthenticatedRgRoute._addFileChildren(
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
+  AuthenticatedCalendarioProducaoRoute: typeof AuthenticatedCalendarioProducaoRoute
   AuthenticatedCampoRoute: typeof AuthenticatedCampoRoute
   AuthenticatedCoordenacaoRoute: typeof AuthenticatedCoordenacaoRoute
   AuthenticatedCoordenadorRoute: typeof AuthenticatedCoordenadorRoute
@@ -989,6 +1010,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
+  AuthenticatedCalendarioProducaoRoute: AuthenticatedCalendarioProducaoRoute,
   AuthenticatedCampoRoute: AuthenticatedCampoRoute,
   AuthenticatedCoordenacaoRoute: AuthenticatedCoordenacaoRoute,
   AuthenticatedCoordenadorRoute: AuthenticatedCoordenadorRoute,
