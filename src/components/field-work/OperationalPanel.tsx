@@ -647,6 +647,18 @@ function statusChip(status?: string | null, visited?: boolean) {
   }
 }
 
+function QuickAction({ icon: Icon, label, onClick }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center gap-1.5 rounded-xl bg-white/10 border border-white/15 py-2 text-[10px] font-black uppercase tracking-widest text-white active:scale-95 transition"
+    >
+      <Icon className="h-3.5 w-3.5" />
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
 function fmtDur(min: number) {
   if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
