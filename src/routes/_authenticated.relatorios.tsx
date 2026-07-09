@@ -55,6 +55,18 @@ import {
   shareBlobViaWhatsApp,
 } from "@/components/reports/DailyReportGenerator";
 import { AgentReportsSimple } from "@/components/agent/AgentReportsSimple";
+import { useServerFn } from "@tanstack/react-start";
+import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
@@ -62,6 +74,10 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 
 function RelatoriosPage() {
   const { userRole } = useOperationalDate();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
+  const rebuildFn = useServerFn(rebuildDailyRecords);
+
   if (!userRole)
     return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
@@ -69,27 +85,80 @@ function RelatoriosPage() {
   const isSupervisor = userRole === "supervisor";
   const isCoordinator = userRole === "coordenador";
   const isAdmin = userRole === "admin_master";
+  const canRebuild = isSupervisor || isCoordinator || isAdmin;
+
+  const handleRebuild = async () => {
+    setConfirmOpen(false);
+    setRebuilding(true);
+    const today = new Date();
+    const to = today.toISOString().slice(0, 10);
+    const fromDate = new Date(today);
+    fromDate.setDate(fromDate.getDate() - 90);
+    const from = fromDate.toISOString().slice(0, 10);
+    console.log("[PRODUCTION_INTEGRITY_START]", { from, to });
+    try {
+      const res = await rebuildFn({ data: { from, to } });
+      console.log("[PRODUCTION_INTEGRITY_FINISH]", res);
+      toast.success(
+        `Reconstrução concluída — ${res.updated}/${res.scanned} diária(s) atualizada(s).`,
+      );
+    } catch (e: any) {
+      console.error("[PRODUCTION_INTEGRITY_ERROR]", e);
+      toast.error(`Falha na reconstrução: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setRebuilding(false);
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6 pb-24 animate-in fade-in duration-500">
-      <header className="space-y-1">
-        <Badge className="bg-blue-600 text-white font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md">
-          Módulo de Relatórios
-        </Badge>
-        <h1 className="text-3xl font-black tracking-tight text-slate-900">
-          Relatórios
-        </h1>
-        <p className="text-sm text-slate-500 font-medium">
-          {isAgent && "Histórico operacional, auditoria e geração de PDFs."}
-          {(isSupervisor || isAdmin) &&
-            "Relatórios da equipe — por agente, área e pendências."}
-          {isCoordinator && "Relatórios municipais e boletins oficiais."}
-        </p>
+      <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="space-y-1">
+          <Badge className="bg-blue-600 text-white font-black text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-md">
+            Módulo de Relatórios
+          </Badge>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">
+            Relatórios
+          </h1>
+          <p className="text-sm text-slate-500 font-medium">
+            {isAgent && "Histórico operacional, auditoria e geração de PDFs."}
+            {(isSupervisor || isAdmin) &&
+              "Relatórios da equipe — por agente, área e pendências."}
+            {isCoordinator && "Relatórios municipais e boletins oficiais."}
+          </p>
+        </div>
+        {canRebuild && (
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            disabled={rebuilding}
+            variant="outline"
+            className="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-2xl h-12 px-5 font-black text-xs uppercase tracking-widest shadow-sm"
+          >
+            <RotateCw className={`mr-2 h-4 w-4 ${rebuilding ? "animate-spin" : ""}`} />
+            {rebuilding ? "Reconstruindo…" : "Reconstruir Relatórios"}
+          </Button>
+        )}
       </header>
 
       {isAgent && <AgentReportsSimple />}
       {(isSupervisor || isAdmin) && <SupervisorReports />}
       {isCoordinator && <CoordinatorReports />}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reconstruir os resumos da produção?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá recalcular os Daily Work Records utilizando as visitas
+              existentes dos últimos 90 dias.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRebuild}>Reconstruir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
