@@ -101,10 +101,17 @@ export function AgentReportsSimple() {
     })();
   }, [fetchDailies]);
 
+  // Usa a diária de hoje quando existir; caso contrário, a mais recente encerrada.
+  // Evita "Sem boletim hoje" quando o agente encerrou jornadas em dias anteriores.
   const todayRecord = useMemo(
-    () => dailies.find((d) => d.work_date === today) || null,
+    () =>
+      dailies.find((d) => d.work_date === today) ||
+      dailies.find((d) => d.status === "completed") ||
+      dailies[0] ||
+      null,
     [dailies, today]
   );
+  const isTodayRecord = todayRecord?.work_date === today;
 
   const weekRecords = useMemo(
     () =>
@@ -126,6 +133,7 @@ export function AgentReportsSimple() {
     tubitos: Number(todayRecord?.tubitos_collected || 0),
     larvicide: Number(todayRecord?.larvicide_amount || 0),
   };
+
 
   const weekStats = {
     worked: sum(weekRecords, "properties_worked"),
