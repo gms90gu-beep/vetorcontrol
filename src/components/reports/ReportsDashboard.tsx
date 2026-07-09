@@ -273,19 +273,32 @@ export function ReportsDashboard() {
           <p className="text-sm font-bold text-slate-500 mt-1">Dashboards analíticos e cobertura territorial</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
+          {(isSupervisor || isAdminMaster) && (
+            <Button
+              onClick={handleRebuild}
+              disabled={rebuilding}
+              variant="outline"
+              className="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-2xl h-14 px-6 font-black text-xs uppercase tracking-widest shadow-sm transition-all active:scale-95"
+              title="Recalcula totais do DWR a partir de visits/visit_deposits"
+            >
+              <RotateCw className={`mr-2 h-4 w-4 ${rebuilding ? "animate-spin" : ""}`} />
+              {rebuilding ? "Reconstruindo…" : "Reconstruir Relatórios"}
+            </Button>
+          )}
+          <Button
             onClick={handleExportPDF}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-14 px-8 font-black shadow-xl shadow-slate-200 transition-all active:scale-95 text-xs uppercase tracking-widest"
           >
             <Printer className="mr-2 h-4 w-4" /> Exportar Relatório
           </Button>
-          <Button 
+          <Button
             variant="outline"
             className="border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl h-14 w-14 p-0 flex items-center justify-center shadow-md transition-all active:scale-95"
           >
             <Share2 className="h-5 w-5" />
           </Button>
         </div>
+
       </div>
 
       <ReportsFilters onFilterChange={setFilters} className="reports-filters" />
