@@ -51,19 +51,9 @@ function typeLabel(t?: string | null) {
   return map[t] || t;
 }
 
-// Ordenação inteligente: número, sequência, complemento (natural)
-function smartCompare(a: any, b: any) {
-  const na = parseInt(String(a.number ?? "").replace(/\D/g, ""), 10);
-  const nb = parseInt(String(b.number ?? "").replace(/\D/g, ""), 10);
-  const nA = isNaN(na) ? Number.MAX_SAFE_INTEGER : na;
-  const nB = isNaN(nb) ? Number.MAX_SAFE_INTEGER : nb;
-  if (nA !== nB) return nA - nB;
-  const sa = a.sequence ?? 0;
-  const sb = b.sequence ?? 0;
-  if (sa !== sb) return sa - sb;
-  const ca = String(a.complement ?? "").localeCompare(String(b.complement ?? ""), "pt-BR", { numeric: true, sensitivity: "base" });
-  return ca;
-}
+// Ordenação operacional canônica — número, sequência, complemento.
+// Nunca considerar tipo do imóvel. Fonte única em @/lib/property-order.
+const smartCompare = comparePropertyOrder;
 
 interface Props {
   session: any;
