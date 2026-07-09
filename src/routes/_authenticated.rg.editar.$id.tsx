@@ -297,9 +297,8 @@ function EditarBoletim() {
     const sorted = [...visiveis].sort((a, b) => {
       if (a._new && !b._new) return 1;
       if (!a._new && b._new) return -1;
-      const na = parseInt(a.number, 10) || 0;
-      const nb = parseInt(b.number, 10) || 0;
-      return na - nb;
+      console.log("[PROPERTY_ORDER_SOURCE]", { screen: "rg.editar", file: "src/routes/_authenticated.rg.editar.$id.tsx", fn: "comparePropertyOrder" });
+      return comparePropertyOrder(a as any, b as any);
     });
     return [...sorted, ...deletados];
   }
