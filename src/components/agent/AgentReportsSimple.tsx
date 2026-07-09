@@ -328,7 +328,7 @@ export function AgentReportsSimple() {
         </h3>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={handleDailyPdf}
+            onClick={() => handleDailyPdf()}
             variant="outline"
             className="rounded-xl h-11 px-4 font-bold text-xs uppercase tracking-wide border-slate-200"
           >
