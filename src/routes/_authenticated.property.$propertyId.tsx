@@ -261,48 +261,20 @@ function PropertyVisitPage() {
 
       const all = allPropsRaw || [];
 
-      const norm = (s: any) => String(s ?? "").trim().toLowerCase();
-      const numKey = (n: any) => {
-        const v = parseInt(String(n ?? "").replace(/\D/g, ""), 10);
-        return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
-      };
-      const seqKey = (s: any) => {
-        if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
-        const v = Number(s);
-        return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
-      };
-
-      const sorted = [...all].sort((a, b) => {
-        const sa = seqKey(a.sequence);
-        const sb = seqKey(b.sequence);
-        if (sa !== sb) return sa - sb;
-        const ra = norm(a.street_name);
-        const rb = norm(b.street_name);
-        if (ra !== rb) return ra < rb ? -1 : 1;
-        const na = numKey(a.number);
-        const nb = numKey(b.number);
-        if (na !== nb) return na - nb;
-        const ca = norm(a.complement);
-        const cb = norm(b.complement);
-        if (ca !== cb) return ca < cb ? -1 : 1;
-        return String(a.id).localeCompare(String(b.id));
-      });
+      // Ordenação operacional canônica — nunca considera tipo do imóvel.
+      const sorted = sortPropertiesOperational(all);
 
       const currentIndex = sorted.findIndex((p) => p.id === propertyId);
-
-      // Logs temporários de diagnóstico de navegação
-      console.log("[Navegação] Quarteirão:", property.block_number, "| total imóveis:", sorted.length);
-      console.log("[Navegação] Imóvel atual:", {
-        id: property.id,
-        number: property.number,
-        sequence: property.sequence,
-        street: property.street_name,
-        index: currentIndex + 1,
-      });
       const prev = currentIndex > 0 ? sorted[currentIndex - 1] : null;
       const next = currentIndex >= 0 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
-      console.log("[Navegação] Anterior:", prev && { id: prev.id, number: prev.number, street: prev.street_name });
-      console.log("[Navegação] Próximo:", next && { id: next.id, number: next.number, street: next.street_name });
+
+      console.log("[PROPERTY_NAVIGATION]", {
+        block_number: property.block_number,
+        total: sorted.length,
+        current: { id: property.id, number: property.number, sequence: property.sequence, complement: property.complement, index: currentIndex + 1 },
+        prev: prev && { id: prev.id, number: prev.number, sequence: prev.sequence, complement: prev.complement },
+        next: next && { id: next.id, number: next.number, sequence: next.sequence, complement: next.complement },
+      });
 
       if (currentIndex !== -1) {
         setPropertyIndex({
