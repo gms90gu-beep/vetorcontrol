@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocoding.functions";
 import { StreetAutocomplete } from "@/components/rg/StreetAutocomplete";
+import { comparePropertyOrder } from "@/lib/property-order";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
   component: EditarBoletim,
