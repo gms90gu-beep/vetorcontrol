@@ -93,20 +93,38 @@ export function FirstVisitStreetPrompt({
         accuracy: (useCoords as any).accuracy ?? null,
       });
 
-      // Reverse geocoding
+      // Reverse geocoding (a localização já está salva; logradouro é complementar)
+      console.log("[REVERSE_GEOCODE_START]", {
+        latitude: useCoords.latitude,
+        longitude: useCoords.longitude,
+      });
       const r = await detectFromGPS(useCoords);
       if (r.street) {
         setDetected(r.street);
         setManual(r.street);
-        console.log("[GPS_AUTOSTREET_FILLED]", {
-          street: r.street,
-          source: r.source,
-          latitude: useCoords.latitude,
-          longitude: useCoords.longitude,
+        console.log("[REVERSE_GEOCODE_SUCCESS]", {
+          logradouro: r.street,
+          bairro: r.neighborhood,
+          cidade: r.city,
         });
+        console.log("[GPS_FALLBACK]", { origem: r.source === "cache" ? "Cache" : "API" });
         toast.success(`Rua detectada: ${r.street}`);
       } else {
-        toast.info("Não foi possível detectar a rua pelo GPS agora.");
+        console.warn("[REVERSE_GEOCODE_FAIL]", { reason: "no_address" });
+        // Fallback: logradouro anterior do mesmo quarteirão
+        const previous = info?.currentStreet || info?.history?.[0] || null;
+        if (previous) {
+          setDetected(previous);
+          setManual(previous);
+          console.log("[GPS_FALLBACK]", { origem: "Logradouro do quarteirão", street: previous });
+          toast.info(
+            `Localização obtida. Logradouro provável (histórico do quarteirão): ${previous}. Confirme ou capture novamente.`,
+          );
+        } else {
+          toast.info(
+            "Localização obtida com sucesso. Não foi possível identificar o logradouro neste momento — tentaremos novamente quando houver conexão.",
+          );
+        }
       }
     } finally {
       setDetecting(false);
