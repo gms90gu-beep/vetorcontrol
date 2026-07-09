@@ -123,7 +123,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
           .order("sequence", { ascending: true, nullsFirst: false }) as any,
         filter: (p) => p.block_id === session.block_id,
       });
-      const sorted = [...(props || [])].sort(smartCompare);
+      const sorted = sortPropertiesOperational(props || []);
       setProperties(sorted);
       try { sessionStorage.setItem(`op_panel_order_${session.block_id}`, JSON.stringify(sorted.map((p) => p.id))); } catch {}
 
