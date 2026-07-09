@@ -1,46 +1,39 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
-import { useState, useEffect } from "react";
-import { 
-  Search, 
-  MapPin, 
-  ChevronRight, 
+import { useState, useEffect, useMemo } from "react";
+import {
+  Search,
+  MapPin,
   Calendar as CalendarIcon,
   CheckCircle2,
   Users,
   Building2,
-  Clock,
-  ArrowRight,
-  Info,
   Layers,
   CalendarDays,
-  Plus,
-  ChevronDown
+  ChevronDown,
+  ArrowRight,
+  Loader2,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { useFieldWorkRecords } from "@/hooks/useOfflineData";
-import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { useOperationalDate } from "@/hooks/useOperationalDate";
-import { translate } from "@/lib/translations";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DailyWorkCloser } from "@/components/DailyWorkCloser";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { AlertTriangle } from "lucide-react";
 import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 
@@ -49,666 +42,365 @@ export const Route = createFileRoute("/_authenticated/field-work")({
   component: FieldWorkPage,
 });
 
-/** Número máximo de dias retroativos permitidos para "Data da Produção". */
+/** Máximo de dias retroativos permitidos para "Data da Produção". */
 const MAX_RETROACTIVE_DAYS = 5;
 
+function toDateOnly(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 async function autoRecoverSession(sessionId: string) {
-  if (!isOnline()) {
-    console.log("[SESSION_AUTO_RECOVER_START]", { session: sessionId, skipped: "offline" });
-    return;
-  }
+  if (!isOnline()) return;
   try {
-    console.log("[SESSION_AUTO_RECOVER_START]", { session: sessionId });
-    const { data, error } = await supabase.rpc("recover_session_visits" as any, { _session_id: sessionId });
-    if (error) {
-      console.warn("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, error: error.message });
-      return;
-    }
-    const status = (data as any)?.status;
-    if (status === "not_needed") {
-      console.log("[SESSION_AUTO_RECOVER_NOT_NEEDED]", { session: sessionId });
-    } else {
-      console.log("[SESSION_AUTO_RECOVER_FOUND]", { session: sessionId, updated: (data as any)?.updated });
-      if ((data as any)?.updated > 0) {
-        console.log("[SESSION_AUTO_RECOVER_UPDATED]", { session: sessionId, updated: (data as any).updated });
-      }
-      if ((data as any)?.dwr_generated) {
-        console.log("[SESSION_AUTO_RECOVER_DWR]", { session: sessionId, dwr_generated: true });
-      }
-    }
-    console.log("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, result: data });
+    await supabase.rpc("recover_session_visits" as any, { _session_id: sessionId });
   } catch (e: any) {
-    console.warn("[SESSION_AUTO_RECOVER_FINISH]", { session: sessionId, error: e?.message });
+    console.warn("[SESSION_AUTO_RECOVER_FINISH]", { sessionId, error: e?.message });
   }
 }
 
 function FieldWorkPage() {
+  const navigate = useNavigate();
+
+  const [userId, setUserId] = useState<string | undefined>(undefined);
   const [date, setDate] = useState<Date>(new Date());
   const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [selectedCycleId, setSelectedCycleId] = useState<string>("");
-  const [selectedWeekId, setSelectedWeekId] = useState<string>("");
-  const [cycles, setCycles] = useState<any[]>([]);
-  const [weeks, setWeeks] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
-  // Jornada Retroativa
-  const [retroOpen, setRetroOpen] = useState(false);
-  const [retroDate, setRetroDate] = useState<Date | undefined>(undefined);
-  const [retroReason, setRetroReason] = useState<string>("");
-  const [retroOtherText, setRetroOtherText] = useState<string>("");
-  const [isRetroactive, setIsRetroactive] = useState(false);
-  const [retroactiveReason, setRetroactiveReason] = useState<string | null>(null);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+
+  // Ciclo/Semana calculados automaticamente pela data
+  const [autoCycle, setAutoCycle] = useState<any | null>(null);
+  const [autoWeek, setAutoWeek] = useState<any | null>(null);
+  const [computing, setComputing] = useState(false);
+
+  // Jornada ativa (renderiza o painel)
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [checkingBoot, setCheckingBoot] = useState(true);
+
+  // Modal "jornada já existente"
   const [openSession, setOpenSession] = useState<OpenSessionInfo | null>(null);
   const [openSessionModal, setOpenSessionModal] = useState(false);
-  const navigate = useNavigate();
-  const { allowWeekend } = useOperationalDate();
+  const [starting, setStarting] = useState(false);
 
-  const [userId, setUserId] = useState<string | undefined>(undefined);
-  const { data, loading, error } = useFieldWorkRecords(userId);
-
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await safeGetUser();
-      if (user) setUserId(user.id);
-    })();
-  }, []);
-
-  // ── Fase 1: painel operacional quando existe jornada em andamento ──
-  const [activeSession, setActiveSession] = useState<any | null>(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  // Inicialização: usuário + blocos
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await safeGetUser();
-        if (!user) { setCheckingSession(false); return; }
-        if (isOnline()) {
-          const { data } = await supabase
-            .from("field_work_sessions")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("status", "in_progress")
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (data) setActiveSession(data);
-        } else {
-          const { listLocal } = await import("@/lib/offline/repos");
-          const local = await listLocal<any>("field_work_sessions", (s: any) =>
-            s.user_id === user.id && s.status === "in_progress");
-          const sorted = [...(local || [])].sort((a: any, b: any) =>
-            String(b.created_at || "").localeCompare(String(a.created_at || "")));
-          if (sorted[0]) setActiveSession(sorted[0]);
-        }
+        if (!user) return;
+        setUserId(user.id);
+        await fetchBlocks(user.id);
       } finally {
-        setCheckingSession(false);
+        setCheckingBoot(false);
       }
     })();
   }, []);
 
+  // Ao trocar data, recalcula ciclo + semana
   useEffect(() => {
-    fetchInitialData();
-  }, []);
+    if (!date) return;
+    void computeCycleWeek(date);
+  }, [date]);
 
-
-  async function fetchInitialData() {
-    setIsLoading(true);
-    const online = isOnline();
+  async function computeCycleWeek(d: Date) {
+    setComputing(true);
     try {
-      // Fetch cycles (offline-first)
+      const iso = toDateOnly(d);
+      // Ciclo por intervalo start_date <= data <= end_date
       const cyclesData = await listRemoteOrCache<any>({
         name: "cycles",
         remote: () =>
-          supabase
-            .from("cycles")
-            .select("*")
-            .eq("year", new Date().getFullYear())
-            .order("number", { ascending: true }) as any,
-        filter: (c) => c.year === new Date().getFullYear(),
+          supabase.from("cycles").select("*").order("year", { ascending: false }).order("number", { ascending: true }) as any,
       });
+      const cycle = (cyclesData || []).find(
+        (c: any) => c.start_date && c.end_date && c.start_date <= iso && iso <= c.end_date,
+      ) || null;
+      setAutoCycle(cycle);
 
-      let activeCycleId: string | null = null;
-      if (cyclesData?.length) {
-        const sorted = [...cyclesData].sort((a, b) => (a.number || 0) - (b.number || 0));
-        setCycles(sorted);
-        const activeCycle = sorted.find((c: any) => c.status === "in_progress") || sorted[0];
-        if (activeCycle) {
-          activeCycleId = activeCycle.id;
-          setSelectedCycleId(activeCycle.id);
-          fetchWeeks(activeCycle.id);
-        }
-      }
-
-      // Only show blocks that have properties linked to a boletim RG
-      // belonging to the CURRENT agent.
-      const { data: { user: currentUser } } = await safeGetUser();
-      console.log("[NEW_JOURNEY_DEBUG]", {
-        stage: "start",
-        user_id: currentUser?.id ?? null,
-        cycle_id: activeCycleId,
-        online,
-      });
-      if (currentUser) {
-        const myBoletins = await listRemoteOrCache<any>({
-          name: "boletins_rg",
+      if (cycle) {
+        const weeksData = await listRemoteOrCache<any>({
+          name: "weeks",
           remote: () =>
-            supabase.from("boletins_rg").select("id, agent_id").eq("agent_id", currentUser.id) as any,
-          filter: (b) => b.agent_id === currentUser.id,
+            supabase.from("weeks").select("*").eq("cycle_id", cycle.id).order("number", { ascending: true }) as any,
+          filter: (w) => w.cycle_id === cycle.id,
         });
-
-        const boletimIds = (myBoletins ?? []).map((b: any) => b.id);
-        console.log("[NEW_JOURNEY_DEBUG]", {
-          stage: "boletins",
-          count: boletimIds.length,
-          ids: boletimIds,
-          source: online ? "supabase+cache" : "dexie",
-        });
-
-        if (boletimIds.length === 0) {
-          console.warn("[NEW_JOURNEY_DEBUG]", { stage: "no-boletins", note: "agent has no RG assigned" });
-          setBlocks([]);
-        } else {
-          let blocksData: any[] = await listRemoteOrCache<any>({
-            name: "blocks",
-            remote: () =>
-              supabase
-                .from("blocks")
-                .select(`*, properties!inner(id, boletim_id)`)
-                .in("properties.boletim_id", boletimIds)
-                .order("number", { ascending: true }) as any,
-          });
-
-          let source: "remote-join" | "dexie-cache" | "supabase-fallback" = online ? "remote-join" : "dexie-cache";
-
-          // Fallback: if the primary query returned nothing and we're online,
-          // rebuild the block list from properties → block_id (avoids
-          // Supabase embedded-filter quirks and stale/empty Dexie caches).
-          if (online && (!blocksData || blocksData.length === 0)) {
-            console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-empty-primary", trying: "supabase-fallback" });
-            const { data: props, error: propsErr } = await supabase
-              .from("properties")
-              .select("block_id, boletim_id")
-              .in("boletim_id", boletimIds);
-            if (propsErr) console.warn("[NEW_JOURNEY_DEBUG]", { stage: "props-error", error: propsErr.message });
-            const blockIds = Array.from(new Set((props ?? []).map((p: any) => p.block_id).filter(Boolean)));
-            console.log("[NEW_JOURNEY_DEBUG]", { stage: "fallback-props", properties: props?.length ?? 0, unique_blocks: blockIds.length });
-            if (blockIds.length > 0) {
-              const { data: bl, error: blErr } = await supabase
-                .from("blocks")
-                .select("*")
-                .in("id", blockIds)
-                .order("number", { ascending: true });
-              if (blErr) console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-fallback-error", error: blErr.message });
-              blocksData = bl ?? [];
-              source = "supabase-fallback";
-            }
-          }
-
-          if (blocksData) {
-            const seen = new Set<string>();
-            const uniq = blocksData.filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
-            uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
-            console.log("[NEW_JOURNEY_DEBUG]", {
-              stage: "blocks-final",
-              total: uniq.length,
-              source,
-              numbers: uniq.map((b: any) => b.number).slice(0, 30),
-            });
-            setBlocks(uniq);
-          } else {
-            console.warn("[NEW_JOURNEY_DEBUG]", { stage: "blocks-null", source });
-            setBlocks([]);
-          }
-        }
+        const wk = (weeksData || []).find(
+          (w: any) => w.start_date <= iso && iso <= w.end_date,
+        ) || null;
+        setAutoWeek(wk);
       } else {
-        console.warn("[NEW_JOURNEY_DEBUG]", { stage: "no-user" });
+        setAutoWeek(null);
       }
+      console.log("[FW_AUTO_CYCLE_WEEK]", { date: iso, cycle: cycle?.number ?? null, week: null });
+    } catch (e) {
+      console.warn("[FW_AUTO_CYCLE_WEEK_ERR]", e);
+    } finally {
+      setComputing(false);
+    }
+  }
 
-    } catch (error) {
-      console.error("[NEW_JOURNEY_DEBUG]", { stage: "exception", error: String((error as any)?.message || error) });
+  async function fetchBlocks(uid: string) {
+    setIsLoading(true);
+    try {
+      const myBoletins = await listRemoteOrCache<any>({
+        name: "boletins_rg",
+        remote: () => supabase.from("boletins_rg").select("id, agent_id").eq("agent_id", uid) as any,
+        filter: (b) => b.agent_id === uid,
+      });
+      const boletimIds = (myBoletins ?? []).map((b: any) => b.id);
+      if (boletimIds.length === 0) {
+        setBlocks([]);
+        return;
+      }
+      let blocksData: any[] = await listRemoteOrCache<any>({
+        name: "blocks",
+        remote: () =>
+          supabase
+            .from("blocks")
+            .select(`*, properties!inner(id, boletim_id)`)
+            .in("properties.boletim_id", boletimIds)
+            .order("number", { ascending: true }) as any,
+      });
+      if (isOnline() && (!blocksData || blocksData.length === 0)) {
+        const { data: props } = await supabase
+          .from("properties")
+          .select("block_id, boletim_id")
+          .in("boletim_id", boletimIds);
+        const blockIds = Array.from(new Set((props ?? []).map((p: any) => p.block_id).filter(Boolean)));
+        if (blockIds.length > 0) {
+          const { data: bl } = await supabase
+            .from("blocks")
+            .select("*")
+            .in("id", blockIds)
+            .order("number", { ascending: true });
+          blocksData = bl ?? [];
+        }
+      }
+      const seen = new Set<string>();
+      const uniq = (blocksData || []).filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
+      uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
+      setBlocks(uniq);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function fetchWeeks(cycleId: string) {
-    try {
-      const weeksData = await listRemoteOrCache<any>({
-        name: "weeks",
-        remote: () =>
-          supabase
-            .from("weeks")
-            .select("*")
-            .eq("cycle_id", cycleId)
-            .order("number", { ascending: true }) as any,
-        filter: (w) => w.cycle_id === cycleId,
-      });
-
-      if (weeksData?.length) {
-        const sorted = [...weeksData].sort((a, b) => (a.number || 0) - (b.number || 0));
-        setWeeks(sorted);
-        const auto = pickWeekForDate(sorted, date);
-        if (auto) setSelectedWeekId(auto.id);
-        else if (sorted.length > 0) setSelectedWeekId(sorted[0].id);
-      }
-    } catch (error) {
-      console.error("Error fetching weeks:", error);
-    }
-  }
-
-
-  function pickWeekForDate(list: any[], d: Date) {
-    const t = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    return list.find((w: any) => {
-      const s = new Date(w.start_date).getTime();
-      const e = new Date(w.end_date).getTime();
-      return t >= s && t <= e;
-    }) || null;
-  }
-
-  // Auto-recompute week whenever the session date or available weeks change
-  useEffect(() => {
-    if (!weeks.length) return;
-    const auto = pickWeekForDate(weeks, date);
-    if (auto && auto.id !== selectedWeekId) setSelectedWeekId(auto.id);
-  }, [date, weeks]);
-
-  const selectedWeek = weeks.find(w => w.id === selectedWeekId);
-
-  const selectedBlock = blocks.find(b => b.id === selectedBlockId);
-
-  const filteredBlocks = blocks.filter(b => 
-    b.number.includes(searchQuery)
+  const selectedBlock = useMemo(
+    () => blocks.find((b) => b.id === selectedBlockId) || null,
+    [blocks, selectedBlockId],
   );
 
-  const handleStartWork = async () => {
-    console.log("[WORK_START]", { blockId: selectedBlockId, cycleId: selectedCycleId, weekId: selectedWeekId, online: isOnline() });
-    if (!selectedBlockId || !selectedCycleId || !selectedWeekId) {
-      toast.error("Por favor, preencha todos os campos");
-      console.log("[WORK_ERROR]", { stage: "validate", reason: "missing-fields" });
-      return;
-    }
+  const filteredBlocks = useMemo(
+    () => blocks.filter((b) => String(b.number).includes(searchQuery)),
+    [blocks, searchQuery],
+  );
 
-    try {
-      const { data: { user } } = await safeGetUser();
-      if (!user) {
-        console.log("[WORK_ERROR]", { stage: "auth", reason: "no-user" });
-        return;
-      }
+  const canStart = !!(date && selectedBlockId && autoCycle && autoWeek && !computing);
 
-      const sessionDateStr = date.toISOString().split('T')[0];
+  async function handleStart() {
+    if (!userId) return;
+    if (!selectedBlock?.id) { toast.error("Selecione o quarteirão."); return; }
+    if (!autoCycle?.id || !autoWeek?.id) { toast.error("Data fora de qualquer ciclo/semana válido."); return; }
 
-      // ── Limites de data ──────────────────────────────────────────
-      const today = new Date(); today.setHours(0, 0, 0, 0);
-      const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
-      if (diffDays < 0) {
-        toast.error("Não é permitido registrar jornadas em datas futuras.");
-        return;
-      }
-      if (diffDays > MAX_RETROACTIVE_DAYS) {
-        toast.error(`Só é permitido lançar produção referente aos últimos ${MAX_RETROACTIVE_DAYS} dias.`);
-        return;
-      }
-      console.log("[PRODUCTION_DATE_SELECTED]", { date: sessionDateStr, diffDays });
+    const sessionDateStr = toDateOnly(date);
 
-      // ── Verificação de jornada aberta (RC-13) ─────────────────────
-      // Regra: apenas UMA jornada in_progress por agente. Se existir,
-      // abrimos o modal para o usuário escolher Continuar / Encerrar / Cancelar.
-      try {
-        if (isOnline()) {
-          console.log("[SESSION_QUERY_BY_DATE]", {
-            user_id: user.id,
-            session_date: sessionDateStr,
-          });
-
-          const { data: openSessions, error: openErr } = await supabase
-            .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_number, property_count, street_name, created_at, updated_at, started_at, user_id")
-            .eq("user_id", user.id)
-            .eq("session_date", sessionDateStr)
-            .eq("status", "in_progress")
-            .order("created_at", { ascending: false });
-
-          if (openErr) console.warn("[SESSION_QUERY_ERROR]", openErr);
-
-          const open = openSessions || [];
-          console.log("[SESSION_QUERY_BY_DATE]", {
-            user_id: user.id,
-            session_date: sessionDateStr,
-            count: open.length,
-          });
-
-          if (open.length === 0) {
-            console.log("[SESSION_NOT_FOUND_FOR_DATE]", { user_id: user.id, session_date: sessionDateStr });
-            // segue direto — nova jornada permitida
-          } else {
-            const chosen: any = open[0];
-            const existing = chosen as OpenSessionInfo;
-            console.log("[SESSION_FOUND_FOR_DATE]", {
-              session_id: existing.id,
-              session_date: existing.session_date,
-              block_number: existing.block_number,
-            });
-            setOpenSession(existing);
-            setOpenSessionModal(true);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn("[SESSION_SELECTOR] Verificação falhou (offline):", e);
-      }
-
-
-
-
-
-      // ── VALIDAÇÃO DE CICLO ATIVO (offline-first) ────────────────
-      // Online: consulta Supabase. Offline: usa o ciclo selecionado pelo usuário
-      // (que já foi hidratado via listRemoteOrCache → Dexie).
-      let cycleIdToUse: string = selectedCycleId;
-      if (isOnline()) {
-        try {
-          const { data: activeCycleRow } = await supabase
-            .from("cycles")
-            .select("id, number, year")
-            .eq("status", "in_progress")
-            .maybeSingle();
-          if (activeCycleRow?.id) {
-            cycleIdToUse = activeCycleRow.id;
-            if (selectedCycleId && selectedCycleId !== cycleIdToUse) {
-              toast.info(`Ciclo ajustado para o ciclo ativo (${activeCycleRow.number}/${activeCycleRow.year}).`);
-            }
-          }
-        } catch (e) {
-          console.warn("[WORK_START] Falha ao validar ciclo ativo — usando ciclo selecionado:", e);
-        }
-      } else {
-        console.log("[WORK_SESSION_CREATE]", { mode: "offline", cycleIdToUse });
-      }
-
-      // Nota: não encerramos mais sessões abertas de OUTRAS datas — cada
-      // Data da Produção é independente. Uma jornada aberta de 07/07 não
-      // interfere com uma nova jornada de 08/07.
-      if (isOnline()) {
-        try {
-          const { data: agent } = await supabase.from("agents").select("id, work_status").eq("profile_id", user.id).maybeSingle();
-          if (agent?.work_status === 'work_completed' && agent?.id) {
-            await updateOffline("agents", agent.id, { work_status: 'in_work' });
-          }
-        } catch {}
-      }
-
-      const { getEpiWeek } = await import("@/lib/cycle-week");
-      const epi = getEpiWeek(new Date(`${sessionDateStr}T12:00:00`));
-
-      const nowIso = new Date().toISOString();
-
-      // ── AUDIT: bloco selecionado ─────────────────────────────────
-      console.log("[NEW_SESSION_SELECTED_BLOCK]", {
-        block_id: selectedBlock?.id ?? null,
-        block_number: selectedBlock?.number ?? null,
-        total_properties: selectedBlock?.total_properties ?? null,
-        boletim_id: (selectedBlock as any)?.properties?.[0]?.boletim_id ?? null,
-      });
-
-      if (!selectedBlock?.id) {
-        console.error("[NEW_SESSION_ABORT]", { reason: "selectedBlock.id ausente — não é permitido criar jornada sem block_id" });
-        toast.error("Quarteirão inválido: id ausente. Recarregue a página.");
-        return;
-      }
-
-      // ── VERIFICAÇÃO DE UNICIDADE (user_id + session_date + block_id) ──
-      if (isOnline()) {
-        console.log("[SESSION_DUPLICATE_CHECK]", {
-          user_id: user.id,
-          session_date: sessionDateStr,
-          block_id: selectedBlock.id,
-        });
-        const { data: dupes, error: dupErr } = await supabase
-          .from("field_work_sessions")
-          .select("id, status, session_date, block_number, block_id, cycle_id, week_id, property_count, street_name, created_at, started_at")
-          .eq("user_id", user.id)
-          .eq("session_date", sessionDateStr)
-          .eq("block_id", selectedBlock.id)
-          .in("status", ["in_progress", "closed"])
-          .order("created_at", { ascending: false });
-        if (dupErr) console.warn("[SESSION_DUPLICATE_CHECK] erro", dupErr);
-        if ((dupes || []).length > 0) {
-          const existing = dupes![0] as any as OpenSessionInfo;
-          console.log("[SESSION_DUPLICATE_FOUND]", {
-            session_id: existing.id,
-            status: (existing as any).status,
-            block_number: existing.block_number,
-          });
-          console.log("[SESSION_DUPLICATE_BLOCKED]", { block_id: selectedBlock.id, session_date: sessionDateStr });
-          setOpenSession(existing);
-          setOpenSessionModal(true);
-          toast.warning("Já existe uma jornada para este quarteirão nesta data.");
-          return;
-        }
-      }
-
-
-      const payload = {
-        user_id: user.id,
-        cycle_id: cycleIdToUse,
-        week_id: selectedWeekId,
-        block_id: selectedBlock.id,
-        block_number: selectedBlock?.number || "",
-        street_name: "Logradouro",
-        property_count: selectedBlock?.total_properties || 0,
-        session_date: sessionDateStr,
-        started_at: nowIso,
-        status: "in_progress",
-        is_retroactive: isRetroactive,
-        retroactive_reason: isRetroactive ? retroactiveReason : null,
-        created_at: nowIso,
-        updated_at: nowIso,
-      };
-
-      console.log("[SESSION_PRODUCTION_DATE]", { session_date: sessionDateStr });
-      console.log("[SESSION_STARTED_AT]", { started_at: nowIso });
-      console.log("[NEW_SESSION_CREATE]", { payload });
-      const saved = await createOffline("field_work_sessions", payload);
-      console.log("[NEW_SESSION_CREATED]", {
-        session_id: saved?.id,
-        block_id: saved?.block_id,
-        block_number: saved?.block_number,
-        cycle_id: saved?.cycle_id,
-        week_id: saved?.week_id,
-        user_id: saved?.user_id,
-      });
-
-      // ── AUDIT: consulta de imóveis com o mesmo filtro que field-work-list ──
-      try {
-        console.log("[NEW_SESSION_PROPERTIES_QUERY]", {
-          table: "properties",
-          filter: ".eq('block_id', ...)",
-          block_id: saved?.block_id ?? selectedBlock.id,
-        });
-        if (isOnline()) {
-          const { data: propsCheck, error: propsErr } = await supabase
-            .from("properties")
-            .select("id, block_id, block_number, boletim_id")
-            .eq("block_id", selectedBlock.id);
-          if (propsErr) console.warn("[NEW_SESSION_PROPERTIES_ERROR]", propsErr.message);
-          console.log("[NEW_SESSION_PROPERTIES_RESULT]", {
-            count: propsCheck?.length ?? 0,
-            first10: (propsCheck ?? []).slice(0, 10).map((p: any) => ({
-              id: p.id, block_id: p.block_id, block_number: p.block_number, boletim_id: p.boletim_id,
-            })),
-          });
-          console.log("[NEW_SESSION_COMPARE]", {
-            selected: { block_id: selectedBlock.id, block_number: selectedBlock.number },
-            session:  { block_id: saved?.block_id, block_number: saved?.block_number },
-            match: {
-              block_id: selectedBlock.id === saved?.block_id,
-              block_number: String(selectedBlock.number) === String(saved?.block_number),
-            },
-            properties_found: propsCheck?.length ?? 0,
-          });
-        }
-      } catch (e: any) {
-        console.warn("[NEW_SESSION_PROPERTIES_EXC]", e?.message ?? e);
-      }
-
-      console.log("[WORK_DEXIE_SAVE]", { id: saved?.id });
-      console.log("[WORK_QUEUE]", { table: "field_work_sessions", op: "insert", online: isOnline() });
-      console.log("[WORK_READY]", { id: saved?.id, online: isOnline() });
-      console.log("[NEW_SESSION_READY]", { session_id: saved?.id, block_number: selectedBlock?.number });
-      try { (window as any).__vcSetJourneyActive?.(true); } catch {}
-
-      toast.success(
-        isRetroactive
-          ? `Jornada retroativa de ${format(date, "dd/MM/yyyy")} registrada.`
-          : (isOnline() ? "Trabalho iniciado com sucesso!" : "Jornada iniciada localmente. Será sincronizada quando houver conexão.")
-      );
-      navigate({ to: `/field-work-list` });
-    } catch (error: any) {
-      console.log("[WORK_ERROR]", { stage: "exception", message: String(error?.message || error) });
-      toast.error("Erro ao iniciar trabalho: " + (error?.message || error));
-    }
-  };
-
-
-  const confirmRetroactive = () => {
-    if (!retroDate) { toast.error("Selecione a data da produção."); return; }
-    if (!retroReason) { toast.error("Selecione o motivo."); return; }
+    // Regra de janela retroativa
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const chosen = new Date(retroDate); chosen.setHours(0, 0, 0, 0);
+    const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
     const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
     if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
     if (diffDays > MAX_RETROACTIVE_DAYS) {
       toast.error(`Só é permitido lançar produção referente aos últimos ${MAX_RETROACTIVE_DAYS} dias.`);
       return;
     }
-    const reasonFinal = retroReason === "Outro" ? (retroOtherText.trim() || "Outro") : retroReason;
-    setDate(retroDate);
-    setIsRetroactive(true);
-    setRetroactiveReason(reasonFinal);
-    setRetroOpen(false);
-    toast.info(`Modo retroativo ativado para ${format(retroDate, "dd/MM/yyyy")}. Toque em INICIAR JORNADA.`);
-  };
 
-  const cancelRetroactive = () => {
-    setIsRetroactive(false);
-    setRetroactiveReason(null);
-    setDate(new Date());
-  };
+    setStarting(true);
+    try {
+      // Verificação estrita: user_id + session_date + block_id + status=in_progress
+      if (isOnline()) {
+        console.log("[SESSION_LOOKUP]", {
+          user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
+        });
+        const { data: existing } = await supabase
+          .from("field_work_sessions")
+          .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
+          .eq("user_id", userId)
+          .eq("session_date", sessionDateStr)
+          .eq("block_id", selectedBlock.id)
+          .eq("status", "in_progress")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-  if (checkingSession) {
+        if (existing) {
+          console.log("[SESSION_FOUND]", { id: existing.id });
+          setOpenSession(existing as any);
+          setOpenSessionModal(true);
+          return;
+        }
+      }
+
+      // Cria nova jornada automaticamente
+      const nowIso = new Date().toISOString();
+      const payload = {
+        user_id: userId,
+        cycle_id: autoCycle.id,
+        week_id: autoWeek.id,
+        block_id: selectedBlock.id,
+        block_number: selectedBlock.number || "",
+        street_name: "Logradouro",
+        property_count: selectedBlock.total_properties || 0,
+        session_date: sessionDateStr,
+        started_at: nowIso,
+        status: "in_progress",
+        is_retroactive: diffDays > 0,
+        retroactive_reason: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      console.log("[SESSION_CREATE]", payload);
+      const saved = await createOffline("field_work_sessions", payload);
+      console.log("[SESSION_CREATED]", { id: saved?.id });
+      try { (window as any).__vcSetJourneyActive?.(true); } catch {}
+      toast.success(
+        isOnline()
+          ? "Jornada iniciada com sucesso."
+          : "Jornada iniciada localmente. Será sincronizada quando houver conexão.",
+      );
+      setActiveSession(saved);
+    } catch (e: any) {
+      console.error("[SESSION_CREATE_ERR]", e);
+      toast.error("Erro ao iniciar jornada: " + (e?.message || e));
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  // Loading inicial
+  if (checkingBoot) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
+  // Se já criamos/recuperamos a jornada nesta sessão de tela, mostra o painel
   if (activeSession) {
-    return <OperationalPanel session={activeSession} onCloseSessionRoute={() => navigate({ to: "/field-work-list" })} />;
+    return (
+      <OperationalPanel
+        session={activeSession}
+        onCloseSessionRoute={() => {
+          setActiveSession(null);
+          setSelectedBlockId(null);
+        }}
+      />
+    );
   }
 
   return (
-    <div className="pb-24 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="pb-24 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
       <div className="bg-slate-900 -mx-4 -mt-4 p-8 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-10">
           <Building2 className="h-32 w-32 text-white" />
         </div>
-        <h2 className="text-3xl font-black tracking-tight text-white mb-2 underline underline-offset-8 decoration-blue-500/30">Início de Trabalho</h2>
-        <p className="text-slate-400 font-medium">Configure sua jornada diária</p>
+        <h2 className="text-3xl font-black tracking-tight text-white mb-2">Início de Trabalho</h2>
+        <p className="text-slate-400 font-medium">A jornada começa pela data da produção</p>
       </div>
 
       <div className="space-y-6 px-1">
-        {/* Cycle and Week Selection */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Ciclo</label>
-            <Select value={selectedCycleId} onValueChange={(val) => {
-              setSelectedCycleId(val);
-              fetchWeeks(val);
-            }}>
-              <SelectTrigger className="h-14 rounded-2xl border-none bg-white shadow-md text-sm font-bold active:scale-95 transition-all">
-                <Layers className="h-4 w-4 mr-2 text-blue-500" />
-                <SelectValue placeholder="Ciclo" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-none shadow-xl">
-                {cycles.map(c => (
-                  <SelectItem key={c.id} value={c.id} className="rounded-xl font-bold">Ciclo {c.number}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Semana Epidemiológica</label>
-            <div className="h-14 rounded-2xl bg-white shadow-md flex items-center px-4 text-sm font-bold text-slate-700">
-              <CalendarDays className="h-4 w-4 mr-2 text-blue-500" />
-              {selectedWeek ? `📅 Semana ${selectedWeek.number}` : "Calculando..."}
-            </div>
-          </div>
-        </div>
-
-        {/* Data da Atividade — automática (hoje) ou retroativa explícita */}
+        {/* Data da Produção — passo 1 */}
         <div className="space-y-3">
-          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Data da Atividade</label>
-          <div
-            className={cn(
-              "w-full h-16 rounded-2xl shadow-md flex items-center justify-between px-5",
-              isRetroactive ? "bg-amber-50 border-2 border-amber-300" : "bg-white"
-            )}
-          >
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">
+            1. Data da Produção
+          </label>
+          <div className="w-full rounded-2xl bg-white shadow-md p-5 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <CalendarIcon className={cn("h-6 w-6", isRetroactive ? "text-amber-600" : "text-blue-500")} />
+              <CalendarIcon className="h-6 w-6 text-blue-500" />
               <div className="flex flex-col">
-                <span className="text-base font-black text-slate-800">
-                  {format(date, "PPP", { locale: ptBR })}
+                <span className="text-lg font-black text-slate-800">
+                  {format(date, "dd/MM/yyyy", { locale: ptBR })}
                 </span>
                 <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                  {isRetroactive ? "Produção retroativa" : "Hoje · automático"}
+                  {format(date, "EEEE", { locale: ptBR })}
                 </span>
               </div>
             </div>
-            {isRetroactive && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={cancelRetroactive}
-                className="text-[10px] font-black text-amber-700 hover:text-amber-900"
-              >
-                Cancelar
-              </Button>
-            )}
+            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-2xl font-black text-xs h-11 border-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Alterar Data
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    setDate(d);
+                    setDatePopoverOpen(false);
+                  }}
+                  locale={ptBR}
+                  disabled={(d) => {
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const min = new Date(today); min.setDate(min.getDate() - MAX_RETROACTIVE_DAYS);
+                    const t = new Date(d); t.setHours(0, 0, 0, 0);
+                    return t > today || t < min;
+                  }}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-          {isRetroactive && retroactiveReason && (
-            <p className="text-[10px] font-bold text-amber-700 ml-1">
-              <AlertTriangle className="inline h-3 w-3 mr-1" />
-              Motivo: {retroactiveReason}
-            </p>
-          )}
         </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between ml-1">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Seleção do Quarteirão</label>
-          </div>
+        {/* Ciclo e Semana — apenas conferência */}
+        <div className="grid grid-cols-2 gap-4">
+          <ReadOnlyField
+            icon={<Layers className="h-4 w-4 text-blue-500" />}
+            label="Ciclo (auto)"
+            value={computing ? "Calculando..." : autoCycle ? `Ciclo ${autoCycle.number}` : "—"}
+          />
+          <ReadOnlyField
+            icon={<CalendarDays className="h-4 w-4 text-blue-500" />}
+            label="Semana Epidemiológica"
+            value={computing ? "Calculando..." : autoWeek ? `Semana ${autoWeek.number}/8` : "—"}
+          />
+        </div>
 
+        {!computing && date && (!autoCycle || !autoWeek) && (
+          <p className="text-[11px] font-bold text-amber-700 ml-1">
+            Esta data não corresponde a nenhum ciclo/semana cadastrada.
+          </p>
+        )}
+
+        {/* Quarteirão — passo 2 */}
+        <div className="space-y-3">
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">
+            2. Quarteirão
+          </label>
           <Dialog open={isBlockModalOpen} onOpenChange={setIsBlockModalOpen}>
             <DialogTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-full h-20 rounded-[2rem] border-none bg-white shadow-lg flex items-center justify-between px-6 active:scale-95 transition-all group",
-                  selectedBlockId ? "ring-2 ring-blue-500/20" : ""
+                  "w-full h-20 rounded-[2rem] border-none bg-white shadow-lg flex items-center justify-between px-6 active:scale-95 transition-all",
+                  selectedBlockId ? "ring-2 ring-blue-500/20" : "",
                 )}
               >
                 <div className="flex items-center gap-4 text-left">
                   <div className={cn(
                     "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors shadow-inner",
-                    selectedBlockId ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-400"
+                    selectedBlockId ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-400",
                   )}>
                     {selectedBlockId ? (
                       <span className="text-xl font-black">{selectedBlock?.number}</span>
@@ -719,28 +411,33 @@ function FieldWorkPage() {
                   <div className="flex flex-col">
                     <span className={cn(
                       "text-base font-black tracking-tight",
-                      selectedBlockId ? "text-slate-800" : "text-slate-400"
+                      selectedBlockId ? "text-slate-800" : "text-slate-400",
                     )}>
                       {selectedBlockId ? `Quarteirão ${selectedBlock?.number}` : "Selecione o quarteirão..."}
                     </span>
                     {selectedBlockId && (
                       <div className="flex items-center gap-2">
                         <Users className="h-3 w-3 text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedBlock?.total_properties || 0} imóveis</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          {selectedBlock?.total_properties || 0} imóveis
+                          {selectedBlock?.status ? ` · ${selectedBlock.status === "finished" ? "Concluído" : selectedBlock.status === "in_progress" ? "Em aberto" : "Pendente"}` : ""}
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
-                <ChevronDown className="h-5 w-5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                <ChevronDown className="h-5 w-5 text-slate-400" />
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md rounded-[2.5rem] bg-slate-950 border-none shadow-2xl p-0 overflow-hidden">
               <DialogHeader className="p-8 pb-4">
-                <DialogTitle className="text-xl font-black text-white uppercase tracking-tight">Quarteirões Disponíveis</DialogTitle>
-                <div className="relative mt-4 group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
-                  <Input 
-                    placeholder="Buscar quarteirão..." 
+                <DialogTitle className="text-xl font-black text-white uppercase tracking-tight">
+                  Quarteirões Disponíveis
+                </DialogTitle>
+                <div className="relative mt-4">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                  <Input
+                    placeholder="Buscar quarteirão..."
                     className="pl-12 h-14 rounded-2xl border-none bg-white/5 text-white placeholder:text-slate-600 font-bold focus-visible:ring-blue-500/20"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -751,7 +448,7 @@ function FieldWorkPage() {
                 <div className="grid grid-cols-1 gap-2 p-4">
                   {isLoading ? (
                     <div className="flex flex-col items-center justify-center py-10 gap-3">
-                      <div className="h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Carregando...</p>
                     </div>
                   ) : filteredBlocks.length === 0 ? (
@@ -763,9 +460,9 @@ function FieldWorkPage() {
                       key={block.id}
                       className={cn(
                         "w-full p-4 rounded-2xl flex items-center justify-between transition-all active:scale-[0.98] text-left",
-                        selectedBlockId === block.id 
-                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
-                          : "bg-white/5 text-slate-300 hover:bg-white/10"
+                        selectedBlockId === block.id
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "bg-white/5 text-slate-300 hover:bg-white/10",
                       )}
                       onClick={() => {
                         setSelectedBlockId(block.id);
@@ -775,16 +472,15 @@ function FieldWorkPage() {
                       <div className="flex items-center gap-4">
                         <div className={cn(
                           "h-12 w-12 rounded-xl flex items-center justify-center font-black text-lg shadow-inner",
-                          selectedBlockId === block.id ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
+                          selectedBlockId === block.id ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400",
                         )}>
                           {block.number}
                         </div>
                         <div className="flex flex-col">
                           <span className="font-black text-sm uppercase tracking-tight">Quarteirão {block.number}</span>
-
                           <span className={cn(
                             "text-[10px] font-bold uppercase tracking-widest",
-                            selectedBlockId === block.id ? "text-white/60" : "text-slate-500"
+                            selectedBlockId === block.id ? "text-white/60" : "text-slate-500",
                           )}>
                             {block.total_properties || 0} imóveis
                           </span>
@@ -799,185 +495,61 @@ function FieldWorkPage() {
           </Dialog>
         </div>
 
-        {/* Summary (Conditional) */}
-        {selectedBlock && (
-          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-            <Card className="border-none shadow-xl bg-slate-50 rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-blue-500" />
-                  <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Resumo do Quarteirão {selectedBlock.number}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 p-5">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Imóveis</p>
-                  <p className="text-xl font-black text-slate-800">{selectedBlock.total_properties || 0}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</p>
-                  <p className={cn(
-                    "text-xl font-black uppercase tracking-tighter",
-                    selectedBlock.status === 'finished' ? 'text-emerald-500' : 'text-blue-500'
-                  )}>
-                    {selectedBlock.status === 'finished' ? 'Concluído' : selectedBlock.status === 'in_progress' ? 'Em Aberto' : translate(selectedBlock.status)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resumo do Quarteirão</p>
-                  <p className="text-xl font-black text-slate-800">Nº {selectedBlock.number}</p>
-
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ciclo Selecionado</p>
-                  <p className="text-xl font-black text-blue-600">
-                    {cycles.find(c => c.id === selectedCycleId)?.number || "--"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Start Button */}
-        <div className="pt-4 pb-8">
-          <Button 
+        {/* Botão iniciar */}
+        <div className="pt-2 pb-8">
+          <Button
             className={cn(
               "w-full h-24 rounded-[3rem] text-2xl font-black shadow-2xl transition-all gap-4 active:scale-95 border-4",
-              selectedBlockId && selectedCycleId && selectedWeekId
-                ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 border-emerald-400 text-white" 
-                : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-slate-300"
+              canStart
+                ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 border-emerald-400 text-white"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-slate-300",
             )}
-            onClick={handleStartWork}
+            onClick={handleStart}
+            disabled={!canStart || starting}
           >
-            INICIAR JORNADA
-            <ArrowRight className="h-8 w-8" />
+            {starting ? <Loader2 className="h-8 w-8 animate-spin" /> : "INICIAR JORNADA"}
+            {!starting && <ArrowRight className="h-8 w-8" />}
           </Button>
-          {(!selectedBlockId || !selectedCycleId || !selectedWeekId) && (
-            <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4 animate-pulse">
-              Selecione ciclo, semana e quarteirão para liberar
+          {!canStart && !starting && (
+            <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4">
+              Escolha a data e o quarteirão para liberar
             </p>
           )}
-
-          {/* Link discreto para Jornada Retroativa */}
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => { setRetroDate(undefined); setRetroReason(""); setRetroOtherText(""); setRetroOpen(true); }}
-              className="text-[11px] font-bold text-slate-500 hover:text-amber-700 underline underline-offset-4 decoration-dotted"
-            >
-              Registrar produção de outra data
-            </button>
-          </div>
-
-          {/* Modal — Jornada Retroativa */}
-          <Dialog open={retroOpen} onOpenChange={setRetroOpen}>
-            <DialogContent className="sm:max-w-md rounded-3xl">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-amber-700">
-                  <AlertTriangle className="h-5 w-5" />
-                  Jornada Retroativa
-                </DialogTitle>
-                <DialogDescription className="text-xs">
-                  Registre uma produção de até <b>{MAX_RETROACTIVE_DAYS} dias anteriores</b>. Para datas mais antigas, procure seu supervisor.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-                    Data da Produção
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-bold">
-                        <CalendarIcon className="mr-2 h-4 w-4 text-amber-600" />
-                        {retroDate ? format(retroDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={retroDate}
-                        onSelect={setRetroDate}
-                        locale={ptBR}
-                        disabled={(d) => {
-                          const today = new Date(); today.setHours(0,0,0,0);
-                          const min = new Date(today); min.setDate(min.getDate() - MAX_RETROACTIVE_DAYS);
-                          const t = new Date(d); t.setHours(0,0,0,0);
-                          return t > today || t < min;
-                        }}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-600">Motivo</Label>
-                  <RadioGroup value={retroReason} onValueChange={setRetroReason} className="space-y-1.5">
-                    {["Chuva", "Falta de internet", "Produção não lançada no dia", "Problema no aparelho", "Outro"].map((m) => (
-                      <div key={m} className="flex items-center gap-2">
-                        <RadioGroupItem id={`retro-${m}`} value={m} />
-                        <Label htmlFor={`retro-${m}`} className="text-sm font-medium cursor-pointer">{m}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                  {retroReason === "Outro" && (
-                    <Input
-                      placeholder="Descreva o motivo"
-                      value={retroOtherText}
-                      onChange={(e) => setRetroOtherText(e.target.value)}
-                      maxLength={120}
-                    />
-                  )}
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button variant="ghost" onClick={() => setRetroOpen(false)}>Cancelar</Button>
-                <Button onClick={confirmRetroactive} className="bg-amber-600 hover:bg-amber-700 text-white font-black">
-                  Confirmar Jornada Retroativa
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Encerramento da Produção do Dia */}
-        <div className="pt-2 pb-8 space-y-3">
-          <div className="flex items-center gap-2 ml-1">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fim do Expediente</span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-          <DailyWorkCloser />
         </div>
       </div>
 
       <OpenSessionModal
         open={openSessionModal}
         session={openSession}
-        cycleLabel={openSession ? (cycles.find((c) => c.id === openSession.cycle_id)?.number ? `Ciclo ${cycles.find((c) => c.id === openSession.cycle_id)?.number}` : "—") : undefined}
-        weekLabel={openSession ? (weeks.find((w) => w.id === openSession.week_id)?.number ? `Semana ${weeks.find((w) => w.id === openSession.week_id)?.number}/8` : "—") : undefined}
+        cycleLabel={openSession && autoCycle?.id === openSession.cycle_id ? `Ciclo ${autoCycle.number}` : undefined}
+        weekLabel={openSession && autoWeek?.id === openSession.week_id ? `Semana ${autoWeek.number}/8` : undefined}
         onContinue={async (s) => {
           setOpenSessionModal(false);
           await autoRecoverSession(s.id);
           try { (window as any).__vcSetJourneyActive?.(true); } catch {}
-          console.log("[SESSION_AUTO_REFRESH]", { session_id: s.id });
-          navigate({ to: `/field-work-list`, search: { restore: s.id, ts: Date.now() } as any });
+          setActiveSession(s);
         }}
         onFinished={() => {
           setOpenSessionModal(false);
           setOpenSession(null);
           toast.info("Você já pode iniciar uma nova jornada.");
         }}
-        onCancel={() => {
-          setOpenSessionModal(false);
-        }}
+        onCancel={() => setOpenSessionModal(false)}
       />
     </div>
   );
 }
 
+function ReadOnlyField({
+  icon, label, value,
+}: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="space-y-3">
+      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">{label}</label>
+      <div className="h-14 rounded-2xl bg-white shadow-md flex items-center px-4 text-sm font-black text-slate-700 gap-2">
+        {icon}
+        {value}
+      </div>
+    </div>
+  );
+}
