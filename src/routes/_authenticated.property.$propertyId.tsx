@@ -642,7 +642,8 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
-      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date, "visits.insert.survey");
+      assertProductionDate(activeSession.session_date, operationalVisitDate, "visits.insert.survey");
 
       const visitPayload = {
         property_id: propertyId as string,
