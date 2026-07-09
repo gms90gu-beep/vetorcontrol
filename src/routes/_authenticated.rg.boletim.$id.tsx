@@ -76,9 +76,9 @@ function tipoCodigo(t: string): "R" | "C" | "TB" | "PE" | "O" {
   return "O";
 }
 
-function comparePropertyNumber(a: Property, b: Property) {
-  return (Number.parseInt(a.number, 10) || 0) - (Number.parseInt(b.number, 10) || 0);
-}
+import { comparePropertyOrder } from "@/lib/property-order";
+
+const comparePropertyNumber = comparePropertyOrder;
 
 function BoletimView() {
   const { id } = useParams({ from: "/_authenticated/rg/boletim/$id" });
