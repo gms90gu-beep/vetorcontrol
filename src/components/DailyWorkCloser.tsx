@@ -815,6 +815,36 @@ export function DailyWorkCloser({
         epi_year: recordData.epi_year,
       });
 
+      // 1.1) Validador de integridade da produção — nunca bloqueia
+      try {
+        const { runProductionIntegrity } = await import("@/lib/production-integrity");
+        const integrityReport = await runProductionIntegrity({
+          agentId: user.id,
+          workDate: operationalWorkDate,
+          cycleId: activeCycle?.id ?? null,
+          snapshot: {
+            workedCount: snap.workedCount,
+            closedCount: snap.closedCount,
+            refusedCount: snap.refusedCount,
+            visitedCount: snap.visitedCount,
+            focusCount: snap.focusCount,
+            depInspected: snap.depInspected,
+            depByType: snap.depByType as any,
+            fociByType: snap.fociByType as any,
+            strategicPointsWorked: snap.strategicPointsWorked,
+          },
+        });
+        if (integrityReport.ok) {
+          toast.success(`Integridade da Produção: ${integrityReport.score}%`);
+        } else {
+          toast.warning(
+            `Integridade da Produção: ${integrityReport.score}% — ${integrityReport.divergences.length} divergência(s) encontrada(s).`,
+          );
+        }
+      } catch (e) {
+        console.error("[PRODUCTION_INTEGRITY_ERROR]", { reason: "runner_failed", message: (e as any)?.message });
+      }
+
       // 2) Marca agente como work_completed — local + fila
       console.log("[ENCERRAR] atualizando agents");
       try { await updateOffline("agents", currentAgent.id, { work_status: 'work_completed' }); } catch (e) {
