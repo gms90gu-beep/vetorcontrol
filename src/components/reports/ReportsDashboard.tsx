@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch } from "@/lib/offline/safe-fetch";
 import { listRemoteOrCache } from "@/lib/offline/repos";
@@ -6,7 +7,7 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2 } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
@@ -15,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek } from "@/lib/cycle-week";
+import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -68,12 +71,20 @@ export function ReportsDashboard() {
     fetchDashboardData();
   }, [filters]);
 
+  const rebuildFn = useServerFn(rebuildDailyRecords);
+  const [rebuilding, setRebuilding] = useState(false);
+
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
       // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
-      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
+      console.log("[REPORT_LOAD]", { filters, cycleFilter });
+      console.log("[REPORT_FILTER]", {
+        agent_id: filters.agent,
+        cycle_id: cycleFilter,
+        week_id: filters.week,
+      });
       const records = await listRemoteOrCache<any>({
         name: "daily_work_records",
         remote: async () => {
@@ -87,7 +98,12 @@ export function ReportsDashboard() {
           (filters.agent === "all" || r.agent_id === filters.agent),
       });
       const rows = records || [];
-      console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
+      console.log("[REPORT_SOURCE]", {
+        table: "daily_work_records",
+        fn: "listRemoteOrCache",
+        count: rows.length,
+      });
+
 
       setDailies(rows);
 
@@ -102,6 +118,29 @@ export function ReportsDashboard() {
       const productivity = rows.length > 0 ? Math.round(worked / rows.length) : 0;
 
       setKpiData({ worked, coverage, focus, treated, productivity });
+
+      console.log("[REPORT_COMPARE]", {
+        dashboard_expected: { worked, treated, focus, pending },
+        dwr_rows: rows.length,
+        source: "daily_work_records",
+      });
+
+      if (rows.length > 0 && worked === 0 && treated === 0 && focus === 0) {
+        console.warn("[REPORT_INCONSISTENCY]", {
+          indicator: "kpis",
+          expected: "> 0 (existe produção registrada)",
+          found: "todos zerados",
+          origin_correct: "daily_work_records reconstruído",
+          origin_incorrect: "daily_work_records atual (snapshot vazio)",
+          hint: "Executar 'Reconstruir Relatórios' para reconciliar totais a partir de visits/visit_deposits.",
+        });
+        console.error("[REPORT_ERROR]", {
+          query: "daily_work_records WHERE cycle_id/agent_id",
+          returned: rows.length,
+          reason: "todos os DWRs no intervalo têm properties_worked=0",
+        });
+      }
+
 
       // Depósitos por tipo (soma de todas as diárias)
       const deposits = [
@@ -144,6 +183,7 @@ export function ReportsDashboard() {
   }
 
   const handleExportPDF = async () => {
+    console.log("[REPORT_PDF]", { source: "on-screen dataset", kpi: kpiData, dailies: dailies.length });
     toast.info("Preparando PDF para exportação...");
     const success = await generateOperationalPDF("reports-content", kpiData);
     if (success) {
@@ -152,6 +192,7 @@ export function ReportsDashboard() {
       toast.error("Erro ao gerar PDF");
     }
   };
+
 
   const handleWeeklyReport = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -188,7 +229,39 @@ export function ReportsDashboard() {
     }
   };
 
+  const handleRebuild = async () => {
+    if (rebuilding) return;
+    if (dailies.length === 0) {
+      toast.info("Nenhuma diária no intervalo para reconstruir.");
+      return;
+    }
+    const dates = dailies.map((d: any) => d.work_date).sort();
+    const from = dates[0];
+    const to = dates[dates.length - 1];
+    setRebuilding(true);
+    toast.info(`Reconstruindo relatórios (${from} → ${to})…`);
+    try {
+      const res = await rebuildFn({
+        data: {
+          from,
+          to,
+          agentId: filters.agent !== "all" ? filters.agent : undefined,
+        },
+      });
+      console.log("[REPORT_REBUILD_RESULT]", res);
+      toast.success(`Reconstrução concluída — ${res.updated}/${res.scanned} diária(s) atualizada(s).`);
+      await fetchDashboardData();
+    } catch (e: any) {
+      console.error("[REPORT_REBUILD_ERROR]", e);
+      toast.error(`Falha na reconstrução: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
   const isSupervisor = userRole === "supervisor" || userRole === "coordenador" || userRole === "admin_master";
+  const isAdminMaster = userRole === "admin_master";
+
 
   return (
     <div id="reports-content" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -202,19 +275,32 @@ export function ReportsDashboard() {
           <p className="text-sm font-bold text-slate-500 mt-1">Dashboards analíticos e cobertura territorial</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
+          {(isSupervisor || isAdminMaster) && (
+            <Button
+              onClick={handleRebuild}
+              disabled={rebuilding}
+              variant="outline"
+              className="border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-2xl h-14 px-6 font-black text-xs uppercase tracking-widest shadow-sm transition-all active:scale-95"
+              title="Recalcula totais do DWR a partir de visits/visit_deposits"
+            >
+              <RotateCw className={`mr-2 h-4 w-4 ${rebuilding ? "animate-spin" : ""}`} />
+              {rebuilding ? "Reconstruindo…" : "Reconstruir Relatórios"}
+            </Button>
+          )}
+          <Button
             onClick={handleExportPDF}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl h-14 px-8 font-black shadow-xl shadow-slate-200 transition-all active:scale-95 text-xs uppercase tracking-widest"
           >
             <Printer className="mr-2 h-4 w-4" /> Exportar Relatório
           </Button>
-          <Button 
+          <Button
             variant="outline"
             className="border-slate-200 bg-white hover:bg-slate-50 text-slate-600 rounded-2xl h-14 w-14 p-0 flex items-center justify-center shadow-md transition-all active:scale-95"
           >
             <Share2 className="h-5 w-5" />
           </Button>
         </div>
+
       </div>
 
       <ReportsFilters onFilterChange={setFilters} className="reports-filters" />
