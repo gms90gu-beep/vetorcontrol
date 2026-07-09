@@ -183,6 +183,7 @@ export function ReportsDashboard() {
   }
 
   const handleExportPDF = async () => {
+    console.log("[REPORT_PDF]", { source: "on-screen dataset", kpi: kpiData, dailies: dailies.length });
     toast.info("Preparando PDF para exportação...");
     const success = await generateOperationalPDF("reports-content", kpiData);
     if (success) {
@@ -191,6 +192,7 @@ export function ReportsDashboard() {
       toast.error("Erro ao gerar PDF");
     }
   };
+
 
   const handleWeeklyReport = async () => {
     const { data: { session } } = await supabase.auth.getSession();
