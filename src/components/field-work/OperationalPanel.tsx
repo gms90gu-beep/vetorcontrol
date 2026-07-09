@@ -21,6 +21,7 @@ import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getEpiWeek } from "@/lib/cycle-week";
+import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
 
 type FilterKey =
   | "all" | "pending" | "visited" | "closed" | "refused"
