@@ -860,9 +860,52 @@ function PropertyVisitPage() {
           setGeoDialogOpen(false);
           if (!saved) return;
           fetchData();
-          // Fluxo CURRENT_STREET: após GPS real (em campo), sugerir/atualizar rua do quarteirão.
           const blockId = (property as any)?.block_id as string | undefined;
-          if (!blockId || !coords) return;
+          if (!coords) return;
+
+          // Detecta logradouro uma única vez para reuso em property + block
+          const det = await detectFromGPS(coords);
+          const detectedStreet = det.street || null;
+
+          // ─── Atualização automática do logradouro do IMÓVEL ───
+          if (detectedStreet && property?.id) {
+            const current = (property as any)?.street_name?.trim() || "";
+            if (!current) {
+              try {
+                await supabase
+                  .from("properties")
+                  .update({ street_name: detectedStreet })
+                  .eq("id", property.id);
+                console.log("[ADDRESS_AUTO_UPDATE]", { propertyId: property.id, street: detectedStreet });
+                toast.success(`Logradouro cadastrado: ${detectedStreet}`);
+                fetchData();
+              } catch (e) {
+                console.warn("[ADDRESS_AUTO_UPDATE_ERROR]", e);
+              }
+            } else if (!isSameStreet(current, detectedStreet)) {
+              const ok = window.confirm(
+                `Novo logradouro encontrado.\n\nAtual: ${current}\nNovo: ${detectedStreet}\n\nDeseja atualizar?`,
+              );
+              if (ok) {
+                try {
+                  await supabase
+                    .from("properties")
+                    .update({ street_name: detectedStreet })
+                    .eq("id", property.id);
+                  console.log("[ADDRESS_UPDATE_CONFIRM]", { propertyId: property.id, from: current, to: detectedStreet });
+                  toast.success(`Logradouro atualizado: ${detectedStreet}`);
+                  fetchData();
+                } catch (e) {
+                  console.warn("[ADDRESS_UPDATE_ERROR]", e);
+                }
+              } else {
+                console.log("[ADDRESS_UPDATE_CANCELLED]", { propertyId: property.id, kept: current, suggested: detectedStreet });
+              }
+            }
+          }
+
+          // ─── Fluxo CURRENT_STREET do quarteirão ───
+          if (!blockId) return;
           const info = await getBlockCurrentStreet(blockId);
           if (!info) return;
           if (!info.currentStreet) {
@@ -872,21 +915,19 @@ function PropertyVisitPage() {
               mode: "first-visit",
               info,
               coords,
-              detected: null,
+              detected: detectedStreet,
             });
-          } else {
-            const det = await detectFromGPS(coords);
-            if (det.street && !isSameStreet(det.street, info.currentStreet)) {
-              setStreetPrompt({
-                open: true,
-                mode: "change-detected",
-                info,
-                coords,
-                detected: det.street,
-              });
-            }
+          } else if (detectedStreet && !isSameStreet(detectedStreet, info.currentStreet)) {
+            setStreetPrompt({
+              open: true,
+              mode: "change-detected",
+              info,
+              coords,
+              detected: detectedStreet,
+            });
           }
         }}
+
       />
       <FirstVisitStreetPrompt
         open={streetPrompt.open}
