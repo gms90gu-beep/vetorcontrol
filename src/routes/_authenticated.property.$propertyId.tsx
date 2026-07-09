@@ -556,7 +556,7 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
-      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date, "visits.insert");
 
       const visitPayload = {
         property_id: propertyId as string,
@@ -569,6 +569,8 @@ function PropertyVisitPage() {
         activity_type: (activityMap[activity] || "routine") as any,
         visit_date: operationalVisitDate,
       };
+
+      assertProductionDate(activeSession.session_date, operationalVisitDate, "visits.insert");
 
 
       console.log("[VISIT_SAVE_START]", {
