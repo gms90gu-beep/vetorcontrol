@@ -40,7 +40,7 @@ import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
-import { getOperationalVisitDate } from "@/lib/operational-date";
+import { getOperationalVisitDate, assertProductionDate } from "@/lib/operational-date";
 import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
 import { FirstVisitStreetPrompt } from "@/components/property/FirstVisitStreetPrompt";
 import { getBlockCurrentStreet, detectFromGPS, isSameStreet } from "@/lib/current-street";
