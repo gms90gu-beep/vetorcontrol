@@ -63,7 +63,7 @@ function logErr(scope: string, ctx: Record<string, unknown>) {
 /* ─── Consulta ─────────────────────────────────────────────────────────── */
 
 export async function findSession(lookup: SessionLookup): Promise<SessionRow | null> {
-  logStart("findSession", lookup);
+  logStart("findSession", { ...lookup });
   try {
     let q = supabase
       .from("field_work_sessions")
