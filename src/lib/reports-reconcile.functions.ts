@@ -97,7 +97,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       if (!v.agent_id || !v.visit_date) continue;
       const wd = localDate(v.visit_date);
       const key = `${v.agent_id}__${wd}`;
-      const g = groups.get(key) ?? { agent_id: v.agent_id, work_date: wd, visits: [], cycle_id: v.cycle_id, week_id: v.week_id };
+      const g = groups.get(key) ?? { agent_id: v.agent_id, work_date: wd, visits: [] as any[], cycle_id: v.cycle_id, week_id: v.week_id };
       g.visits.push(v);
       if (!g.cycle_id && v.cycle_id) g.cycle_id = v.cycle_id;
       if (!g.week_id && v.week_id) g.week_id = v.week_id;
