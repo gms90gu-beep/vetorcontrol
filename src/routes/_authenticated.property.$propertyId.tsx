@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { usePropertyRecords } from "@/hooks/useOfflineData";
+import { sortPropertiesOperational } from "@/lib/property-order";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
 import { isOnline, safeFetch } from "@/lib/offline/safe-fetch";
