@@ -234,16 +234,19 @@ export function AgentReportsSimple() {
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
-                Resumo do Dia
+                {isTodayRecord ? "Resumo do Dia" : "Última Diária Encerrada"}
               </h3>
               <p className="text-[11px] font-bold text-slate-400 uppercase">
-                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                {todayRecord
+                  ? format(new Date(`${todayRecord.work_date}T12:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })
+                  : format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </p>
             </div>
           </div>
           <Badge className="bg-emerald-600 text-white text-[10px] font-black">
-            HOJE
+            {isTodayRecord ? "HOJE" : "MAIS RECENTE"}
           </Badge>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
