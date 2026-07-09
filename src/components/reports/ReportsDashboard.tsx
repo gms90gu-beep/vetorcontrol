@@ -227,7 +227,39 @@ export function ReportsDashboard() {
     }
   };
 
+  const handleRebuild = async () => {
+    if (rebuilding) return;
+    if (dailies.length === 0) {
+      toast.info("Nenhuma diária no intervalo para reconstruir.");
+      return;
+    }
+    const dates = dailies.map((d: any) => d.work_date).sort();
+    const from = dates[0];
+    const to = dates[dates.length - 1];
+    setRebuilding(true);
+    toast.info(`Reconstruindo relatórios (${from} → ${to})…`);
+    try {
+      const res = await rebuildFn({
+        data: {
+          from,
+          to,
+          agentId: filters.agent !== "all" ? filters.agent : undefined,
+        },
+      });
+      console.log("[REPORT_REBUILD_RESULT]", res);
+      toast.success(`Reconstrução concluída — ${res.updated}/${res.scanned} diária(s) atualizada(s).`);
+      await fetchDashboardData();
+    } catch (e: any) {
+      console.error("[REPORT_REBUILD_ERROR]", e);
+      toast.error(`Falha na reconstrução: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setRebuilding(false);
+    }
+  };
+
   const isSupervisor = userRole === "supervisor" || userRole === "coordenador" || userRole === "admin_master";
+  const isAdminMaster = userRole === "admin_master";
+
 
   return (
     <div id="reports-content" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
