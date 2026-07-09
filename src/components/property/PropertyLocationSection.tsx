@@ -118,6 +118,7 @@ export function PropertyLocationSection({ property, role, actorId, onUpdated }: 
           Imóvel ainda não georreferenciado. A localização será solicitada na primeira visita.
         </p>
       )}
+      <ConfirmGpsOverwriteDialog open={confirmOpen} onDecision={handleDecision} />
     </section>
   );
 }
