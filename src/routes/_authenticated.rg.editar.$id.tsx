@@ -739,9 +739,7 @@ function EditarBoletim() {
     .sort((a, b) => {
       if (a._new && !b._new) return 1;
       if (!a._new && b._new) return -1;
-      const na = parseInt(a.number, 10) || 0;
-      const nb = parseInt(b.number, 10) || 0;
-      return na - nb;
+      return comparePropertyOrder(a as any, b as any);
     });
 
   return (
