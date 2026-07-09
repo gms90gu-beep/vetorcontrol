@@ -119,6 +119,29 @@ export function ReportsDashboard() {
 
       setKpiData({ worked, coverage, focus, treated, productivity });
 
+      console.log("[REPORT_COMPARE]", {
+        dashboard_expected: { worked, treated, focus, pending },
+        dwr_rows: rows.length,
+        source: "daily_work_records",
+      });
+
+      if (rows.length > 0 && worked === 0 && treated === 0 && focus === 0) {
+        console.warn("[REPORT_INCONSISTENCY]", {
+          indicator: "kpis",
+          expected: "> 0 (existe produção registrada)",
+          found: "todos zerados",
+          origin_correct: "daily_work_records reconstruído",
+          origin_incorrect: "daily_work_records atual (snapshot vazio)",
+          hint: "Executar 'Reconstruir Relatórios' para reconciliar totais a partir de visits/visit_deposits.",
+        });
+        console.error("[REPORT_ERROR]", {
+          query: "daily_work_records WHERE cycle_id/agent_id",
+          returned: rows.length,
+          reason: "todos os DWRs no intervalo têm properties_worked=0",
+        });
+      }
+
+
       // Depósitos por tipo (soma de todas as diárias)
       const deposits = [
         { name: "A1", value: sum("deposits_a1") },
