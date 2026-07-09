@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isManagerRole } from "@/lib/role-guards";
 import { georeferenceProperty } from "@/lib/geolocation";
+import { ConfirmGpsOverwriteDialog } from "@/components/property/ConfirmGpsOverwriteDialog";
 
 interface Props {
   property: {
@@ -19,14 +20,13 @@ interface Props {
 
 export function PropertyLocationSection({ property, role, actorId, onUpdated }: Props) {
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const canEdit = isManagerRole(role);
   const lat = property.latitude != null ? Number(property.latitude) : null;
   const lng = property.longitude != null ? Number(property.longitude) : null;
   const hasCoords = lat != null && lng != null;
 
-  async function handleUpdate() {
-    if (!canEdit) return;
-    if (hasCoords && !window.confirm("Substituir a localização registrada deste imóvel?")) return;
+  async function runCapture() {
     setBusy(true);
     try {
       const coords = await georeferenceProperty(property.id, actorId);
@@ -36,6 +36,26 @@ export function PropertyLocationSection({ property, role, actorId, onUpdated }: 
       toast.error(err?.message || "Falha ao atualizar localização.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleUpdate() {
+    if (!canEdit) return;
+    if (hasCoords) {
+      console.log("[GPS_ALREADY_EXISTS]", { propertyId: property.id });
+      setConfirmOpen(true);
+      return;
+    }
+    void runCapture();
+  }
+
+  function handleDecision(decision: "update" | "keep" | "cancel") {
+    setConfirmOpen(false);
+    if (decision === "update") {
+      console.log("[GPS_UPDATE_ACCEPTED]", { propertyId: property.id });
+      void runCapture();
+    } else {
+      console.log("[GPS_UPDATE_CANCELLED]", { propertyId: property.id, decision });
     }
   }
 
@@ -98,6 +118,7 @@ export function PropertyLocationSection({ property, role, actorId, onUpdated }: 
           Imóvel ainda não georreferenciado. A localização será solicitada na primeira visita.
         </p>
       )}
+      <ConfirmGpsOverwriteDialog open={confirmOpen} onDecision={handleDecision} />
     </section>
   );
 }
