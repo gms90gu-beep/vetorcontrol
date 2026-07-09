@@ -384,8 +384,9 @@ function PropertyVisitPage() {
           filter: (p) => p.block_id === prop.block_id,
         });
         if (allProps) {
-          allProps.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
-          setBlockProperties(allProps);
+          const ordered = sortPropertiesOperational(allProps as any);
+          console.log("[PROPERTY_ORDER_SOURCE]", { screen: "property.detail", file: "src/routes/_authenticated.property.$propertyId.tsx", fn: "sortPropertiesOperational" });
+          setBlockProperties(ordered);
         }
       }
 
