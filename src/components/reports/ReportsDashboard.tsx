@@ -71,12 +71,20 @@ export function ReportsDashboard() {
     fetchDashboardData();
   }, [filters]);
 
+  const rebuildFn = useServerFn(rebuildDailyRecords);
+  const [rebuilding, setRebuilding] = useState(false);
+
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
       // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
-      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
+      console.log("[REPORT_LOAD]", { filters, cycleFilter });
+      console.log("[REPORT_FILTER]", {
+        agent_id: filters.agent,
+        cycle_id: cycleFilter,
+        week_id: filters.week,
+      });
       const records = await listRemoteOrCache<any>({
         name: "daily_work_records",
         remote: async () => {
@@ -90,7 +98,12 @@ export function ReportsDashboard() {
           (filters.agent === "all" || r.agent_id === filters.agent),
       });
       const rows = records || [];
-      console.log(`[RELATORIOS_FONTE] daily_work_records=${rows.length} ciclo=${cycleFilter || "—"}`);
+      console.log("[REPORT_SOURCE]", {
+        table: "daily_work_records",
+        fn: "listRemoteOrCache",
+        count: rows.length,
+      });
+
 
       setDailies(rows);
 
