@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { format } from "date-fns";
 import { translate } from "./translations";
+import { comparePropertyOrder } from "./property-order";
 
 interface Property {
   number: string;
@@ -115,16 +116,9 @@ export const generateRGPDF = async (
     propertiesByStreet[street].push(p);
   });
 
-  // Sort by property number ascending (same order as the listing view).
-  // SEQ remains independent and is displayed as stored.
-  properties = [...properties].sort((a, b) => {
-    const na = parseInt(a.number, 10);
-    const nb = parseInt(b.number, 10);
-    if (isNaN(na) && isNaN(nb)) return (a.number || "").localeCompare(b.number || "");
-    if (isNaN(na)) return 1;
-    if (isNaN(nb)) return -1;
-    return na - nb;
-  });
+  // Ordenação operacional canônica — número, sequência, complemento.
+  // Nunca considera tipo do imóvel.
+  properties = [...properties].sort(comparePropertyOrder);
 
   const streets = Object.keys(propertiesByStreet).sort();
   

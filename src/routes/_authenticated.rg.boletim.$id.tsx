@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { comparePropertyOrder } from "@/lib/property-order";
 import { Button } from "@/components/ui/button";
 import {
   Printer,
@@ -76,9 +77,7 @@ function tipoCodigo(t: string): "R" | "C" | "TB" | "PE" | "O" {
   return "O";
 }
 
-function comparePropertyNumber(a: Property, b: Property) {
-  return (Number.parseInt(a.number, 10) || 0) - (Number.parseInt(b.number, 10) || 0);
-}
+const comparePropertyNumber = comparePropertyOrder;
 
 function BoletimView() {
   const { id } = useParams({ from: "/_authenticated/rg/boletim/$id" });

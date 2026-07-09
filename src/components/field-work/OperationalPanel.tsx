@@ -21,6 +21,7 @@ import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getEpiWeek } from "@/lib/cycle-week";
+import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
 
 type FilterKey =
   | "all" | "pending" | "visited" | "closed" | "refused"
@@ -50,19 +51,9 @@ function typeLabel(t?: string | null) {
   return map[t] || t;
 }
 
-// Ordenação inteligente: número, sequência, complemento (natural)
-function smartCompare(a: any, b: any) {
-  const na = parseInt(String(a.number ?? "").replace(/\D/g, ""), 10);
-  const nb = parseInt(String(b.number ?? "").replace(/\D/g, ""), 10);
-  const nA = isNaN(na) ? Number.MAX_SAFE_INTEGER : na;
-  const nB = isNaN(nb) ? Number.MAX_SAFE_INTEGER : nb;
-  if (nA !== nB) return nA - nB;
-  const sa = a.sequence ?? 0;
-  const sb = b.sequence ?? 0;
-  if (sa !== sb) return sa - sb;
-  const ca = String(a.complement ?? "").localeCompare(String(b.complement ?? ""), "pt-BR", { numeric: true, sensitivity: "base" });
-  return ca;
-}
+// Ordenação operacional canônica — número, sequência, complemento.
+// Nunca considerar tipo do imóvel. Fonte única em @/lib/property-order.
+const smartCompare = comparePropertyOrder;
 
 interface Props {
   session: any;
@@ -132,7 +123,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
           .order("sequence", { ascending: true, nullsFirst: false }) as any,
         filter: (p) => p.block_id === session.block_id,
       });
-      const sorted = [...(props || [])].sort(smartCompare);
+      const sorted = sortPropertiesOperational(props || []);
       setProperties(sorted);
       try { sessionStorage.setItem(`op_panel_order_${session.block_id}`, JSON.stringify(sorted.map((p) => p.id))); } catch {}
 
