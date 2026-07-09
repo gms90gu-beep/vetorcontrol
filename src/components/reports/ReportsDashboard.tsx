@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch } from "@/lib/offline/safe-fetch";
 import { listRemoteOrCache } from "@/lib/offline/repos";
@@ -6,7 +7,7 @@ import { ReportsFilters } from "./ReportsFilters";
 import { OperationalKPIs } from "./OperationalKPIs";
 import { OperationalCharts } from "./OperationalCharts";
 import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2 } from "lucide-react";
+import { Download, Share2, Printer, LayoutDashboard, FileText, ChevronRight, BarChart3, CheckCircle2, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
@@ -15,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek } from "@/lib/cycle-week";
+import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
