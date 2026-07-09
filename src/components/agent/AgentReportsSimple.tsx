@@ -151,18 +151,20 @@ export function AgentReportsSimple() {
       cycleNumber: null,
     });
 
-  const handleDailyPdf = async () => {
-    if (!todayRecord) {
-      toast.info("Nenhum relatório diário encontrado para hoje.");
+  const handleDailyPdf = async (idOverride?: string) => {
+    const targetId = idOverride ?? todayRecord?.id;
+    if (!targetId) {
+      toast.info("Nenhum relatório diário encontrado.");
       return;
     }
     toast.info("Gerando PDF diário…");
-    const res = await buildDailyPdf(todayRecord.id);
+    const res = await buildDailyPdf(targetId);
     if (res) {
       res.pdf.save(res.fileName);
       toast.success("PDF gerado");
     }
   };
+
 
   const handleWeeklyPdf = async () => {
     if (!authId) return;
