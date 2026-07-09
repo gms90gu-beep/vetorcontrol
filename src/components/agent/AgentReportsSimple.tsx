@@ -101,10 +101,17 @@ export function AgentReportsSimple() {
     })();
   }, [fetchDailies]);
 
+  // Usa a diária de hoje quando existir; caso contrário, a mais recente encerrada.
+  // Evita "Sem boletim hoje" quando o agente encerrou jornadas em dias anteriores.
   const todayRecord = useMemo(
-    () => dailies.find((d) => d.work_date === today) || null,
+    () =>
+      dailies.find((d) => d.work_date === today) ||
+      dailies.find((d) => d.status === "completed") ||
+      dailies[0] ||
+      null,
     [dailies, today]
   );
+  const isTodayRecord = todayRecord?.work_date === today;
 
   const weekRecords = useMemo(
     () =>
@@ -127,6 +134,7 @@ export function AgentReportsSimple() {
     larvicide: Number(todayRecord?.larvicide_amount || 0),
   };
 
+
   const weekStats = {
     worked: sum(weekRecords, "properties_worked"),
     blocks: sum(weekRecords, "blocks_worked"),
@@ -143,18 +151,20 @@ export function AgentReportsSimple() {
       cycleNumber: null,
     });
 
-  const handleDailyPdf = async () => {
-    if (!todayRecord) {
-      toast.info("Nenhum relatório diário encontrado para hoje.");
+  const handleDailyPdf = async (idOverride?: string) => {
+    const targetId = idOverride ?? todayRecord?.id;
+    if (!targetId) {
+      toast.info("Nenhum relatório diário encontrado.");
       return;
     }
     toast.info("Gerando PDF diário…");
-    const res = await buildDailyPdf(todayRecord.id);
+    const res = await buildDailyPdf(targetId);
     if (res) {
       res.pdf.save(res.fileName);
       toast.success("PDF gerado");
     }
   };
+
 
   const handleWeeklyPdf = async () => {
     if (!authId) return;
@@ -224,16 +234,19 @@ export function AgentReportsSimple() {
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">
-                Resumo do Dia
+                {isTodayRecord ? "Resumo do Dia" : "Última Diária Encerrada"}
               </h3>
               <p className="text-[11px] font-bold text-slate-400 uppercase">
-                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+                {todayRecord
+                  ? format(new Date(`${todayRecord.work_date}T12:00:00`), "EEEE, dd 'de' MMMM", { locale: ptBR })
+                  : format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
               </p>
             </div>
           </div>
           <Badge className="bg-emerald-600 text-white text-[10px] font-black">
-            HOJE
+            {isTodayRecord ? "HOJE" : "MAIS RECENTE"}
           </Badge>
+
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -318,7 +331,7 @@ export function AgentReportsSimple() {
         </h3>
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={handleDailyPdf}
+            onClick={() => handleDailyPdf()}
             variant="outline"
             className="rounded-xl h-11 px-4 font-bold text-xs uppercase tracking-wide border-slate-200"
           >
