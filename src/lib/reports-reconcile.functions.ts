@@ -49,11 +49,12 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Local day (UTC-3) helper — visit_date is timestamptz; group by local date.
+    // Data operacional oficial: America/Sao_Paulo (Brasil sem DST → UTC-3 fixo).
+    // Precisa bater com public.operational_date() no banco.
     const localDate = (iso: string) => {
       const d = new Date(iso);
-      d.setUTCHours(d.getUTCHours() - 3);
-      return d.toISOString().slice(0, 10);
+      const saoPaulo = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+      return saoPaulo.toISOString().slice(0, 10);
     };
 
     // Range as timestamps covering local days (UTC-3): pad ±1 day for safety.
