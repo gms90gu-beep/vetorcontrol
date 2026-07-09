@@ -26,6 +26,7 @@ import {
   BarChart3,
   Droplets
 } from "lucide-react";
+import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -402,7 +403,8 @@ function FieldWorkListPage() {
               const m = String(n ?? "").match(/\d+/);
               return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
             };
-            dedup.sort((a, b) => parseNum(a.number) - parseNum(b.number));
+            console.log("[PROPERTY_ORDER_SOURCE]", { screen: "field-work-list.dbAudit", file: "src/routes/_authenticated.field-work-list.tsx", fn: "comparePropertyOrder" });
+            dedup.sort((a, b) => comparePropertyOrder(a as any, b as any));
 
             console.log("[DB_BLOCK_PROPERTIES]", {
               session_block_id: session.block_id ?? null,
@@ -535,27 +537,8 @@ function FieldWorkListPage() {
         });
 
 
-        const seqKey = (s: any) => {
-          if (s === null || s === undefined || s === "") return Number.MAX_SAFE_INTEGER;
-          const v = Number(s);
-          return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
-        };
-        const numKey = (n: any) => {
-          const v = parseInt(String(n ?? "").replace(/\D/g, ""), 10);
-          return Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
-        };
-        const norm = (s: any) => String(s ?? "").trim().toLowerCase();
-        const props = [...(propsRaw || [])].sort((a: any, b: any) => {
-          const sa = seqKey(a.sequence); const sb = seqKey(b.sequence);
-          if (sa !== sb) return sa - sb;
-          const ra = norm(a.street_name); const rb = norm(b.street_name);
-          if (ra !== rb) return ra < rb ? -1 : 1;
-          const na = numKey(a.number); const nb = numKey(b.number);
-          if (na !== nb) return na - nb;
-          const ca = norm(a.complement); const cb = norm(b.complement);
-          if (ca !== cb) return ca < cb ? -1 : 1;
-          return String(a.id).localeCompare(String(b.id));
-        });
+        console.log("[PROPERTY_ORDER_SOURCE]", { screen: "field-work-list.session", file: "src/routes/_authenticated.field-work-list.tsx", fn: "sortPropertiesOperational" });
+        const props = sortPropertiesOperational([...(propsRaw || [])] as any[]);
 
         if (props) {
           const propertyIds = props.map((p: any) => p.id).filter(Boolean);
@@ -815,14 +798,10 @@ function FieldWorkListPage() {
           });
 
 
-          normalizedProps.sort((a: any, b: any) => {
-            const na = parseInt(a.number, 10);
-            const nb = parseInt(b.number, 10);
-            if (isNaN(na) && isNaN(nb)) return 0;
-            if (isNaN(na)) return 1;
-            if (isNaN(nb)) return -1;
-            return na - nb;
-          });
+          console.log("[PROPERTY_ORDER_SOURCE]", { screen: "field-work-list.normalized", file: "src/routes/_authenticated.field-work-list.tsx", fn: "sortPropertiesOperational" });
+          const _sorted = sortPropertiesOperational(normalizedProps as any);
+          normalizedProps.length = 0;
+          normalizedProps.push(..._sorted);
           setProperties(normalizedProps);
           console.log("[SESSION_PROPERTIES_READY]", { count: normalizedProps.length });
           console.log("[SESSION_VISITS_READY]", { count: blockCycleVisits.length, marked: markedCount });
