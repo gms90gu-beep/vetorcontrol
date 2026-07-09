@@ -660,6 +660,26 @@ export function DailyWorkCloser({
       const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
       const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
+      if (!activeSessionForClose?.session_date) {
+        console.error("[PRODUCTION_DATE_ERROR]", {
+          module: "DailyWorkCloser",
+          reason: "sessão sem session_date ao fechar DWR",
+          fallback: operationalWorkDate,
+        });
+      } else {
+        console.log("[PRODUCTION_DATE_SOURCE]", {
+          module: "DailyWorkCloser",
+          source: "field_work_sessions.session_date",
+          session_id: activeSessionForClose.id,
+          session_date: activeSessionForClose.session_date,
+        });
+      }
+      console.log("[PRODUCTION_DATE_PROPAGATION]", {
+        module: "daily_work_records",
+        session_date: activeSessionForClose?.session_date ?? null,
+        work_date: operationalWorkDate,
+      });
+
       console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
       if (sessionIsRetro) {
         console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });

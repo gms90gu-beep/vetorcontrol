@@ -40,7 +40,7 @@ import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
-import { getOperationalVisitDate } from "@/lib/operational-date";
+import { getOperationalVisitDate, assertProductionDate } from "@/lib/operational-date";
 import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
 import { FirstVisitStreetPrompt } from "@/components/property/FirstVisitStreetPrompt";
 import { getBlockCurrentStreet, detectFromGPS, isSameStreet } from "@/lib/current-street";
@@ -556,7 +556,7 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
-      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date, "visits.insert");
 
       const visitPayload = {
         property_id: propertyId as string,
@@ -569,6 +569,8 @@ function PropertyVisitPage() {
         activity_type: (activityMap[activity] || "routine") as any,
         visit_date: operationalVisitDate,
       };
+
+      assertProductionDate(activeSession.session_date, operationalVisitDate, "visits.insert");
 
 
       console.log("[VISIT_SAVE_START]", {
@@ -640,7 +642,8 @@ function PropertyVisitPage() {
         "pending": "pending"
       };
 
-      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date);
+      const operationalVisitDate = getOperationalVisitDate(activeSession.session_date, "visits.insert.survey");
+      assertProductionDate(activeSession.session_date, operationalVisitDate, "visits.insert.survey");
 
       const visitPayload = {
         property_id: propertyId as string,
