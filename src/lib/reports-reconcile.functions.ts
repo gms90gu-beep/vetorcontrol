@@ -8,6 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { epiWeekFromDate } from "@/lib/operational-date";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
