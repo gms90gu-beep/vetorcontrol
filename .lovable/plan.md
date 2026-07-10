@@ -1,52 +1,83 @@
-# Fase 2 — Inteligência Operacional (plano)
+# Suíte de Regressão VetorControl
 
-Escopo grande. Proponho quebrar em **5 entregas incrementais**, cada uma estável antes da próxima. Todas usam tabelas existentes (`field_work_sessions`, `properties`, `visits`, `boletins_rg`, `daily_work_records`, `blocks`), relacionamento por `block_id`, e **zero mudança** em Sync Engine / SafeFetch / Repos / Dexie / RLS.
+Cobertura média: unitários, integração (com Supabase mockado), E2E Playwright, offline (Dexie real via fake-indexeddb) e CI bloqueante no GitHub Actions.
 
-Sem registro de horário por visita, sem tempo por imóvel — confirmado.
+## 1. Infraestrutura
 
-## Entrega 2.A — Mapa Operacional do Quarteirão
-- Novo componente `BlockOperationalMap.tsx` em `src/components/field-work/`, usando `@/components/map/shared` (`SharedMap` + `SharedMarkerLayer`).
-- Fonte: `properties` do `block_id` da jornada em `in_progress`, cruzando com `visits` (visitado / foco / pendente) e `type` (PE / terreno).
-- Cores: verde=visitado, vermelho=foco, laranja=pendente, azul=PE, cinza=não iniciado.
-- Popup: número, complemento, tipo, situação, foco, pendência, coords, botão "Abrir Visita" (navega para `/property/$id`), botão "🧭 Navegar" (abre `https://www.google.com/maps/dir/?api=1&destination=lat,lng`).
-- Filtros: Todos, Visitados, Pendentes, Focos, PE, Terrenos, Sem GPS.
-- Heatmap opcional (toggle) via `leaflet.heat` já disponível no projeto de mapas.
-- Integração: novo botão "Mapa" na barra fixa do `OperationalPanel` abre em `Dialog` fullscreen.
+Instalar: `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`, `fake-indexeddb`, `@playwright/test`, `msw`.
 
-## Entrega 2.B — Assistente Operacional (regras, sem IA)
-- Componente `SmartAssistantCard.tsx` no topo colapsável do painel.
-- Regras derivadas dos dados já carregados: pendentes, sem GPS, focos sem visita fechada, depósitos sem foco vinculado, % concluído.
-- Mensagens estáticas em pt-BR + botão de ação ("Ir para o primeiro pendente", "Georreferenciar", etc.).
+Novos arquivos de config:
+- `vitest.config.ts` — jsdom, setup file, alias `@`, coverage.
+- `tests/setup.ts` — jest-dom, `fake-indexeddb/auto`, mocks globais (`matchMedia`, `navigator.geolocation`, `navigator.onLine`).
+- `tests/mocks/supabase.ts` — factory de client mockado (from/rpc/auth encadeáveis).
+- `tests/mocks/geolocation.ts` — helpers `mockGeoSuccess/Denied/Unavailable/Timeout`.
+- `playwright.config.ts` — baseURL `http://localhost:8080`, chromium, reuse dev server.
+- Scripts em `package.json`: `test`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`.
 
-## Entrega 2.C — Histórico Territorial do Imóvel
-- Nova aba/seção "Histórico" em `_authenticated.property.$propertyId.tsx`.
-- Query: todas as `visits` do `property_id` ordenadas por ciclo/semana, com agente, foco, coords, fotos (se houver).
-- Timeline vertical simples (ciclo → resultado).
+## 2. Testes unitários (`tests/unit/`)
 
-## Entrega 2.D — Checklist Inteligente de Encerramento
-- Estender `src/lib/shift-validation.ts` + `DailyWorkCloser.tsx`.
-- Verificações extras: GPS ausente, focos/depósitos/larvicida vinculados, DWR gerado.
-- Modal com lista de inconsistências e botões: Corrigir (deep-link), Sincronizar, Finalizar mesmo assim (apenas supervisor/admin).
+- `operational-date.test.ts` — `getOperationalDate` (22:30 BRT, 23:59 BRT, virada UTC), `epiWeekFromDate`, `getOperationalVisitDate`, `assertProductionDate`.
+- `property-order.test.ts` — ordenação, complemento, sequência de navegação.
+- `session-state.test.ts` — máquina de estados da jornada.
+- `production-integrity.test.ts` — validações de DWR/visita.
+- `epi-week.test.ts` — semana epidemiológica.
+- `cycle-week.test.ts` — resolução de ciclo/semana.
 
-## Entrega 2.E — UX Avançada
-- Swipe esquerda/direita para navegar entre imóveis na tela de visita.
-- Botões rápidos "Ir para primeiro pendente/foco/PE/sem GPS" no assistente.
-- Long-press na lista → menu com Abrir/Georref/Editar/Histórico/Mapa.
-- Fotos rápidas (imóvel/foco/depósito) reutilizando componentes existentes.
+## 3. Testes de integração (`tests/integration/`)
 
-## Ordem sugerida
-1. **2.A Mapa** (maior valor visível, isolado)
-2. **2.B Assistente** (baixo risco, curto)
-3. **2.E UX** (polimento em cima do painel)
-4. **2.C Histórico** (mudança na tela de imóvel)
-5. **2.D Checklist** (mais crítico, por último para estabilizar)
+Supabase mockado, Dexie real.
+
+- `dwr-close.test.tsx` — `DailyWorkCloser` fecha jornada com `status='completed'`, `end_time`, `work_date` corretos, `onConflict='legacy_agent_id,work_date'`.
+- `dwr-rebuild.test.ts` — chama RPC `rebuild_daily_work_records`, verifica idempotência (2 chamadas → mesmo estado).
+- `dashboard-vs-dwr.test.ts` — totais do dashboard batem com soma de DWR.
+- `reports-vs-dwr.test.ts` — relatórios semanais consistentes com DWR.
+- `session-visits.test.ts` — RPC `get_session_visits` + filtros Pendentes/Visitados/Fechados.
+
+## 4. Offline (`tests/offline/`)
+
+- `dexie-queue.test.ts` — enfileirar mutação offline, `pendingMutationCount`.
+- `sync-flush.test.ts` — reconexão dispara `flushMutations`, remove itens ok.
+- `sync-retry.test.ts` — erro incrementa `tries`, respeita `MAX_RETRIES`.
+- `sync-conflict.test.ts` — `23505` tratado como sucesso.
+- `sync-rebuild.test.ts` — `purgeInvalidTmpMutations` remove IDs legados.
+
+Reutiliza `tests/offline/offline-suite.spec.ts` existente para E2E offline.
+
+## 5. Playwright E2E (`tests/e2e/`)
+
+Session Supabase injetada via `LOVABLE_BROWSER_SUPABASE_*` (skip gracioso se ausente).
+
+- `jornada.spec.ts` — iniciar, continuar, encerrar.
+- `trabalho.spec.ts` — abrir tela de trabalho, navegar entre imóveis.
+- `rg.spec.ts` — gerar RG.
+- `pdf.spec.ts` — exportar PDF (verifica download).
+- `dashboard.spec.ts` — carrega KPIs.
+- `relatorios.spec.ts` — carrega relatórios.
+
+## 6. CI (`.github/workflows/ci.yml`)
+
+Jobs em PRs:
+1. `lint-typecheck` — `tsgo`.
+2. `unit` — `bun test:unit --coverage`.
+3. `integration` — `bun test:integration`.
+4. `e2e` — `bun run build && bun test:e2e`.
+
+Todos required checks; falha em qualquer suíte de Produção/Jornada/Dashboard/Relatórios/DWR bloqueia merge (via matriz de jobs nomeados e branch protection).
+
+Documentação `docs/testing.md` explicando como rodar e adicionar testes.
 
 ## Detalhes técnicos
-- Mapa: `SharedMap` já resolve tiles, cluster, fallback. `MARKER_COLORS` já cobre a paleta.
-- Google Maps navigation: link externo puro (`window.open`), sem API key.
-- Long-press: hook `usePointerLongPress` simples (sem lib).
-- Swipe: `@use-gesture/react` (já no bundle? — verificar; senão, handler pointer nativo).
-- Nada de novas tabelas, nenhuma migração, nenhum edge function.
 
-## Pergunta
-Confirma esta divisão em 5 entregas nessa ordem, ou prefere entregar tudo de uma vez / mudar a ordem?
+- Mock do Supabase usa chain builder retornando `{ data, error }` para `.from().select().eq()...` e `.rpc()`.
+- Dexie usa `fake-indexeddb/auto` no setup, resetado em `beforeEach`.
+- Geolocation via `Object.defineProperty(navigator, 'geolocation', { value: mock })`.
+- Playwright roda contra dev server já ativo em `:8080`; sem gerenciar ciclo de vida.
+- Testes de integridade SQL (pgTAP) ficam fora — exigem banco Postgres dedicado; será TODO documentado.
+
+## Entrega
+
+Vou executar em 2 turnos:
+- **Turno 1 (este):** config, setup, mocks, todos os unitários e de integração, offline unit tests, workflow CI, docs.
+- **Turno 2 (próximo):** specs Playwright E2E (após confirmar que unit/integration passam).
+
+Confirma para eu começar?
