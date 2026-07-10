@@ -810,11 +810,20 @@ export function DailyWorkCloser({
 
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
-      const savedDaily: any = await upsertOffline(
-        "daily_work_records",
-        recordData,
-        { onConflict: "agent_id,work_date" },
-      );
+      const dwrConflictTarget = "legacy_agent_id,work_date";
+      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id, work_date: recordData.work_date });
+      console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_date_unique(legacy_agent_id, work_date)" });
+      let savedDaily: any;
+      try {
+        savedDaily = await upsertOffline(
+          "daily_work_records",
+          { ...recordData, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id },
+          { onConflict: dwrConflictTarget },
+        );
+      } catch (e: any) {
+        console.error("[DWR_CONFLICT_ERROR]", { onConflict: dwrConflictTarget, message: e?.message, details: e?.details, hint: e?.hint });
+        throw e;
+      }
       console.log("[DIARIA_SALVA]", {
         id: savedDaily?.id ?? null,
         agent_id: recordData.agent_id,
