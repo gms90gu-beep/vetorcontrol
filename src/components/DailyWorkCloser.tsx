@@ -881,6 +881,24 @@ export function DailyWorkCloser({
         epi_week: recordData.epi_week,
         epi_year: recordData.epi_year,
       });
+      console.log("[DAY_CLOSE_DWR]", {
+        dwr_id: savedDaily?.id ?? null,
+        agent_id: recordData.agent_id,
+        work_date: recordData.work_date,
+        sessions_consolidated: dayAllSessions.length,
+        session_ids: dayAllSessionIds,
+        properties_worked: recordData.properties_worked,
+        properties_closed: recordData.properties_closed,
+        properties_refused: recordData.properties_refused,
+        properties_positive: recordData.properties_positive,
+        positive_foci: recordData.positive_foci,
+        deposits_inspected: recordData.deposits_inspected,
+        deposits_treated: recordData.deposits_treated,
+        deposits_eliminated: recordData.deposits_eliminated,
+        larvicide_amount: recordData.larvicide_amount,
+        tubitos_collected: recordData.tubitos_collected,
+        blocks_worked: recordData.blocks_worked,
+      });
 
       // 1.1) Validador de integridade da produção — nunca bloqueia
       try {
