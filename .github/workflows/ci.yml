@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx tsgo --noEmit
+        continue-on-error: false
+
+  unit:
+    name: Unit tests (Produção · Jornada · DWR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Run unit tests
+        run: bunx vitest run tests/unit --reporter=default
+
+  integration:
+    name: Integration tests (Dashboard · Relatórios · DWR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Run integration tests
+        run: bunx vitest run tests/integration --reporter=default
+
+  offline:
+    name: Offline / Dexie / Sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Run offline tests
+        run: bunx vitest run tests/offline --reporter=default
+
+  e2e:
+    name: E2E Playwright (smoke)
+    runs-on: ubuntu-latest
+    needs: [unit, integration, offline]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install --with-deps chromium
+      - name: Start dev server
+        run: bun run dev &
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080 > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Dev server never became ready"; exit 1
+      - name: Run smoke E2E
+        run: bunx playwright test tests/e2e/smoke.spec.ts
