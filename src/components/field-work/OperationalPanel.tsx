@@ -51,6 +51,27 @@ function typeLabel(t?: string | null) {
   return map[t] || t;
 }
 
+/**
+ * Retorna a data operacional (YYYY-MM-DD) no fuso America/Sao_Paulo,
+ * espelhando a função SQL `public.operational_date(timestamptz)`. É a fonte
+ * única usada para casar `visits.visit_date` com `field_work_sessions.session_date`
+ * quando lemos do cache Dexie offline.
+ */
+const _opDateFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function operationalDateBR(iso: string | Date | null | undefined): string | null {
+  if (!iso) return null;
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return _opDateFmt.format(d);
+}
+
+
+
 // Ordenação operacional canônica — número, sequência, complemento.
 // Nunca considerar tipo do imóvel. Fonte única em @/lib/property-order.
 const smartCompare = comparePropertyOrder;
@@ -136,14 +157,22 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       }
     }
 
-    const dayStart = `${session.session_date}T00:00:00`;
-    const dayEnd = `${session.session_date}T23:59:59.999`;
-    const vsRes = await supabase.from("visits")
-      .select("id, property_id, status, has_focus, treatment_amount, visit_date")
-      .eq("agent_id", session.user_id)
-      .gte("visit_date", dayStart).lte("visit_date", dayEnd);
-    const vs = vsRes.data || [];
+    // Data operacional (America/Sao_Paulo) — fonte única, sem janelas UTC .gte/.lte.
+    // A RPC public.get_session_visits filtra por public.operational_date(visit_date) = session.session_date.
+    // Fallback offline: Dexie + filtro por operational_date computada no fuso do Brasil.
+    const vs = await listRemoteOrCache<any>({
+      name: "visits",
+      remote: () =>
+        supabase.rpc("get_session_visits" as any, {
+          _agent_id: session.user_id,
+          _session_date: session.session_date,
+        }) as any,
+      filter: (v) =>
+        v.agent_id === session.user_id &&
+        operationalDateBR(v.visit_date) === session.session_date,
+    });
     setVisits(vs);
+    audit("OP_PANEL_VISITS", { count: vs.length, source: (vs as any).source, session_date: session.session_date });
 
     if (vs.length) {
       const { data: deps } = await supabase.from("visit_deposits")
@@ -154,6 +183,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       setDeposits([]);
     }
     audit("OP_PANEL_REFRESH", { properties: (properties || []).length });
+
   }, [session?.id, session?.block_id, session?.session_date, session?.user_id, session?.cycle_id, session?.week_id]);
 
   useEffect(() => { loadAll(); }, [loadAll, refreshTick]);
