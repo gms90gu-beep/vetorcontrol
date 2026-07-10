@@ -935,7 +935,12 @@ export function DailyWorkCloser({
         return;
       }
 
-      const opDateStr = jornadaDate || getOperationalDate();
+      if (!jornadaDate) {
+        console.error("[PRODUCTION_DATE_ERROR]", { module: "DailyWorkCloser.defaultGeneratePDF", reason: "sem jornadaDate (session_date)" });
+        toast.error("Data da jornada indisponível. Não é possível gerar o PDF.");
+        return;
+      }
+      const opDateStr = jornadaDate;
       const startOfDay = new Date(`${opDateStr}T00:00:00`);
       const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
