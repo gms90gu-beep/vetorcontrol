@@ -25,6 +25,7 @@ import { InstallPromoCard } from "@/components/InstallPromoCard";
 import { RunningAsAppBadge } from "@/components/InstallAppButton";
 import { MyWeeklyConsolidation } from "@/components/agent/MyWeeklyConsolidation";
 import { BulletinPreview } from "@/components/agent/BulletinPreview";
+import { getOperationalDate } from "@/lib/operational-date";
 
 const DAILY_GOAL = 30;
 
@@ -95,7 +96,7 @@ export function AgentDashboard() {
       if (cancelled) return;
       setProfile(p ?? null);
 
-      const todayIso = new Date().toISOString().split("T")[0];
+      const todayIso = getOperationalDate();
       const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 

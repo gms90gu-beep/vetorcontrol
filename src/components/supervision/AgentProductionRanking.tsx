@@ -7,12 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Trophy, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { getOperationalDate } from "@/lib/operational-date";
 
 function isoDays(offsetDaysFromMonday: number, base = new Date()) {
-  const d = new Date(base);
-  const day = d.getDay() || 7;
-  d.setDate(d.getDate() - (day - 1) + offsetDaysFromMonday);
-  return d.toISOString().slice(0, 10);
+  const today = getOperationalDate(base);
+  const [y, m, d] = today.split("-").map(Number);
+  const local = new Date(y, m - 1, d);
+  const day = local.getDay() || 7;
+  local.setDate(local.getDate() - (day - 1) + offsetDaysFromMonday);
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
 }
 
 export function AgentProductionRanking() {

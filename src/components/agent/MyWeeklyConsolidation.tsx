@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { CalendarDays, CheckCircle2, XCircle, Bug, Droplets, Beaker, Home, TrendingUp, AlertTriangle, Eye } from "lucide-react";
+import { getOperationalDate } from "@/lib/operational-date";
 
 const WORK_DAYS = 5;
 
@@ -210,15 +211,23 @@ function Cell({ icon: Icon, label, value, highlight }: {
 }
 
 // ── Helpers de janela semanal (segunda → domingo da semana atual) ───────────
+// Base sempre na data operacional (America/Sao_Paulo) para evitar drift de UTC.
+function fmtLocal(x: Date): string {
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+}
+function localFromOp(d: Date): Date {
+  const [y, m, dd] = getOperationalDate(d).split("-").map(Number);
+  return new Date(y, m - 1, dd);
+}
 function isoMondayOf(d: Date): string {
-  const x = new Date(d);
+  const x = localFromOp(d);
   const day = x.getDay() || 7; // domingo=0 → 7
   x.setDate(x.getDate() - day + 1);
-  return x.toISOString().split("T")[0];
+  return fmtLocal(x);
 }
 function isoSundayOf(d: Date): string {
-  const x = new Date(d);
+  const x = localFromOp(d);
   const day = x.getDay() || 7;
   x.setDate(x.getDate() + (7 - day));
-  return x.toISOString().split("T")[0];
+  return fmtLocal(x);
 }

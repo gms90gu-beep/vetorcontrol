@@ -20,9 +20,11 @@ export const Route = createFileRoute("/_authenticated/heatmap")({
 });
 
 function isoOffset(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const today = getOperationalDate();
+  const [y, m, d] = today.split("-").map(Number);
+  const local = new Date(y, m - 1, d);
+  local.setDate(local.getDate() + days);
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
 }
 
 function classify(p: PropertyMapPoint) {

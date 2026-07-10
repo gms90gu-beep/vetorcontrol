@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { getOperationalDate } from "@/lib/operational-date";
 import { useNavigate } from "@tanstack/react-router";
 
 type FilterKey = "all" | "active" | "inactive" | "no_session";
@@ -93,9 +94,7 @@ export function SupervisionDashboard() {
         (p: any) => p.role === "agente" || p.role === "agent",
       );
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayISO = todayStart.toISOString().slice(0, 10);
+      const todayISO = getOperationalDate();
 
       const [visits, sessions] = await Promise.all([
         listRemoteOrCache<any>({

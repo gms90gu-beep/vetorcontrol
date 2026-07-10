@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { getOperationalDate } from "@/lib/operational-date";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -52,7 +53,7 @@ export function CoordinatorDashboard() {
         (p: any) => p.role === "agente" || p.role === "agent",
       );
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getOperationalDate();
       const [visits, openSessions] = await Promise.all([
         listRemoteOrCache<any>({
           name: "visits",
