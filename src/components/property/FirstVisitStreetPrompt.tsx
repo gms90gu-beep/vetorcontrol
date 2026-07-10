@@ -57,35 +57,31 @@ export function FirstVisitStreetPrompt({
   async function handleDetectGps() {
     console.log("[GPS_BUTTON_CLICK]", { hasCoords: !!coords, blockId });
     setDetecting(true);
-    try {
-      // Permissões
-      try {
-        const perm: any =
-          (navigator as any).permissions &&
-          (await (navigator as any).permissions.query({ name: "geolocation" }));
-        console.log("[GPS_PERMISSION]", { state: perm?.state ?? "unknown" });
-        if (perm?.state === "denied") {
-          toast.error("Permissão de localização negada. Ative-a nas configurações do navegador.");
-          return;
-        }
-      } catch (e) {
-        console.log("[GPS_PERMISSION]", { state: "query_unsupported" });
-      }
 
-      // Captura coordenadas (usa as passadas ou requisita novas)
-      let useCoords = coords ?? null;
+    // IMPORTANTE: chamar getCurrentPosition SÍNCRONO dentro do gesto do usuário.
+    // Qualquer `await` antes disso quebra o contexto de gesto e o navegador
+    // rejeita silenciosamente a chamada de GPS.
+    const capture = (): Promise<typeof coords> => {
+      if (coords) return Promise.resolve(coords);
+      return requestCurrentPosition();
+    };
+
+    try {
+      let useCoords;
+      try {
+        useCoords = await capture();
+      } catch (err: any) {
+        console.warn("[GPS_POSITION]", { error: err?.message, code: err?.code });
+        const code = err?.code;
+        if (code === 1) toast.error("Permissão de localização negada. Ative-a nas configurações do navegador.");
+        else if (code === 2) toast.error("Localização indisponível no momento.");
+        else if (code === 3) toast.error("Tempo esgotado ao obter GPS.");
+        else toast.error("Não foi possível obter a localização.");
+        return;
+      }
       if (!useCoords) {
-        try {
-          useCoords = await requestCurrentPosition();
-        } catch (err: any) {
-          console.warn("[GPS_POSITION]", { error: err?.message, code: err?.code });
-          const code = err?.code;
-          if (code === 1) toast.error("Permissão de localização negada.");
-          else if (code === 2) toast.error("Localização indisponível no momento.");
-          else if (code === 3) toast.error("Tempo esgotado ao obter GPS.");
-          else toast.error("Não foi possível obter a localização.");
-          return;
-        }
+        toast.error("Não foi possível obter a localização.");
+        return;
       }
       console.log("[GPS_POSITION]", {
         latitude: useCoords.latitude,
