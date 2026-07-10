@@ -1657,6 +1657,10 @@ export type Database = {
         Returns: boolean
       }
       operational_date: { Args: { ts: string }; Returns: string }
+      rebuild_daily_work_records: {
+        Args: { _agent?: string; _from?: string; _to?: string }
+        Returns: Json
+      }
       reconcile_rg_integrity: { Args: never; Returns: Json }
       recover_session_visits: { Args: { _session_id: string }; Returns: Json }
       regenerate_cycle_weeks: {
