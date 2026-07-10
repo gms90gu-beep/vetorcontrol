@@ -9,6 +9,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
+import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
