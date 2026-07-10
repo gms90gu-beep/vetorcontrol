@@ -31,6 +31,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getOperationalDate } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
 import { CycleWeekBadge } from "@/components/CycleWeekBadge";
@@ -106,7 +107,7 @@ export function OperationalHeader() {
         // Data operacional: se há sessão (mesmo retroativa), usa session_date; senão, hoje.
         const opDateStr: string = session?.session_date
           ? session.session_date
-          : new Date().toISOString().split('T')[0];
+          : getOperationalDate();
         console.log("[CICLO]", { work_date: opDateStr, cycle_id: cycle.id });
 
         // 4. Get cycle week using operational date (work_date), not today.

@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getHeatmapData, getPropertyMapPoints, type PropertyMapPoint } from "@/lib/wave-c.functions";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
+import { getOperationalDate } from "@/lib/operational-date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,11 @@ export const Route = createFileRoute("/_authenticated/heatmap")({
 });
 
 function isoOffset(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const today = getOperationalDate();
+  const [y, m, d] = today.split("-").map(Number);
+  const local = new Date(y, m - 1, d);
+  local.setDate(local.getDate() + days);
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
 }
 
 function classify(p: PropertyMapPoint) {

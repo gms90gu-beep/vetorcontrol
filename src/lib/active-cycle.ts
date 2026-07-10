@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export type ActiveCycle = {
   id: string;
@@ -17,7 +18,7 @@ export type ActiveCycle = {
  *   3) ciclo com status='in_progress'                            (fallback final)
  */
 export async function getActiveCycleForUser(userId: string | null | undefined): Promise<ActiveCycle | null> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getOperationalDate();
 
   // 1 — Ciclo pela DATA atual (regra principal)
   const { data: byDate } = await supabase

@@ -5,10 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
+import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
 
-// ISO/epidemiological week from a Date — delegates to canonical helper.
+// Semana epidemiológica derivada da DATA OPERACIONAL (America/Sao_Paulo).
 function epiWeekOf(date: Date): { week: number; year: number } {
-  return getEpiWeek(date);
+  return epiWeekFromDate(getOperationalDate(date));
 }
 
 function pct(n: number, d: number) {
@@ -37,13 +38,14 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       .maybeSingle();
 
     const { week: epiWeek, year: epiYear } = epiWeekOf(referenceDate);
-    console.log("[SE]", { work_date: referenceDate.toISOString().split("T")[0], epi_week: epiWeek, epi_year: epiYear });
+    const refOpDate = getOperationalDate(referenceDate);
+    console.log("[SE]", { work_date: refOpDate, epi_week: epiWeek, epi_year: epiYear });
 
     // Ciclo ativo do usuário — boletim NUNCA mistura ciclos
     const activeCycle = await getActiveCycleForUser(agentAuthId);
-    console.log("[CICLO]", { work_date: referenceDate.toISOString().split("T")[0], cycle_id: activeCycle?.id ?? null });
+    console.log("[CICLO]", { work_date: refOpDate, cycle_id: activeCycle?.id ?? null });
     const refCycleWeek = activeCycle?.id ? await resolveCycleWeek(activeCycle.id, referenceDate) : null;
-    console.log("[SEMANA_CICLO]", { work_date: referenceDate.toISOString().split("T")[0], cycle_id: activeCycle?.id ?? null, cycle_week: refCycleWeek?.number ?? null });
+    console.log("[SEMANA_CICLO]", { work_date: refOpDate, cycle_id: activeCycle?.id ?? null, cycle_week: refCycleWeek?.number ?? null });
     console.log(`[CICLO] WeeklyReport usando ciclo ${activeCycle?.name || activeCycle?.id || "—"}`);
 
     let dailiesQuery = supabase

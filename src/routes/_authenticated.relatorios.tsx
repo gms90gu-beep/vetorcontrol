@@ -57,6 +57,7 @@ import {
 import { AgentReportsSimple } from "@/components/agent/AgentReportsSimple";
 import { useServerFn } from "@tanstack/react-start";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import { getOperationalDate } from "@/lib/operational-date";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,11 +91,11 @@ function RelatoriosPage() {
   const handleRebuild = async () => {
     setConfirmOpen(false);
     setRebuilding(true);
-    const today = new Date();
-    const to = today.toISOString().slice(0, 10);
-    const fromDate = new Date(today);
+    const to = getOperationalDate();
+    const [ty, tm, td] = to.split("-").map(Number);
+    const fromDate = new Date(ty, tm - 1, td);
     fromDate.setDate(fromDate.getDate() - 90);
-    const from = fromDate.toISOString().slice(0, 10);
+    const from = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, "0")}-${String(fromDate.getDate()).padStart(2, "0")}`;
     console.log("[PRODUCTION_INTEGRITY_START]", { from, to });
     try {
       const res = await rebuildFn({ data: { from, to } });
