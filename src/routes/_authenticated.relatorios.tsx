@@ -479,7 +479,7 @@ function AgentReports() {
 
   const handleWeeklyShare = async () => {
     if (!authId) return;
-    const result = await generateWeeklyReportPDF(authId);
+    const result = await generateWeeklyReportPDF(authId, new Date());
     if (result) openWhatsAppShare(result.fileName, agentMeta.name);
   };
 

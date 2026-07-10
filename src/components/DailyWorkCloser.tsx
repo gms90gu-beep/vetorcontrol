@@ -320,7 +320,12 @@ export function DailyWorkCloser({
       );
       const active = localSessions
         .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-      const workDate: string = active?.session_date ?? getOperationalDate();
+      if (!active?.session_date) {
+        console.error("[PRODUCTION_DATE_ERROR]", { module: "DailyWorkCloser.handlePreClose", reason: "sessão ativa sem session_date" });
+        toast.error("Jornada sem data de sessão. Abra uma nova jornada para prosseguir.");
+        return;
+      }
+      const workDate: string = active.session_date;
 
       const report = await runShiftValidation({
         userId: user.id,
@@ -392,16 +397,6 @@ export function DailyWorkCloser({
       if (cycle) {
         setActiveCycle(cycle);
 
-        const { data: week } = await supabase
-          .from("weeks")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .lte("start_date", getOperationalDate())
-          .gte("end_date", getOperationalDate())
-          .maybeSingle();
-        
-        if (week) setActiveWeek(week);
-
         // Considera a data da jornada ativa (se existir) como referência operacional
         const { data: activeSession } = await supabase
           .from("field_work_sessions")
@@ -420,9 +415,24 @@ export function DailyWorkCloser({
           createdAt: (activeSession as any)?.created_at ?? null,
         });
 
-        const opDateStr: string = activeSession?.session_date
-          ? activeSession.session_date
-          : getOperationalDate();
+        if (!activeSession?.session_date) {
+          console.warn("[PRODUCTION_DATE_ERROR]", {
+            module: "DailyWorkCloser.fetchDailyContext",
+            reason: "sem session_date; não é possível resolver semana/data operacional",
+          });
+          return;
+        }
+        const opDateStr: string = activeSession.session_date;
+
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .lte("start_date", opDateStr)
+          .gte("end_date", opDateStr)
+          .maybeSingle();
+
+        if (week) setActiveWeek(week);
         setJornadaDate(opDateStr);
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
@@ -655,26 +665,24 @@ export function DailyWorkCloser({
       const activeSessionForClose = localSessions
         .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
 
-      const operationalWorkDate: string = activeSessionForClose?.session_date
-        ? activeSessionForClose.session_date
-        : getOperationalDate();
+      if (!activeSessionForClose?.session_date) {
+        console.error("[PRODUCTION_DATE_ERROR]", {
+          module: "DailyWorkCloser.handleCloseDay",
+          reason: "sessão sem session_date ao fechar DWR — abortando",
+        });
+        toast.error("Jornada sem data de sessão. Não é possível fechar o DWR.");
+        throw new Error("session_date ausente ao encerrar jornada");
+      }
+      const operationalWorkDate: string = activeSessionForClose.session_date;
       const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
       const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
-      if (!activeSessionForClose?.session_date) {
-        console.error("[PRODUCTION_DATE_ERROR]", {
-          module: "DailyWorkCloser",
-          reason: "sessão sem session_date ao fechar DWR",
-          fallback: operationalWorkDate,
-        });
-      } else {
-        console.log("[PRODUCTION_DATE_SOURCE]", {
-          module: "DailyWorkCloser",
-          source: "field_work_sessions.session_date",
-          session_id: activeSessionForClose.id,
-          session_date: activeSessionForClose.session_date,
-        });
-      }
+      console.log("[PRODUCTION_DATE_SOURCE]", {
+        module: "DailyWorkCloser",
+        source: "field_work_sessions.session_date",
+        session_id: activeSessionForClose.id,
+        session_date: activeSessionForClose.session_date,
+      });
       console.log("[PRODUCTION_DATE_PROPAGATION]", {
         module: "daily_work_records",
         session_date: activeSessionForClose?.session_date ?? null,
@@ -927,7 +935,12 @@ export function DailyWorkCloser({
         return;
       }
 
-      const opDateStr = jornadaDate || getOperationalDate();
+      if (!jornadaDate) {
+        console.error("[PRODUCTION_DATE_ERROR]", { module: "DailyWorkCloser.defaultGeneratePDF", reason: "sem jornadaDate (session_date)" });
+        toast.error("Data da jornada indisponível. Não é possível gerar o PDF.");
+        return;
+      }
+      const opDateStr = jornadaDate;
       const startOfDay = new Date(`${opDateStr}T00:00:00`);
       const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 

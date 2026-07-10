@@ -22,7 +22,7 @@ function pct(n: number, d: number) {
  * da semana epidemiológica do agente. Fonte única; não recalcula de visits.
  * Bloqueia geração se houver diárias inconsistentes (status != completed).
  */
-export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate: Date = new Date()) {
+export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate: Date) {
   try {
     const { data: profile } = await supabase
       .from("profiles")
