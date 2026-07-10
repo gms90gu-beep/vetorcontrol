@@ -665,26 +665,24 @@ export function DailyWorkCloser({
       const activeSessionForClose = localSessions
         .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
 
-      const operationalWorkDate: string = activeSessionForClose?.session_date
-        ? activeSessionForClose.session_date
-        : getOperationalDate();
+      if (!activeSessionForClose?.session_date) {
+        console.error("[PRODUCTION_DATE_ERROR]", {
+          module: "DailyWorkCloser.handleCloseDay",
+          reason: "sessão sem session_date ao fechar DWR — abortando",
+        });
+        toast.error("Jornada sem data de sessão. Não é possível fechar o DWR.");
+        throw new Error("session_date ausente ao encerrar jornada");
+      }
+      const operationalWorkDate: string = activeSessionForClose.session_date;
       const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
       const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
-      if (!activeSessionForClose?.session_date) {
-        console.error("[PRODUCTION_DATE_ERROR]", {
-          module: "DailyWorkCloser",
-          reason: "sessão sem session_date ao fechar DWR",
-          fallback: operationalWorkDate,
-        });
-      } else {
-        console.log("[PRODUCTION_DATE_SOURCE]", {
-          module: "DailyWorkCloser",
-          source: "field_work_sessions.session_date",
-          session_id: activeSessionForClose.id,
-          session_date: activeSessionForClose.session_date,
-        });
-      }
+      console.log("[PRODUCTION_DATE_SOURCE]", {
+        module: "DailyWorkCloser",
+        source: "field_work_sessions.session_date",
+        session_id: activeSessionForClose.id,
+        session_date: activeSessionForClose.session_date,
+      });
       console.log("[PRODUCTION_DATE_PROPAGATION]", {
         module: "daily_work_records",
         session_date: activeSessionForClose?.session_date ?? null,
