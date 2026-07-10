@@ -169,7 +169,7 @@ export function AgentReportsSimple() {
   const handleWeeklyPdf = async () => {
     if (!authId) return;
     toast.info("Gerando Boletim Semanal…");
-    const res = await generateWeeklyReportPDF(authId);
+    const res = await generateWeeklyReportPDF(authId, new Date());
     if (res) {
       res.pdf.save(res.fileName);
       toast.success(`SE ${res.epiWeek}/${res.epiYear} gerado`);

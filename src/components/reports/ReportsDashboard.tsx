@@ -199,7 +199,7 @@ export function ReportsDashboard() {
     if (!session?.user) return;
 
     toast.info("Gerando Boletim Semanal...");
-    const result = await generateWeeklyReportPDF(session.user.id);
+    const result = await generateWeeklyReportPDF(session.user.id, new Date());
 
     if (result) {
       toast.success(
@@ -223,7 +223,7 @@ export function ReportsDashboard() {
       { label: "profile.full_name" },
     );
 
-    const result = await generateWeeklyReportPDF(session.user.id);
+    const result = await generateWeeklyReportPDF(session.user.id, new Date());
     if (result) {
       openWhatsAppShare(result.fileName, profile?.full_name || "Agente");
     }
