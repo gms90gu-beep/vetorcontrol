@@ -68,6 +68,9 @@ function operationalDateBR(iso: string | Date | null | undefined): string | null
   const d = iso instanceof Date ? iso : new Date(iso);
   if (isNaN(d.getTime())) return null;
   return _opDateFmt.format(d);
+}
+
+
 
 // Ordenação operacional canônica — número, sequência, complemento.
 // Nunca considerar tipo do imóvel. Fonte única em @/lib/property-order.
