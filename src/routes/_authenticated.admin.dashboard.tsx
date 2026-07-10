@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { getExecutiveDashboard } from "@/lib/wave-c.functions";
+import { getOperationalDate } from "@/lib/operational-date";
 import {
   generateInstitutionalPDF,
   downloadCSV,

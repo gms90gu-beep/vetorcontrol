@@ -31,6 +31,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getOperationalDate } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
 import { CycleWeekBadge } from "@/components/CycleWeekBadge";

@@ -57,6 +57,7 @@ import {
 import { AgentReportsSimple } from "@/components/agent/AgentReportsSimple";
 import { useServerFn } from "@tanstack/react-start";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import { getOperationalDate } from "@/lib/operational-date";
 import {
   AlertDialog,
   AlertDialogAction,
