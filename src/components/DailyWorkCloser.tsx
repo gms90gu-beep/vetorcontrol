@@ -320,7 +320,12 @@ export function DailyWorkCloser({
       );
       const active = localSessions
         .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-      const workDate: string = active?.session_date ?? getOperationalDate();
+      if (!active?.session_date) {
+        console.error("[PRODUCTION_DATE_ERROR]", { module: "DailyWorkCloser.handlePreClose", reason: "sessão ativa sem session_date" });
+        toast.error("Jornada sem data de sessão. Abra uma nova jornada para prosseguir.");
+        return;
+      }
+      const workDate: string = active.session_date;
 
       const report = await runShiftValidation({
         userId: user.id,
