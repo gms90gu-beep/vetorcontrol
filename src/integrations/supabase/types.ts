@@ -1648,6 +1648,41 @@ export type Database = {
         }
       }
       get_epi_week: { Args: { d: string }; Returns: number }
+      get_session_visits: {
+        Args: { _agent_id: string; _session_date: string }
+        Returns: {
+          activity_type: Database["public"]["Enums"]["activity_type"]
+          agent_id: string
+          block_id: string | null
+          cycle_id: string
+          elimination_amount: number | null
+          elimination_done: boolean | null
+          field_work_session_id: string | null
+          guidance_given: boolean | null
+          has_focus: boolean | null
+          id: string
+          is_recovered: boolean | null
+          larvicide_unit: string | null
+          notes: string | null
+          property_id: string
+          sample_collected: boolean | null
+          status: Database["public"]["Enums"]["visit_status"]
+          treated_deposits: number | null
+          treatment_amount: number | null
+          treatment_applied: boolean | null
+          tubitos_coletados: number | null
+          visit_date: string
+          week_id: string | null
+          week_number: number | null
+          year: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_role: { Args: { u_id: string }; Returns: string }
       has_role: {
         Args: {
