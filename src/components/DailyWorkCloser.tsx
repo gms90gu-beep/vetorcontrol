@@ -397,16 +397,6 @@ export function DailyWorkCloser({
       if (cycle) {
         setActiveCycle(cycle);
 
-        const { data: week } = await supabase
-          .from("weeks")
-          .select("*")
-          .eq("cycle_id", cycle.id)
-          .lte("start_date", getOperationalDate())
-          .gte("end_date", getOperationalDate())
-          .maybeSingle();
-        
-        if (week) setActiveWeek(week);
-
         // Considera a data da jornada ativa (se existir) como referência operacional
         const { data: activeSession } = await supabase
           .from("field_work_sessions")
@@ -425,9 +415,24 @@ export function DailyWorkCloser({
           createdAt: (activeSession as any)?.created_at ?? null,
         });
 
-        const opDateStr: string = activeSession?.session_date
-          ? activeSession.session_date
-          : getOperationalDate();
+        if (!activeSession?.session_date) {
+          console.warn("[PRODUCTION_DATE_ERROR]", {
+            module: "DailyWorkCloser.fetchDailyContext",
+            reason: "sem session_date; não é possível resolver semana/data operacional",
+          });
+          return;
+        }
+        const opDateStr: string = activeSession.session_date;
+
+        const { data: week } = await supabase
+          .from("weeks")
+          .select("*")
+          .eq("cycle_id", cycle.id)
+          .lte("start_date", opDateStr)
+          .gte("end_date", opDateStr)
+          .maybeSingle();
+
+        if (week) setActiveWeek(week);
         setJornadaDate(opDateStr);
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
