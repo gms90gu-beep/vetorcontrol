@@ -100,3 +100,38 @@ export function assertProductionDate(
     });
   }
 }
+
+/**
+ * Data operacional oficial (America/Sao_Paulo), formato YYYY-MM-DD.
+ *
+ * Fonte única para "hoje" no frontend. Substitui todo uso de
+ * `new Date().toISOString().split('T')[0]` / `.slice(0,10)` que gera UTC
+ * e desloca visitas noturnas para o dia seguinte.
+ *
+ * Bate 1:1 com `public.operational_date(now())` no banco.
+ */
+export function getOperationalDate(now: Date = new Date()): string {
+  // Intl trata DST corretamente. Brasil sem DST desde 2019, mas mantém robusto.
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(now); // "YYYY-MM-DD"
+}
+
+/**
+ * Semana e ano epidemiológicos (ISO) calculados a partir de uma data-only
+ * (YYYY-MM-DD) já normalizada para America/Sao_Paulo. Uso interno de UTC
+ * aqui é seguro porque a entrada é uma data de calendário, não timestamp.
+ */
+export function epiWeekFromDate(dateOnly: string): { week: number; year: number } {
+  const [y, m, d] = dateOnly.split("-").map(Number);
+  const t = new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+  const dayNum = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { week, year: t.getUTCFullYear() };
+}

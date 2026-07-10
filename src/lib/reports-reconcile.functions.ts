@@ -8,6 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { epiWeekFromDate } from "@/lib/operational-date";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
@@ -215,8 +216,9 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         }
         rows.push({ agent_id: g.agent_id, work_date: g.work_date, before, after, updated: changed });
       } else {
-        // Missing DWR: create one
-        const wd = new Date(`${g.work_date}T12:00:00Z`);
+        // Missing DWR: create one. Data operacional derivada 100% em America/Sao_Paulo.
+        const todayOp = localDate(new Date().toISOString());
+        const epi = epiWeekFromDate(g.work_date);
         const insert = {
           ...payload,
           agent_id: g.agent_id,
@@ -225,11 +227,9 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
           cycle_id: g.cycle_id ?? null,
           week_id: g.week_id ?? null,
           status: "completed",
-          is_retroactive: g.work_date < new Date().toISOString().slice(0, 10),
-          epi_week: Number.isFinite(wd.getUTCDate())
-            ? Math.ceil(((wd.getTime() - Date.UTC(wd.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7)
-            : null,
-          epi_year: wd.getUTCFullYear(),
+          is_retroactive: g.work_date < todayOp,
+          epi_week: epi.week,
+          epi_year: epi.year,
         };
         const { error: iErr } = await supabaseAdmin
           .from("daily_work_records")

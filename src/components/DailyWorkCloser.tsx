@@ -9,6 +9,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
+import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -319,7 +320,7 @@ export function DailyWorkCloser({
       );
       const active = localSessions
         .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-      const workDate: string = active?.session_date ?? new Date().toISOString().split("T")[0];
+      const workDate: string = active?.session_date ?? getOperationalDate();
 
       const report = await runShiftValidation({
         userId: user.id,
@@ -395,8 +396,8 @@ export function DailyWorkCloser({
           .from("weeks")
           .select("*")
           .eq("cycle_id", cycle.id)
-          .lte("start_date", new Date().toISOString().split('T')[0])
-          .gte("end_date", new Date().toISOString().split('T')[0])
+          .lte("start_date", getOperationalDate())
+          .gte("end_date", getOperationalDate())
           .maybeSingle();
         
         if (week) setActiveWeek(week);
@@ -421,7 +422,7 @@ export function DailyWorkCloser({
 
         const opDateStr: string = activeSession?.session_date
           ? activeSession.session_date
-          : new Date().toISOString().split('T')[0];
+          : getOperationalDate();
         setJornadaDate(opDateStr);
         const startOfDay = new Date(`${opDateStr}T00:00:00`);
         const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
@@ -656,7 +657,7 @@ export function DailyWorkCloser({
 
       const operationalWorkDate: string = activeSessionForClose?.session_date
         ? activeSessionForClose.session_date
-        : new Date().toISOString().split('T')[0];
+        : getOperationalDate();
       const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
       const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
@@ -926,19 +927,12 @@ export function DailyWorkCloser({
         return;
       }
 
-      const opDateStr = jornadaDate || new Date().toISOString().split('T')[0];
+      const opDateStr = jornadaDate || getOperationalDate();
       const startOfDay = new Date(`${opDateStr}T00:00:00`);
       const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
-      // EPI week (ISO week) calculation
-      const refDate = new Date(`${opDateStr}T12:00:00`);
-      const epiWeek = (() => {
-        const d = new Date(Date.UTC(refDate.getFullYear(), refDate.getMonth(), refDate.getDate()));
-        const dayNum = d.getUTCDay() || 7;
-        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-      })();
+      // Semana epidemiológica derivada da data operacional (America/Sao_Paulo).
+      const epiWeek = epiWeekFromDate(opDateStr).week;
 
       let visits: any[] | null = null;
       if (isOnline()) {
