@@ -51,6 +51,24 @@ function typeLabel(t?: string | null) {
   return map[t] || t;
 }
 
+/**
+ * Retorna a data operacional (YYYY-MM-DD) no fuso America/Sao_Paulo,
+ * espelhando a função SQL `public.operational_date(timestamptz)`. É a fonte
+ * única usada para casar `visits.visit_date` com `field_work_sessions.session_date`
+ * quando lemos do cache Dexie offline.
+ */
+const _opDateFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function operationalDateBR(iso: string | Date | null | undefined): string | null {
+  if (!iso) return null;
+  const d = iso instanceof Date ? iso : new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return _opDateFmt.format(d);
+
 // Ordenação operacional canônica — número, sequência, complemento.
 // Nunca considerar tipo do imóvel. Fonte única em @/lib/property-order.
 const smartCompare = comparePropertyOrder;
