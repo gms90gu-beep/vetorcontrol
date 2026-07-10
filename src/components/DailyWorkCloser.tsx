@@ -458,13 +458,21 @@ export function DailyWorkCloser({
           supabase_visits_ids: (todayVisits || []).map((v: any) => v.id),
         });
 
-        // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
-        let snap = await buildDailySnapshot(user.id, opDateStr, {
-          sessionId: activeSession?.id ?? null,
-          blockNumber: (activeSession as any)?.block_number ?? null,
-          blockId: (activeSession as any)?.block_id ?? null,
-          startedAt: (activeSession as any)?.created_at ?? null,
+        // Snapshot completo a partir do Dexie (offline-first, sempre fresco).
+        // CONSOLIDAÇÃO: sem escopo — soma TODAS as jornadas do agente na
+        // mesma Data da Produção (múltiplos quarteirões no mesmo dia).
+        const daySessionsList = await listLocal<any>(
+          "field_work_sessions",
+          (s) => s.user_id === user.id && s.session_date === opDateStr,
+        );
+        console.log("[DAY_CLOSE_SESSIONS]", {
+          op_date: opDateStr,
+          count: daySessionsList.length,
+          sessions: daySessionsList.map((s: any) => ({
+            id: s.id, block_number: s.block_number, block_id: s.block_id, status: s.status,
+          })),
         });
+        let snap = await buildDailySnapshot(user.id, opDateStr);
 
         // Fallback Supabase: se o Dexie está vazio mas o servidor tem visitas
         // da jornada, reconstrói o snapshot (inclui detalhamento por tipo)
@@ -702,12 +710,53 @@ export function DailyWorkCloser({
         work_date: operationalWorkDate,
       });
 
-      // Snapshot único — Dexie é fonte autoritativa local, escopado à jornada ativa
-      const snap = await buildDailySnapshot(user.id, operationalWorkDate, {
-        sessionId: activeSessionForClose?.id ?? null,
-        blockNumber: activeSessionForClose?.block_number ?? null,
-        blockId: (activeSessionForClose as any)?.block_id ?? null,
-        startedAt: activeSessionForClose?.created_at ?? null,
+      // CONSOLIDAÇÃO OFICIAL: soma TODAS as jornadas do agente na mesma
+      // Data da Produção. Nunca escopar por currentSession.id — o encerramento
+      // do expediente deve refletir a produção do dia inteiro.
+      const dayAllSessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === user.id && s.session_date === operationalWorkDate,
+      );
+      const dayAllSessionIds = dayAllSessions.map((s: any) => s.id);
+      console.log("[DAY_CLOSE_SESSIONS]", {
+        op_date: operationalWorkDate,
+        count: dayAllSessions.length,
+        sessions: dayAllSessions.map((s: any) => ({
+          id: s.id, block_number: s.block_number, block_id: s.block_id, status: s.status,
+        })),
+      });
+      const visitsByAllSessions = await listLocal<any>(
+        "visits",
+        (v) =>
+          v.agent_id === user.id &&
+          String(v.visit_date || "").slice(0, 10) === operationalWorkDate,
+      );
+      const visitsPerSession: Record<string, number> = {};
+      for (const v of visitsByAllSessions) {
+        const key = v.field_work_session_id || "sem_sessao";
+        visitsPerSession[key] = (visitsPerSession[key] || 0) + 1;
+      }
+      console.log("[DAY_CLOSE_VISITS]", {
+        op_date: operationalWorkDate,
+        total_visits: visitsByAllSessions.length,
+        per_session: visitsPerSession,
+        session_ids: dayAllSessionIds,
+      });
+
+      // Snapshot único — sem scope: consolida TODAS as jornadas da Data da Produção
+      const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+      console.log("[DAY_CLOSE_CONSOLIDATED]", {
+        op_date: operationalWorkDate,
+        sessions: dayAllSessions.length,
+        worked: snap.workedCount,
+        closed: snap.closedCount,
+        refused: snap.refusedCount,
+        visited: snap.visitedCount,
+        focus: snap.focusCount,
+        depInspected: snap.depInspected,
+        larvicide: snap.larvicideAmount,
+        tubitos: snap.tubitos,
+        blocks_worked: snap.blocksWorked,
       });
       console.log("[SESSION_TOTAL_VISITS]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
       console.log("[SESSION_TOTAL_PROPERTIES]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
@@ -831,6 +880,24 @@ export function DailyWorkCloser({
         cycle_id: recordData.cycle_id,
         epi_week: recordData.epi_week,
         epi_year: recordData.epi_year,
+      });
+      console.log("[DAY_CLOSE_DWR]", {
+        dwr_id: savedDaily?.id ?? null,
+        agent_id: recordData.agent_id,
+        work_date: recordData.work_date,
+        sessions_consolidated: dayAllSessions.length,
+        session_ids: dayAllSessionIds,
+        properties_worked: recordData.properties_worked,
+        properties_closed: recordData.properties_closed,
+        properties_refused: recordData.properties_refused,
+        properties_positive: recordData.properties_positive,
+        positive_foci: recordData.positive_foci,
+        deposits_inspected: recordData.deposits_inspected,
+        deposits_treated: recordData.deposits_treated,
+        deposits_eliminated: recordData.deposits_eliminated,
+        larvicide_amount: recordData.larvicide_amount,
+        tubitos_collected: recordData.tubitos_collected,
+        blocks_worked: recordData.blocks_worked,
       });
 
       // 1.1) Validador de integridade da produção — nunca bloqueia
