@@ -458,13 +458,21 @@ export function DailyWorkCloser({
           supabase_visits_ids: (todayVisits || []).map((v: any) => v.id),
         });
 
-        // Snapshot completo a partir do Dexie (offline-first, sempre fresco)
-        let snap = await buildDailySnapshot(user.id, opDateStr, {
-          sessionId: activeSession?.id ?? null,
-          blockNumber: (activeSession as any)?.block_number ?? null,
-          blockId: (activeSession as any)?.block_id ?? null,
-          startedAt: (activeSession as any)?.created_at ?? null,
+        // Snapshot completo a partir do Dexie (offline-first, sempre fresco).
+        // CONSOLIDAÇÃO: sem escopo — soma TODAS as jornadas do agente na
+        // mesma Data da Produção (múltiplos quarteirões no mesmo dia).
+        const daySessionsList = await listLocal<any>(
+          "field_work_sessions",
+          (s) => s.user_id === user.id && s.session_date === opDateStr,
+        );
+        console.log("[DAY_CLOSE_SESSIONS]", {
+          op_date: opDateStr,
+          count: daySessionsList.length,
+          sessions: daySessionsList.map((s: any) => ({
+            id: s.id, block_number: s.block_number, block_id: s.block_id, status: s.status,
+          })),
         });
+        let snap = await buildDailySnapshot(user.id, opDateStr);
 
         // Fallback Supabase: se o Dexie está vazio mas o servidor tem visitas
         // da jornada, reconstrói o snapshot (inclui detalhamento por tipo)
