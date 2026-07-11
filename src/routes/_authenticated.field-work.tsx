@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { listRemoteOrCache, createOffline } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import {
   Dialog,
