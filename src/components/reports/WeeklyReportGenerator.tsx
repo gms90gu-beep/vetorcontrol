@@ -124,6 +124,51 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     const positivity = pct(t.focos, t.depInspected || t.worked);
     const pendOpen = Math.max(0, t.pending - t.recovered);
 
+    // Composição por tipo de imóvel — visitas trabalhadas da SE do agente/ciclo
+    const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
+    {
+      let vq = supabase
+        .from("visits")
+        .select("property_id, status, properties!inner(type)")
+        .eq("agent_id", agentAuthId)
+        .eq("week_number", epiWeek)
+        .eq("year", epiYear);
+      if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
+      const { data: vrows } = await vq;
+      const rows = (vrows as any[]) || [];
+      const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
+      const seen = new Set<string>();
+      for (const r of rows) {
+        if (!workedStatuses.has(String(r.status))) continue;
+        if (seen.has(r.property_id)) continue;
+        seen.add(r.property_id);
+        const type = String(r.properties?.type || "others");
+        if (type in propTypes) (propTypes as any)[type] += 1;
+        else propTypes.others += 1;
+      }
+    }
+    const totalTypes =
+      propTypes.residence + propTypes.commerce + propTypes.vacant_lot +
+      propTypes.strategic_point + propTypes.others;
+    const habitados = propTypes.residence + propTypes.commerce + propTypes.strategic_point;
+    const naoHabitados = propTypes.vacant_lot + propTypes.others;
+    const avgPerDaily = records.length > 0 ? (t.worked / records.length) : 0;
+
+    console.log("[WEEKLY_REPORT_PROPERTY_TYPES]", {
+      residencial: propTypes.residence,
+      comercial: propTypes.commerce,
+      terreno_baldio: propTypes.vacant_lot,
+      ponto_estrategico: propTypes.strategic_point,
+      outros: propTypes.others,
+      total: totalTypes,
+    });
+    console.log("[WEEKLY_REPORT_PROPERTY_SUMMARY]", {
+      habitados,
+      nao_habitados: naoHabitados,
+      media_por_diaria: Number(avgPerDaily.toFixed(2)),
+      total_diarias: records.length,
+    });
+
     // ===== PDF =====
     const pdf = new jsPDF();
     const pageW = pdf.internal.pageSize.getWidth();
@@ -178,6 +223,63 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       styles: { fontSize: 9, halign: "center" },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
+
+    // 2.1 Composição da Produção Imobiliária
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("2.1 COMPOSIÇÃO DA PRODUÇÃO IMOBILIÁRIA", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Tipo de Imóvel", "Quantidade"]],
+      body: [
+        ["Residencial (R)", String(propTypes.residence)],
+        ["Comercial (C)", String(propTypes.commerce)],
+        ["Terreno Baldio (TB)", String(propTypes.vacant_lot)],
+        ["Ponto Estratégico (PE)", String(propTypes.strategic_point)],
+        ["Outros (O)", String(propTypes.others)],
+        ["Total Geral", String(totalTypes)],
+      ],
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: "center", cellWidth: 40 } },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.row.index === 5) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [241, 245, 249];
+        }
+      },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 2;
+    if (totalTypes !== t.worked) {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180, 83, 9);
+      pdf.text(
+        `Atenção: total por tipo (${totalTypes}) difere dos trabalhados (${t.worked}).`,
+        14, y + 3
+      );
+      pdf.setTextColor(15, 23, 42);
+      y += 4;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    y += 3;
+    autoTable(pdf, {
+      startY: y,
+      head: [["Habitados", "Não Habitados", "Média por diária", "Diárias na semana"]],
+      body: [[
+        String(habitados),
+        String(naoHabitados),
+        avgPerDaily.toFixed(1).replace(".", ","),
+        String(records.length),
+      ]],
+      theme: "grid",
+      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+
+
 
     // 3. Levantamento de Índice (LI)
     pdf.text("3. LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
