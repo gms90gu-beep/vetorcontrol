@@ -224,6 +224,60 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
+    // 2.1 Composição da Produção Imobiliária
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("2.1 COMPOSIÇÃO DA PRODUÇÃO IMOBILIÁRIA", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Tipo de Imóvel", "Quantidade"]],
+      body: [
+        ["Residencial (R)", String(propTypes.residence)],
+        ["Comercial (C)", String(propTypes.commerce)],
+        ["Terreno Baldio (TB)", String(propTypes.vacant_lot)],
+        ["Ponto Estratégico (PE)", String(propTypes.strategic_point)],
+        ["Outros (O)", String(propTypes.others)],
+        ["Total Geral", String(totalTypes)],
+      ],
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: "center", cellWidth: 40 } },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.row.index === 5) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [241, 245, 249];
+        }
+      },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 2;
+    if (totalTypes !== t.worked) {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180, 83, 9);
+      pdf.text(
+        `Atenção: total por tipo (${totalTypes}) difere dos trabalhados (${t.worked}).`,
+        14, y + 3
+      );
+      pdf.setTextColor(15, 23, 42);
+      y += 4;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    y += 3;
+    autoTable(pdf, {
+      startY: y,
+      head: [["Habitados", "Não Habitados", "Média por diária", "Diárias na semana"]],
+      body: [[
+        String(habitados),
+        String(naoHabitados),
+        avgPerDaily.toFixed(1).replace(".", ","),
+        String(records.length),
+      ]],
+      theme: "grid",
+      headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+
     // 3. Levantamento de Índice (LI)
     pdf.text("3. LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
     autoTable(pdf, {
