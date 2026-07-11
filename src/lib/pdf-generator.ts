@@ -30,7 +30,9 @@ interface AgentInfo {
   latitude?: number | null;
   longitude?: number | null;
   locationSource?: "gps" | "manual" | null;
+  accuracy?: number | null;
 }
+
 
 interface ExportMetadata {
   total: number;
@@ -58,55 +60,117 @@ export const generateRGPDF = async (
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 10;
 
-  // Header Helper
+  // Header Helper — 3 blocks: Administrativo, Produção, Responsável
+  // Altura total ~21mm (antes 15mm, +40%)
   const drawHeader = (pageNumber: number, totalPages: number) => {
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text("BOLETIM OPERACIONAL - RECONHECIMENTO GEOGRÁFICO (RG)", pageWidth / 2, 12, { align: "center" });
+    doc.text("BOLETIM OPERACIONAL - RECONHECIMENTO GEOGRÁFICO (RG)", pageWidth / 2, 11, { align: "center" });
 
-    doc.setFontSize(8);
+    const hx = margin;
+    const hy = 15;
+    const hw = pageWidth - 2 * margin;
+    const rowH = 7;
+    const totalH = rowH * 3; // 21mm
+
+    // Moldura externa + linhas horizontais
+    doc.setLineWidth(0.2);
+    doc.rect(hx, hy, hw, totalH);
+    doc.line(hx, hy + rowH, hx + hw, hy + rowH);
+    doc.line(hx, hy + rowH * 2, hx + hw, hy + rowH * 2);
+
+    // Etiqueta de bloco (faixa cinza à esquerda)
+    const labelW = 26;
+    doc.setFillColor(235, 235, 235);
+    doc.rect(hx, hy, labelW, totalH, "F");
+    doc.line(hx + labelW, hy, hx + labelW, hy + totalH);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    
-    // Header Grid (reproducing the physical form layout)
-    doc.rect(margin, 18, pageWidth - (2 * margin), 15);
-    
-    // Vertical lines for header
-    doc.line(40, 18, 40, 33);
-    doc.line(100, 18, 100, 33);
-    doc.line(150, 18, 150, 33);
-    doc.line(200, 18, 200, 33);
-    
-    doc.text("UF: CE", margin + 2, 22);
-    doc.text(`MUNICÍPIO: ${agent.municipality || ""}`, 42, 22);
-    doc.text(`LOCALIDADE: ${agent.street || ""}`, 102, 22);
-    doc.text(`QUARTEIRÃO: ${agent.block || ""}`, 152, 22);
-    doc.text(`DATA: ${format(new Date(), "dd/MM/yyyy")}`, 202, 22);
+    doc.setTextColor(60, 60, 60);
+    doc.text("ADMINISTRATIVO", hx + labelW / 2, hy + rowH / 2 + 1, { align: "center" });
+    doc.text("PRODUÇÃO", hx + labelW / 2, hy + rowH + rowH / 2 + 1, { align: "center" });
+    doc.text("RESPONSÁVEL", hx + labelW / 2, hy + rowH * 2 + rowH / 2 + 1, { align: "center" });
+    doc.setTextColor(0, 0, 0);
 
-    doc.line(margin, 26, pageWidth - margin, 26);
-    doc.text(`AGENTE: ${agent.name || ""}`, margin + 2, 30);
-    doc.text(`MATRÍCULA: ${agent.registrationId || ""}`, 102, 30);
-    doc.text(`CICLO: ${agent.cycle || ""}`, 152, 30);
-    doc.text(`SEMANA: ${agent.week || ""}`, 202, 30);
-
-    // Optional: hybrid location info
-    if (agent.address || agent.latitude != null) {
-      const parts: string[] = [];
-      if (agent.address) parts.push(`LOGRADOURO: ${agent.address}${agent.neighborhood ? ` — ${agent.neighborhood}` : ""}`);
-      if (agent.locationSource) parts.push(`ORIGEM: ${agent.locationSource === "gps" ? "GPS" : "Manual"}`);
-      if (agent.latitude != null && agent.longitude != null) {
-        parts.push(`LAT: ${agent.latitude.toFixed(6)}`);
-        parts.push(`LNG: ${agent.longitude.toFixed(6)}`);
-      }
+    // Helper para célula rotulada
+    const cell = (x: number, y: number, w: number, label: string, value: string, valueSize = 10) => {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.text(parts.join("   "), margin + 2, 36);
+      doc.setFontSize(6.5);
+      doc.setTextColor(110, 110, 110);
+      doc.text(label, x + 1.5, y + 2.5);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
+      doc.setFontSize(valueSize);
+      doc.setTextColor(0, 0, 0);
+      const maxW = w - 3;
+      let v = value || "—";
+      while (doc.getTextWidth(v) > maxW && v.length > 4) v = v.slice(0, -2);
+      if (v !== (value || "—")) v = v.slice(0, -1) + "…";
+      doc.text(v, x + 1.5, y + rowH - 1.8);
+    };
+
+    // Linha 1 — ADMINISTRATIVO (Município compacto, Ciclo, Semana, Data)
+    const r1 = hx + labelW;
+    const c1w = 55, c2w = 35, c3w = 35;
+    const r1w = hw - labelW;
+    const c4w = r1w - c1w - c2w - c3w;
+    doc.line(r1 + c1w, hy, r1 + c1w, hy + rowH);
+    doc.line(r1 + c1w + c2w, hy, r1 + c1w + c2w, hy + rowH);
+    doc.line(r1 + c1w + c2w + c3w, hy, r1 + c1w + c2w + c3w, hy + rowH);
+    cell(r1, hy, c1w, "MUNICÍPIO / UF", `${agent.municipality || ""} / CE`, 9);
+    cell(r1 + c1w, hy, c2w, "CICLO", agent.cycle || "", 10);
+    cell(r1 + c1w + c2w, hy, c3w, "SEMANA EPI.", agent.week || "", 10);
+    cell(r1 + c1w + c2w + c3w, hy, c4w, "DATA DA PRODUÇÃO", format(new Date(), "dd/MM/yyyy"), 11);
+
+    // Linha 2 — PRODUÇÃO (Logradouro grande, Quarteirão destacado)
+    const y2 = hy + rowH;
+    const lgW = r1w * 0.72;
+    const qtW = r1w - lgW;
+    doc.line(r1 + lgW, y2, r1 + lgW, y2 + rowH);
+    const logradouro = agent.address
+      ? `${agent.address}${agent.neighborhood ? ` — ${agent.neighborhood}` : ""}`
+      : (agent.street || "");
+    cell(r1, y2, lgW, "LOGRADOURO", logradouro, 11);
+    // Quarteirão em destaque
+    doc.setFillColor(250, 250, 250);
+    doc.rect(r1 + lgW + 0.2, y2 + 0.2, qtW - 0.4, rowH - 0.4, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(110, 110, 110);
+    doc.text("QUARTEIRÃO", r1 + lgW + qtW / 2, y2 + 2.5, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text(agent.block || "—", r1 + lgW + qtW / 2, y2 + rowH - 1.5, { align: "center" });
+
+    // Linha 3 — RESPONSÁVEL (Agente, Matrícula, Origem, Precisão)
+    const y3 = hy + rowH * 2;
+    const a1 = r1w * 0.48, a2 = r1w * 0.18, a3 = r1w * 0.17, a4 = r1w - a1 - a2 - a3;
+    doc.line(r1 + a1, y3, r1 + a1, y3 + rowH);
+    doc.line(r1 + a1 + a2, y3, r1 + a1 + a2, y3 + rowH);
+    doc.line(r1 + a1 + a2 + a3, y3, r1 + a1 + a2 + a3, y3 + rowH);
+    cell(r1, y3, a1, "AGENTE RESPONSÁVEL", agent.name || "", 11);
+    cell(r1 + a1, y3, a2, "MATRÍCULA", agent.registrationId || "", 10);
+    const origem = agent.locationSource === "gps" ? "GPS" : agent.locationSource === "manual" ? "Manual" : "—";
+    cell(r1 + a1 + a2, y3, a3, "ORIGEM", origem, 10);
+    const prec = agent.accuracy != null ? `±${Math.round(agent.accuracy)} m` : "—";
+    cell(r1 + a1 + a2 + a3, y3, a4, "PRECISÃO", prec, 10);
+
+    // Linha de auditoria (coordenadas discretas)
+    if (agent.latitude != null && agent.longitude != null) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6);
+      doc.setTextColor(140, 140, 140);
+      doc.text(
+        `Auditoria — lat ${agent.latitude.toFixed(6)}  ·  lng ${agent.longitude.toFixed(6)}`,
+        hx, hy + totalH + 3
+      );
+      doc.setTextColor(0, 0, 0);
     }
 
     doc.setFontSize(8);
     doc.text(`Página ${pageNumber} de ${totalPages}`, pageWidth - margin - 20, pageHeight - 5);
   };
+
 
   // Group properties by street to organize the PDF
   const propertiesByStreet: Record<string, Property[]> = {};
@@ -150,7 +214,7 @@ export const generateRGPDF = async (
     ]);
 
     autoTable(doc, {
-      startY: agent.address || agent.latitude != null ? 40 : 38,
+      startY: (agent.latitude != null ? 42 : 39),
       head: [['RUA OU LOGRADOURO', 'LADO', 'NÚMERO', 'SEQ.', 'COMP.', 'TIPO', 'HAB.']],
       body: tableData,
       theme: 'grid',
