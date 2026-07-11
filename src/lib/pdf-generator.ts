@@ -214,7 +214,7 @@ export const generateRGPDF = async (
     ]);
 
     autoTable(doc, {
-      startY: agent.address || agent.latitude != null ? 40 : 38,
+      startY: (agent.latitude != null ? 42 : 39),
       head: [['RUA OU LOGRADOURO', 'LADO', 'NÚMERO', 'SEQ.', 'COMP.', 'TIPO', 'HAB.']],
       body: tableData,
       theme: 'grid',
