@@ -267,6 +267,15 @@ function FieldWorkPage() {
 
         if (existing) {
           console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
+          if ((existing as any).status === "paused") {
+            console.log("[JOURNEY_DUPLICATE_BLOCKED]", {
+              user_id: userId,
+              block_id: selectedBlock.id,
+              cycle_id: autoCycle.id,
+              existing_session_id: existing.id,
+              existing_status: (existing as any).status,
+            });
+          }
           setOpenSession(existing as any);
           setOpenSessionModal(true);
           return;
