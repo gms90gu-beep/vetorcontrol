@@ -218,7 +218,8 @@ function FieldWorkPage() {
 
     setStarting(true);
     try {
-      // Verificação estrita: user_id + session_date + block_id + status=in_progress
+      // Verificação estrita: user_id + block_id + status in (in_progress, paused)
+      // Sessões pausadas de datas anteriores são retomadas neste bloco.
       if (isOnline()) {
         console.log("[SESSION_LOOKUP]", {
           user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
@@ -227,20 +228,20 @@ function FieldWorkPage() {
           .from("field_work_sessions")
           .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
           .eq("user_id", userId)
-          .eq("session_date", sessionDateStr)
           .eq("block_id", selectedBlock.id)
-          .eq("status", "in_progress")
+          .in("status", ["in_progress", "paused"])
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (existing) {
-          console.log("[SESSION_FOUND]", { id: existing.id });
+          console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
           setOpenSession(existing as any);
           setOpenSessionModal(true);
           return;
         }
       }
+
 
       // Cria nova jornada automaticamente
       const nowIso = new Date().toISOString();
