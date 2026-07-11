@@ -97,7 +97,8 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
       const worked = visitedProps.size + closedProps.size + refusedProps.size;
       const pending = Math.max(0, total - worked);
 
-      setStats({
+      const nextIndex = worked + 1;
+      const nextStats: Stats = {
         total,
         visited: visitedProps.size,
         closed: closedProps.size,
@@ -106,7 +107,21 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
         positive,
         deposits,
         larvicide,
-      });
+        nextIndex,
+      };
+      setStats(nextStats);
+
+      if (s.status === "paused") {
+        console.log("[JOURNEY_PAUSED_MODAL]", {
+          session_id: s.id,
+          block_id: s.block_id ?? null,
+          block_number: s.block_number ?? null,
+          visited: visitedProps.size + closedProps.size + refusedProps.size,
+          pending,
+          next_property: nextIndex,
+          paused_at: s.paused_at ?? s.updated_at ?? null,
+        });
+      }
     } catch (e) {
       console.warn("[SESSION_MODAL_STATS] falha", e);
     } finally {
