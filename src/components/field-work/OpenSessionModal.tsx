@@ -141,6 +141,14 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
     console.log("[SESSION_DURATION]", { minutes: Math.round(dur / 60000) });
   }
 
+  const isPaused = session.status === "paused";
+  const pausedAtSrc = session.paused_at || session.updated_at || null;
+  const pausedAtMs = pausedAtSrc ? new Date(pausedAtSrc).getTime() : null;
+  const daysSincePause = pausedAtMs ? Math.max(0, Math.floor((Date.now() - pausedAtMs) / 86400000)) : null;
+  const pausedAtBR = pausedAtSrc
+    ? new Date(pausedAtSrc).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—";
+
   const handleContinue = () => {
     console.log("[SESSION_CONTINUE]", { id: session.id, cycle_id: session.cycle_id, week_id: session.week_id, block_number: session.block_number });
     console.log("[SESSION_RESTORE]", {
@@ -151,6 +159,15 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
       block_number: session.block_number,
       session_date: session.session_date,
     });
+    if (isPaused) {
+      console.log("[JOURNEY_RESUME_SELECTED]", {
+        session_id: session.id,
+        block_id: session.block_id ?? null,
+        block_number: session.block_number ?? null,
+        next_property: stats?.nextIndex ?? null,
+        paused_at: pausedAtSrc,
+      });
+    }
     onContinue(session);
   };
 
@@ -199,27 +216,47 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-700">
             <AlertTriangle className="h-5 w-5" />
-            {view === "main" ? "Jornada em andamento" : "Encerrar jornada?"}
+            {view === "main"
+              ? (isPaused ? "Jornada pausada" : "Jornada em andamento")
+              : "Encerrar jornada?"}
           </DialogTitle>
           <DialogDescription>
             {view === "main"
-              ? "Já existe uma jornada em aberto. Escolha uma das opções abaixo."
+              ? (isPaused
+                ? "Existe uma jornada pausada para este quarteirão. Deseja continuar de onde parou?"
+                : "Já existe uma jornada em aberto. Escolha uma das opções abaixo.")
               : "Revise o resumo abaixo antes de encerrar. Esta ação não pode ser desfeita."}
           </DialogDescription>
         </DialogHeader>
 
         {view === "main" ? (
-          <div className="grid grid-cols-2 gap-3 py-2 text-sm">
-            <Info label="Data da Produção" value={dateBR} />
-            <Info label="Jornada iniciada" value={startTime} />
+          isPaused ? (
+            <div className="grid grid-cols-2 gap-3 py-2 text-sm">
+              <Info label="Quarteirão" value={session.block_number || "—"} />
+              <Info label="Status" value="Pausada" />
+              <Info label="Última Data da Produção" value={dateBR} />
+              <Info label="Data/hora da pausa" value={pausedAtBR} />
+              <Info
+                label="Progresso"
+                value={loadingStats ? "…" : `${(stats?.visited ?? 0) + (stats?.closed ?? 0) + (stats?.refused ?? 0)} de ${stats?.total ?? session.property_count ?? 0}`}
+              />
+              <Info label="Próximo imóvel" value={loadingStats ? "…" : String(stats?.nextIndex ?? 1)} />
+              <Info label="Pendentes" value={loadingStats ? "…" : String(stats?.pending ?? 0)} />
+              <Info label="Tempo desde a pausa" value={daysSincePause === null ? "—" : daysSincePause === 0 ? "Hoje" : daysSincePause === 1 ? "1 dia" : `${daysSincePause} dias`} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 py-2 text-sm">
+              <Info label="Data da Produção" value={dateBR} />
+              <Info label="Jornada iniciada" value={startTime} />
 
-            <Info label="Ciclo" value={cycleLabel || "—"} />
-            <Info label="Semana" value={weekLabel || "—"} />
-            <Info label="Quarteirão" value={session.block_number || "—"} />
-            <Info label="Imóveis" value={String(session.property_count ?? "—")} />
-            <Info label="Visitados" value={loadingStats ? "…" : String(stats?.visited ?? 0)} />
-            <Info label="Pendentes" value={loadingStats ? "…" : String(stats?.pending ?? 0)} />
-          </div>
+              <Info label="Ciclo" value={cycleLabel || "—"} />
+              <Info label="Semana" value={weekLabel || "—"} />
+              <Info label="Quarteirão" value={session.block_number || "—"} />
+              <Info label="Imóveis" value={String(session.property_count ?? "—")} />
+              <Info label="Visitados" value={loadingStats ? "…" : String(stats?.visited ?? 0)} />
+              <Info label="Pendentes" value={loadingStats ? "…" : String(stats?.pending ?? 0)} />
+            </div>
+          )
         ) : (
           <div className="grid grid-cols-2 gap-3 py-2 text-sm">
             <Info label="Total de imóveis" value={String(stats?.total ?? 0)} />
