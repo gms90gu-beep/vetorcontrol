@@ -380,7 +380,7 @@ export function DailyWorkCloser({
   };
 
   const handleForceClose = async () => {
-    console.warn("[SHIFT_CLOSE_FORCED]", { role: userRole });
+    console.log("[DAY_CLOSE_ALLOWED]", { reason: "warnings_acknowledged", role: userRole });
     setShowValidation(false);
     await handleCloseDay();
   };
