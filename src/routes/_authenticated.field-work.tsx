@@ -557,9 +557,35 @@ function FieldWorkPage() {
         weekLabel={openSession && autoWeek?.id === openSession.week_id ? `Semana ${autoWeek.number}/8` : undefined}
         onContinue={async (s) => {
           setOpenSessionModal(false);
+          // Se a jornada estava PAUSED, reativa para in_progress na data atual
+          const wasPaused = (s as any).status === "paused";
+          let resumed = s;
+          if (wasPaused) {
+            const todayStr = toDateOnly(new Date());
+            try {
+              await updateOffline("field_work_sessions", s.id, {
+                status: "in_progress",
+                session_date: todayStr,
+                updated_at: new Date().toISOString(),
+              });
+              resumed = { ...s, status: "in_progress", session_date: todayStr } as any;
+              console.log("[JOURNEY_RESUMED]", {
+                user_id: userId,
+                session_id: s.id,
+                block_id: (s as any).block_id ?? null,
+                block_number: s.block_number ?? null,
+                cycle_id: s.cycle_id ?? null,
+                session_date: todayStr,
+                previous_status: "paused",
+                new_status: "in_progress",
+              });
+            } catch (e) {
+              console.warn("[JOURNEY_RESUMED_ERR]", e);
+            }
+          }
           await autoRecoverSession(s.id);
           try { (window as any).__vcSetJourneyActive?.(true); } catch {}
-          setActiveSession(s);
+          setActiveSession(resumed);
         }}
         onFinished={() => {
           setOpenSessionModal(false);
