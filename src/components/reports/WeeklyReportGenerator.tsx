@@ -172,6 +172,25 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       media_por_diaria: Number(avgPerDaily.toFixed(2)),
       total_diarias: records.length,
     });
+    const composicaoDiff = totalTypes - t.worked;
+    if (composicaoDiff !== 0) {
+      console.warn("[WEEKLY_REPORT_PROPERTY_MISMATCH]", {
+        total_producao: t.worked,
+        total_composicao: totalTypes,
+        diferenca: composicaoDiff,
+      });
+      console.warn("[WEEKLY_REPORT_INTEGRITY_ERROR]", {
+        secao: "producao_imobiliaria_vs_composicao",
+        esperado: t.worked,
+        obtido: totalTypes,
+      });
+    }
+    console.log("[WEEKLY_REPORT_PROPERTY_VALIDATION]", {
+      total_producao_imobiliaria: t.worked,
+      total_composicao: totalTypes,
+      diferenca: composicaoDiff,
+    });
+
 
     // ===== PDF =====
     const pdf = new jsPDF();
