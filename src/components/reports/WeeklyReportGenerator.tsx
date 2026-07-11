@@ -124,15 +124,17 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     const positivity = pct(t.focos, t.depInspected || t.worked);
     const pendOpen = Math.max(0, t.pending - t.recovered);
 
-    // Composição por tipo de imóvel — visitas trabalhadas da SE do agente/ciclo
+    // Composição por tipo de imóvel — 1 imóvel = 1 registro (visita mais recente da SE)
     const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
+    let uniquePropertiesCount = 0;
+    let totalVisitsFound = 0;
     {
       const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean);
       let vrows: any[] = [];
       if (workDates.length > 0) {
         let vq = supabase
           .from("visits")
-          .select("property_id, status, visit_date, properties!inner(type)")
+          .select("id, property_id, status, visit_date, visit_type, created_at, properties!inner(type, block_id, number, sequence, complement)")
           .eq("agent_id", agentAuthId)
           .in("visit_date", workDates);
         if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
@@ -140,14 +142,51 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
         vrows = (data as any[]) || [];
       }
       const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
-      const seen = new Set<string>();
-      for (const r of vrows) {
-        if (!workedStatuses.has(String(r.status))) continue;
-        if (seen.has(r.property_id)) continue;
-        seen.add(r.property_id);
-        const type = String(r.properties?.type || "others");
+      const workedVisits = vrows.filter((r) => workedStatuses.has(String(r.status)));
+      totalVisitsFound = workedVisits.length;
+
+      // Agrupar por property_id (fallback: block_id+number+sequence+complement)
+      const groups = new Map<string, any[]>();
+      for (const r of workedVisits) {
+        const p = r.properties || {};
+        const key =
+          r.property_id ||
+          `${p.block_id ?? ""}|${p.number ?? ""}|${p.sequence ?? ""}|${p.complement ?? ""}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(r);
+      }
+
+      for (const [key, visits] of groups) {
+        visits.sort((a, b) => {
+          const d = String(b.visit_date).localeCompare(String(a.visit_date));
+          if (d !== 0) return d;
+          return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+        });
+        const chosen = visits[0];
+        const discarded = visits.slice(1);
+        if (discarded.length > 0) {
+          console.log("[WEEKLY_REPORT_DUPLICATE_PROPERTY]", {
+            property_id: chosen.property_id ?? key,
+            visitas: visits.length,
+            visita_utilizada: { id: chosen.id, visit_date: chosen.visit_date, status: chosen.status },
+            visitas_descartadas: discarded.map((v) => ({ id: v.id, visit_date: v.visit_date, status: v.status })),
+          });
+        }
+        // Prioridade: properties.type (vigente) → visit.visit_type → outros
+        const type = String(chosen.properties?.type || chosen.visit_type || "others");
         if (type in propTypes) (propTypes as any)[type] += 1;
         else propTypes.others += 1;
+      }
+      uniquePropertiesCount = groups.size;
+
+      console.log("[WEEKLY_REPORT_PROPERTY_UNIQUE]", {
+        visitas_encontradas: totalVisitsFound,
+        imoveis_unicos: uniquePropertiesCount,
+        diferenca: totalVisitsFound - uniquePropertiesCount,
+        composicao_final: { ...propTypes },
+      });
+      if (totalVisitsFound > uniquePropertiesCount) {
+        console.log("Foram encontradas revisitas na semana. A composição considera apenas imóveis únicos.");
       }
     }
 
