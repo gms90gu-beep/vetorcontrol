@@ -45,7 +45,6 @@ import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 import {
   runShiftValidation,
-  canForceClose,
   type ShiftValidationReport,
 } from "@/lib/shift-validation";
 import { flushMutations, retryFailedMutations } from "@/lib/offline/sync";
@@ -336,11 +335,27 @@ export function DailyWorkCloser({
       });
       setValidation(report);
 
-      if (report.ok) {
-        console.log("[SHIFT_CLOSE_VALIDATION_OK]");
+      const critical = report.issues.filter((i) => i.severity === "error").length;
+      const warnings = report.issues.filter((i) => i.severity === "warning").length;
+      console.log("[DAY_CLOSE_VALIDATION]", {
+        critical,
+        warnings,
+        info: report.counters,
+        codes: report.issues.map((i) => i.code),
+      });
+
+      if (critical === 0 && warnings === 0) {
+        console.log("[DAY_CLOSE_ALLOWED]", { reason: "no_issues" });
         await handleCloseDay();
+      } else if (critical > 0) {
+        console.warn("[DAY_CLOSE_BLOCKED]", {
+          codes: report.issues.filter((i) => i.severity === "error").map((i) => i.code),
+        });
+        setShowValidation(true);
       } else {
-        console.warn("[SHIFT_CLOSE_VALIDATION_BLOCKED]", report.issues);
+        console.log("[DAY_CLOSE_WARNING]", {
+          codes: report.issues.map((i) => i.code),
+        });
         setShowValidation(true);
       }
     } catch (e) {
@@ -364,7 +379,7 @@ export function DailyWorkCloser({
   };
 
   const handleForceClose = async () => {
-    console.warn("[SHIFT_CLOSE_FORCED]", { role: userRole });
+    console.log("[DAY_CLOSE_ALLOWED]", { reason: "warnings_acknowledged", role: userRole });
     setShowValidation(false);
     await handleCloseDay();
   };
@@ -1649,66 +1664,115 @@ export function DailyWorkCloser({
 
       <Dialog open={showValidation} onOpenChange={setShowValidation}>
         <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <ShieldAlert className="h-5 w-5" />
-              Jornada com inconsistências
-            </DialogTitle>
-            <DialogDescription>
-              Corrija os itens abaixo antes de encerrar a jornada.
-            </DialogDescription>
-          </DialogHeader>
+          {(() => {
+            const criticals = validation?.issues.filter((i) => i.severity === "error") ?? [];
+            const warnings = validation?.issues.filter((i) => i.severity === "warning") ?? [];
+            const hasCritical = criticals.length > 0;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className={cn("flex items-center gap-2", hasCritical ? "text-red-600" : "text-slate-800")}>
+                    {hasCritical ? <ShieldAlert className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                    {hasCritical ? "Encerramento bloqueado" : "Encerrar Expediente"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {hasCritical
+                      ? "Existem erros que precisam ser corrigidos antes de encerrar o expediente."
+                      : "Resumo da Produção — revise os avisos abaixo e confirme o encerramento."}
+                  </DialogDescription>
+                </DialogHeader>
 
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-            {validation?.issues.map((i) => (
-              <div
-                key={i.code}
-                className={cn(
-                  "flex items-start gap-2 rounded-lg border p-3 text-sm",
-                  i.severity === "error"
-                    ? "border-red-200 bg-red-50 text-red-800"
-                    : "border-amber-200 bg-amber-50 text-amber-800",
-                )}
-              >
-                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <p className="font-semibold">{i.message}</p>
-                  <p className="text-[10px] font-mono opacity-70">{i.code}</p>
+                <div className="space-y-3 max-h-[55vh] overflow-y-auto">
+                  {hasCritical && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-red-600">Erros críticos</p>
+                      {criticals.map((i) => (
+                        <div key={i.code} className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-semibold">{i.message}</p>
+                            <p className="text-[10px] font-mono opacity-70">{i.code}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {warnings.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Avisos operacionais</p>
+                      {warnings.map((i) => (
+                        <div key={i.code} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                          <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-semibold">{i.message}</p>
+                            {i.code === "PENDING_MUTATIONS" && (
+                              <p className="text-[11px] opacity-80 mt-0.5">
+                                Os dados permanecem armazenados localmente e serão sincronizados automaticamente.
+                              </p>
+                            )}
+                            {i.code === "PARTIAL_JOURNEY" && (
+                              <p className="text-[11px] opacity-80 mt-0.5">
+                                A jornada poderá ser retomada posteriormente do último imóvel trabalhado.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {validation && (
+                    <div className="text-xs text-muted-foreground border-t pt-2 mt-2 grid grid-cols-2 gap-1">
+                      <span className="col-span-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Informações</span>
+                      <span>Imóveis no escopo: <b>{validation.counters.propertiesInScope}</b></span>
+                      <span>Visitas: <b>{validation.counters.visitsInScope}</b></span>
+                      <span>Depósitos vinculados: <b>{validation.counters.depositsLinked}</b></span>
+                      <span>Fila pendente: <b>{validation.counters.pendingMutations}</b></span>
+                      <span>Fila com erro: <b>{validation.counters.failedMutations}</b></span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-            {validation && (
-              <div className="text-xs text-muted-foreground border-t pt-2 mt-2 grid grid-cols-2 gap-1">
-                <span>Imóveis no escopo: <b>{validation.counters.propertiesInScope}</b></span>
-                <span>Visitas: <b>{validation.counters.visitsInScope}</b></span>
-                <span>Depósitos vinculados: <b>{validation.counters.depositsLinked}</b></span>
-                <span>Fila pendente: <b>{validation.counters.pendingMutations}</b></span>
-                <span>Fila com erro: <b>{validation.counters.failedMutations}</b></span>
-              </div>
-            )}
-          </div>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-col">
-            <Button onClick={handleSyncNow} disabled={validating} className="w-full">
-              <RefreshCw className={cn("h-4 w-4 mr-2", validating && "animate-spin")} />
-              Sincronizar Agora e Revalidar
-            </Button>
-            <Button variant="outline" onClick={() => setShowValidation(false)} className="w-full">
-              Corrigir Manualmente
-            </Button>
-            {canForceClose(userRole) && (
-              <Button
-                variant="destructive"
-                onClick={handleForceClose}
-                disabled={isLoading}
-                className="w-full"
-              >
-                Encerrar Mesmo Assim (Supervisor)
-              </Button>
-            )}
-          </DialogFooter>
+                <DialogFooter className="flex-col gap-2 sm:flex-col">
+                  {hasCritical ? (
+                    <>
+                      <Button onClick={handleSyncNow} disabled={validating} className="w-full">
+                        <RefreshCw className={cn("h-4 w-4 mr-2", validating && "animate-spin")} />
+                        Corrigir Agora (Sincronizar e Revalidar)
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowValidation(false)} className="w-full">
+                        Cancelar
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {validation && validation.counters.pendingMutations > 0 && (
+                        <Button onClick={handleSyncNow} disabled={validating} className="w-full">
+                          <RefreshCw className={cn("h-4 w-4 mr-2", validating && "animate-spin")} />
+                          Sincronizar Agora
+                        </Button>
+                      )}
+                      <Button
+                        variant="default"
+                        onClick={handleForceClose}
+                        disabled={isLoading}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        Encerrar Mesmo Assim
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowValidation(false)} className="w-full">
+                        Cancelar
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
+
     </Dialog>
   );
 }
