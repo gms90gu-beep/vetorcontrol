@@ -84,7 +84,7 @@ function FieldWorkPage() {
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [starting, setStarting] = useState(false);
 
-  // Inicialização: usuário + blocos
+  // Inicialização: usuário + blocos + retomada de jornadas pausadas
   useEffect(() => {
     (async () => {
       try {
@@ -92,11 +92,42 @@ function FieldWorkPage() {
         if (!user) return;
         setUserId(user.id);
         await fetchBlocks(user.id);
+
+        // Retomada automática: procura jornada PAUSED do agente
+        if (isOnline()) {
+          try {
+            const { data: paused } = await supabase
+              .from("field_work_sessions")
+              .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
+              .eq("user_id", user.id)
+              .eq("status", "paused")
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (paused) {
+              console.log("[JOURNEY_RESUMED]", {
+                user_id: user.id,
+                session_id: (paused as any).id,
+                block_id: (paused as any).block_id,
+                block_number: (paused as any).block_number,
+                cycle_id: (paused as any).cycle_id,
+                session_date: (paused as any).session_date,
+                previous_status: "paused",
+                new_status: "prompt",
+              });
+              setOpenSession(paused as any);
+              setOpenSessionModal(true);
+            }
+          } catch (e) {
+            console.warn("[JOURNEY_RESUMED_ERR]", e);
+          }
+        }
       } finally {
         setCheckingBoot(false);
       }
     })();
   }, []);
+
 
   // Ao trocar data, recalcula ciclo + semana
   useEffect(() => {
