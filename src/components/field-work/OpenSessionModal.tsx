@@ -18,6 +18,9 @@ export interface OpenSessionInfo {
   street_name?: string | null;
   created_at?: string | null;
   started_at?: string | null;
+  status?: string | null;
+  updated_at?: string | null;
+  paused_at?: string | null;
 }
 
 interface Stats {
@@ -29,6 +32,7 @@ interface Stats {
   positive: number;
   deposits: number;
   larvicide: number;
+  nextIndex: number;
 }
 
 interface Props {
