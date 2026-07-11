@@ -277,6 +277,9 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       headStyles: { fillColor: [71, 85, 105], textColor: 255, fontSize: 8, halign: "center" },
       styles: { fontSize: 9, halign: "center" },
     });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+
+
 
     // 3. Levantamento de Índice (LI)
     pdf.text("3. LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
