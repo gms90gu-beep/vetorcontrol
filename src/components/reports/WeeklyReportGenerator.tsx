@@ -124,6 +124,51 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     const positivity = pct(t.focos, t.depInspected || t.worked);
     const pendOpen = Math.max(0, t.pending - t.recovered);
 
+    // Composição por tipo de imóvel — visitas trabalhadas da SE do agente/ciclo
+    const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
+    {
+      let vq = supabase
+        .from("visits")
+        .select("property_id, status, properties!inner(type)")
+        .eq("agent_id", agentAuthId)
+        .eq("week_number", epiWeek)
+        .eq("year", epiYear);
+      if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
+      const { data: vrows } = await vq;
+      const rows = (vrows as any[]) || [];
+      const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
+      const seen = new Set<string>();
+      for (const r of rows) {
+        if (!workedStatuses.has(String(r.status))) continue;
+        if (seen.has(r.property_id)) continue;
+        seen.add(r.property_id);
+        const type = String(r.properties?.type || "others");
+        if (type in propTypes) (propTypes as any)[type] += 1;
+        else propTypes.others += 1;
+      }
+    }
+    const totalTypes =
+      propTypes.residence + propTypes.commerce + propTypes.vacant_lot +
+      propTypes.strategic_point + propTypes.others;
+    const habitados = propTypes.residence + propTypes.commerce + propTypes.strategic_point;
+    const naoHabitados = propTypes.vacant_lot + propTypes.others;
+    const avgPerDaily = records.length > 0 ? (t.worked / records.length) : 0;
+
+    console.log("[WEEKLY_REPORT_PROPERTY_TYPES]", {
+      residencial: propTypes.residence,
+      comercial: propTypes.commerce,
+      terreno_baldio: propTypes.vacant_lot,
+      ponto_estrategico: propTypes.strategic_point,
+      outros: propTypes.others,
+      total: totalTypes,
+    });
+    console.log("[WEEKLY_REPORT_PROPERTY_SUMMARY]", {
+      habitados,
+      nao_habitados: naoHabitados,
+      media_por_diaria: Number(avgPerDaily.toFixed(2)),
+      total_diarias: records.length,
+    });
+
     // ===== PDF =====
     const pdf = new jsPDF();
     const pageW = pdf.internal.pageSize.getWidth();
