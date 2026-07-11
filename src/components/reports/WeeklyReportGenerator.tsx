@@ -127,18 +127,21 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     // Composição por tipo de imóvel — visitas trabalhadas da SE do agente/ciclo
     const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
     {
-      let vq = supabase
-        .from("visits")
-        .select("property_id, status, properties!inner(type)")
-        .eq("agent_id", agentAuthId)
-        .eq("week_number", epiWeek)
-        .eq("year", epiYear);
-      if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
-      const { data: vrows } = await vq;
-      const rows = (vrows as any[]) || [];
+      const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean);
+      let vrows: any[] = [];
+      if (workDates.length > 0) {
+        let vq = supabase
+          .from("visits")
+          .select("property_id, status, visit_date, properties!inner(type)")
+          .eq("agent_id", agentAuthId)
+          .in("visit_date", workDates);
+        if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
+        const { data } = await vq;
+        vrows = (data as any[]) || [];
+      }
       const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
       const seen = new Set<string>();
-      for (const r of rows) {
+      for (const r of vrows) {
         if (!workedStatuses.has(String(r.status))) continue;
         if (seen.has(r.property_id)) continue;
         seen.add(r.property_id);
@@ -147,6 +150,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
         else propTypes.others += 1;
       }
     }
+
     const totalTypes =
       propTypes.residence + propTypes.commerce + propTypes.vacant_lot +
       propTypes.strategic_point + propTypes.others;
