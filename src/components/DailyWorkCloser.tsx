@@ -45,7 +45,6 @@ import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 import {
   runShiftValidation,
-  canForceClose,
   type ShiftValidationReport,
 } from "@/lib/shift-validation";
 import { flushMutations, retryFailedMutations } from "@/lib/offline/sync";
