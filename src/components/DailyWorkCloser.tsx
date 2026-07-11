@@ -336,11 +336,27 @@ export function DailyWorkCloser({
       });
       setValidation(report);
 
-      if (report.ok) {
-        console.log("[SHIFT_CLOSE_VALIDATION_OK]");
+      const critical = report.issues.filter((i) => i.severity === "error").length;
+      const warnings = report.issues.filter((i) => i.severity === "warning").length;
+      console.log("[DAY_CLOSE_VALIDATION]", {
+        critical,
+        warnings,
+        info: report.counters,
+        codes: report.issues.map((i) => i.code),
+      });
+
+      if (critical === 0 && warnings === 0) {
+        console.log("[DAY_CLOSE_ALLOWED]", { reason: "no_issues" });
         await handleCloseDay();
+      } else if (critical > 0) {
+        console.warn("[DAY_CLOSE_BLOCKED]", {
+          codes: report.issues.filter((i) => i.severity === "error").map((i) => i.code),
+        });
+        setShowValidation(true);
       } else {
-        console.warn("[SHIFT_CLOSE_VALIDATION_BLOCKED]", report.issues);
+        console.log("[DAY_CLOSE_WARNING]", {
+          codes: report.issues.map((i) => i.code),
+        });
         setShowValidation(true);
       }
     } catch (e) {
