@@ -30,7 +30,9 @@ interface AgentInfo {
   latitude?: number | null;
   longitude?: number | null;
   locationSource?: "gps" | "manual" | null;
+  accuracy?: number | null;
 }
+
 
 interface ExportMetadata {
   total: number;
