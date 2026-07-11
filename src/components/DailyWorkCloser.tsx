@@ -944,17 +944,49 @@ export function DailyWorkCloser({
         p_date: operationalWorkDate,
       });
 
-      // 4) Encerra todas as sessões em andamento (local + fila)
+      // 4) Encerra o expediente: para cada jornada em andamento,
+      //    decide PAUSED (imóveis pendentes) x FINISHED (tudo trabalhado).
       console.log("[ENCERRAR] atualizando field_work_sessions");
       const sessionsToClose = await listLocal<any>(
         "field_work_sessions",
         (s) => s.user_id === user.id && s.status === "in_progress",
       );
+      const localVisitsAll = await listLocal<any>("visits", (v) => v.agent_id === user.id);
       for (const s of sessionsToClose) {
+        const total = Number(s.property_count || 0);
+        const workedIds = new Set<string>();
+        for (const v of localVisitsAll) {
+          if (v.field_work_session_id !== s.id) continue;
+          if (!v.property_id) continue;
+          if (v.status === "visited" || v.status === "closed" || v.status === "refused") {
+            workedIds.add(v.property_id);
+          }
+        }
+        const worked = workedIds.size;
+        const allDone = total > 0 && worked >= total;
+        const nextStatus = allDone ? "completed" : "paused";
+        const prevStatus = s.status;
         await updateOffline("field_work_sessions", s.id, {
-          status: "completed",
+          status: nextStatus,
           updated_at: new Date().toISOString(),
         });
+        const logPayload = {
+          user_id: user.id,
+          session_id: s.id,
+          block_id: s.block_id ?? null,
+          block_number: s.block_number ?? null,
+          cycle_id: s.cycle_id ?? null,
+          session_date: s.session_date ?? null,
+          previous_status: prevStatus,
+          new_status: nextStatus,
+          worked,
+          total,
+        };
+        if (allDone) {
+          console.log("[JOURNEY_FINISHED]", logPayload);
+        } else {
+          console.log("[JOURNEY_PAUSED]", logPayload);
+        }
       }
       const closedSessionId = activeSessionForClose?.id ?? null;
       const closedBlockId = (activeSessionForClose as any)?.block_id ?? activeSessionForClose?.block_number ?? null;
