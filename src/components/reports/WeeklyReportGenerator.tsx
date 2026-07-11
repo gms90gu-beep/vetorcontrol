@@ -127,18 +127,21 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     // Composição por tipo de imóvel — visitas trabalhadas da SE do agente/ciclo
     const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
     {
-      let vq = supabase
-        .from("visits")
-        .select("property_id, status, properties!inner(type)")
-        .eq("agent_id", agentAuthId)
-        .eq("week_number", epiWeek)
-        .eq("year", epiYear);
-      if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
-      const { data: vrows } = await vq;
-      const rows = (vrows as any[]) || [];
+      const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean);
+      let vrows: any[] = [];
+      if (workDates.length > 0) {
+        let vq = supabase
+          .from("visits")
+          .select("property_id, status, visit_date, properties!inner(type)")
+          .eq("agent_id", agentAuthId)
+          .in("visit_date", workDates);
+        if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
+        const { data } = await vq;
+        vrows = (data as any[]) || [];
+      }
       const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
       const seen = new Set<string>();
-      for (const r of rows) {
+      for (const r of vrows) {
         if (!workedStatuses.has(String(r.status))) continue;
         if (seen.has(r.property_id)) continue;
         seen.add(r.property_id);
@@ -147,6 +150,7 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
         else propTypes.others += 1;
       }
     }
+
     const totalTypes =
       propTypes.residence + propTypes.commerce + propTypes.vacant_lot +
       propTypes.strategic_point + propTypes.others;
@@ -168,6 +172,25 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
       media_por_diaria: Number(avgPerDaily.toFixed(2)),
       total_diarias: records.length,
     });
+    const composicaoDiff = totalTypes - t.worked;
+    if (composicaoDiff !== 0) {
+      console.warn("[WEEKLY_REPORT_PROPERTY_MISMATCH]", {
+        total_producao: t.worked,
+        total_composicao: totalTypes,
+        diferenca: composicaoDiff,
+      });
+      console.warn("[WEEKLY_REPORT_INTEGRITY_ERROR]", {
+        secao: "producao_imobiliaria_vs_composicao",
+        esperado: t.worked,
+        obtido: totalTypes,
+      });
+    }
+    console.log("[WEEKLY_REPORT_PROPERTY_VALIDATION]", {
+      total_producao_imobiliaria: t.worked,
+      total_composicao: totalTypes,
+      diferenca: composicaoDiff,
+    });
+
 
     // ===== PDF =====
     const pdf = new jsPDF();
