@@ -96,14 +96,15 @@ export async function runShiftValidation(
     });
   }
 
-  // Imóveis pendentes (sem visita hoje)
+  // Imóveis pendentes (sem visita hoje) — NÃO é inconsistência.
+  // Faz parte do fluxo normal: a jornada será pausada e retomada depois.
   const visitedProps = new Set(visits.map((v) => v.property_id));
   const pendingProps = propsInScope.filter((p) => !visitedProps.has(p.id));
   if (pendingProps.length > 0) {
     issues.push({
-      code: "PENDING_PROPERTIES",
+      code: "PARTIAL_JOURNEY",
       severity: "warning",
-      message: `${pendingProps.length} imóvel(is) pendente(s) sem visita.`,
+      message: `Jornada parcial: ${pendingProps.length} imóvel(is) restante(s). Será pausada automaticamente.`,
       count: pendingProps.length,
     });
   }
