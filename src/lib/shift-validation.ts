@@ -143,14 +143,16 @@ export async function runShiftValidation(
   const pendingMutations = await db.mutations.where("status").equals("pending").count();
   const failedMutations = await db.mutations.where("status").equals("error").count();
 
+  // Fila aguardando envio — apenas AVISO (pode estar offline).
   if (pendingMutations > 0) {
     issues.push({
       code: "PENDING_MUTATIONS",
-      severity: "error",
-      message: `${pendingMutations} mutação(ões) pendente(s) de sincronização.`,
+      severity: "warning",
+      message: `${pendingMutations} sincronização(ões) pendente(s). Serão enviadas quando houver internet.`,
       count: pendingMutations,
     });
   }
+  // Fila com erro — bloqueante (falha real que exige ação).
   if (failedMutations > 0) {
     issues.push({
       code: "FAILED_MUTATIONS",
