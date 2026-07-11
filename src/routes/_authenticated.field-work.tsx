@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { listRemoteOrCache, createOffline } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline, updateOffline } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import {
   Dialog,
@@ -84,7 +84,7 @@ function FieldWorkPage() {
   const [openSessionModal, setOpenSessionModal] = useState(false);
   const [starting, setStarting] = useState(false);
 
-  // Inicialização: usuário + blocos
+  // Inicialização: usuário + blocos + retomada de jornadas pausadas
   useEffect(() => {
     (async () => {
       try {
@@ -92,11 +92,42 @@ function FieldWorkPage() {
         if (!user) return;
         setUserId(user.id);
         await fetchBlocks(user.id);
+
+        // Retomada automática: procura jornada PAUSED do agente
+        if (isOnline()) {
+          try {
+            const { data: paused } = await supabase
+              .from("field_work_sessions")
+              .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
+              .eq("user_id", user.id)
+              .eq("status", "paused")
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (paused) {
+              console.log("[JOURNEY_RESUMED]", {
+                user_id: user.id,
+                session_id: (paused as any).id,
+                block_id: (paused as any).block_id,
+                block_number: (paused as any).block_number,
+                cycle_id: (paused as any).cycle_id,
+                session_date: (paused as any).session_date,
+                previous_status: "paused",
+                new_status: "prompt",
+              });
+              setOpenSession(paused as any);
+              setOpenSessionModal(true);
+            }
+          } catch (e) {
+            console.warn("[JOURNEY_RESUMED_ERR]", e);
+          }
+        }
       } finally {
         setCheckingBoot(false);
       }
     })();
   }, []);
+
 
   // Ao trocar data, recalcula ciclo + semana
   useEffect(() => {
@@ -218,7 +249,8 @@ function FieldWorkPage() {
 
     setStarting(true);
     try {
-      // Verificação estrita: user_id + session_date + block_id + status=in_progress
+      // Verificação estrita: user_id + block_id + status in (in_progress, paused)
+      // Sessões pausadas de datas anteriores são retomadas neste bloco.
       if (isOnline()) {
         console.log("[SESSION_LOOKUP]", {
           user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
@@ -227,20 +259,20 @@ function FieldWorkPage() {
           .from("field_work_sessions")
           .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
           .eq("user_id", userId)
-          .eq("session_date", sessionDateStr)
           .eq("block_id", selectedBlock.id)
-          .eq("status", "in_progress")
+          .in("status", ["in_progress", "paused"])
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (existing) {
-          console.log("[SESSION_FOUND]", { id: existing.id });
+          console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
           setOpenSession(existing as any);
           setOpenSessionModal(true);
           return;
         }
       }
+
 
       // Cria nova jornada automaticamente
       const nowIso = new Date().toISOString();
@@ -525,9 +557,35 @@ function FieldWorkPage() {
         weekLabel={openSession && autoWeek?.id === openSession.week_id ? `Semana ${autoWeek.number}/8` : undefined}
         onContinue={async (s) => {
           setOpenSessionModal(false);
+          // Se a jornada estava PAUSED, reativa para in_progress na data atual
+          const wasPaused = (s as any).status === "paused";
+          let resumed = s;
+          if (wasPaused) {
+            const todayStr = toDateOnly(new Date());
+            try {
+              await updateOffline("field_work_sessions", s.id, {
+                status: "in_progress",
+                session_date: todayStr,
+                updated_at: new Date().toISOString(),
+              });
+              resumed = { ...s, status: "in_progress", session_date: todayStr } as any;
+              console.log("[JOURNEY_RESUMED]", {
+                user_id: userId,
+                session_id: s.id,
+                block_id: (s as any).block_id ?? null,
+                block_number: s.block_number ?? null,
+                cycle_id: s.cycle_id ?? null,
+                session_date: todayStr,
+                previous_status: "paused",
+                new_status: "in_progress",
+              });
+            } catch (e) {
+              console.warn("[JOURNEY_RESUMED_ERR]", e);
+            }
+          }
           await autoRecoverSession(s.id);
           try { (window as any).__vcSetJourneyActive?.(true); } catch {}
-          setActiveSession(s);
+          setActiveSession(resumed);
         }}
         onFinished={() => {
           setOpenSessionModal(false);
