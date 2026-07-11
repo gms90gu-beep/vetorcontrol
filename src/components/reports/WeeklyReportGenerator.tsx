@@ -341,7 +341,48 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
+    // 2.2 Indicadores Operacionais
+    const revisitas = Math.max(0, totalVisitsFound - uniquePropertiesCount);
+    const avgPropsPerDaily = records.length > 0 ? uniquePropertiesCount / records.length : 0;
+    const avgVisitsPerDaily = records.length > 0 ? totalVisitsFound / records.length : 0;
 
+    console.log("[WEEKLY_REPORT_OPERATIONAL_SUMMARY]", {
+      visitas: totalVisitsFound,
+      imoveis_unicos: uniquePropertiesCount,
+      revisitas,
+      media_imoveis_dia: Number(avgPropsPerDaily.toFixed(2)),
+      media_visitas_dia: Number(avgVisitsPerDaily.toFixed(2)),
+      diarias: records.length,
+    });
+    if (totalVisitsFound !== uniquePropertiesCount + revisitas) {
+      console.warn("[WEEKLY_REPORT_OPERATIONAL_MISMATCH]", {
+        total_visitas: totalVisitsFound,
+        imoveis_unicos: uniquePropertiesCount,
+        revisitas,
+        diferenca: totalVisitsFound - (uniquePropertiesCount + revisitas),
+      });
+    }
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+    pdf.text("2.2 INDICADORES OPERACIONAIS", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Visitas realizadas", String(totalVisitsFound)],
+        ["Imóveis únicos", String(uniquePropertiesCount)],
+        ["Revisitas", String(revisitas)],
+        ["Diárias realizadas", String(records.length)],
+        ["Média de imóveis por diária", avgPropsPerDaily.toFixed(1).replace(".", ",")],
+        ["Média de visitas por diária", avgVisitsPerDaily.toFixed(1).replace(".", ",")],
+      ],
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: "center", cellWidth: 40 } },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
 
     // 3. Levantamento de Índice (LI)
     pdf.text("3. LEVANTAMENTO DE ÍNDICE (LI)", 14, y);
