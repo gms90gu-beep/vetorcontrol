@@ -5,6 +5,7 @@ export * from "./logger";
 export * from "./context";
 export * from "./SharedMap";
 export * from "./SharedMarkerLayer";
+export * from "./SharedNumberedMarkerLayer";
 export * from "./SharedLegend";
 export * from "./SharedLoading";
 export * from "./SharedError";
