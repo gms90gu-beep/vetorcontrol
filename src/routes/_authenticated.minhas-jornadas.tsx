@@ -11,6 +11,7 @@ import { isOnline } from "@/lib/offline/safe-fetch";
 import { updateOffline } from "@/lib/offline/repos";
 import { db } from "@/lib/offline/db";
 import { toast } from "sonner";
+import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
