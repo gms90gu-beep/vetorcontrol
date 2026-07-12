@@ -580,12 +580,20 @@ function FieldWorkPage() {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-black text-sm uppercase tracking-tight">Quarteirão {block.number}</span>
-                          <span className={cn(
-                            "text-[10px] font-bold uppercase tracking-widest",
-                            selectedBlockId === block.id ? "text-white/60" : "text-slate-500",
-                          )}>
-                            {block.total_properties || 0} imóveis
-                          </span>
+                          {(() => {
+                            const s = blockStats.get(block.id);
+                            const label = s
+                              ? `${s.total} imóveis · ${s.visited + s.closed + s.refused} visitados · ${s.pending} pendentes${s.status === "CONCLUIDO" ? " · CONCLUÍDO" : ""}`
+                              : `${block.total_properties || 0} imóveis`;
+                            return (
+                              <span className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest",
+                                selectedBlockId === block.id ? "text-white/60" : "text-slate-500",
+                              )}>
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       {selectedBlockId === block.id && <CheckCircle2 className="h-5 w-5 text-white" />}
