@@ -170,26 +170,29 @@ function MySessionsPage() {
         });
         enriched.forEach((r) => {
           const vs = groups.get(r.id) || [];
-          const visited = new Set<string>();
-          const closed = new Set<string>();
-          const refused = new Set<string>();
-          let positive = 0;
-          vs.forEach((v: any) => {
-            if (v.property_id) {
-              if (v.status === "visited") visited.add(v.property_id);
-              if (v.status === "closed") closed.add(v.property_id);
-              if (v.status === "refused") refused.add(v.property_id);
-            }
-            if (v.has_focus) positive += 1;
+          const propIds = Array.from(new Set(vs.map((v: any) => v.property_id).filter(Boolean)));
+          const canonical = getOperationalBlockStatus({
+            propertyIds: propIds,
+            visits: vs as any[],
+            fallbackTotal: r.property_count || 0,
           });
-          const total = r.property_count || 0;
-          const worked = visited.size + closed.size + refused.size;
+          logBlockStatusShared(
+            {
+              module: "MinhasJornadas",
+              productionDate: r.session_date,
+              blockId: r.block_id,
+              blockNumber: r.block_number,
+              sessionId: r.id,
+            },
+            canonical,
+          );
+          const positive = vs.reduce((a: number, v: any) => a + (v.has_focus ? 1 : 0), 0);
           r.stats = {
-            total,
-            visited: visited.size,
-            closed: closed.size,
-            refused: refused.size,
-            pending: Math.max(0, total - worked),
+            total: canonical.totalProperties,
+            visited: canonical.visitedProperties,
+            closed: canonical.closedProperties,
+            refused: canonical.refusedProperties,
+            pending: canonical.pendingProperties,
             positive,
             deposits: depMap.get(r.id) || 0,
           };
