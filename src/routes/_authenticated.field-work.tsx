@@ -36,6 +36,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
+import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
