@@ -4,6 +4,9 @@ import { getEpiWeek } from "@/lib/cycle-week";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { FileText } from "lucide-react";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "agent/BulletinPreview", file: "src/components/agent/BulletinPreview.tsx", source: "daily_work_records", note: "preview do boletim — usar getDateMetrics após refator" });
+
 type Props = { userId: string };
 
 type T = {

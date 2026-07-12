@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
   FileText,
   Download,
   FileSpreadsheet,

@@ -5,6 +5,9 @@ import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { CalendarDays, CheckCircle2, XCircle, Bug, Droplets, Beaker, Home, TrendingUp, AlertTriangle, Eye } from "lucide-react";
 import { getOperationalDate } from "@/lib/operational-date";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "agent/MyWeeklyConsolidation", file: "src/components/agent/MyWeeklyConsolidation.tsx", source: "daily_work_records", note: "consolidação semanal — usar getWeekMetrics após refator" });
+
 const WORK_DAYS = 5;
 
 type Props = { userId: string };

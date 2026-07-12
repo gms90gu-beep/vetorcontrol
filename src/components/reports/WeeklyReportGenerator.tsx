@@ -7,6 +7,9 @@ import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
 import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "reports/WeeklyReportGenerator", file: "src/components/reports/WeeklyReportGenerator.tsx", source: "daily_work_records", note: "gerador PDF semanal — usar getWeekMetrics após refator" });
+
 // Semana epidemiológica derivada da DATA OPERACIONAL (America/Sao_Paulo).
 function epiWeekOf(date: Date): { week: number; year: number } {
   return epiWeekFromDate(getOperationalDate(date));

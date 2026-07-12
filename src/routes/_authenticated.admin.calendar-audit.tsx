@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "routes/admin.calendar-audit", file: "src/routes/_authenticated.admin.calendar-audit.tsx", source: "daily_work_records", note: "auditoria de calendário — leitura administrativa" });
+
 export const Route = createFileRoute("/_authenticated/admin/calendar-audit")({
   component: CalendarAuditPage,
 });

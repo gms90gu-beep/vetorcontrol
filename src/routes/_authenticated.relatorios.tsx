@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "routes/relatorios", file: "src/routes/_authenticated.relatorios.tsx", source: "daily_work_records", note: "tela relatórios — usar getDashboardMetrics após refator" });
   RefreshCw,
   FileText,
   Download,
