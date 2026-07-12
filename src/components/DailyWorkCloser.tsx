@@ -10,6 +10,7 @@ import {
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
+import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -239,6 +240,56 @@ async function buildDailySnapshot(
   snap.blocksInProgress = new Set(
     daySessions.filter((s) => s.status === "in_progress").map((s) => s.block_number),
   ).size;
+  // Auditoria: reconciliar snapshot com a biblioteca central por sessão.
+  try {
+    const bySession = new Map<string, any[]>();
+    for (const v of allVisits) {
+      const sid = String(v.field_work_session_id || "_none_");
+      const arr = bySession.get(sid) || [];
+      arr.push(v);
+      bySession.set(sid, arr);
+    }
+    const daySess = await listLocal<any>(
+      "field_work_sessions",
+      (s) => s.user_id === userId && s.session_date === opDateStr,
+    );
+    for (const s of daySess) {
+      const vs = bySession.get(s.id) || [];
+      const propIds = Array.from(new Set(vs.map((v: any) => v.property_id).filter(Boolean)));
+      const canonical = getOperationalBlockStatus({
+        propertyIds: propIds,
+        visits: vs,
+        fallbackTotal: s.property_count || 0,
+      });
+      logBlockStatusShared(
+        {
+          module: "DailyWorkCloser",
+          productionDate: opDateStr,
+          blockId: s.block_id,
+          blockNumber: s.block_number,
+          sessionId: s.id,
+        },
+        canonical,
+      );
+    }
+    assertOperationalStatusMatches("DailyWorkCloser/snapshot", {
+      totalProperties: snap.workedCount,
+      visitedProperties: snap.visitedCount,
+      closedProperties: snap.closedCount,
+      refusedProperties: snap.refusedCount,
+      recoveredProperties: 0,
+      pendingProperties: snap.pendingLocal,
+      completionPercentage: 0,
+      status: "EM_ANDAMENTO",
+    }, {
+      totalProperties: snap.visitedCount + snap.closedCount + snap.refusedCount,
+      visitedProperties: snap.visitedCount,
+      closedProperties: snap.closedCount,
+      pendingProperties: snap.pendingLocal,
+    });
+  } catch (e) {
+    console.warn("[BLOCK_STATUS_AUDIT_ERR]", e);
+  }
   return snap;
 }
 
