@@ -129,21 +129,44 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     let uniquePropertiesCount = 0;
     let totalVisitsFound = 0;
     {
-      const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean);
+      const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean) as string[];
       let vrows: any[] = [];
       if (workDates.length > 0) {
+        const sorted = [...workDates].sort();
+        const minDate = sorted[0];
+        const maxDate = sorted[sorted.length - 1];
+        // visit_date é timestamptz — filtrar por range e casar via operational_date (America/Sao_Paulo)
+        const startIso = `${minDate}T00:00:00-03:00`;
+        const endIso = `${maxDate}T23:59:59.999-03:00`;
         let vq = supabase
           .from("visits")
-          .select("id, property_id, status, visit_date, visit_type, created_at, properties!inner(type, block_id, number, sequence, complement)")
+          .select("id, property_id, status, visit_date, visit_type, created_at, properties(type, block_id, number, sequence, complement)")
           .eq("agent_id", agentAuthId)
-          .in("visit_date", workDates);
+          .gte("visit_date", startIso)
+          .lte("visit_date", endIso);
         if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
-        const { data } = await vq;
-        vrows = (data as any[]) || [];
+        const { data, error: vErr } = await vq;
+        if (vErr) console.warn("[WEEKLY_REPORT_VISITS_QUERY_ERROR]", vErr);
+        const workDateSet = new Set(workDates);
+        vrows = ((data as any[]) || []).filter((r) => {
+          const opDate = getOperationalDate(new Date(r.visit_date));
+          return workDateSet.has(opDate);
+        });
+        console.log("[WEEKLY_REPORT_VISITS_FETCH]", {
+          workDates,
+          range: { startIso, endIso },
+          returned: (data as any[])?.length ?? 0,
+          matched_by_operational_date: vrows.length,
+        });
       }
       const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
       const workedVisits = vrows.filter((r) => workedStatuses.has(String(r.status)));
       totalVisitsFound = workedVisits.length;
+
+      for (const v of workedVisits) {
+        console.log("[WEEKLY_REPORT_VISIT]", { visitId: v.id, propertyId: v.property_id });
+        console.log("[WEEKLY_REPORT_PROPERTY]", { propertyId: v.property_id, property: v.properties });
+      }
 
       // Agrupar por property_id (fallback: block_id+number+sequence+complement)
       const groups = new Map<string, any[]>();
@@ -173,10 +196,37 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
           });
         }
         // Prioridade: properties.type (vigente) → visit.visit_type → outros
-        const type = String(chosen.properties?.type || chosen.visit_type || "others");
+        const rawType = chosen.properties?.type ?? chosen.visit_type ?? null;
+        const typeOrigin = chosen.properties?.type
+          ? "properties.type"
+          : chosen.visit_type
+            ? "visits.visit_type"
+            : "fallback:others";
+        const type = String(rawType || "others");
         if (type in propTypes) (propTypes as any)[type] += 1;
         else propTypes.others += 1;
+        console.log("[WEEKLY_REPORT_PROPERTY_DEBUG]", {
+          property_id: chosen.property_id ?? key,
+          tipo: type,
+          origem: typeOrigin,
+          visita: { id: chosen.id, visit_date: chosen.visit_date, status: chosen.status },
+        });
+        if (!chosen.properties) {
+          console.warn("[WEEKLY_REPORT_PROPERTY_FALLBACK]", {
+            property_id: chosen.property_id ?? key,
+            origem: typeOrigin,
+            motivo: "properties join vazio",
+          });
+        }
       }
+      console.log("[WEEKLY_REPORT_PROPERTY_COUNTS]", {
+        residencial: propTypes.residence,
+        comercial: propTypes.commerce,
+        terreno_baldio: propTypes.vacant_lot,
+        pe: propTypes.strategic_point,
+        outros: propTypes.others,
+        total: propTypes.residence + propTypes.commerce + propTypes.vacant_lot + propTypes.strategic_point + propTypes.others,
+      });
       uniquePropertiesCount = groups.size;
 
       console.log("[WEEKLY_REPORT_PROPERTY_UNIQUE]", {
