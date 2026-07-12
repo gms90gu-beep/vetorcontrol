@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
+import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 
 type FilterKey =
   | "all" | "pending" | "visited" | "closed" | "refused"
@@ -232,43 +233,40 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   }, [visits]);
 
   const stats = useMemo(() => {
-    let visited = 0, closed = 0, refused = 0, focus = 0;
+    const canonical = getOperationalBlockStatus({
+      propertyIds: properties.map((p) => p.id),
+      visits,
+      fallbackTotal: total,
+    });
+    logBlockStatusShared(
+      {
+        module: "OperationalPanel",
+        productionDate: session?.session_date ?? null,
+        blockId: session?.block_id ?? null,
+        blockNumber: session?.block_number ?? null,
+        sessionId: session?.id ?? null,
+      },
+      canonical,
+    );
+    let focus = 0;
     for (const p of properties) {
       const v = lastVisitByProp.get(p.id);
-      const calculated = !v ? "PENDENTE"
-        : v.status === "closed" ? "FECHADO"
-        : v.status === "refused" ? "RECUSA"
-        : v.status === "visited" ? "VISITADO"
-        : String(v.status || "PENDENTE").toUpperCase();
-      console.log("[PROPERTY_STATUS_CALC]", {
-        property_id: p.id,
-        has_visit: !!v,
-        status_calculated: calculated,
-      });
-      if (!v) continue;
-      if (v.status === "visited") visited++;
-      else if (v.status === "closed") closed++;
-      else if (v.status === "refused") refused++;
-      if (v.has_focus) focus++;
+      if (v?.has_focus) focus++;
     }
-    const done = visited + closed + refused;
-    const pendingCount = Math.max(0, total - done);
     const larvicida = visits.reduce((a, v) => a + (Number(v.treatment_amount) || 0), 0);
     const depositos = deposits.length;
     const pendenciasAbertas = pendencies.filter((p) => !p.resolved_at).length;
     const semGeo = properties.filter((p) => p.latitude == null || p.longitude == null).length;
-    const blockFinal = total > 0 && pendingCount === 0 ? "CONCLUIDO" : "EM_ANDAMENTO";
-    console.log("[BLOCK_STATUS_CALC]", {
-      block_id: session?.block_id ?? null,
-      total,
-      visitados: visited,
-      fechados: closed,
-      pendentes: pendingCount,
-      status_final: blockFinal,
-      validation_ok: (visited + closed + refused + pendingCount) === total,
-    });
-    return { visited, closed, refused, focus, done, pendingCount, larvicida, depositos, pendenciasAbertas, semGeo };
-  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, session?.block_id]);
+    return {
+      visited: canonical.visitedProperties,
+      closed: canonical.closedProperties,
+      refused: canonical.refusedProperties,
+      focus,
+      done: canonical.visitedProperties + canonical.closedProperties + canonical.refusedProperties,
+      pendingCount: canonical.pendingProperties,
+      larvicida, depositos, pendenciasAbertas, semGeo,
+    };
+  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, session?.id, session?.block_id, session?.block_number, session?.session_date]);
 
   const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
   useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total }); }, [progress, stats.done, total]);
