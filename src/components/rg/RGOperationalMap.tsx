@@ -1,18 +1,20 @@
-// Mapa Operacional do RG — Fase 1.
-// Split-view: painel lateral (KPIs + lista numerada) + mapa com marcadores numerados.
-// Sincronização bidirecional via `selectedId` / `onSelect`.
+// Mapa Operacional do RG — Fase 2 (Navegação Operacional).
+// Split-view: painel lateral (KPIs + lista numerada + controles de navegação) + mapa.
 // Regra: nenhum import direto de Leaflet — tudo via @/components/map/shared.
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type L from "leaflet";
 import {
   SharedMap,
   SharedNumberedMarkerLayer,
+  SharedRouteLayer,
+  SharedUserLocationLayer,
   type NumberedPoint,
 } from "@/components/map/shared";
 import { cn } from "@/lib/utils";
 import { comparePropertyOrder } from "@/lib/property-order";
 import {
-  Home, MapPin, AlertTriangle, Flame, CheckCircle2,
-  Landmark, Trees, X,
+  Home, AlertTriangle, Flame, CheckCircle2,
+  Landmark, Trees, X, Navigation, LocateFixed, Play, Pause, ArrowRight,
 } from "lucide-react";
 
 export type RGMapProperty = {
@@ -41,32 +43,18 @@ interface Props {
   className?: string;
 }
 
-type Kind =
-  | "focus" | "closed" | "visited" | "pending"
-  | "strategic" | "vacant";
+type Kind = "focus" | "closed" | "visited" | "pending" | "strategic" | "vacant";
 
 const KIND_COLOR: Record<Kind, string> = {
-  focus: "#ef4444",      // 🔴
-  closed: "#2563eb",     // 🔵
-  visited: "#10b981",    // 🟢
-  pending: "#f97316",    // 🟠
-  strategic: "#a855f7",  // 🟣
-  vacant: "#1f2937",     // ⚫
+  focus: "#ef4444", closed: "#2563eb", visited: "#10b981",
+  pending: "#f97316", strategic: "#a855f7", vacant: "#1f2937",
 };
-
 const KIND_LABEL: Record<Kind, string> = {
-  focus: "Foco positivo",
-  closed: "Fechado",
-  visited: "Visitado",
-  pending: "Pendente",
-  strategic: "Ponto Estratégico",
-  vacant: "Terreno Baldio",
+  focus: "Foco positivo", closed: "Fechado", visited: "Visitado",
+  pending: "Pendente", strategic: "Ponto Estratégico", vacant: "Terreno Baldio",
 };
 
-function normType(t: string | null | undefined): string {
-  return (t || "").toLowerCase();
-}
-
+function normType(t: string | null | undefined): string { return (t || "").toLowerCase(); }
 function classify(p: RGMapProperty): Kind {
   if (p.had_previous_focus) return "focus";
   const t = normType(p.type);
@@ -77,7 +65,6 @@ function classify(p: RGMapProperty): Kind {
   if (s === "visited") return "visited";
   return "pending";
 }
-
 function tipoSigla(t: string | null | undefined): string {
   const x = normType(t);
   if (x === "residence" || x === "residential" || x === "r") return "R";
@@ -86,30 +73,46 @@ function tipoSigla(t: string | null | undefined): string {
   if (x === "strategic_point" || x === "pe") return "PE";
   return "O";
 }
-
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
   ));
 }
 
+// Haversine em metros.
+function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371000;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s1 = Math.sin(dLat / 2);
+  const s2 = Math.sin(dLng / 2);
+  const h = s1 * s1 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function bearingDeg(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const toDeg = (x: number) => (x * 180) / Math.PI;
+  const φ1 = toRad(from.lat), φ2 = toRad(to.lat);
+  const λ1 = toRad(from.lng), λ2 = toRad(to.lng);
+  const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+function fmtDistance(m: number): string {
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${(m / 1000).toFixed(m < 10000 ? 2 : 1)} km`;
+}
+
 export function RGOperationalMap({
   blockNumber, agentName, properties, selectedId, onSelect, onClose, className,
 }: Props) {
-  // Ordenação operacional canônica.
-  const ordered = useMemo(
-    () => [...properties].sort(comparePropertyOrder),
-    [properties],
-  );
-
-  // Mapeia índice → label sequencial exibido no marcador (sequência do RG ou índice+1).
-  const enriched = useMemo(() => {
-    return ordered.map((p, i) => {
-      const kind = classify(p);
-      const label = p.sequence != null ? p.sequence : i + 1;
-      return { p, kind, label };
-    });
-  }, [ordered]);
+  const ordered = useMemo(() => [...properties].sort(comparePropertyOrder), [properties]);
+  const enriched = useMemo(() => ordered.map((p, i) => {
+    const kind = classify(p);
+    const label = p.sequence != null ? p.sequence : i + 1;
+    return { p, kind, label };
+  }), [ordered]);
 
   const totals = useMemo(() => {
     const t = { total: ordered.length, visited: 0, pending: 0, focus: 0, closed: 0, strategic: 0, vacant: 0 };
@@ -124,50 +127,146 @@ export function RGOperationalMap({
     return t;
   }, [enriched, ordered.length]);
 
-  // Próximo imóvel pendente (por ordem operacional).
-  const next = useMemo(
-    () => enriched.find((e) => e.kind === "pending"),
-    [enriched],
-  );
+  const next = useMemo(() => enriched.find((e) => e.kind === "pending"), [enriched]);
+  const nextId = next?.p.id ?? null;
 
-  const points: NumberedPoint[] = useMemo(() => {
-    return enriched
-      .filter((e) => e.p.latitude != null && e.p.longitude != null)
-      .map(({ p, kind, label }) => {
-        const color = KIND_COLOR[kind];
-        const acc = p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—";
-        const addr = [p.street_name, p.side ? `Lado ${p.side}` : null].filter(Boolean).join(" · ");
-        const popup = `
-          <div style="font-family:system-ui;font-size:12px;min-width:220px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:11px">${label}</span>
-              <b style="font-size:13px">Nº ${escapeHtml(String(p.number ?? "—"))}${p.complement ? " · " + escapeHtml(p.complement) : ""}</b>
-            </div>
-            <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
-              <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
-              <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
-              <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
-              <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
-              <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
-              <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
-            </div>
-          </div>`;
-        return {
-          id: p.id,
-          lat: p.latitude as number,
-          lng: p.longitude as number,
-          label,
-          color,
-          popupHtml: popup,
-          tooltip: `${label} · Nº ${p.number ?? "—"}`,
-        };
-      });
-  }, [enriched, agentName]);
+  const points: NumberedPoint[] = useMemo(() => enriched
+    .filter((e) => e.p.latitude != null && e.p.longitude != null)
+    .map(({ p, kind, label }) => {
+      const color = KIND_COLOR[kind];
+      const acc = p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—";
+      const addr = [p.street_name, p.side ? `Lado ${p.side}` : null].filter(Boolean).join(" · ");
+      const popup = `
+        <div style="font-family:system-ui;font-size:12px;min-width:220px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:11px">${label}</span>
+            <b style="font-size:13px">Nº ${escapeHtml(String(p.number ?? "—"))}${p.complement ? " · " + escapeHtml(p.complement) : ""}</b>
+          </div>
+          <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
+            <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
+            <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
+            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
+            <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
+            <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
+            <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
+          </div>
+        </div>`;
+      return {
+        id: p.id,
+        lat: p.latitude as number,
+        lng: p.longitude as number,
+        label, color, popupHtml: popup,
+        tooltip: `${label} · Nº ${p.number ?? "—"}`,
+      };
+    }), [enriched, agentName]);
 
   const geoCount = points.length;
 
-  // Scroll do painel lateral para o item selecionado.
+  // Rota — sequência dos pontos com GPS.
+  const routePoints = useMemo(
+    () => points.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [points],
+  );
+
+  // Instância do mapa (para setView por clique nos botões).
+  const [mapInst, setMapInst] = useState<L.Map | null>(null);
+
+  // Geolocalização — apenas sob demanda, watchPosition ativo somente enquanto ligado.
+  const [gpsOn, setGpsOn] = useState(false);
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  const stopWatch = useCallback(() => {
+    if (watchIdRef.current != null && typeof navigator !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    watchIdRef.current = null;
+    console.log("[NAVIGATION_STOP]", { block: blockNumber });
+  }, [blockNumber]);
+
+  const startWatch = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGpsError("Geolocalização indisponível neste dispositivo.");
+      return;
+    }
+    setGpsError(null);
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null };
+        setUserPos(p);
+        console.log("[NAVIGATION_GPS]", { lat: p.lat, lng: p.lng, accuracy: p.accuracy });
+      },
+      (err) => {
+        setGpsError(err.message || "Falha ao obter localização.");
+        setGpsOn(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+    );
+    watchIdRef.current = id;
+  }, []);
+
+  // Liga/desliga watchPosition conforme toggle.
+  useEffect(() => {
+    if (gpsOn) startWatch();
+    else { stopWatch(); setUserPos(null); }
+    return () => stopWatch();
+  }, [gpsOn, startWatch, stopWatch]);
+
+  // Centraliza o mapa no usuário na primeira leitura após ligar o GPS.
+  const centeredOnceRef = useRef(false);
+  useEffect(() => {
+    if (!gpsOn) { centeredOnceRef.current = false; return; }
+    if (!mapInst || !userPos || centeredOnceRef.current) return;
+    mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+    centeredOnceRef.current = true;
+  }, [gpsOn, userPos, mapInst]);
+
+  // "Seguir Jornada" — recentraliza no próximo pendente sempre que ele mudar.
+  const [followJourney, setFollowJourney] = useState(false);
+  const lastNextRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!followJourney || !mapInst || !nextId) return;
+    if (lastNextRef.current === nextId) return;
+    lastNextRef.current = nextId;
+    const pt = points.find((p) => p.id === nextId);
+    if (!pt) return;
+    mapInst.closePopup();
+    mapInst.setView([pt.lat, pt.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+    onSelect(nextId);
+    console.log("[NAVIGATION_NEXT]", { next: nextId });
+  }, [followJourney, nextId, mapInst, points, onSelect]);
+
+  // Log de início.
+  useEffect(() => {
+    console.log("[NAVIGATION_START]", { block: blockNumber, total: totals.total, next: nextId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockNumber]);
+
+  // Distância + rumo até o próximo pendente (quando temos GPS).
+  const nextPoint = useMemo(() => nextId ? points.find((p) => p.id === nextId) ?? null : null, [nextId, points]);
+  const distToNext = useMemo(() => {
+    if (!userPos || !nextPoint) return null;
+    return distanceMeters(userPos, nextPoint);
+  }, [userPos, nextPoint]);
+  const bearingToNext = useMemo(() => {
+    if (!userPos || !nextPoint) return null;
+    return bearingDeg(userPos, nextPoint);
+  }, [userPos, nextPoint]);
+
+  const goToNext = useCallback(() => {
+    if (!mapInst || !nextPoint) return;
+    mapInst.setView([nextPoint.lat, nextPoint.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+    onSelect(nextPoint.id);
+    console.log("[NAVIGATION_NEXT]", { next: nextPoint.id, manual: true });
+  }, [mapInst, nextPoint, onSelect]);
+
+  const goToUser = useCallback(() => {
+    if (!mapInst || !userPos) return;
+    mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+  }, [mapInst, userPos]);
+
   const listRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!selectedId || !listRef.current) return;
@@ -176,14 +275,7 @@ export function RGOperationalMap({
   }, [selectedId]);
 
   return (
-    <section
-      className={cn(
-        "grid gap-3 md:grid-cols-[320px_minmax(0,1fr)]",
-        "brg-no-print",
-        className,
-      )}
-    >
-      {/* Painel lateral */}
+    <section className={cn("grid gap-3 md:grid-cols-[320px_minmax(0,1fr)]", "brg-no-print", className)}>
       <aside className="rounded-xl border border-slate-200 bg-white p-3 flex flex-col min-h-0 md:max-h-[78vh]">
         <header className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
@@ -191,11 +283,7 @@ export function RGOperationalMap({
             <div className="text-sm font-black truncate">Quarteirão {blockNumber ?? "—"}</div>
           </div>
           {onClose && (
-            <button
-              onClick={onClose}
-              aria-label="Fechar mapa"
-              className="p-1 rounded hover:bg-slate-100 text-slate-500"
-            >
+            <button onClick={onClose} aria-label="Fechar mapa" className="p-1 rounded hover:bg-slate-100 text-slate-500">
               <X className="h-4 w-4" />
             </button>
           )}
@@ -210,6 +298,63 @@ export function RGOperationalMap({
           <Kpi icon={<Trees className="h-3.5 w-3.5" />} label="TB/PE" value={totals.vacant + totals.strategic} tone="slate" />
         </div>
 
+        {/* Controles de navegação */}
+        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGpsOn((v) => !v)}
+            className={cn(
+              "flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
+              gpsOn
+                ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+            )}
+            title="Ativa/desativa GPS enquanto o mapa está aberto"
+          >
+            <LocateFixed className="h-3.5 w-3.5" />
+            {gpsOn ? "GPS Ligado" : "Minha Localização"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFollowJourney((v) => !v)}
+            className={cn(
+              "flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
+              followJourney
+                ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+            )}
+            title="Centraliza automaticamente no próximo pendente após cada visita"
+          >
+            {followJourney ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {followJourney ? "Pausar Jornada" : "Seguir Jornada"}
+          </button>
+          <button
+            type="button"
+            onClick={goToNext}
+            disabled={!nextPoint}
+            className="col-span-2 flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ArrowRight className="h-3.5 w-3.5" />
+            Próximo Pendente
+          </button>
+          {gpsOn && userPos && (
+            <button
+              type="button"
+              onClick={goToUser}
+              className="col-span-2 flex items-center justify-center gap-1.5 h-7 rounded-md text-[10px] font-bold uppercase tracking-wide border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 transition"
+            >
+              <Navigation className="h-3.5 w-3.5" />
+              Centralizar em mim
+            </button>
+          )}
+        </div>
+
+        {gpsError && (
+          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
+            {gpsError}
+          </div>
+        )}
+
         {next && (
           <button
             type="button"
@@ -223,6 +368,20 @@ export function RGOperationalMap({
             <div className="text-[11px] text-orange-800/80 truncate">
               {next.p.street_name || "—"}
             </div>
+            {distToNext != null && (
+              <div className="mt-1 text-[11px] font-bold text-orange-900">
+                Distância: {fmtDistance(distToNext)}
+                {bearingToNext != null && (
+                  <span
+                    className="inline-block ml-1 align-middle"
+                    style={{ transform: `rotate(${bearingToNext}deg)` }}
+                    aria-hidden
+                  >
+                    ↑
+                  </span>
+                )}
+              </div>
+            )}
           </button>
         )}
 
@@ -237,6 +396,7 @@ export function RGOperationalMap({
             <ul>
               {enriched.map(({ p, kind, label }) => {
                 const isSel = p.id === selectedId;
+                const isNext = p.id === nextId;
                 const hasGeo = p.latitude != null && p.longitude != null;
                 return (
                   <li key={p.id} data-prop-id={p.id}>
@@ -245,12 +405,15 @@ export function RGOperationalMap({
                       onClick={() => onSelect(p.id)}
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs border-b border-slate-100 transition",
-                        isSel ? "bg-blue-50" : "hover:bg-slate-50",
+                        isSel ? "bg-blue-50" : isNext ? "bg-orange-50/60" : "hover:bg-slate-50",
                         !hasGeo && "opacity-70",
                       )}
                     >
                       <span
-                        className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-black text-white shrink-0"
+                        className={cn(
+                          "inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-black text-white shrink-0",
+                          isNext && "ring-2 ring-orange-400 ring-offset-1",
+                        )}
                         style={{ background: KIND_COLOR[kind] }}
                         title={KIND_LABEL[kind]}
                       >
@@ -274,19 +437,29 @@ export function RGOperationalMap({
         </div>
       </aside>
 
-      {/* Mapa */}
       <div className="min-h-0">
         <SharedMap
           height="78vh"
           isEmpty={ordered.length === 0 || geoCount === 0}
           emptyVariant={ordered.length === 0 ? "no-data" : "no-geo"}
           legend="none"
+          onReady={setMapInst}
         >
+          <SharedRouteLayer points={routePoints} />
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
+            nextId={nextId}
             onClick={onSelect}
           />
+          {gpsOn && userPos && (
+            <SharedUserLocationLayer
+              lat={userPos.lat}
+              lng={userPos.lng}
+              accuracy={userPos.accuracy}
+              bearingDeg={bearingToNext}
+            />
+          )}
         </SharedMap>
         <MapLegend />
       </div>
@@ -326,6 +499,10 @@ function MapLegend() {
           {KIND_LABEL[kind]}
         </span>
       ))}
+      <span className="inline-flex items-center gap-1 ml-auto">
+        <span className="inline-block h-0.5 w-6 bg-blue-500" style={{ borderTop: "2px dashed #3b82f6", background: "transparent" }} />
+        Rota operacional
+      </span>
     </div>
   );
 }
