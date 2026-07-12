@@ -46,6 +46,45 @@ function logSource(meta: MetricsAuditMeta, source: MetricsSource, extra: Record<
   });
 }
 
+/**
+ * Emitir sempre que um módulo AINDA consome uma fonte direta
+ * (visits / daily_work_records / operational-block-status)
+ * fora das exceções permitidas (sync, reconcile, migrations, tests).
+ */
+export function logDirectSource(meta: {
+  module: string;
+  file: string;
+  source: "visits" | "daily_work_records" | "operational-block-status";
+  note?: string;
+}) {
+  console.warn("[METRICS_DIRECT_SOURCE]", { ...meta, metrics_version: METRICS_VERSION });
+}
+
+/**
+ * Comparação de integridade entre módulos. Emite [METRICS_INTEGRITY_ERROR]
+ * quando algum campo diverge do valor canônico.
+ */
+export function assertMetricsIntegrity(
+  module: string,
+  expected: Partial<DwrTotals>,
+  found: Partial<DwrTotals>,
+) {
+  const diffs: Record<string, { expected: unknown; found: unknown }> = {};
+  const keys = new Set([...Object.keys(expected), ...Object.keys(found)]) as Set<keyof DwrTotals>;
+  for (const k of keys) {
+    const e = (expected as any)[k];
+    const f = (found as any)[k];
+    if (e !== undefined && f !== undefined && Number(e) !== Number(f)) {
+      diffs[k as string] = { expected: e, found: f };
+    }
+  }
+  if (Object.keys(diffs).length > 0) {
+    console.error("[METRICS_INTEGRITY_ERROR]", { module, diffs, metrics_version: METRICS_VERSION });
+    return false;
+  }
+  return true;
+}
+
 // ─── Real-time (jornada em andamento / Trabalho) ─────────────────────────────
 
 export interface OperationalMetricsInput extends MetricsAuditMeta {

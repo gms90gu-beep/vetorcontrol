@@ -17,6 +17,7 @@ import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenera
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import { getReportMetrics, logDirectSource } from "@/lib/operational-metrics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
@@ -77,8 +78,13 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      // FONTE ÚNICA: daily_work_records. Não consultamos visits diretamente.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
+      logDirectSource({
+        module: "ReportsDashboard",
+        file: "src/components/reports/ReportsDashboard.tsx",
+        source: "daily_work_records",
+        note: "cycle-scoped read still bypasses operational-metrics (needs cycle-aware API)",
+      });
       console.log("[REPORT_LOAD]", { filters, cycleFilter });
       console.log("[REPORT_FILTER]", {
         agent_id: filters.agent,
