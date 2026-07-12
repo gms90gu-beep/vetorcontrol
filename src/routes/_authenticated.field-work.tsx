@@ -520,8 +520,9 @@ function FieldWorkPage() {
                       <div className="flex items-center gap-2">
                         <Users className="h-3 w-3 text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                          {selectedBlock?.total_properties || 0} imóveis
-                          {selectedBlock?.status ? ` · ${selectedBlock.status === "finished" ? "Concluído" : selectedBlock.status === "in_progress" ? "Em aberto" : "Pendente"}` : ""}
+                          {selectedStats
+                            ? `${selectedStats.total} imóveis · ${selectedStats.visited + selectedStats.closed + selectedStats.refused} visitados · ${selectedStats.pending} pendentes${selectedStats.status === "CONCLUIDO" ? " · CONCLUÍDO" : ""}`
+                            : `${selectedBlock?.total_properties || 0} imóveis`}
                         </span>
                       </div>
                     )}
