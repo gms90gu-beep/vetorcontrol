@@ -218,15 +218,75 @@ function FieldWorkPage() {
     }
   }
 
+
+  // Estatísticas por quarteirão para a Data da Produção selecionada
+  // (baseado nas visitas reais do agente, não no status estático do bloco).
+  const [blockStats, setBlockStats] = useState<Map<string, { total: number; visited: number; closed: number; refused: number; pending: number; status: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO" }>>(new Map());
+
+  useEffect(() => {
+    (async () => {
+      if (!userId || !date || blocks.length === 0) { setBlockStats(new Map()); return; }
+      const iso = toDateOnly(date);
+      try {
+        const { data: props } = await supabase
+          .from("properties")
+          .select("id, block_id")
+          .in("block_id", blocks.map((b) => b.id));
+        const propsByBlock = new Map<string, string[]>();
+        (props || []).forEach((p: any) => {
+          if (!p.block_id) return;
+          const list = propsByBlock.get(p.block_id) || [];
+          list.push(p.id);
+          propsByBlock.set(p.block_id, list);
+        });
+
+        const { data: vs } = await supabase.rpc("get_session_visits" as any, {
+          _agent_id: userId,
+          _session_date: iso,
+        });
+        const visitByProp = new Map<string, any>();
+        (vs || []).forEach((v: any) => { if (v.property_id) visitByProp.set(v.property_id, v); });
+
+        const m = new Map<string, any>();
+        blocks.forEach((b) => {
+          const propIds = propsByBlock.get(b.id) || [];
+          let visited = 0, closed = 0, refused = 0;
+          propIds.forEach((pid) => {
+            const v = visitByProp.get(pid);
+            if (!v) return;
+            if (v.status === "visited") visited++;
+            else if (v.status === "closed") closed++;
+            else if (v.status === "refused") refused++;
+          });
+          const total = propIds.length || b.total_properties || 0;
+          const done = visited + closed + refused;
+          const pending = Math.max(0, total - done);
+          const status = total > 0 && pending === 0 ? "CONCLUIDO" : done > 0 ? "EM_ANDAMENTO" : "PENDENTE";
+          console.log("[BLOCK_STATUS_CALC]", {
+            block_id: b.id, block_number: b.number,
+            total, visitados: visited, fechados: closed, recusas: refused, pendentes: pending,
+            status_final: status, validation_ok: (visited + closed + refused + pending) === total,
+          });
+          m.set(b.id, { total, visited, closed, refused, pending, status });
+        });
+        setBlockStats(m);
+      } catch (e) {
+        console.warn("[BLOCK_STATUS_CALC_ERR]", e);
+      }
+    })();
+  }, [userId, date, blocks]);
+
   const selectedBlock = useMemo(
     () => blocks.find((b) => b.id === selectedBlockId) || null,
     [blocks, selectedBlockId],
   );
+  const selectedStats = selectedBlockId ? blockStats.get(selectedBlockId) : null;
 
   const filteredBlocks = useMemo(
     () => blocks.filter((b) => String(b.number).includes(searchQuery)),
     [blocks, searchQuery],
   );
+
 
   const canStart = !!(date && selectedBlockId && autoCycle && autoWeek && !computing);
 
@@ -460,8 +520,9 @@ function FieldWorkPage() {
                       <div className="flex items-center gap-2">
                         <Users className="h-3 w-3 text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                          {selectedBlock?.total_properties || 0} imóveis
-                          {selectedBlock?.status ? ` · ${selectedBlock.status === "finished" ? "Concluído" : selectedBlock.status === "in_progress" ? "Em aberto" : "Pendente"}` : ""}
+                          {selectedStats
+                            ? `${selectedStats.total} imóveis · ${selectedStats.visited + selectedStats.closed + selectedStats.refused} visitados · ${selectedStats.pending} pendentes${selectedStats.status === "CONCLUIDO" ? " · CONCLUÍDO" : ""}`
+                            : `${selectedBlock?.total_properties || 0} imóveis`}
                         </span>
                       </div>
                     )}
@@ -519,12 +580,20 @@ function FieldWorkPage() {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-black text-sm uppercase tracking-tight">Quarteirão {block.number}</span>
-                          <span className={cn(
-                            "text-[10px] font-bold uppercase tracking-widest",
-                            selectedBlockId === block.id ? "text-white/60" : "text-slate-500",
-                          )}>
-                            {block.total_properties || 0} imóveis
-                          </span>
+                          {(() => {
+                            const s = blockStats.get(block.id);
+                            const label = s
+                              ? `${s.total} imóveis · ${s.visited + s.closed + s.refused} visitados · ${s.pending} pendentes${s.status === "CONCLUIDO" ? " · CONCLUÍDO" : ""}`
+                              : `${block.total_properties || 0} imóveis`;
+                            return (
+                              <span className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest",
+                                selectedBlockId === block.id ? "text-white/60" : "text-slate-500",
+                              )}>
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       {selectedBlockId === block.id && <CheckCircle2 className="h-5 w-5 text-white" />}
