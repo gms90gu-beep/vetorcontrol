@@ -196,10 +196,37 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
           });
         }
         // Prioridade: properties.type (vigente) → visit.visit_type → outros
-        const type = String(chosen.properties?.type || chosen.visit_type || "others");
+        const rawType = chosen.properties?.type ?? chosen.visit_type ?? null;
+        const typeOrigin = chosen.properties?.type
+          ? "properties.type"
+          : chosen.visit_type
+            ? "visits.visit_type"
+            : "fallback:others";
+        const type = String(rawType || "others");
         if (type in propTypes) (propTypes as any)[type] += 1;
         else propTypes.others += 1;
+        console.log("[WEEKLY_REPORT_PROPERTY_DEBUG]", {
+          property_id: chosen.property_id ?? key,
+          tipo: type,
+          origem: typeOrigin,
+          visita: { id: chosen.id, visit_date: chosen.visit_date, status: chosen.status },
+        });
+        if (!chosen.properties) {
+          console.warn("[WEEKLY_REPORT_PROPERTY_FALLBACK]", {
+            property_id: chosen.property_id ?? key,
+            origem: typeOrigin,
+            motivo: "properties join vazio",
+          });
+        }
       }
+      console.log("[WEEKLY_REPORT_PROPERTY_COUNTS]", {
+        residencial: propTypes.residence,
+        comercial: propTypes.commerce,
+        terreno_baldio: propTypes.vacant_lot,
+        pe: propTypes.strategic_point,
+        outros: propTypes.others,
+        total: propTypes.residence + propTypes.commerce + propTypes.vacant_lot + propTypes.strategic_point + propTypes.others,
+      });
       uniquePropertiesCount = groups.size;
 
       console.log("[WEEKLY_REPORT_PROPERTY_UNIQUE]", {
