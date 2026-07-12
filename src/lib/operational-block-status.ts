@@ -15,7 +15,7 @@
  *   [BLOCK_STATUS_SOURCE]     — origem dos dados
  *   [BLOCK_STATUS_SHARED]     — módulo que reutilizou a função central
  *   [OPERATIONAL_STATUS_DIVERGENCE] — divergência entre módulos
- */
+export const BLOCK_STATUS_VERSION = "1.0.0";
 
 export type OperationalBlockStatus = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO";
 
