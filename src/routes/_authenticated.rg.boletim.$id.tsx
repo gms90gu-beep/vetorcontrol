@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { BlockMapDialog } from "@/components/rg/BlockMapDialog";
+import { RGOperationalMap } from "@/components/rg/RGOperationalMap";
 import { GeorefButton } from "@/components/property/GeorefButton";
 
 export const Route = createFileRoute("/_authenticated/rg/boletim/$id")({
@@ -89,6 +89,7 @@ function BoletimView() {
   const [viewerFilters, setViewerFilters] = useState<Record<string, any> | null>(null);
   const [loadError, setLoadError] = useState<{ kind: "not_found" | "forbidden" | "generic"; message: string } | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -646,14 +647,15 @@ function BoletimView() {
             BRG · FA-D-05 · Quarteirão {(boletim as any).block_number ?? (boletim as any).quarteirao ?? "-"}
           </div>
           <Button
-            variant="outline"
+            variant={mapOpen ? "default" : "outline"}
             size="sm"
             className="h-9 gap-1.5 px-2.5 text-xs"
-            onClick={() => setMapOpen(true)}
-            aria-label="Ver mapa do quarteirão"
+            onClick={() => setMapOpen((v) => !v)}
+            aria-label="Alternar mapa operacional"
+            aria-pressed={mapOpen}
           >
             <MapIcon className="h-4 w-4" />
-            <span className="hidden xs:inline sm:inline">Mapa</span>
+            <span className="hidden xs:inline sm:inline">{mapOpen ? "Boletim" : "Mapa"}</span>
           </Button>
           <Button
             variant="outline"
