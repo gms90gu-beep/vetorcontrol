@@ -5,9 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-
-import { logDirectSource } from "@/lib/operational-metrics";
-logDirectSource({ module: "supervision/AdminMasterDashboard", file: "src/components/supervision/AdminMasterDashboard.tsx", source: "daily_work_records", note: "dashboard admin master — usar getDashboardMetrics após refator" });
   ShieldCheck,
   UserPlus,
   Trash2,
@@ -23,8 +20,9 @@ logDirectSource({ module: "supervision/AdminMasterDashboard", file: "src/compone
   UserCheck,
   Wrench,
   AlertTriangle,
-
 } from "lucide-react";
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "supervision/AdminMasterDashboard", file: "src/components/supervision/AdminMasterDashboard.tsx", source: "daily_work_records", note: "dashboard admin master — usar getDashboardMetrics após refator" });
 import { toast } from "sonner";
 import {
   Dialog,
