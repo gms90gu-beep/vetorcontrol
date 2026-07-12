@@ -20,8 +20,9 @@ import {
   UserCheck,
   Wrench,
   AlertTriangle,
-
 } from "lucide-react";
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "supervision/AdminMasterDashboard", file: "src/components/supervision/AdminMasterDashboard.tsx", source: "daily_work_records", note: "dashboard admin master — usar getDashboardMetrics após refator" });
 import { toast } from "sonner";
 import {
   Dialog,

@@ -13,6 +13,9 @@ import { DepositDistributionBars } from "@/components/reports/DepositDistributio
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "routes/daily-bulletin", file: "src/routes/_authenticated.daily-bulletin.$id.tsx", source: "daily_work_records", note: "boletim diário por id — usar getDateMetrics após refator" });
+
 export const Route = createFileRoute("/_authenticated/daily-bulletin/$id")({
   component: DailyBulletinView,
 });

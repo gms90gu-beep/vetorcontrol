@@ -22,6 +22,8 @@ import {
   Clock,
   Filter,
 } from "lucide-react";
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "routes/relatorios", file: "src/routes/_authenticated.relatorios.tsx", source: "daily_work_records", note: "tela relatórios — usar getDashboardMetrics após refator" });
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Button } from "@/components/ui/button";

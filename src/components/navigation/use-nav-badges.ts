@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { BadgeKey } from "./navigation-config";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "navigation/use-nav-badges", file: "src/components/navigation/use-nav-badges.ts", source: "daily_work_records", note: "badges de navegação — leitura leve" });
+
 /**
  * Provides numeric badges for the navigation. Returns 0 for buckets
  * whose data source is unavailable; the UI only renders badges > 0.

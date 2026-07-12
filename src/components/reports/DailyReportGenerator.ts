@@ -5,6 +5,9 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "reports/DailyReportGenerator", file: "src/components/reports/DailyReportGenerator.ts", source: "daily_work_records", note: "gerador PDF diário — usar getDateMetrics após refator" });
+
 export interface DailyPdfMeta {
   agentName?: string;
   registration?: string;

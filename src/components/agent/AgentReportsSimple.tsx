@@ -16,6 +16,8 @@ import {
   Eye,
   RefreshCw,
 } from "lucide-react";
+import { logDirectSource } from "@/lib/operational-metrics";
+logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
 import { getEpiWeek } from "@/lib/cycle-week";
 import {
   generateDailyReportPDF,
