@@ -17,6 +17,7 @@ import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenera
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import { getReportMetrics, logDirectSource } from "@/lib/operational-metrics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
