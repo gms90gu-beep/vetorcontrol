@@ -20,6 +20,7 @@ export type NumberedPoint = {
 interface Props {
   points: NumberedPoint[];
   selectedId?: string | null;
+  nextId?: string | null;
   cluster?: boolean;
   fitToPoints?: boolean;
   onClick?: (id: string) => void;
@@ -32,18 +33,22 @@ function ensureCss() {
   style.setAttribute("data-shared-numbered-marker", "");
   style.textContent = `
     @keyframes rg-marker-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.18)} }
+    @keyframes rg-next-pulse { 0%,100%{box-shadow:0 0 0 6px rgba(249,115,22,.35),0 2px 6px rgba(0,0,0,.35)} 50%{box-shadow:0 0 0 12px rgba(249,115,22,.15),0 2px 6px rgba(0,0,0,.35)} }
     .rg-num-marker { background: transparent !important; border: none !important; }
   `;
   document.head.appendChild(style);
   __cssInjected = true;
 }
 
-function buildIcon(color: string, label: string | number, selected: boolean): L.DivIcon {
-  const size = selected ? 36 : 28;
-  const ring = selected
-    ? "box-shadow:0 0 0 6px rgba(59,130,246,.30),0 2px 6px rgba(0,0,0,.35);animation:rg-marker-pulse 1.4s ease-in-out infinite;"
-    : "box-shadow:0 1px 3px rgba(0,0,0,.35);";
-  const font = selected ? 13 : 11;
+function buildIcon(color: string, label: string | number, kind: "default" | "selected" | "next"): L.DivIcon {
+  const size = kind === "default" ? 28 : 36;
+  const font = kind === "default" ? 11 : 13;
+  const ring =
+    kind === "selected"
+      ? "box-shadow:0 0 0 6px rgba(59,130,246,.30),0 2px 6px rgba(0,0,0,.35);animation:rg-marker-pulse 1.4s ease-in-out infinite;"
+      : kind === "next"
+        ? "animation:rg-next-pulse 1.4s ease-in-out infinite;"
+        : "box-shadow:0 1px 3px rgba(0,0,0,.35);";
   return L.divIcon({
     className: "rg-num-marker",
     iconSize: [size, size],
@@ -54,7 +59,7 @@ function buildIcon(color: string, label: string | number, selected: boolean): L.
 }
 
 export function SharedNumberedMarkerLayer({
-  points, selectedId, cluster = true, fitToPoints = true, onClick,
+  points, selectedId, nextId, cluster = true, fitToPoints = true, onClick,
 }: Props) {
   const map = useSharedMap();
 
