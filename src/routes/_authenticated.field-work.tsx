@@ -250,24 +250,29 @@ function FieldWorkPage() {
         const m = new Map<string, any>();
         blocks.forEach((b) => {
           const propIds = propsByBlock.get(b.id) || [];
-          let visited = 0, closed = 0, refused = 0;
-          propIds.forEach((pid) => {
-            const v = visitByProp.get(pid);
-            if (!v) return;
-            if (v.status === "visited") visited++;
-            else if (v.status === "closed") closed++;
-            else if (v.status === "refused") refused++;
+          const blockVisits = propIds.map((pid) => visitByProp.get(pid)).filter(Boolean);
+          const canonical = getOperationalBlockStatus({
+            propertyIds: propIds,
+            visits: blockVisits as any[],
+            fallbackTotal: b.total_properties || 0,
           });
-          const total = propIds.length || b.total_properties || 0;
-          const done = visited + closed + refused;
-          const pending = Math.max(0, total - done);
-          const status = total > 0 && pending === 0 ? "CONCLUIDO" : done > 0 ? "EM_ANDAMENTO" : "PENDENTE";
-          console.log("[BLOCK_STATUS_CALC]", {
-            block_id: b.id, block_number: b.number,
-            total, visitados: visited, fechados: closed, recusas: refused, pendentes: pending,
-            status_final: status, validation_ok: (visited + closed + refused + pending) === total,
+          logBlockStatusShared(
+            {
+              module: "FieldWork/BlockPicker",
+              productionDate: iso,
+              blockId: b.id,
+              blockNumber: b.number,
+            },
+            canonical,
+          );
+          m.set(b.id, {
+            total: canonical.totalProperties,
+            visited: canonical.visitedProperties,
+            closed: canonical.closedProperties,
+            refused: canonical.refusedProperties,
+            pending: canonical.pendingProperties,
+            status: canonical.status,
           });
-          m.set(b.id, { total, visited, closed, refused, pending, status });
         });
         setBlockStats(m);
       } catch (e) {
