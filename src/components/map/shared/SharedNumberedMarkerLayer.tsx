@@ -75,18 +75,21 @@ export function SharedNumberedMarkerLayer({
     map,
     () =>
       points.map((p) => {
+        const kind: "default" | "selected" | "next" =
+          p.id === selectedId ? "selected" : p.id === nextId ? "next" : "default";
         const marker = L.marker([p.lat, p.lng], {
-          icon: buildIcon(p.color, p.label, p.id === selectedId),
-          zIndexOffset: p.id === selectedId ? 1000 : 0,
+          icon: buildIcon(p.color, p.label, kind),
+          zIndexOffset: kind === "selected" ? 1000 : kind === "next" ? 800 : 0,
         });
         if (p.popupHtml) marker.bindPopup(p.popupHtml);
         if (p.tooltip) marker.bindTooltip(p.tooltip, { direction: "top", offset: [0, -14] });
         if (onClick) marker.on("click", () => onClick(p.id));
         return marker;
       }),
-    [points, selectedId, cluster],
+    [points, selectedId, nextId, cluster],
     { enabled: cluster, maxClusterRadius: 35 },
   );
+
 
   // Centraliza no imóvel selecionado (sincronização bidirecional).
   useEffect(() => {
