@@ -278,3 +278,138 @@ export async function getProductionMetrics(input: ProductionMetricsInput) {
   if (!input.dwr) throw new Error("getProductionMetrics: dwr input required for closed session");
   return getDashboardMetrics({ ...input, ...input.dwr });
 }
+
+// ─── FASE 2: wrappers de alto nível ──────────────────────────────────────────
+
+function logMigration(module: string, wrapper: string, extra: Record<string, unknown> = {}) {
+  console.info("[METRICS_MIGRATION]", { module, wrapper, metrics_version: METRICS_VERSION, ...extra });
+}
+
+/** Produção consolidada por ciclo. Fonte: DWR filtrada por cycle_id. */
+export async function getCycleMetrics(
+  input: MetricsAuditMeta & { cycleId: string; agentIds?: string[] },
+): Promise<DwrMetricsResult & { cycle_id: string; coverage_pct: number }> {
+  let q = supabase.from("daily_work_records").select("*").eq("cycle_id", input.cycleId);
+  if (input.agentIds?.length) q = q.in("agent_id", input.agentIds);
+  else if (input.agentId) q = q.eq("agent_id", input.agentId);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const rows = data ?? [];
+  const totals = aggregate(rows);
+  const visitable = totals.properties_worked + rows.reduce((a, r: any) => a + (Number(r.pending_visits) || 0), 0);
+  const coverage_pct = visitable > 0 ? Math.round((totals.properties_worked / visitable) * 100) : 0;
+  logSource({ ...input, module: input.module || "getCycleMetrics" }, "daily_work_records", { cycle_id: input.cycleId, rows: rows.length });
+  logMigration(input.module || "cycle", "getCycleMetrics", { cycle_id: input.cycleId });
+  const first = rows[0]?.work_date ?? "";
+  const last = rows[rows.length - 1]?.work_date ?? "";
+  return { source: "daily_work_records", from: first, to: last, rows, totals, cycle_id: input.cycleId, coverage_pct };
+}
+
+/** Produção por quarteirão em tempo real. Fonte: operational-block-status. */
+export function getBlockMetrics(
+  input: OperationalMetricsInput,
+): OperationalBlockStats & { source: MetricsSource } {
+  logMigration(input.module || "block", "getBlockMetrics", { block_id: input.blockId });
+  return getOperationalMetrics(input);
+}
+
+/** Histórico e situação de um imóvel. Fonte: visits + visit_deposits. */
+export async function getPropertyMetrics(
+  input: MetricsAuditMeta & { propertyId: string },
+): Promise<{
+  source: "visits";
+  property_id: string;
+  visit_count: number;
+  last_visit_at: string | null;
+  last_status: string | null;
+  positive_foci: number;
+  deposits: Array<{ type_code: string | null; count: number; is_positive: boolean }>;
+  has_geo: boolean;
+  visits: any[];
+}> {
+  const [{ data: visits, error: vErr }, { data: property, error: pErr }] = await Promise.all([
+    supabase.from("visits").select("*").eq("property_id", input.propertyId).order("visit_date", { ascending: false }),
+    supabase.from("properties").select("latitude, longitude").eq("id", input.propertyId).maybeSingle(),
+  ]);
+  if (vErr) throw new Error(vErr.message);
+  if (pErr) throw new Error(pErr.message);
+  const rows = visits ?? [];
+  const visitIds = rows.map((r: any) => r.id);
+  let deposits: any[] = [];
+  if (visitIds.length) {
+    const { data: dep, error: dErr } = await supabase.from("visit_deposits").select("*").in("visit_id", visitIds);
+    if (dErr) throw new Error(dErr.message);
+    deposits = dep ?? [];
+  }
+  const depMap = new Map<string, { type_code: string | null; count: number; is_positive: boolean }>();
+  for (const d of deposits) {
+    const k = String(d.type_code ?? "");
+    const cur = depMap.get(k) ?? { type_code: d.type_code ?? null, count: 0, is_positive: !!d.is_positive };
+    cur.count += 1;
+    cur.is_positive = cur.is_positive || !!d.is_positive;
+    depMap.set(k, cur);
+  }
+  logSource({ ...input, module: input.module || "getPropertyMetrics" }, "operational-block-status", { property_id: input.propertyId, visits: rows.length });
+  logMigration(input.module || "property", "getPropertyMetrics", { property_id: input.propertyId });
+  return {
+    source: "visits",
+    property_id: input.propertyId,
+    visit_count: rows.length,
+    last_visit_at: rows[0]?.visit_date ?? null,
+    last_status: rows[0]?.status ?? null,
+    positive_foci: rows.filter((r: any) => r.has_focus).length,
+    deposits: Array.from(depMap.values()),
+    has_geo: !!(property?.latitude && property?.longitude),
+    visits: rows,
+  };
+}
+
+/** Alias explícito para uma semana epidemiológica. */
+export async function getWeekMetrics(
+  input: MetricsAuditMeta & { epiWeek: number; epiYear: number; agentIds?: string[] },
+) {
+  logMigration(input.module || "week", "getWeekMetrics", { epi_week: input.epiWeek, epi_year: input.epiYear });
+  return getWeeklyMetrics(input);
+}
+
+/** Produção de uma única data (Dashboard Diário / PDF Diário / Encerramento). */
+export async function getDateMetrics(
+  input: MetricsAuditMeta & { date: string; agentIds?: string[] },
+) {
+  logMigration(input.module || "date", "getDateMetrics", { date: input.date });
+  return getDailyMetrics(input);
+}
+
+/** Comparação genérica entre duas janelas (hoje×ontem, semana atual×anterior, ciclo×ciclo, agente×equipe). */
+export interface ComparisonWindow {
+  label: string;
+  from?: string;
+  to?: string;
+  cycleId?: string;
+  epiWeek?: number;
+  epiYear?: number;
+  agentIds?: string[];
+}
+
+export async function getComparisonMetrics(
+  input: MetricsAuditMeta & { a: ComparisonWindow; b: ComparisonWindow },
+): Promise<{
+  a: DwrMetricsResult & { label: string };
+  b: DwrMetricsResult & { label: string };
+  diff: Partial<DwrTotals>;
+}> {
+  const resolve = async (w: ComparisonWindow): Promise<DwrMetricsResult> => {
+    if (w.cycleId) return getCycleMetrics({ ...input, cycleId: w.cycleId, agentIds: w.agentIds });
+    if (w.epiWeek && w.epiYear)
+      return getWeeklyMetrics({ ...input, epiWeek: w.epiWeek, epiYear: w.epiYear, agentIds: w.agentIds });
+    if (w.from && w.to) return getDashboardMetrics({ ...input, from: w.from, to: w.to, agentIds: w.agentIds });
+    throw new Error("getComparisonMetrics: window needs cycleId, epiWeek+epiYear, or from+to");
+  };
+  const [ra, rb] = await Promise.all([resolve(input.a), resolve(input.b)]);
+  const diff: Partial<DwrTotals> = {};
+  for (const k of Object.keys(ra.totals) as (keyof DwrTotals)[]) {
+    diff[k] = (ra.totals[k] as number) - (rb.totals[k] as number);
+  }
+  logMigration(input.module || "comparison", "getComparisonMetrics", { a: input.a.label, b: input.b.label });
+  return { a: { ...ra, label: input.a.label }, b: { ...rb, label: input.b.label }, diff };
+}
