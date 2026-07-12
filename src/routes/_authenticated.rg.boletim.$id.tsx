@@ -733,27 +733,25 @@ function BoletimView() {
       </div>
 
 
-      <BlockMapDialog
-        open={mapOpen}
-        onOpenChange={setMapOpen}
-        blockNumber={boletim.block_number}
-        properties={imoveis.map((p) => ({
-          id: p.id,
-          number: p.number,
-          street_name: p.street_name,
-          type: p.type,
-          latitude: p.latitude,
-          longitude: p.longitude,
-          had_previous_focus: p.had_previous_focus,
-          status: p.status,
-        }))}
-      />
+      {mapOpen && (
+        <div className="mx-auto w-full max-w-7xl px-2 pt-2 sm:px-4">
+          <RGOperationalMap
+            blockNumber={boletim.block_number}
+            agentName={boletim.agent_name}
+            properties={imoveis}
+            selectedId={selectedPropertyId}
+            onSelect={setSelectedPropertyId}
+            onClose={() => setMapOpen(false)}
+          />
+        </div>
+      )}
 
-      {/* Documento com auto-scale */}
+      {/* Documento com auto-scale — oculto enquanto o mapa operacional está ativo */}
       <div
-        className="brg-scale-wrap"
+        className={"brg-scale-wrap" + (mapOpen ? " hidden" : "")}
         style={{ ["--brg-scale" as any]: String(scale) }}
       >
+
         {folhas.map((folha, idx) => {
           const isLast = idx === folhas.length - 1;
           return (
