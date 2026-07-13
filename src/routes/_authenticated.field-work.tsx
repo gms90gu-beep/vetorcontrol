@@ -59,6 +59,106 @@ async function autoRecoverSession(sessionId: string) {
   }
 }
 
+/**
+ * Decide se uma sessão pausada realmente deve exibir o modal "Continuar Jornada".
+ * Se o quarteirão já estiver CONCLUÍDO na Data da Produção ou o DWR já tiver sido
+ * encerrado, auto-repara a sessão (marca como closed) e suprime o modal.
+ */
+async function assessSessionForResume(session: any): Promise<{ show: boolean; reason: string }> {
+  const base = {
+    session_id: session?.id,
+    agent_id: session?.user_id,
+    block_number: session?.block_number ?? null,
+    block_id: session?.block_id ?? null,
+    session_date: session?.session_date ?? null,
+    status: session?.status ?? null,
+    paused_at: session?.paused_at ?? session?.updated_at ?? null,
+    completed_at: session?.completed_at ?? null,
+  };
+
+  console.log("[JOURNEY_SCAN]", base);
+
+  const statusOk = session?.status === "paused" || session?.status === "in_progress";
+  if (!statusOk || session?.completed_at) {
+    console.log("[JOURNEY_RESUME_CHECK]", { ...base, motivo: "status inválido ou já concluída", show: false });
+    return { show: false, reason: "status inválido" };
+  }
+
+  if (!isOnline()) {
+    console.log("[JOURNEY_RESUME_CHECK]", { ...base, motivo: "offline — sem validação", show: true });
+    return { show: true, reason: "offline" };
+  }
+
+  try {
+    let propertyIds: string[] = [];
+    if (session?.block_id) {
+      const { data: props } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("block_id", session.block_id);
+      propertyIds = (props || []).map((p: any) => p.id);
+    }
+
+    const { data: vs } = await supabase.rpc("get_session_visits" as any, {
+      _agent_id: session.user_id,
+      _session_date: session.session_date,
+    });
+
+    const canonical = getOperationalBlockStatus({
+      propertyIds,
+      visits: (vs || []) as any[],
+      fallbackTotal: session?.property_count || 0,
+    });
+
+    const { data: dwr } = await supabase
+      .from("daily_work_records")
+      .select("id, status, end_time")
+      .eq("agent_id", session.user_id)
+      .eq("work_date", session.session_date)
+      .maybeSingle();
+    const dwrClosed = !!dwr && ((dwr as any).status === "completed" || !!(dwr as any).end_time);
+
+    const enriched = {
+      ...base,
+      pending_properties: canonical.pendingProperties,
+      total_properties: canonical.totalProperties,
+      block_status: canonical.status,
+      dwr_closed: dwrClosed,
+    };
+
+    const blockDone = canonical.status === "CONCLUIDO" ||
+      (canonical.totalProperties > 0 && canonical.pendingProperties === 0);
+
+    if (blockDone || dwrClosed) {
+      console.log("[JOURNEY_COMPLETED_BLOCK]", {
+        ...enriched,
+        motivo: blockDone ? "quarteirão concluído" : "DWR encerrado",
+      });
+      try {
+        await updateOffline("field_work_sessions", session.id, {
+          status: "closed",
+          updated_at: new Date().toISOString(),
+        });
+        console.log("[JOURNEY_AUTO_REPAIR]", { ...enriched, motivo: "sessão marcada como closed" });
+      } catch (e: any) {
+        console.warn("[JOURNEY_AUTO_REPAIR_ERR]", { ...enriched, error: e?.message });
+      }
+      return { show: false, reason: blockDone ? "quarteirão concluído" : "DWR encerrado" };
+    }
+
+    if (canonical.pendingProperties <= 0) {
+      console.log("[JOURNEY_RESUME_CHECK]", { ...enriched, motivo: "sem pendências", show: false });
+      return { show: false, reason: "sem pendências" };
+    }
+
+    console.log("[JOURNEY_RESUME_CHECK]", { ...enriched, motivo: "pendências reais — exibir modal", show: true });
+    return { show: true, reason: "pendências reais" };
+  } catch (e: any) {
+    console.warn("[JOURNEY_RESUME_CHECK_ERR]", { ...base, error: e?.message });
+    return { show: true, reason: "erro na validação" };
+  }
+}
+
 function FieldWorkPage() {
   const navigate = useNavigate();
 
