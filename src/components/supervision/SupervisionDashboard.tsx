@@ -37,6 +37,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getOperationalDate } from "@/lib/operational-date";
 import { useNavigate } from "@tanstack/react-router";
+import { getBlockProgressBatch } from "@/lib/offline/repos/blockProgress";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 
 type FilterKey = "all" | "active" | "inactive" | "no_session";
 
