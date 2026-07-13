@@ -102,6 +102,7 @@ export async function clearOfflineDB() {
     db.weeks.clear(),
     db.profiles.clear(),
     db.agents.clear(),
+    db.block_progress.clear(),
     db.meta.clear(),
   ]);
 }
