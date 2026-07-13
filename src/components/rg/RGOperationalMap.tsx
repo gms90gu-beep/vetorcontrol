@@ -300,7 +300,7 @@ export function RGOperationalMap({
                   <li key={p.id} data-prop-id={p.id}>
                     <button
                       type="button"
-                      onClick={() => onSelect(p.id)}
+                      onClick={() => handleSelectFromList(p.id)}
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs border-b border-slate-100 transition",
                         isSel ? "bg-blue-50" : "hover:bg-slate-50",
