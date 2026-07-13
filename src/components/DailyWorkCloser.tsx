@@ -1048,11 +1048,32 @@ export function DailyWorkCloser({
       console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_date_unique(legacy_agent_id, work_date)" });
       let savedDaily: any;
       try {
+        console.log("[DAY_CLOSE_DWR_PRE]", {
+          work_date: recordData.work_date,
+          properties_worked: recordData.properties_worked,
+          properties_closed: recordData.properties_closed,
+          properties_refused: recordData.properties_refused,
+          properties_recovered: recordData.properties_recovered,
+          pending_visits: recordData.pending_visits,
+          deposits_inspected: recordData.deposits_inspected,
+          positive_foci: recordData.positive_foci,
+        });
         savedDaily = await upsertOffline(
           "daily_work_records",
           { ...recordData, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id },
           { onConflict: dwrConflictTarget },
         );
+        console.log("[DAY_CLOSE_DWR_POST]", {
+          dwr_id: savedDaily?.id ?? null,
+          work_date: savedDaily?.work_date ?? recordData.work_date,
+          properties_worked: savedDaily?.properties_worked ?? recordData.properties_worked,
+          properties_closed: savedDaily?.properties_closed ?? recordData.properties_closed,
+          properties_refused: savedDaily?.properties_refused ?? recordData.properties_refused,
+          pending_visits: savedDaily?.pending_visits ?? recordData.pending_visits,
+          deposits_inspected: savedDaily?.deposits_inspected ?? recordData.deposits_inspected,
+          positive_foci: savedDaily?.positive_foci ?? recordData.positive_foci,
+        });
+
       } catch (e: any) {
         console.error("[DWR_CONFLICT_ERROR]", { onConflict: dwrConflictTarget, message: e?.message, details: e?.details, hint: e?.hint });
         throw e;
