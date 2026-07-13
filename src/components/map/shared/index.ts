@@ -1,9 +1,11 @@
 // Barrel oficial da biblioteca de mapas.
 // Regra: nenhum componente fora desta pasta deve importar `leaflet` diretamente.
 export * from "./providers";
+export * from "./base-layers";
 export * from "./logger";
 export * from "./context";
 export * from "./SharedMap";
+export * from "./SharedMapControls";
 export * from "./SharedMarkerLayer";
 export * from "./SharedNumberedMarkerLayer";
 export * from "./SharedRouteLayer";
