@@ -30,6 +30,7 @@ export type RGMapProperty = {
   had_previous_focus?: boolean | null;
   status?: string | null;
   accuracy?: number | null;
+  last_visit_date?: string | null;
 };
 
 interface Props {
