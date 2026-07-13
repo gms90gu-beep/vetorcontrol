@@ -370,12 +370,18 @@ export function DailyWorkCloser({
       );
       const active = localSessions
         .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-      if (!active?.session_date) {
-        console.error("[PRODUCTION_DATE_ERROR]", { module: "DailyWorkCloser.handlePreClose", reason: "sessão ativa sem session_date" });
-        toast.error("Jornada sem data de sessão. Abra uma nova jornada para prosseguir.");
-        return;
+      // Data da Produção ativa (hoje, America/Sao_Paulo). Nunca usar session_date:
+      // a jornada do quarteirão pode ter começado em dias anteriores.
+      const workDate: string = getOperationalDate();
+      if (active?.session_date && active.session_date !== workDate) {
+        console.log("[DAY_CLOSE_CROSS_DAY_SESSION]", {
+          module: "DailyWorkCloser.handlePreClose",
+          session_id: active?.id ?? null,
+          session_started_at: active?.session_date ?? null,
+          operational_date: workDate,
+          note: "quarteirão iniciado em data anterior — produção contabilizada em operational_date",
+        });
       }
-      const workDate: string = active.session_date;
 
       const report = await runShiftValidation({
         userId: user.id,
@@ -739,34 +745,53 @@ export function DailyWorkCloser({
       const activeSessionForClose = localSessions
         .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
 
-      if (!activeSessionForClose?.session_date) {
-        console.error("[PRODUCTION_DATE_ERROR]", {
-          module: "DailyWorkCloser.handleCloseDay",
-          reason: "sessão sem session_date ao fechar DWR — abortando",
+      // REGRA: o encerramento fecha SEMPRE a Data da Produção ativa (hoje).
+      // A jornada de um quarteirão pode atravessar vários dias — as visitas
+      // realizadas hoje pertencem exclusivamente a operational_date.
+      const operationalWorkDate: string = getOperationalDate();
+      const sessionStartedAt: string | null = activeSessionForClose?.session_date ?? null;
+      const sessionLastResumedAt: string | null =
+        (activeSessionForClose as any)?.last_resumed_at ?? null;
+      const sessionCompletedAt: string | null =
+        (activeSessionForClose as any)?.completed_at ?? null;
+      const closingDate: string = new Date().toISOString();
+      const isCrossDaySession =
+        !!sessionStartedAt && sessionStartedAt !== operationalWorkDate;
+      // Compatibilidade — nunca marcar DWR como retroativo por session_date antiga.
+      const sessionIsRetro = false;
+      const sessionRetroReason: string | null = null;
+
+      console.log("[DAY_CLOSE_OPERATIONAL_DATE]", {
+        operational_date: operationalWorkDate,
+        session_id: activeSessionForClose?.id ?? null,
+        session_started_at: sessionStartedAt,
+        last_resumed_at: sessionLastResumedAt,
+        completed_at: sessionCompletedAt,
+        closing_date: closingDate,
+      });
+
+      if (isCrossDaySession) {
+        console.log("[DAY_CLOSE_CROSS_DAY_SESSION]", {
+          session_id: activeSessionForClose?.id ?? null,
+          session_started_at: sessionStartedAt,
+          operational_date: operationalWorkDate,
+          note: "quarteirão iniciado anteriormente — produção do dia registrada em operational_date; nenhum dia anterior é reaberto",
         });
-        toast.error("Jornada sem data de sessão. Não é possível fechar o DWR.");
-        throw new Error("session_date ausente ao encerrar jornada");
       }
-      const operationalWorkDate: string = activeSessionForClose.session_date;
-      const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
-      const sessionRetroReason: string | null = activeSessionForClose?.retroactive_reason ?? null;
 
       console.log("[PRODUCTION_DATE_SOURCE]", {
         module: "DailyWorkCloser",
-        source: "field_work_sessions.session_date",
+        source: "operational_date",
+        operational_date: operationalWorkDate,
         session_id: activeSessionForClose.id,
-        session_date: activeSessionForClose.session_date,
       });
       console.log("[PRODUCTION_DATE_PROPAGATION]", {
         module: "daily_work_records",
-        session_date: activeSessionForClose?.session_date ?? null,
+        operational_date: operationalWorkDate,
         work_date: operationalWorkDate,
       });
 
-      console.log("[DailyWorkCloser:close] Data da jornada (work_date):", operationalWorkDate);
-      if (sessionIsRetro) {
-        console.log("[RETROATIVO]", { agent_id: currentAgent.id, work_date: operationalWorkDate, created_at: new Date().toISOString(), reason: sessionRetroReason });
-      }
+      console.log("[DailyWorkCloser:close] Data da Produção (work_date):", operationalWorkDate);
 
       console.log("[SESSION_CLOSE_START]", {
         session_id: activeSessionForClose?.id ?? null,
@@ -1728,10 +1753,10 @@ export function DailyWorkCloser({
               Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
             </span>
           </div>
-          {sessionRetro.retro && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2">
-              <span className="text-[11px] font-black uppercase tracking-widest">
-                ⚠ Produção Retroativa{sessionRetro.reason ? ` · ${sessionRetro.reason}` : ""}
+          {jornadaDate && jornadaDate !== getOperationalDate() && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2 max-w-[520px]">
+              <span className="text-[11px] font-black uppercase tracking-wide leading-snug text-left">
+                Você está concluindo um quarteirão iniciado anteriormente. As visitas realizadas hoje serão contabilizadas na produção de {new Date(`${getOperationalDate()}T12:00:00`).toLocaleDateString('pt-BR')}.
               </span>
             </div>
           )}
