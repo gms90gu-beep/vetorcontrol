@@ -1788,13 +1788,13 @@ export function DailyWorkCloser({
           <div className="mt-4 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2">
             <Calendar className="h-3.5 w-3.5" />
             <span className="text-[11px] font-black uppercase tracking-widest">
-              Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+              Produção de {new Date(`${operationalDate}T12:00:00`).toLocaleDateString('pt-BR')}
             </span>
           </div>
-          {jornadaDate && jornadaDate !== getOperationalDate() && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2 max-w-[520px]">
-              <span className="text-[11px] font-black uppercase tracking-wide leading-snug text-left">
-                Você está concluindo um quarteirão iniciado anteriormente. As visitas realizadas hoje serão contabilizadas na produção de {new Date(`${getOperationalDate()}T12:00:00`).toLocaleDateString('pt-BR')}.
+          {jornadaDate && jornadaDate !== operationalDate && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2 max-w-[520px]">
+              <span className="text-[10px] font-bold uppercase tracking-wide leading-snug text-left text-white/90">
+                Quarteirão iniciado em {new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR')} e concluído hoje.
               </span>
             </div>
           )}
