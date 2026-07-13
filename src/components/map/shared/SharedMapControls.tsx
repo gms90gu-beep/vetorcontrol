@@ -2,6 +2,7 @@
 // alternância de camadas cartográficas, zoom, minha localização,
 // centralizar todos os pontos, atualizar.
 import { useEffect, useMemo, useRef, useState } from "react";
+import L from "leaflet";
 import { Layers, Plus, Minus, LocateFixed, Maximize2, RotateCw, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSharedMapContext } from "./context";
@@ -92,15 +93,8 @@ export function SharedMapControls({
       return;
     }
     // dynamic import via any to avoid pulling Leaflet symbols in this consumer file
-    const L = (map as any).constructor.prototype.constructor as any;
-    // fallback: use map.eachLayer bounds using LatLngBounds via map's internal L
-    const anyMap = map as any;
-    const LGlobal = anyMap._container ? (anyMap._container.ownerDocument.defaultView as any).L : null;
-    const LL = LGlobal ?? L;
-    if (LL?.latLngBounds) {
-      const bounds = LL.latLngBounds(fitPoints.map((p: [number, number]) => LL.latLng(p[0], p[1])));
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 18 });
-    }
+    const bounds = L.latLngBounds(fitPoints.map((p) => L.latLng(p[0], p[1])));
+    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 18 });
   };
 
   return (
