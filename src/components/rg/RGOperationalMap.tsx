@@ -30,6 +30,7 @@ export type RGMapProperty = {
   had_previous_focus?: boolean | null;
   status?: string | null;
   accuracy?: number | null;
+  last_visit_date?: string | null;
 };
 
 interface Props {
@@ -104,12 +105,20 @@ export function RGOperationalMap({
     return t;
   }, [enriched, ordered.length]);
 
+  const missingGeo = useMemo(
+    () => enriched.filter((e) => e.p.latitude == null || e.p.longitude == null),
+    [enriched],
+  );
+
   const points: NumberedPoint[] = useMemo(() => enriched
     .filter((e) => e.p.latitude != null && e.p.longitude != null)
     .map(({ p, kind, label }) => {
       const color = KIND_COLOR[kind];
       const acc = p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—";
       const addr = [p.street_name, p.side ? `Lado ${p.side}` : null].filter(Boolean).join(" · ");
+      const lastVisit = p.last_visit_date
+        ? new Date(p.last_visit_date).toLocaleDateString("pt-BR")
+        : "—";
       const popup = `
         <div style="font-family:system-ui;font-size:12px;min-width:220px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -121,9 +130,12 @@ export function RGOperationalMap({
             <span style="color:#64748b">Sequência</span><b>#${label}</b>
             <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
             <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
-            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
             <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
-            <span style="color:#64748b">Coordenadas</span><b>${fmtCoord(p.latitude)}, ${fmtCoord(p.longitude)}</b>
+            <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
+            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
+            <span style="color:#64748b">Última visita</span><b>${escapeHtml(lastVisit)}</b>
+            <span style="color:#64748b">Latitude</span><b>${fmtCoord(p.latitude)}</b>
+            <span style="color:#64748b">Longitude</span><b>${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
           </div>
         </div>`;
@@ -137,6 +149,21 @@ export function RGOperationalMap({
     }), [enriched, agentName]);
 
   const geoCount = points.length;
+
+  // Logs de ciclo de vida do mapa.
+  useEffect(() => {
+    console.log("[RG_MAP_LOAD]", { block: blockNumber, total: ordered.length });
+  }, [blockNumber, ordered.length]);
+  useEffect(() => {
+    console.log("[RG_MAP_RENDER]", { block: blockNumber, rendered: geoCount, missing: missingGeo.length });
+    if (missingGeo.length > 0) {
+      console.log("[RG_MAP_MISSING_COORDINATES]", {
+        block: blockNumber,
+        properties: missingGeo.map((e) => ({ id: e.p.id, number: e.p.number, sequence: e.label })),
+      });
+    }
+  }, [blockNumber, geoCount, missingGeo]);
+
 
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
@@ -161,11 +188,11 @@ export function RGOperationalMap({
     }
     setGpsError(null);
     const id = navigator.geolocation.watchPosition(
-      (pos) => setUserPos({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy ?? null,
-      }),
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null };
+        setUserPos(p);
+        console.log("[RG_MAP_GPS]", p);
+      },
       (err) => {
         setGpsError(err.message || "Falha ao obter localização.");
         setGpsOn(false);
@@ -187,6 +214,7 @@ export function RGOperationalMap({
     if (!gpsOn) { centeredOnceRef.current = false; return; }
     if (!mapInst || !userPos || centeredOnceRef.current) return;
     mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+    console.log("[RG_MAP_CENTER]", { target: "user", lat: userPos.lat, lng: userPos.lng });
     centeredOnceRef.current = true;
   }, [gpsOn, userPos, mapInst]);
 
@@ -195,7 +223,19 @@ export function RGOperationalMap({
     if (!selectedId || !listRef.current) return;
     const el = listRef.current.querySelector<HTMLElement>(`[data-prop-id="${selectedId}"]`);
     if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    console.log("[RG_MAP_CENTER]", { target: "property", id: selectedId });
   }, [selectedId]);
+
+  const handleSelectFromList = useCallback((id: string) => {
+    console.log("[RG_MAP_RG_SELECTED]", { id });
+    onSelect(id);
+  }, [onSelect]);
+
+  const handleSelectFromMap = useCallback((id: string) => {
+    console.log("[RG_MAP_PROPERTY_SELECTED]", { id });
+    onSelect(id);
+  }, [onSelect]);
+
 
   return (
     <section className={cn("grid gap-3 md:grid-cols-[320px_minmax(0,1fr)]", "brg-no-print", className)}>
@@ -260,7 +300,7 @@ export function RGOperationalMap({
                   <li key={p.id} data-prop-id={p.id}>
                     <button
                       type="button"
-                      onClick={() => onSelect(p.id)}
+                      onClick={() => handleSelectFromList(p.id)}
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs border-b border-slate-100 transition",
                         isSel ? "bg-blue-50" : "hover:bg-slate-50",
@@ -290,6 +330,27 @@ export function RGOperationalMap({
             </ul>
           )}
         </div>
+
+        {missingGeo.length > 0 && (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-amber-800">
+              Imóveis sem georreferenciamento ({missingGeo.length})
+            </div>
+            <ul className="mt-1 max-h-28 overflow-auto">
+              {missingGeo.map(({ p, label }) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFromList(p.id)}
+                    className="w-full text-left text-[11px] px-1 py-0.5 rounded hover:bg-amber-100 text-amber-900 truncate"
+                  >
+                    #{label} · Nº {p.number} — {p.street_name || "—"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </aside>
 
       <div className="min-h-0">
@@ -303,7 +364,7 @@ export function RGOperationalMap({
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
-            onClick={onSelect}
+            onClick={handleSelectFromMap}
           />
           {gpsOn && userPos && (
             <SharedUserLocationLayer
