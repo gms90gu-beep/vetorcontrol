@@ -539,7 +539,15 @@ function FieldWorkPage() {
             setOpenSessionModal(true);
             return;
           }
-          toast.info("Este quarteirão já foi concluído nesta Data da Produção.");
+          if (decision.decision === "blocked_by_block") {
+            toast.info("Este quarteirão já foi concluído nesta Data da Produção.");
+          } else if (decision.decision === "blocked_by_date") {
+            toast.info("Esta jornada é de outra Data da Produção.");
+          } else if (decision.decision === "blocked_by_dwr") {
+            toast.info("Expediente desta data já encerrado (DWR).");
+          } else {
+            toast.info(`Não é possível retomar: ${decision.reason}`);
+          }
           return;
         }
       }
