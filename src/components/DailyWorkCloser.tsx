@@ -1833,8 +1833,8 @@ export function DailyWorkCloser({
             <div className="grid grid-cols-2 gap-3">
               <SummaryItemSmall label="Existentes" value={snapshot.depExisting} icon={Layers} />
               <SummaryItemSmall label="Inspecionados" value={snapshot.depInspected} icon={Layers} />
-              <SummaryItemSmall label="Tratados" value={snapshot.depTreated || stats.treatedDeposits || stats.treated} icon={Layers} />
-              <SummaryItemSmall label="Eliminados" value={snapshot.depEliminated || stats.eliminated} icon={Layers} />
+              <SummaryItemSmall label="Tratados" value={displayTreatedDep} icon={Layers} />
+              <SummaryItemSmall label="Eliminados" value={displayEliminated} icon={Layers} />
             </div>
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
               <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Detalhamento por tipo</p>
