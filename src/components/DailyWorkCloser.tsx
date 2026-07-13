@@ -355,6 +355,44 @@ export function DailyWorkCloser({
 
   const stats = externalStats || localStats;
 
+  // ─── DAY_CLOSE_MODAL_SOURCE_OF_TRUTH ──────────────────────────────
+  // O modal renderiza EXCLUSIVAMENTE os números vindos de `externalStats`
+  // (Tela Operacional → operational-metrics). O `snapshot` só é usado
+  // como fonte auxiliar de detalhamento (depósitos por tipo, tubitos,
+  // amostras) enquanto o refactor global não atinge esses campos.
+  const displayWorked   = externalStats ? externalStats.worked   : (snapshot.workedCount  || localStats.worked);
+  const displayClosed   = externalStats ? externalStats.closed   : (snapshot.closedCount  || localStats.closed);
+  const displayRefused  = externalStats ? externalStats.refused  : (snapshot.refusedCount || localStats.refused);
+  const displayFocus    = externalStats ? externalStats.focus    : (snapshot.focusCount   || localStats.focus);
+  const displayPending  = externalStats ? externalStats.pending  : (snapshot.pendingLocal || localStats.pending);
+  const displayTreatedDep    = externalStats ? (externalStats.treatedDeposits ?? 0) : (snapshot.depTreated    || localStats.treatedDeposits);
+  const displayEliminated    = externalStats ? externalStats.eliminated              : (snapshot.depEliminated || localStats.eliminated);
+  const displayLarvicideUsed = externalStats ? (externalStats.larvicideUsed ?? 0)    : (snapshot.larvicideAmount || localStats.larvicideUsed);
+  const displayTreated       = externalStats ? externalStats.treated                 : (snapshot.treatedPropsCount || localStats.treated);
+  const operationalDate = getOperationalDate();
+
+  // Loga divergência entre Tela Operacional (externalStats) e o snapshot
+  // interno assim que o modal abre.
+  useEffect(() => {
+    if (!isOpen || !externalStats) return;
+    const compare = (field: string, ui: any, modal: any) => {
+      if (Number(ui) !== Number(modal)) {
+        console.warn("[DAY_CLOSE_MODAL_DIVERGENCE]", {
+          field,
+          valor_tela: ui,
+          valor_modal: modal,
+          origem_tela: "operational-metrics (props.stats)",
+          origem_modal: "buildDailySnapshot (Dexie)",
+        });
+      }
+    };
+    compare("worked",   externalStats.worked,   snapshot.workedCount);
+    compare("closed",   externalStats.closed,   snapshot.closedCount);
+    compare("refused",  externalStats.refused,  snapshot.refusedCount);
+    compare("focus",    externalStats.focus,    snapshot.focusCount);
+    compare("pending",  externalStats.pending,  snapshot.pendingLocal);
+  }, [isOpen, externalStats, snapshot.workedCount, snapshot.closedCount, snapshot.refusedCount, snapshot.focusCount, snapshot.pendingLocal]);
+
   const handlePreClose = async () => {
     console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
     setValidating(true);
