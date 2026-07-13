@@ -45,6 +45,7 @@ class VetorDB extends Dexie {
   weeks!: Table<CachedRow, string>;
   profiles!: Table<CachedRow, string>;
   agents!: Table<CachedRow, string>;
+  block_progress!: Table<CachedRow, string>;
   meta!: Table<MetaRow, string>;
 
   constructor() {
@@ -67,6 +68,9 @@ class VetorDB extends Dexie {
       weeks: "id, updatedAt",
       profiles: "id, updatedAt",
       agents: "id, updatedAt",
+    });
+    this.version(3).stores({
+      block_progress: "id, updatedAt",
     });
   }
 }
@@ -98,6 +102,7 @@ export async function clearOfflineDB() {
     db.weeks.clear(),
     db.profiles.clear(),
     db.agents.clear(),
+    db.block_progress.clear(),
     db.meta.clear(),
   ]);
 }

@@ -113,6 +113,96 @@ export type Database = {
         }
         Relationships: []
       }
+      block_progress: {
+        Row: {
+          agent_id: string
+          block_number: string
+          closed_properties: number
+          completed_at: string | null
+          completion_percentage: number
+          created_at: string
+          cycle_id: string
+          id: string
+          last_operational_date: string | null
+          last_sync: string | null
+          last_visit_at: string | null
+          negative_focus: number
+          pe_properties: number
+          pending_properties: number
+          positive_focus: number
+          recovered_properties: number
+          started_at: string | null
+          status: string
+          tb_properties: number
+          total_properties: number
+          updated_at: string
+          visited_properties: number
+        }
+        Insert: {
+          agent_id: string
+          block_number: string
+          closed_properties?: number
+          completed_at?: string | null
+          completion_percentage?: number
+          created_at?: string
+          cycle_id: string
+          id?: string
+          last_operational_date?: string | null
+          last_sync?: string | null
+          last_visit_at?: string | null
+          negative_focus?: number
+          pe_properties?: number
+          pending_properties?: number
+          positive_focus?: number
+          recovered_properties?: number
+          started_at?: string | null
+          status?: string
+          tb_properties?: number
+          total_properties?: number
+          updated_at?: string
+          visited_properties?: number
+        }
+        Update: {
+          agent_id?: string
+          block_number?: string
+          closed_properties?: number
+          completed_at?: string | null
+          completion_percentage?: number
+          created_at?: string
+          cycle_id?: string
+          id?: string
+          last_operational_date?: string | null
+          last_sync?: string | null
+          last_visit_at?: string | null
+          negative_focus?: number
+          pe_properties?: number
+          pending_properties?: number
+          positive_focus?: number
+          recovered_properties?: number
+          started_at?: string | null
+          status?: string
+          tb_properties?: number
+          total_properties?: number
+          updated_at?: string
+          visited_properties?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_progress_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "block_progress_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocks: {
         Row: {
           address: string | null
@@ -1695,6 +1785,39 @@ export type Database = {
       rebuild_daily_work_records: {
         Args: { _agent?: string; _from?: string; _to?: string }
         Returns: Json
+      }
+      recompute_block_progress: {
+        Args: { _agent_id: string; _block_number: string; _cycle_id: string }
+        Returns: {
+          agent_id: string
+          block_number: string
+          closed_properties: number
+          completed_at: string | null
+          completion_percentage: number
+          created_at: string
+          cycle_id: string
+          id: string
+          last_operational_date: string | null
+          last_sync: string | null
+          last_visit_at: string | null
+          negative_focus: number
+          pe_properties: number
+          pending_properties: number
+          positive_focus: number
+          recovered_properties: number
+          started_at: string | null
+          status: string
+          tb_properties: number
+          total_properties: number
+          updated_at: string
+          visited_properties: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "block_progress"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reconcile_rg_integrity: { Args: never; Returns: Json }
       recover_session_visits: { Args: { _session_id: string }; Returns: Json }

@@ -19,7 +19,8 @@ export type DexieTableName =
   | "cycles"
   | "weeks"
   | "profiles"
-  | "agents";
+  | "agents"
+  | "block_progress";
 
 
 async function hydrate(name: DexieTableName, rows: any[]) {

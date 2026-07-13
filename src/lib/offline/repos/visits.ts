@@ -1,11 +1,17 @@
 // Helpers de domínio para visitas offline-first.
 // Garante que visit + visit_deposits sejam gravados localmente e enfileirados.
+// Também atualiza a camada única BLOCK_PROGRESS após cada visita.
 
 import {
   createOffline,
   updateOffline,
   deleteWhereOffline,
 } from "./index";
+import {
+  applyLocalVisitDelta,
+  enqueueRecomputeBlockProgress,
+} from "./blockProgress";
+import { db } from "../db";
 
 export interface VisitPayload {
   id?: string;
@@ -73,6 +79,30 @@ export async function saveVisitOffline(
       const c = await createOffline("visit_deposits", dp);
       console.log("[SAVE_VISIT_DEXIE_OK]", { id: c.id, table: "visit_deposits", updatedAt: dp.updated_at });
       console.log("[SAVE_VISIT_QUEUE_OK]", { id: c.id, table: "visit_deposits", op: "insert" });
+    }
+
+    // BLOCK_PROGRESS — camada única (independente da Produção Diária).
+    try {
+      const propRow = await db.properties.get(visit.property_id);
+      const block_number = (propRow?.data as any)?.block_number as string | undefined;
+      if (block_number && visit.cycle_id && visit.agent_id) {
+        await applyLocalVisitDelta({
+          cycle_id: visit.cycle_id,
+          block_number: String(block_number),
+          agent_id: visit.agent_id,
+          status: visit.status,
+          property_id: visit.property_id,
+          is_recovery: visit.is_recovered,
+          visit_date: visit.visit_date,
+        });
+        await enqueueRecomputeBlockProgress({
+          cycle_id: visit.cycle_id,
+          block_number: String(block_number),
+          agent_id: visit.agent_id,
+        });
+      }
+    } catch (e) {
+      console.warn("[BLOCK_PROGRESS_UPDATE_FAIL]", e);
     }
 
     console.log("[SAVE_VISIT_FINISH]", { visitId, depositsSaved: deposits.length });
