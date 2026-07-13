@@ -1,11 +1,17 @@
 // Helpers de domínio para visitas offline-first.
 // Garante que visit + visit_deposits sejam gravados localmente e enfileirados.
+// Também atualiza a camada única BLOCK_PROGRESS após cada visita.
 
 import {
   createOffline,
   updateOffline,
   deleteWhereOffline,
 } from "./index";
+import {
+  applyLocalVisitDelta,
+  enqueueRecomputeBlockProgress,
+} from "./blockProgress";
+import { db } from "../db";
 
 export interface VisitPayload {
   id?: string;
