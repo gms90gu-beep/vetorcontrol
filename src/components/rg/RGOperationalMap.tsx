@@ -364,7 +364,7 @@ export function RGOperationalMap({
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
-            onClick={onSelect}
+            onClick={handleSelectFromMap}
           />
           {gpsOn && userPos && (
             <SharedUserLocationLayer
