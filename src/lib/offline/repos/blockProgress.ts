@@ -162,6 +162,54 @@ export async function listBlockProgress(agent_id: string): Promise<BlockProgress
 }
 
 /**
+ * Lote em cache/servidor para dashboards com múltiplos quarteirões/agentes.
+ * Se `block_numbers` for omitido, retorna todos os blocos do agente/ciclo.
+ */
+export async function getBlockProgressBatch(input: {
+  cycle_id?: string | null;
+  agent_ids?: string[];
+  block_numbers?: string[];
+}): Promise<BlockProgress[]> {
+  const { cycle_id, agent_ids, block_numbers } = input;
+  return safeFetch<BlockProgress[]>(
+    async () => {
+      let q = supabase.from(TABLE).select("*");
+      if (cycle_id) q = q.eq("cycle_id", cycle_id);
+      if (agent_ids && agent_ids.length) q = q.in("agent_id", agent_ids);
+      if (block_numbers && block_numbers.length)
+        q = q.in("block_number", block_numbers.map(String));
+      const { data, error } = await q;
+      if (error) throw error;
+      const rows = (data || []) as BlockProgress[];
+      await hydrateLocal(rows);
+      log("BLOCK_PROGRESS_SYNC", {
+        source: "remote",
+        scope: "batch",
+        count: rows.length,
+        cycle_id: cycle_id ?? null,
+        agents: agent_ids?.length ?? 0,
+        blocks: block_numbers?.length ?? 0,
+      });
+      return rows;
+    },
+    async () => {
+      const all = await db.block_progress.toArray();
+      return all
+        .map((r) => r.data as BlockProgress)
+        .filter((r) => {
+          if (!r) return false;
+          if (cycle_id && r.cycle_id !== cycle_id) return false;
+          if (agent_ids && agent_ids.length && !agent_ids.includes(r.agent_id)) return false;
+          if (block_numbers && block_numbers.length &&
+              !block_numbers.map(String).includes(String(r.block_number))) return false;
+          return true;
+        });
+    },
+    { label: `${TABLE}:batch` },
+  );
+}
+
+/**
  * Aplica delta local imediatamente após uma visita — não espera sync.
  * Mantém pending = max(0, total - visited - closed).
  */
