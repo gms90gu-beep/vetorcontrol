@@ -446,8 +446,16 @@ function FieldWorkPage() {
               existing_status: (existing as any).status,
             });
           }
-          setOpenSession(existing as any);
-          setOpenSessionModal(true);
+          const decision = await assessSessionForResume({
+            ...(existing as any),
+            user_id: userId,
+          });
+          if (decision.show) {
+            setOpenSession(existing as any);
+            setOpenSessionModal(true);
+            return;
+          }
+          toast.info("Este quarteirão já foi concluído nesta Data da Produção.");
           return;
         }
       }
