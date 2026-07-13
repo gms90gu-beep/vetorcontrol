@@ -79,18 +79,62 @@ async function assessSessionForResume(session: any): Promise<{ show: boolean; re
 
   console.log("[JOURNEY_SCAN]", base);
 
+  const decide = (decision: string, show: boolean, reason: string, extra: Record<string, unknown> = {}) => {
+    console.log("[JOURNEY_RESUME_DECISION]", { ...base, ...extra, decision, show, reason });
+    return { show, reason };
+  };
+
+  // 1) Data da Produção — jornada só pode ser retomada na Data da Produção ativa.
+  const opDate = getOperationalDate();
+  if (!session?.session_date || session.session_date !== opDate) {
+    console.log("[JOURNEY_EXPIRED]", {
+      session_id: base.session_id,
+      session_date: base.session_date,
+      operational_date: opDate,
+      motivo: "session_date diferente da Data da Produção ativa",
+    });
+    return decide("blocked_by_date", false, "data expirada", { operational_date: opDate });
+  }
+
   const statusOk = session?.status === "paused" || session?.status === "in_progress";
   if (!statusOk || session?.completed_at) {
-    console.log("[JOURNEY_RESUME_CHECK]", { ...base, motivo: "status inválido ou já concluída", show: false });
-    return { show: false, reason: "status inválido" };
+    return decide("blocked_by_completed", false, "status inválido ou já concluída");
   }
 
   if (!isOnline()) {
-    console.log("[JOURNEY_RESUME_CHECK]", { ...base, motivo: "offline — sem validação", show: true });
-    return { show: true, reason: "offline" };
+    return decide("resumed", true, "offline — sem validação remota");
   }
 
   try {
+    // 2) DWR — prevalece sobre qualquer sessão pausada.
+    const { data: dwr } = await supabase
+      .from("daily_work_records")
+      .select("id, status, end_time")
+      .eq("agent_id", session.user_id)
+      .eq("work_date", session.session_date)
+      .maybeSingle();
+    const dwrClosed = !!dwr && ((dwr as any).status === "completed" || !!(dwr as any).end_time);
+
+    if (dwrClosed) {
+      console.log("[JOURNEY_DWR_CLOSED]", {
+        session_id: base.session_id,
+        session_date: base.session_date,
+        dwr_id: (dwr as any).id,
+        motivo: "DWR já encerrado para a Data da Produção",
+      });
+      try {
+        await updateOffline("field_work_sessions", session.id, {
+          status: "closed",
+          updated_at: new Date().toISOString(),
+        });
+        console.log("[JOURNEY_AUTO_REPAIR]", { ...base, motivo: "sessão fechada por DWR encerrado" });
+      } catch (e: any) {
+        console.warn("[JOURNEY_AUTO_REPAIR_ERR]", { ...base, error: e?.message });
+      }
+      return decide("blocked_by_dwr", false, "DWR encerrado");
+    }
+
+    // 3) Operational Block Status
     let propertyIds: string[] = [];
     if (session?.block_id) {
       const { data: props } = await supabase
@@ -111,52 +155,38 @@ async function assessSessionForResume(session: any): Promise<{ show: boolean; re
       fallbackTotal: session?.property_count || 0,
     });
 
-    const { data: dwr } = await supabase
-      .from("daily_work_records")
-      .select("id, status, end_time")
-      .eq("agent_id", session.user_id)
-      .eq("work_date", session.session_date)
-      .maybeSingle();
-    const dwrClosed = !!dwr && ((dwr as any).status === "completed" || !!(dwr as any).end_time);
-
     const enriched = {
-      ...base,
       pending_properties: canonical.pendingProperties,
       total_properties: canonical.totalProperties,
       block_status: canonical.status,
-      dwr_closed: dwrClosed,
     };
 
     const blockDone = canonical.status === "CONCLUIDO" ||
       (canonical.totalProperties > 0 && canonical.pendingProperties === 0);
 
-    if (blockDone || dwrClosed) {
-      console.log("[JOURNEY_COMPLETED_BLOCK]", {
-        ...enriched,
-        motivo: blockDone ? "quarteirão concluído" : "DWR encerrado",
-      });
+    if (blockDone) {
+      console.log("[JOURNEY_COMPLETED_BLOCK]", { ...base, ...enriched, motivo: "quarteirão concluído" });
       try {
         await updateOffline("field_work_sessions", session.id, {
           status: "closed",
           updated_at: new Date().toISOString(),
         });
-        console.log("[JOURNEY_AUTO_REPAIR]", { ...enriched, motivo: "sessão marcada como closed" });
+        console.log("[JOURNEY_AUTO_REPAIR]", { ...base, ...enriched, motivo: "sessão marcada como closed" });
       } catch (e: any) {
-        console.warn("[JOURNEY_AUTO_REPAIR_ERR]", { ...enriched, error: e?.message });
+        console.warn("[JOURNEY_AUTO_REPAIR_ERR]", { ...base, error: e?.message });
       }
-      return { show: false, reason: blockDone ? "quarteirão concluído" : "DWR encerrado" };
+      return decide("blocked_by_block", false, "quarteirão concluído", enriched);
     }
 
+    // 4) Field Work Session
     if (canonical.pendingProperties <= 0) {
-      console.log("[JOURNEY_RESUME_CHECK]", { ...enriched, motivo: "sem pendências", show: false });
-      return { show: false, reason: "sem pendências" };
+      return decide("blocked_by_completed", false, "sem pendências", enriched);
     }
 
-    console.log("[JOURNEY_RESUME_CHECK]", { ...enriched, motivo: "pendências reais — exibir modal", show: true });
-    return { show: true, reason: "pendências reais" };
+    return decide("resumed", true, "pendências reais", enriched);
   } catch (e: any) {
     console.warn("[JOURNEY_RESUME_CHECK_ERR]", { ...base, error: e?.message });
-    return { show: true, reason: "erro na validação" };
+    return decide("resumed", true, "erro na validação (fallback permissivo)");
   }
 }
 
