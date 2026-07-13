@@ -370,9 +370,7 @@ export function DailyWorkCloser({
   const handleDiscardFailed = async (id: number) => {
     await discardFailedMutation(id);
     await refreshFailedMutations();
-    await handlePreCloseRef.current?.();
   };
-  const handlePreCloseRef = { current: null as null | (() => Promise<void>) };
 
   const stats = externalStats || localStats;
 
