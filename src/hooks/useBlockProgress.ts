@@ -4,13 +4,15 @@
  * (Trabalho, Dashboard, OperationalPanel, Supervisor, RG, Mapas) devem usar
  * este hook em vez de recalcular a partir das visitas.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBlockProgress,
+  checkIntegrity,
   type BlockProgress,
 } from "@/lib/offline/repos/blockProgress";
 import { onSyncChange } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
+import { enqueueRpcOffline } from "@/lib/offline/repos";
 
 export interface UseBlockProgressOptions {
   cycle_id: string | null | undefined;
@@ -24,6 +26,15 @@ export function useBlockProgress(opts: UseBlockProgressOptions) {
   const { cycle_id, block_number, agent_id, module } = opts;
   const [progress, setProgress] = useState<BlockProgress | null>(null);
   const [loading, setLoading] = useState<boolean>(!!(cycle_id && block_number && agent_id));
+  const migrationLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (migrationLoggedRef.current) return;
+    migrationLoggedRef.current = true;
+    try {
+      console.info("[BLOCK_PROGRESS_MIGRATION]", { module, hook: "useBlockProgress", version: 1 });
+    } catch {}
+  }, [module]);
 
   const refresh = useCallback(async () => {
     if (!cycle_id || !block_number || !agent_id) return;
@@ -44,6 +55,15 @@ export function useBlockProgress(opts: UseBlockProgressOptions) {
           percentual: row?.completion_percentage ?? 0,
         });
       } catch {}
+      if (row && !checkIntegrity(row, `useBlockProgress:${module}`)) {
+        try {
+          await enqueueRpcOffline("recompute_block_progress", {
+            _cycle_id: cycle_id,
+            _block_number: String(block_number),
+            _agent_id: agent_id,
+          });
+        } catch {}
+      }
     } finally {
       setLoading(false);
     }
