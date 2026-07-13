@@ -859,6 +859,124 @@ export function DailyWorkCloser({
       }
       setSnapshot(snap);
 
+      // ═══════════ AUDITORIA DO ENCERRAMENTO ═══════════
+      // Regra: o encerramento consome exclusivamente `operational-metrics`.
+      // Compara UI (Tela de Trabalho) × Metrics × BlockStatus × Snapshot × DWR.
+      const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
+      const __propsAll = await listLocal<any>("properties");
+      const __propBlock = new Map<string, string>();
+      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
+
+      const __dwrProperties = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0, deposits: 0, focuses: 0 };
+      const __perBlockAudit: any[] = [];
+      for (const s of dayAllSessions) {
+        const bn = String(s.block_number ?? "");
+        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const metrics = __getMetrics({
+          module: "DailyWorkCloser/audit",
+          productionDate: operationalWorkDate,
+          blockId: s.block_id,
+          sessionId: s.id,
+          propertyIds: propIds,
+          visits: vs,
+          fallbackTotal: Number(s.property_count || 0),
+        });
+        __perBlockAudit.push({ block_number: bn, ...metrics });
+        __dwrProperties.total += metrics.totalProperties;
+        __dwrProperties.visited += metrics.visitedProperties;
+        __dwrProperties.pending += metrics.pendingProperties;
+        __dwrProperties.closed += metrics.closedProperties;
+        __dwrProperties.recovered += metrics.recoveredProperties;
+      }
+      __dwrProperties.deposits = snap.depInspected;
+      __dwrProperties.focuses = snap.focusCount;
+
+      const __uiPayload = {
+        operational_date: operationalWorkDate,
+        cycle: activeCycle?.id ?? null,
+        blocks: __perBlockAudit.map((b) => b.block_number),
+        total_properties: __dwrProperties.total,
+        visited: __dwrProperties.visited,
+        pending: __dwrProperties.pending,
+        closed: __dwrProperties.closed,
+        recovered: __dwrProperties.recovered,
+        deposits: __dwrProperties.deposits,
+        focuses: __dwrProperties.focuses,
+      };
+      console.log("[DAY_CLOSE_UI]", __uiPayload);
+      console.log("[DAY_CLOSE_METRICS]", { ...__uiPayload, source: "operational-metrics" });
+      console.log("[DAY_CLOSE_BLOCK_STATUS]", { blocks: __perBlockAudit });
+
+      const __snapshotView = {
+        total_properties: snap.workedCount,
+        visited: snap.visitedCount,
+        pending: snap.pendingLocal,
+        closed: snap.closedCount,
+        deposits: snap.depInspected,
+        focuses: snap.focusCount,
+      };
+      console.log("[DAY_CLOSE_PRE_SNAPSHOT]", __snapshotView);
+
+      // Comparação: divergências entre módulos
+      const __divergences: any[] = [];
+      const __check = (module: string, expected: any, found: any) => {
+        for (const k of Object.keys(expected)) {
+          if (Number(expected[k]) !== Number(found[k])) {
+            __divergences.push({ module, field: k, expected: expected[k], found: found[k] });
+          }
+        }
+      };
+      __check("Snapshot vs Metrics", {
+        visited: __dwrProperties.visited,
+        pending: __dwrProperties.pending,
+        closed: __dwrProperties.closed,
+      }, {
+        visited: snap.visitedCount,
+        pending: snap.pendingLocal,
+        closed: snap.closedCount,
+      });
+
+      // Cache: comparar Dexie × Supabase (total de visitas do dia)
+      let __remoteCount = 0;
+      try {
+        if (isOnline()) {
+          const { count } = await supabase
+            .from("visits")
+            .select("id", { count: "exact", head: true })
+            .eq("agent_id", user.id)
+            .gte("visit_date", `${operationalWorkDate}T00:00:00`)
+            .lte("visit_date", `${operationalWorkDate}T23:59:59.999`);
+          __remoteCount = count || 0;
+        }
+      } catch {}
+      const __cacheDiv = __remoteCount > 0 && __remoteCount !== visitsByAllSessions.length;
+      console.log("[DAY_CLOSE_CACHE]", {
+        local_total: visitsByAllSessions.length,
+        remote_total: __remoteCount,
+        divergent: __cacheDiv,
+      });
+
+      if (__divergences.length > 0) {
+        for (const d of __divergences) console.error("[DAY_CLOSE_METRICS_DIVERGENCE]", d);
+        const first = __divergences[0];
+        console.error("[DAY_CLOSE_BLOCK_REASON]", {
+          module: first.module,
+          field: first.field,
+          expected: first.expected,
+          found: first.found,
+          reason: `Divergência entre ${first.module} no campo ${first.field}: esperado ${first.expected}, encontrado ${first.found}`,
+        });
+        toast.error(
+          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}.`,
+        );
+        throw new Error(`[DAY_CLOSE_BLOCK_REASON] ${first.module}/${first.field}`);
+      }
+      console.log("[DAY_CLOSE_POST_SNAPSHOT]", __snapshotView);
+      // ═════════════════════════════════════════════════
+
+
+
       let { depTreated, depEliminated, larvicideAmount } = snap;
       if (depTreated === 0 && stats.treatedDeposits) depTreated = stats.treatedDeposits;
       if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
