@@ -48,7 +48,7 @@ import {
   runShiftValidation,
   type ShiftValidationReport,
 } from "@/lib/shift-validation";
-import { flushMutations, retryFailedMutations } from "@/lib/offline/sync";
+import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, type FailedMutationInfo } from "@/lib/offline/sync";
 import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 
 type DepKey = "A1" | "A2" | "B" | "C" | "D1" | "D2" | "E";
@@ -352,6 +352,27 @@ export function DailyWorkCloser({
   const [validation, setValidation] = useState<ShiftValidationReport | null>(null);
   const [showValidation, setShowValidation] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [failedMutations, setFailedMutations] = useState<FailedMutationInfo[]>([]);
+  const [showFailedDetails, setShowFailedDetails] = useState(false);
+
+  const refreshFailedMutations = useCallback(async () => {
+    try {
+      setFailedMutations(await listFailedMutations());
+    } catch (e) {
+      console.warn("[FAILED_MUTATIONS_LOAD_ERR]", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showValidation) void refreshFailedMutations();
+  }, [showValidation, validation, refreshFailedMutations]);
+
+  const handleDiscardFailed = async (id: number) => {
+    await discardFailedMutation(id);
+    await refreshFailedMutations();
+    await handlePreCloseRef.current?.();
+  };
+  const handlePreCloseRef = { current: null as null | (() => Promise<void>) };
 
   const stats = externalStats || localStats;
 
