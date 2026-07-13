@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
-import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
+import { useBlockProgress } from "@/hooks/useBlockProgress";
 
 type FilterKey =
   | "all" | "pending" | "visited" | "closed" | "refused"
