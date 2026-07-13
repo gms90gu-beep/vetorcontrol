@@ -1821,11 +1821,11 @@ export function DailyWorkCloser({
           <div className="space-y-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produção Imobiliária</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Trabalhados" value={stats.worked} icon={Target} />
-              <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
-              <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
+              <SummaryItemSmall label="Trabalhados" value={displayWorked} icon={Target} />
+              <SummaryItemSmall label={translate("CLOSED")} value={displayClosed} icon={XCircle} />
+              <SummaryItemSmall label={translate("REFUSED")} value={displayRefused} icon={XCircle} />
               <SummaryItemSmall label="Recuperados" value={recoveredCount} icon={CheckCircle2} />
-              <SummaryItemSmall label="Pend. Geradas" value={snapshot.pendingLocal || pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Pend. Geradas" value={displayPending} icon={Clock} />
               <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
             </div>
 
