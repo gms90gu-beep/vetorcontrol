@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type L from "leaflet";
 import {
   SharedMap,
+  SharedMapControls,
   SharedNumberedMarkerLayer,
   SharedUserLocationLayer,
   type NumberedPoint,
@@ -373,6 +374,14 @@ export function RGOperationalMap({
               accuracy={userPos.accuracy}
             />
           )}
+          <SharedMapControls
+            autoNight
+            fitPoints={points.map((p) => [p.lat, p.lng] as [number, number])}
+            onRefresh={() => {
+              console.log("[RG_MAP_REFRESH]", { block: blockNumber });
+              if (mapInst) mapInst.invalidateSize();
+            }}
+          />
         </SharedMap>
         <MapLegend />
       </div>
