@@ -330,6 +330,27 @@ export function RGOperationalMap({
             </ul>
           )}
         </div>
+
+        {missingGeo.length > 0 && (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-amber-800">
+              Imóveis sem georreferenciamento ({missingGeo.length})
+            </div>
+            <ul className="mt-1 max-h-28 overflow-auto">
+              {missingGeo.map(({ p, label }) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFromList(p.id)}
+                    className="w-full text-left text-[11px] px-1 py-0.5 rounded hover:bg-amber-100 text-amber-900 truncate"
+                  >
+                    #{label} · Nº {p.number} — {p.street_name || "—"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </aside>
 
       <div className="min-h-0">
