@@ -216,9 +216,13 @@ function FieldWorkPage() {
                 previous_status: "paused",
                 new_status: "prompt",
               });
-              setOpenSession(paused as any);
-              setOpenSessionModal(true);
+              const decision = await assessSessionForResume(paused);
+              if (decision.show) {
+                setOpenSession(paused as any);
+                setOpenSessionModal(true);
+              }
             }
+
           } catch (e) {
             console.warn("[JOURNEY_RESUMED_ERR]", e);
           }
