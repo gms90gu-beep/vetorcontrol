@@ -26,6 +26,7 @@ import { RunningAsAppBadge } from "@/components/InstallAppButton";
 import { MyWeeklyConsolidation } from "@/components/agent/MyWeeklyConsolidation";
 import { BulletinPreview } from "@/components/agent/BulletinPreview";
 import { getOperationalDate } from "@/lib/operational-date";
+import { listBlockProgress } from "@/lib/offline/repos/blockProgress";
 
 const DAILY_GOAL = 30;
 
@@ -184,7 +185,7 @@ export function AgentDashboard() {
       }
 
 
-      // Sessão ativa + blocos
+      // Sessão ativa (apenas para saber se há jornada em curso — timeline).
       const { data: active } = await supabase
         .from("field_work_sessions")
         .select("id, block_number, status")
@@ -194,17 +195,27 @@ export function AgentDashboard() {
         .limit(1)
         .maybeSingle();
 
-      const { data: allSessions } = await supabase
-        .from("field_work_sessions")
-        .select("block_number, status")
-        .eq("user_id", user.id);
+      // BLOCK_PROGRESS_SOURCE_OF_TRUTH — nunca contar blocos via field_work_sessions.
+      const allProgress = await listBlockProgress(user.id);
+      const cycleProgress = activeCycleId
+        ? allProgress.filter((p) => p.cycle_id === activeCycleId)
+        : allProgress;
 
       if (!cancelled) {
         setHasActiveSession(!!active);
-        const concluidos = (allSessions || []).filter((s) => s.status === "completed").length;
-        const pendentes = (allSessions || []).filter((s) => s.status === "active").length;
+        const concluidos = cycleProgress.filter((p) => p.status === "COMPLETED").length;
+        const pendentes = cycleProgress.filter(
+          (p) => p.status === "IN_PROGRESS" || p.status === "PAUSED",
+        ).length;
         setBlockStats({
           atual: active?.block_number || "—",
+          concluidos,
+          pendentes,
+        });
+        console.info("[BLOCK_PROGRESS_MIGRATION]", {
+          module: "AgentDashboard",
+          hook: "listBlockProgress",
+          version: 1,
           concluidos,
           pendentes,
         });
