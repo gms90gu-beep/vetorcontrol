@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type L from "leaflet";
 import {
   SharedMap,
+  SharedMapControls,
   SharedNumberedMarkerLayer,
   SharedUserLocationLayer,
   type NumberedPoint,
