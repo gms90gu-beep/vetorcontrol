@@ -81,6 +81,30 @@ export async function saveVisitOffline(
       console.log("[SAVE_VISIT_QUEUE_OK]", { id: c.id, table: "visit_deposits", op: "insert" });
     }
 
+    // BLOCK_PROGRESS — camada única (independente da Produção Diária).
+    try {
+      const propRow = await db.properties.get(visit.property_id);
+      const block_number = (propRow?.data as any)?.block_number as string | undefined;
+      if (block_number && visit.cycle_id && visit.agent_id) {
+        await applyLocalVisitDelta({
+          cycle_id: visit.cycle_id,
+          block_number: String(block_number),
+          agent_id: visit.agent_id,
+          status: visit.status,
+          property_id: visit.property_id,
+          is_recovery: visit.is_recovered,
+          visit_date: visit.visit_date,
+        });
+        await enqueueRecomputeBlockProgress({
+          cycle_id: visit.cycle_id,
+          block_number: String(block_number),
+          agent_id: visit.agent_id,
+        });
+      }
+    } catch (e) {
+      console.warn("[BLOCK_PROGRESS_UPDATE_FAIL]", e);
+    }
+
     console.log("[SAVE_VISIT_FINISH]", { visitId, depositsSaved: deposits.length });
     return visitId as string;
   } catch (error: any) {
