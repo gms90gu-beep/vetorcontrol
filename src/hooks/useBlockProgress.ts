@@ -4,13 +4,15 @@
  * (Trabalho, Dashboard, OperationalPanel, Supervisor, RG, Mapas) devem usar
  * este hook em vez de recalcular a partir das visitas.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBlockProgress,
+  checkIntegrity,
   type BlockProgress,
 } from "@/lib/offline/repos/blockProgress";
 import { onSyncChange } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
+import { enqueueRpcOffline } from "@/lib/offline/repos";
 
 export interface UseBlockProgressOptions {
   cycle_id: string | null | undefined;
