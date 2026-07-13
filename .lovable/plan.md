@@ -1,90 +1,72 @@
-# Fase 3 — Camada `block_progress`
 
-Objetivo: criar uma fonte única de verdade para o estado operacional do quarteirão, independente da Produção Diária. Nenhum consumidor recalcula mais progresso a partir das visitas — todos leem de `block_progress`.
+# Migração para `block_progress` como fonte única de progresso
 
-## 1. Banco (migration)
+Objetivo: substituir todos os cálculos locais de "visitados / pendentes / percentual / status do quarteirão" pelo hook `useBlockProgress()` (ou `getBlockProgress()` fora de React), mantendo o `block_progress` como única fonte de verdade.
 
-Nova tabela `public.block_progress`:
+## Lote 1 — Painel operacional (prioridade máxima)
 
-- Chaves: `id uuid pk`, `cycle_id uuid fk cycles`, `block_number text`, `agent_id uuid fk profiles(id)`
-- Timestamps: `started_at`, `completed_at`, `last_visit_at`, `last_operational_date date`, `last_sync timestamptz`, `updated_at`
-- Estado: `status text` (`NOT_STARTED | IN_PROGRESS | PAUSED | COMPLETED`), `completion_percentage numeric`
-- Contadores: `total_properties`, `visited_properties`, `pending_properties`, `closed_properties`, `recovered_properties`, `positive_focus`, `negative_focus`, `tb_properties`, `pe_properties`
-- Constraint: `UNIQUE (cycle_id, block_number, agent_id)`
-- GRANT SELECT/INSERT/UPDATE authenticated; ALL service_role
-- RLS: agente lê/escreve suas próprias linhas (`agent_id = auth.uid()`); supervisor/coordenador/admin_master leem todas (`has_role`)
-- Trigger `updated_at`
-- Função `public.recompute_block_progress(_cycle_id uuid, _block_number text, _agent_id uuid)` — recalcula a partir de `properties` (total) e `visits` (agregados) e faz upsert. Usada pelo pós-sync e pelo trigger em `visits`.
-- Trigger `AFTER INSERT/UPDATE/DELETE ON visits` que chama a função para o par (bloco, agente) impactado.
+Arquivo: `src/components/field-work/OperationalPanel.tsx`
 
-## 2. Repositório local (offline)
+- Consumir `useBlockProgress({ cycle_id, block_number, agent_id, module: "OperationalPanel" })`.
+- Substituir os campos derivados hoje em `stats` (via `getOperationalBlockStatus`) por leitura direta do hook:
+  - `visited → progress.visited_properties`
+  - `closed → progress.closed_properties`
+  - `pendingCount → progress.pending_properties`
+  - `total → progress.total_properties` (fallback para `properties.length` só quando `progress` ainda estiver carregando)
+  - `progress% → progress.completion_percentage`
+  - `status → progress.status` (usado para os badges "Em andamento / Concluído")
+- Manter `visits`, `deposits`, `properties` apenas para: mapa, filtros da lista, contagem de focos, larvicida, depósitos e sem-GPS — nunca para progresso.
+- Remover `getOperationalBlockStatus` / `logBlockStatusShared` deste componente.
+- Emitir `console.info("[BLOCK_PROGRESS_MIGRATION]", { module: "OperationalPanel", hook: "useBlockProgress", version: 1 })` uma vez no mount.
 
-- Adicionar store `block_progress` em `src/lib/offline/db.ts` (nova `version(3)`).
-- `src/lib/offline/repos/blockProgress.ts`:
-  - `getBlockProgress(cycle_id, block_number, agent_id)`
-  - `listBlockProgress(agent_id)`
-  - `upsertBlockProgress(row)` (via `safeFetch` + Dexie mirror)
-  - `applyLocalVisitDelta(...)` — atualiza contadores localmente logo após registrar visita, mesmo offline; enfileira `rpc: recompute_block_progress` para reconciliação.
+## Lote 2 — Dashboards
 
-## 3. Hook de leitura único
+Arquivos:
+- `src/components/agent/AgentDashboard.tsx`
+- `src/components/supervision/SupervisionDashboard.tsx`
+- Qualquer card em `src/components/field-work/*` que mostre "progresso do quarteirão".
 
-`src/hooks/useBlockProgress.ts` — devolve `{ status, totalProperties, visitedProperties, pendingProperties, closedProperties, completionPercentage, startedAt, completedAt, lastVisitAt }`. Fonte: Dexie mirror + Supabase Realtime opcional.
+Alterações:
+- Onde hoje há `visits.filter(...)`, `properties.filter(...)` ou `reduce` para calcular progresso de um quarteirão, trocar por `useBlockProgress()` (uso pontual por card) ou `getBlockProgress(cycle_id, block_number, agent_id)` em loops server-side.
+- Para listas com vários quarteirões, criar helper `getBlockProgressBatch(cycle_id, agent_id, block_numbers[])` em `src/lib/offline/repos/blockProgress.ts` que busca em lote (Dexie + Supabase fallback).
+- Emitir `[BLOCK_PROGRESS_MIGRATION]` por módulo.
 
-## 4. Escrita — pipeline de visita
+## Lote 3 — RG e Mapa
 
-Em `PropertyVisitButtons` / `useOfflineMutation('visit')` (após enfileirar a mutação de `visits`):
+Arquivos:
+- `src/components/rg/RGOperationalMap.tsx`
+- `src/components/field-work/BlockOperationalMap.tsx`
+- Cards de resumo em `src/routes/_authenticated.rg*.tsx`.
 
-1. Chamar `applyLocalVisitDelta(...)` (atualiza `block_progress` local imediatamente).
-2. Enfileirar `rpc: recompute_block_progress` para o par (bloco, agente).
-3. Log `[BLOCK_PROGRESS_UPDATE]`.
-4. Se `pending === 0` → marcar `COMPLETED` + `completed_at` + log `[BLOCK_PROGRESS_COMPLETED]`.
+Alterações:
+- Marcadores continuam vindo de `visits` (localização geográfica).
+- Cabeçalho / badge de status geral do quarteirão passa a ler de `useBlockProgress()`.
+- Legenda operacional (Visitado / Pendente / Fechado / Foco / PE / TB) permanece; contadores acima da legenda passam a vir do hook.
 
-## 5. Encerramento do expediente
+## Guardas anti-regressão
 
-`DailyWorkCloser.handleCloseDay`:
+- Criar utilitário `src/lib/block-progress-audit.ts` (já existe parcialmente) com `warnDirectCalc({ file, line, reason })` que emite `[BLOCK_PROGRESS_DIRECT_CALC]`.
+- Adicionar comentário `// BLOCK_PROGRESS_SOURCE_OF_TRUTH` acima do uso do hook em cada consumidor.
+- Adicionar teste-lint via `rg` documentado no README interno: `rg -n "visits\\.filter|properties\\.filter" src/components/{field-work,agent,supervision,rg}` não deve retornar cálculos de progresso.
 
-- Se restarem pendentes: setar `status = PAUSED` no `block_progress` do bloco ativo + log `[BLOCK_PROGRESS_PAUSED]`.
-- Não alterar `daily_work_records` (continua usando `operational_date`).
+## Integridade automática
 
-## 6. Retomada da jornada
-
-`src/routes/_authenticated.field-work.tsx` — `assessSessionForResume`:
-
-- Primeira consulta passa a ser `block_progress` (`status === PAUSED`).
-- `field_work_sessions` vira apenas timeline. Se `block_progress.status === COMPLETED`, bloqueia retomada com `blocked_by_block_progress`.
-
-## 7. Consumidores migrados para `useBlockProgress`
-
-- Tela de Trabalho (barras/percentual)
-- `OperationalPanel` / cards de quarteirão
-- `AgentDashboard` cards
-- `SupervisionDashboard` / `AgentProductionRanking`
-- `RGOperationalMap` (barra de progresso)
-- `BlockOperationalMap` (legenda de status)
-
-Cada consumidor emite `[BLOCK_PROGRESS_READ] { module }`.
-
-## 8. Produção Diária permanece separada
-
-Não alterar: `DailyWorkCloser` (cálculo do DWR), PDFs, boletins, `_authenticated.relatorios`, `_authenticated.reports`. Continuam usando `visits` filtrado por `operational_date`.
-
-## 9. Sincronização
-
-`src/lib/offline/sync.ts` — após drain da fila de `visits`, chamar `recompute_block_progress` para cada `(cycle_id, block_number, agent_id)` distinto processado + log `[BLOCK_PROGRESS_SYNC]`.
-
-## 10. Auditoria e integridade
-
-`src/lib/block-progress-audit.ts`:
-
-- Logs: `[BLOCK_PROGRESS_UPDATE]`, `[BLOCK_PROGRESS_SYNC]`, `[BLOCK_PROGRESS_COMPLETED]`, `[BLOCK_PROGRESS_PAUSED]`, `[BLOCK_PROGRESS_RESUMED]`, `[BLOCK_PROGRESS_RECALCULATED]`.
-- Validação `visited + pending === total` → `[BLOCK_PROGRESS_INTEGRITY_ERROR]` com esperado/encontrado/origem.
-- Nova rota admin `/admin/block-progress-audit` (tabela simples) listando divergências.
+Em `useBlockProgress` (uma única alteração), após obter `progress`:
+- Se `progress.total_properties !== progress.visited_properties + progress.pending_properties + progress.closed_properties + progress.refused_properties`, emitir:
+  `console.warn("[BLOCK_PROGRESS_INTEGRITY_ERROR]", { module, cycle_id, block_number, agent_id, ...progress })`
+  e disparar `recompute_block_progress` via `enqueueRpcOffline`.
 
 ## Detalhes técnicos
 
-- Migration Postgres em uma única chamada (`CREATE TABLE` → `GRANT` → `RLS` → `POLICY` → função + triggers).
-- Dexie `version(3)` adiciona store `block_progress: "id, cycle_id, block_number, agent_id, status, updated_at"`.
-- Realtime opcional (`supabase.channel('block_progress')`) — habilitar no `useBlockProgress` só quando `navigator.onLine`.
-- Rollout: entrega em 3 PRs internos — (a) migration + repo + hook; (b) escrita/pause/complete + sync; (c) migração dos consumidores + auditoria.
+- Nenhum consumidor deve ler `block_progress` direto do Supabase — sempre via `getBlockProgress` (Dexie-first, com fallback remoto) ou `useBlockProgress`.
+- Sessão/`field_work_sessions` continua sendo timeline (não é fonte de progresso).
+- `DailyWorkCloser` e relatórios PDF **não mudam** — continuam usando `operational-metrics` / `daily_work_records`.
+- `BlockOperationalMap` deve receber `progress` via prop opcional, caindo para hook interno se ausente (evita duas leituras no OperationalPanel).
 
-Aprove para eu começar pelo passo 1 (migration).
+## Ordem de execução sugerida (uma resposta cada)
+
+1. Lote 1 — OperationalPanel + integridade em `useBlockProgress`.
+2. Lote 2a — `AgentDashboard`.
+3. Lote 2b — `SupervisionDashboard` + `getBlockProgressBatch`.
+4. Lote 3 — `RGOperationalMap` + `BlockOperationalMap`.
+5. Sweep final: rodar o `rg` de guarda, remover `getOperationalBlockStatus` onde não for mais usado.
