@@ -355,6 +355,44 @@ export function DailyWorkCloser({
 
   const stats = externalStats || localStats;
 
+  // ─── DAY_CLOSE_MODAL_SOURCE_OF_TRUTH ──────────────────────────────
+  // O modal renderiza EXCLUSIVAMENTE os números vindos de `externalStats`
+  // (Tela Operacional → operational-metrics). O `snapshot` só é usado
+  // como fonte auxiliar de detalhamento (depósitos por tipo, tubitos,
+  // amostras) enquanto o refactor global não atinge esses campos.
+  const displayWorked   = externalStats ? externalStats.worked   : (snapshot.workedCount  || localStats.worked);
+  const displayClosed   = externalStats ? externalStats.closed   : (snapshot.closedCount  || localStats.closed);
+  const displayRefused  = externalStats ? externalStats.refused  : (snapshot.refusedCount || localStats.refused);
+  const displayFocus    = externalStats ? externalStats.focus    : (snapshot.focusCount   || localStats.focus);
+  const displayPending  = externalStats ? externalStats.pending  : (snapshot.pendingLocal || localStats.pending);
+  const displayTreatedDep    = externalStats ? (externalStats.treatedDeposits ?? 0) : (snapshot.depTreated    || localStats.treatedDeposits);
+  const displayEliminated    = externalStats ? externalStats.eliminated              : (snapshot.depEliminated || localStats.eliminated);
+  const displayLarvicideUsed = externalStats ? (externalStats.larvicideUsed ?? 0)    : (snapshot.larvicideAmount || localStats.larvicideUsed);
+  const displayTreated       = externalStats ? externalStats.treated                 : (snapshot.treatedPropsCount || localStats.treated);
+  const operationalDate = getOperationalDate();
+
+  // Loga divergência entre Tela Operacional (externalStats) e o snapshot
+  // interno assim que o modal abre.
+  useEffect(() => {
+    if (!isOpen || !externalStats) return;
+    const compare = (field: string, ui: any, modal: any) => {
+      if (Number(ui) !== Number(modal)) {
+        console.warn("[DAY_CLOSE_MODAL_DIVERGENCE]", {
+          field,
+          valor_tela: ui,
+          valor_modal: modal,
+          origem_tela: "operational-metrics (props.stats)",
+          origem_modal: "buildDailySnapshot (Dexie)",
+        });
+      }
+    };
+    compare("worked",   externalStats.worked,   snapshot.workedCount);
+    compare("closed",   externalStats.closed,   snapshot.closedCount);
+    compare("refused",  externalStats.refused,  snapshot.refusedCount);
+    compare("focus",    externalStats.focus,    snapshot.focusCount);
+    compare("pending",  externalStats.pending,  snapshot.pendingLocal);
+  }, [isOpen, externalStats, snapshot.workedCount, snapshot.closedCount, snapshot.refusedCount, snapshot.focusCount, snapshot.pendingLocal]);
+
   const handlePreClose = async () => {
     console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
     setValidating(true);
@@ -1750,13 +1788,13 @@ export function DailyWorkCloser({
           <div className="mt-4 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2">
             <Calendar className="h-3.5 w-3.5" />
             <span className="text-[11px] font-black uppercase tracking-widest">
-              Jornada de {jornadaDate ? new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')}
+              Produção de {new Date(`${operationalDate}T12:00:00`).toLocaleDateString('pt-BR')}
             </span>
           </div>
-          {jornadaDate && jornadaDate !== getOperationalDate() && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-amber-400/90 text-amber-950 rounded-full px-4 py-2 max-w-[520px]">
-              <span className="text-[11px] font-black uppercase tracking-wide leading-snug text-left">
-                Você está concluindo um quarteirão iniciado anteriormente. As visitas realizadas hoje serão contabilizadas na produção de {new Date(`${getOperationalDate()}T12:00:00`).toLocaleDateString('pt-BR')}.
+          {jornadaDate && jornadaDate !== operationalDate && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2 max-w-[520px]">
+              <span className="text-[10px] font-bold uppercase tracking-wide leading-snug text-left text-white/90">
+                Quarteirão iniciado em {new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR')} e concluído hoje.
               </span>
             </div>
           )}
@@ -1783,11 +1821,11 @@ export function DailyWorkCloser({
           <div className="space-y-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Produção Imobiliária</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Trabalhados" value={stats.worked} icon={Target} />
-              <SummaryItemSmall label={translate("CLOSED")} value={stats.closed} icon={XCircle} />
-              <SummaryItemSmall label={translate("REFUSED")} value={stats.refused} icon={XCircle} />
+              <SummaryItemSmall label="Trabalhados" value={displayWorked} icon={Target} />
+              <SummaryItemSmall label={translate("CLOSED")} value={displayClosed} icon={XCircle} />
+              <SummaryItemSmall label={translate("REFUSED")} value={displayRefused} icon={XCircle} />
               <SummaryItemSmall label="Recuperados" value={recoveredCount} icon={CheckCircle2} />
-              <SummaryItemSmall label="Pend. Geradas" value={snapshot.pendingLocal || pendingCount} icon={Clock} />
+              <SummaryItemSmall label="Pend. Geradas" value={displayPending} icon={Clock} />
               <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
             </div>
 
@@ -1795,8 +1833,8 @@ export function DailyWorkCloser({
             <div className="grid grid-cols-2 gap-3">
               <SummaryItemSmall label="Existentes" value={snapshot.depExisting} icon={Layers} />
               <SummaryItemSmall label="Inspecionados" value={snapshot.depInspected} icon={Layers} />
-              <SummaryItemSmall label="Tratados" value={snapshot.depTreated || stats.treatedDeposits || stats.treated} icon={Layers} />
-              <SummaryItemSmall label="Eliminados" value={snapshot.depEliminated || stats.eliminated} icon={Layers} />
+              <SummaryItemSmall label="Tratados" value={displayTreatedDep} icon={Layers} />
+              <SummaryItemSmall label="Eliminados" value={displayEliminated} icon={Layers} />
             </div>
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-3">
               <p className="text-[9px] font-black uppercase tracking-widest text-indigo-700 mb-2">Detalhamento por tipo</p>
@@ -1818,14 +1856,14 @@ export function DailyWorkCloser({
 
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Focos & Larvicida</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Focos (+)" value={snapshot.focusCount || stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Focos (+)" value={displayFocus} icon={CheckCircle2} />
               <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
               <SummaryItemSmall
                 label="Larvicida"
-                value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                value={`${displayLarvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
                 icon={Droplets}
               />
-              <SummaryItemSmall label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} icon={Layers} />
+              <SummaryItemSmall label="Imóveis Trat." value={displayTreated} icon={Layers} />
             </div>
 
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Tubitos & Amostras</h4>
