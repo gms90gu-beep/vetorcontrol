@@ -1,12 +1,11 @@
-// Mapa Operacional do RG — Fase 2 (Navegação Operacional).
-// Split-view: painel lateral (KPIs + lista numerada + controles de navegação) + mapa.
+// Mapa Geográfico do RG — visualização espacial dos imóveis do quarteirão.
+// Sem rotas, sem navegação. Apenas distribuição geográfica + sync com a lista do RG.
 // Regra: nenhum import direto de Leaflet — tudo via @/components/map/shared.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type L from "leaflet";
 import {
   SharedMap,
   SharedNumberedMarkerLayer,
-  SharedRouteLayer,
   SharedUserLocationLayer,
   type NumberedPoint,
 } from "@/components/map/shared";
@@ -14,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { comparePropertyOrder } from "@/lib/property-order";
 import {
   Home, AlertTriangle, Flame, CheckCircle2,
-  Landmark, Trees, X, Navigation, LocateFixed, Play, Pause, ArrowRight,
+  Landmark, Trees, X, LocateFixed,
 } from "lucide-react";
 
 export type RGMapProperty = {
@@ -78,30 +77,8 @@ function escapeHtml(s: string): string {
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
   ));
 }
-
-// Haversine em metros.
-function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6371000;
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s1 = Math.sin(dLat / 2);
-  const s2 = Math.sin(dLng / 2);
-  const h = s1 * s1 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * s2 * s2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-function bearingDeg(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const toDeg = (x: number) => (x * 180) / Math.PI;
-  const φ1 = toRad(from.lat), φ2 = toRad(to.lat);
-  const λ1 = toRad(from.lng), λ2 = toRad(to.lng);
-  const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
-  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-function fmtDistance(m: number): string {
-  if (m < 1000) return `${Math.round(m)} m`;
-  return `${(m / 1000).toFixed(m < 10000 ? 2 : 1)} km`;
+function fmtCoord(n: number | null | undefined): string {
+  return n == null ? "—" : n.toFixed(6);
 }
 
 export function RGOperationalMap({
@@ -127,9 +104,6 @@ export function RGOperationalMap({
     return t;
   }, [enriched, ordered.length]);
 
-  const next = useMemo(() => enriched.find((e) => e.kind === "pending"), [enriched]);
-  const nextId = next?.p.id ?? null;
-
   const points: NumberedPoint[] = useMemo(() => enriched
     .filter((e) => e.p.latitude != null && e.p.longitude != null)
     .map(({ p, kind, label }) => {
@@ -144,11 +118,12 @@ export function RGOperationalMap({
           </div>
           <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
+            <span style="color:#64748b">Sequência</span><b>#${label}</b>
             <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
             <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
             <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
             <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
-            <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
+            <span style="color:#64748b">Coordenadas</span><b>${fmtCoord(p.latitude)}, ${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
           </div>
         </div>`;
@@ -157,22 +132,16 @@ export function RGOperationalMap({
         lat: p.latitude as number,
         lng: p.longitude as number,
         label, color, popupHtml: popup,
-        tooltip: `${label} · Nº ${p.number ?? "—"}`,
+        tooltip: `#${label} · Nº ${p.number ?? "—"}`,
       };
     }), [enriched, agentName]);
 
   const geoCount = points.length;
 
-  // Rota — sequência dos pontos com GPS.
-  const routePoints = useMemo(
-    () => points.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [points],
-  );
-
-  // Instância do mapa (para setView por clique nos botões).
+  // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
 
-  // Geolocalização — apenas sob demanda, watchPosition ativo somente enquanto ligado.
+  // Geolocalização — apenas sob demanda.
   const [gpsOn, setGpsOn] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -183,8 +152,7 @@ export function RGOperationalMap({
       navigator.geolocation.clearWatch(watchIdRef.current);
     }
     watchIdRef.current = null;
-    console.log("[NAVIGATION_STOP]", { block: blockNumber });
-  }, [blockNumber]);
+  }, []);
 
   const startWatch = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -193,11 +161,11 @@ export function RGOperationalMap({
     }
     setGpsError(null);
     const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null };
-        setUserPos(p);
-        console.log("[NAVIGATION_GPS]", { lat: p.lat, lng: p.lng, accuracy: p.accuracy });
-      },
+      (pos) => setUserPos({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy ?? null,
+      }),
       (err) => {
         setGpsError(err.message || "Falha ao obter localização.");
         setGpsOn(false);
@@ -207,14 +175,13 @@ export function RGOperationalMap({
     watchIdRef.current = id;
   }, []);
 
-  // Liga/desliga watchPosition conforme toggle.
   useEffect(() => {
     if (gpsOn) startWatch();
     else { stopWatch(); setUserPos(null); }
     return () => stopWatch();
   }, [gpsOn, startWatch, stopWatch]);
 
-  // Centraliza o mapa no usuário na primeira leitura após ligar o GPS.
+  // Centraliza no usuário assim que a primeira leitura chega após ligar o GPS.
   const centeredOnceRef = useRef(false);
   useEffect(() => {
     if (!gpsOn) { centeredOnceRef.current = false; return; }
@@ -222,50 +189,6 @@ export function RGOperationalMap({
     mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
     centeredOnceRef.current = true;
   }, [gpsOn, userPos, mapInst]);
-
-  // "Seguir Jornada" — recentraliza no próximo pendente sempre que ele mudar.
-  const [followJourney, setFollowJourney] = useState(false);
-  const lastNextRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!followJourney || !mapInst || !nextId) return;
-    if (lastNextRef.current === nextId) return;
-    lastNextRef.current = nextId;
-    const pt = points.find((p) => p.id === nextId);
-    if (!pt) return;
-    mapInst.closePopup();
-    mapInst.setView([pt.lat, pt.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
-    onSelect(nextId);
-    console.log("[NAVIGATION_NEXT]", { next: nextId });
-  }, [followJourney, nextId, mapInst, points, onSelect]);
-
-  // Log de início.
-  useEffect(() => {
-    console.log("[NAVIGATION_START]", { block: blockNumber, total: totals.total, next: nextId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blockNumber]);
-
-  // Distância + rumo até o próximo pendente (quando temos GPS).
-  const nextPoint = useMemo(() => nextId ? points.find((p) => p.id === nextId) ?? null : null, [nextId, points]);
-  const distToNext = useMemo(() => {
-    if (!userPos || !nextPoint) return null;
-    return distanceMeters(userPos, nextPoint);
-  }, [userPos, nextPoint]);
-  const bearingToNext = useMemo(() => {
-    if (!userPos || !nextPoint) return null;
-    return bearingDeg(userPos, nextPoint);
-  }, [userPos, nextPoint]);
-
-  const goToNext = useCallback(() => {
-    if (!mapInst || !nextPoint) return;
-    mapInst.setView([nextPoint.lat, nextPoint.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
-    onSelect(nextPoint.id);
-    console.log("[NAVIGATION_NEXT]", { next: nextPoint.id, manual: true });
-  }, [mapInst, nextPoint, onSelect]);
-
-  const goToUser = useCallback(() => {
-    if (!mapInst || !userPos) return;
-    mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
-  }, [mapInst, userPos]);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -279,7 +202,7 @@ export function RGOperationalMap({
       <aside className="rounded-xl border border-slate-200 bg-white p-3 flex flex-col min-h-0 md:max-h-[78vh]">
         <header className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Mapa Operacional</div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Mapa Geográfico</div>
             <div className="text-sm font-black truncate">Quarteirão {blockNumber ?? "—"}</div>
           </div>
           {onClose && (
@@ -298,91 +221,27 @@ export function RGOperationalMap({
           <Kpi icon={<Trees className="h-3.5 w-3.5" />} label="TB/PE" value={totals.vacant + totals.strategic} tone="slate" />
         </div>
 
-        {/* Controles de navegação */}
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <div className="mt-2">
           <button
             type="button"
             onClick={() => setGpsOn((v) => !v)}
             className={cn(
-              "flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
+              "w-full flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
               gpsOn
                 ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
             )}
-            title="Ativa/desativa GPS enquanto o mapa está aberto"
+            title="Mostra sua posição atual no mapa"
           >
             <LocateFixed className="h-3.5 w-3.5" />
-            {gpsOn ? "GPS Ligado" : "Minha Localização"}
+            {gpsOn ? "Ocultar minha localização" : "Minha localização"}
           </button>
-          <button
-            type="button"
-            onClick={() => setFollowJourney((v) => !v)}
-            className={cn(
-              "flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
-              followJourney
-                ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-            )}
-            title="Centraliza automaticamente no próximo pendente após cada visita"
-          >
-            {followJourney ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {followJourney ? "Pausar Jornada" : "Seguir Jornada"}
-          </button>
-          <button
-            type="button"
-            onClick={goToNext}
-            disabled={!nextPoint}
-            className="col-span-2 flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <ArrowRight className="h-3.5 w-3.5" />
-            Próximo Pendente
-          </button>
-          {gpsOn && userPos && (
-            <button
-              type="button"
-              onClick={goToUser}
-              className="col-span-2 flex items-center justify-center gap-1.5 h-7 rounded-md text-[10px] font-bold uppercase tracking-wide border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 transition"
-            >
-              <Navigation className="h-3.5 w-3.5" />
-              Centralizar em mim
-            </button>
-          )}
         </div>
 
         {gpsError && (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
             {gpsError}
           </div>
-        )}
-
-        {next && (
-          <button
-            type="button"
-            onClick={() => onSelect(next.p.id)}
-            className="mt-2 rounded-lg border border-orange-200 bg-orange-50 p-2 text-left hover:bg-orange-100 transition"
-          >
-            <div className="text-[9px] font-bold uppercase tracking-widest text-orange-600">Próximo imóvel</div>
-            <div className="text-sm font-black text-orange-900">
-              #{next.label} · Nº {next.p.number}
-            </div>
-            <div className="text-[11px] text-orange-800/80 truncate">
-              {next.p.street_name || "—"}
-            </div>
-            {distToNext != null && (
-              <div className="mt-1 text-[11px] font-bold text-orange-900">
-                Distância: {fmtDistance(distToNext)}
-                {bearingToNext != null && (
-                  <span
-                    className="inline-block ml-1 align-middle"
-                    style={{ transform: `rotate(${bearingToNext}deg)` }}
-                    aria-hidden
-                  >
-                    ↑
-                  </span>
-                )}
-              </div>
-            )}
-          </button>
         )}
 
         <div className="mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
@@ -396,7 +255,6 @@ export function RGOperationalMap({
             <ul>
               {enriched.map(({ p, kind, label }) => {
                 const isSel = p.id === selectedId;
-                const isNext = p.id === nextId;
                 const hasGeo = p.latitude != null && p.longitude != null;
                 return (
                   <li key={p.id} data-prop-id={p.id}>
@@ -405,15 +263,12 @@ export function RGOperationalMap({
                       onClick={() => onSelect(p.id)}
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs border-b border-slate-100 transition",
-                        isSel ? "bg-blue-50" : isNext ? "bg-orange-50/60" : "hover:bg-slate-50",
+                        isSel ? "bg-blue-50" : "hover:bg-slate-50",
                         !hasGeo && "opacity-70",
                       )}
                     >
                       <span
-                        className={cn(
-                          "inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-black text-white shrink-0",
-                          isNext && "ring-2 ring-orange-400 ring-offset-1",
-                        )}
+                        className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-black text-white shrink-0"
                         style={{ background: KIND_COLOR[kind] }}
                         title={KIND_LABEL[kind]}
                       >
@@ -445,11 +300,9 @@ export function RGOperationalMap({
           legend="none"
           onReady={setMapInst}
         >
-          <SharedRouteLayer points={routePoints} />
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
-            nextId={nextId}
             onClick={onSelect}
           />
           {gpsOn && userPos && (
@@ -457,7 +310,6 @@ export function RGOperationalMap({
               lat={userPos.lat}
               lng={userPos.lng}
               accuracy={userPos.accuracy}
-              bearingDeg={bearingToNext}
             />
           )}
         </SharedMap>
@@ -499,10 +351,6 @@ function MapLegend() {
           {KIND_LABEL[kind]}
         </span>
       ))}
-      <span className="inline-flex items-center gap-1 ml-auto">
-        <span className="inline-block h-0.5 w-6 bg-blue-500" style={{ borderTop: "2px dashed #3b82f6", background: "transparent" }} />
-        Rota operacional
-      </span>
     </div>
   );
 }
