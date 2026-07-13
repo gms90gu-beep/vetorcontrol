@@ -222,7 +222,17 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   }, []);
 
   // ── Derived state ───────────────────────────────────────────────
-  const total = properties.length || session?.property_count || 0;
+  // BLOCK_PROGRESS_SOURCE_OF_TRUTH — progresso, visitados, pendentes e status
+  // vêm exclusivamente do hook useBlockProgress. `visits`/`properties` só são
+  // usados para mapa, filtros da lista, contagem de focos, larvicida, depósitos.
+  const { progress: bp } = useBlockProgress({
+    cycle_id: session?.cycle_id ?? null,
+    block_number: session?.block_number ?? null,
+    agent_id: session?.user_id ?? null,
+    module: "OperationalPanel",
+  });
+
+  const total = bp?.total_properties ?? properties.length ?? session?.property_count ?? 0;
   const lastVisitByProp = useMemo(() => {
     const m = new Map<string, any>();
     for (const v of [...visits].sort((a, b) =>
@@ -233,21 +243,6 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   }, [visits]);
 
   const stats = useMemo(() => {
-    const canonical = getOperationalBlockStatus({
-      propertyIds: properties.map((p) => p.id),
-      visits,
-      fallbackTotal: total,
-    });
-    logBlockStatusShared(
-      {
-        module: "OperationalPanel",
-        productionDate: session?.session_date ?? null,
-        blockId: session?.block_id ?? null,
-        blockNumber: session?.block_number ?? null,
-        sessionId: session?.id ?? null,
-      },
-      canonical,
-    );
     let focus = 0;
     for (const p of properties) {
       const v = lastVisitByProp.get(p.id);
@@ -257,19 +252,23 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     const depositos = deposits.length;
     const pendenciasAbertas = pendencies.filter((p) => !p.resolved_at).length;
     const semGeo = properties.filter((p) => p.latitude == null || p.longitude == null).length;
+    const visited = bp?.visited_properties ?? 0;
+    const closed = bp?.closed_properties ?? 0;
+    const refused = 0; // recusas contam como parte de "fechados operacionais" no block_progress
+    const pendingCount = bp?.pending_properties ?? Math.max(0, total - visited - closed);
     return {
-      visited: canonical.visitedProperties,
-      closed: canonical.closedProperties,
-      refused: canonical.refusedProperties,
+      visited,
+      closed,
+      refused,
       focus,
-      done: canonical.visitedProperties + canonical.closedProperties + canonical.refusedProperties,
-      pendingCount: canonical.pendingProperties,
+      done: visited + closed,
+      pendingCount,
       larvicida, depositos, pendenciasAbertas, semGeo,
     };
-  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, session?.id, session?.block_id, session?.block_number, session?.session_date]);
+  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, bp]);
 
-  const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
-  useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total }); }, [progress, stats.done, total]);
+  const progress = bp?.completion_percentage ?? (total > 0 ? Math.round((stats.done / total) * 100) : 0);
+  useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total, bp_status: bp?.status ?? null }); }, [progress, stats.done, total, bp?.status]);
 
   const startedMs = session?.started_at ? new Date(session.started_at).getTime() : now;
   const durationMin = Math.max(0, Math.round((now - startedMs) / 60000));
