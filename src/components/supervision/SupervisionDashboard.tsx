@@ -98,11 +98,16 @@ export function SupervisionDashboard() {
 
       const todayISO = getOperationalDate();
 
-      const [visits, sessions] = await Promise.all([
-        listRemoteOrCache<any>({
-          name: "visits",
-          remote: () => supabase.from("visits").select("agent_id, status, has_focus") as any,
-        }),
+      const agentIds = team.map((a: any) => a.id).filter(Boolean);
+      const activeCycle = await getActiveCycleForUser(user?.id ?? null);
+
+      const [progressRows, sessions] = await Promise.all([
+        agentIds.length
+          ? getBlockProgressBatch({
+              cycle_id: activeCycle?.id ?? undefined,
+              agent_ids: agentIds,
+            })
+          : Promise.resolve([]),
         listRemoteOrCache<any>({
           name: "field_work_sessions",
           remote: () => supabase.from("field_work_sessions").select("user_id, status, session_date").gte("session_date", todayISO) as any,
@@ -110,10 +115,22 @@ export function SupervisionDashboard() {
         }),
       ]);
 
-
+      // BLOCK_PROGRESS_SOURCE_OF_TRUTH — dashboards agora somam de block_progress.
+      try {
+        console.info("[BLOCK_PROGRESS_MIGRATION]", {
+          module: "SupervisionDashboard",
+          hook: "getBlockProgressBatch",
+          version: 1,
+          agents: agentIds.length,
+          rows: progressRows.length,
+        });
+      } catch {}
 
       const withStats = team.map((agent: any) => {
-        const av = (visits || []).filter((v: any) => v.agent_id === agent.id);
+        const rows = (progressRows || []).filter((r: any) => r.agent_id === agent.id);
+        const visited = rows.reduce((s, r: any) => s + (r.visited_properties || 0), 0);
+        const closed = rows.reduce((s, r: any) => s + (r.closed_properties || 0), 0);
+        const focus = rows.reduce((s, r: any) => s + (r.positive_focus || 0), 0);
         const todaySessions = (sessions || []).filter(
           (s: any) => s.user_id === agent.id,
         );
@@ -122,9 +139,9 @@ export function SupervisionDashboard() {
         return {
           ...agent,
           stats: {
-            worked: av.length,
-            closed: av.filter((v: any) => v.status === "closed").length,
-            focus: av.filter((v: any) => v.has_focus).length,
+            worked: visited + closed,
+            closed,
+            focus,
           },
           hasOpenSession,
           hasAnyToday,
