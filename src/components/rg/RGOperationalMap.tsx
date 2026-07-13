@@ -105,12 +105,20 @@ export function RGOperationalMap({
     return t;
   }, [enriched, ordered.length]);
 
+  const missingGeo = useMemo(
+    () => enriched.filter((e) => e.p.latitude == null || e.p.longitude == null),
+    [enriched],
+  );
+
   const points: NumberedPoint[] = useMemo(() => enriched
     .filter((e) => e.p.latitude != null && e.p.longitude != null)
     .map(({ p, kind, label }) => {
       const color = KIND_COLOR[kind];
       const acc = p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—";
       const addr = [p.street_name, p.side ? `Lado ${p.side}` : null].filter(Boolean).join(" · ");
+      const lastVisit = p.last_visit_date
+        ? new Date(p.last_visit_date).toLocaleDateString("pt-BR")
+        : "—";
       const popup = `
         <div style="font-family:system-ui;font-size:12px;min-width:220px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -122,9 +130,12 @@ export function RGOperationalMap({
             <span style="color:#64748b">Sequência</span><b>#${label}</b>
             <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
             <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
-            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
             <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
-            <span style="color:#64748b">Coordenadas</span><b>${fmtCoord(p.latitude)}, ${fmtCoord(p.longitude)}</b>
+            <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
+            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
+            <span style="color:#64748b">Última visita</span><b>${escapeHtml(lastVisit)}</b>
+            <span style="color:#64748b">Latitude</span><b>${fmtCoord(p.latitude)}</b>
+            <span style="color:#64748b">Longitude</span><b>${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
           </div>
         </div>`;
@@ -138,6 +149,21 @@ export function RGOperationalMap({
     }), [enriched, agentName]);
 
   const geoCount = points.length;
+
+  // Logs de ciclo de vida do mapa.
+  useEffect(() => {
+    console.log("[RG_MAP_LOAD]", { block: blockNumber, total: ordered.length });
+  }, [blockNumber, ordered.length]);
+  useEffect(() => {
+    console.log("[RG_MAP_RENDER]", { block: blockNumber, rendered: geoCount, missing: missingGeo.length });
+    if (missingGeo.length > 0) {
+      console.log("[RG_MAP_MISSING_COORDINATES]", {
+        block: blockNumber,
+        properties: missingGeo.map((e) => ({ id: e.p.id, number: e.p.number, sequence: e.label })),
+      });
+    }
+  }, [blockNumber, geoCount, missingGeo]);
+
 
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
