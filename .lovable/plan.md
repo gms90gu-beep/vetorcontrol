@@ -1,83 +1,90 @@
-# Suíte de Regressão VetorControl
+# Fase 3 — Camada `block_progress`
 
-Cobertura média: unitários, integração (com Supabase mockado), E2E Playwright, offline (Dexie real via fake-indexeddb) e CI bloqueante no GitHub Actions.
+Objetivo: criar uma fonte única de verdade para o estado operacional do quarteirão, independente da Produção Diária. Nenhum consumidor recalcula mais progresso a partir das visitas — todos leem de `block_progress`.
 
-## 1. Infraestrutura
+## 1. Banco (migration)
 
-Instalar: `vitest`, `@vitest/coverage-v8`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`, `fake-indexeddb`, `@playwright/test`, `msw`.
+Nova tabela `public.block_progress`:
 
-Novos arquivos de config:
-- `vitest.config.ts` — jsdom, setup file, alias `@`, coverage.
-- `tests/setup.ts` — jest-dom, `fake-indexeddb/auto`, mocks globais (`matchMedia`, `navigator.geolocation`, `navigator.onLine`).
-- `tests/mocks/supabase.ts` — factory de client mockado (from/rpc/auth encadeáveis).
-- `tests/mocks/geolocation.ts` — helpers `mockGeoSuccess/Denied/Unavailable/Timeout`.
-- `playwright.config.ts` — baseURL `http://localhost:8080`, chromium, reuse dev server.
-- Scripts em `package.json`: `test`, `test:unit`, `test:integration`, `test:e2e`, `test:coverage`.
+- Chaves: `id uuid pk`, `cycle_id uuid fk cycles`, `block_number text`, `agent_id uuid fk profiles(id)`
+- Timestamps: `started_at`, `completed_at`, `last_visit_at`, `last_operational_date date`, `last_sync timestamptz`, `updated_at`
+- Estado: `status text` (`NOT_STARTED | IN_PROGRESS | PAUSED | COMPLETED`), `completion_percentage numeric`
+- Contadores: `total_properties`, `visited_properties`, `pending_properties`, `closed_properties`, `recovered_properties`, `positive_focus`, `negative_focus`, `tb_properties`, `pe_properties`
+- Constraint: `UNIQUE (cycle_id, block_number, agent_id)`
+- GRANT SELECT/INSERT/UPDATE authenticated; ALL service_role
+- RLS: agente lê/escreve suas próprias linhas (`agent_id = auth.uid()`); supervisor/coordenador/admin_master leem todas (`has_role`)
+- Trigger `updated_at`
+- Função `public.recompute_block_progress(_cycle_id uuid, _block_number text, _agent_id uuid)` — recalcula a partir de `properties` (total) e `visits` (agregados) e faz upsert. Usada pelo pós-sync e pelo trigger em `visits`.
+- Trigger `AFTER INSERT/UPDATE/DELETE ON visits` que chama a função para o par (bloco, agente) impactado.
 
-## 2. Testes unitários (`tests/unit/`)
+## 2. Repositório local (offline)
 
-- `operational-date.test.ts` — `getOperationalDate` (22:30 BRT, 23:59 BRT, virada UTC), `epiWeekFromDate`, `getOperationalVisitDate`, `assertProductionDate`.
-- `property-order.test.ts` — ordenação, complemento, sequência de navegação.
-- `session-state.test.ts` — máquina de estados da jornada.
-- `production-integrity.test.ts` — validações de DWR/visita.
-- `epi-week.test.ts` — semana epidemiológica.
-- `cycle-week.test.ts` — resolução de ciclo/semana.
+- Adicionar store `block_progress` em `src/lib/offline/db.ts` (nova `version(3)`).
+- `src/lib/offline/repos/blockProgress.ts`:
+  - `getBlockProgress(cycle_id, block_number, agent_id)`
+  - `listBlockProgress(agent_id)`
+  - `upsertBlockProgress(row)` (via `safeFetch` + Dexie mirror)
+  - `applyLocalVisitDelta(...)` — atualiza contadores localmente logo após registrar visita, mesmo offline; enfileira `rpc: recompute_block_progress` para reconciliação.
 
-## 3. Testes de integração (`tests/integration/`)
+## 3. Hook de leitura único
 
-Supabase mockado, Dexie real.
+`src/hooks/useBlockProgress.ts` — devolve `{ status, totalProperties, visitedProperties, pendingProperties, closedProperties, completionPercentage, startedAt, completedAt, lastVisitAt }`. Fonte: Dexie mirror + Supabase Realtime opcional.
 
-- `dwr-close.test.tsx` — `DailyWorkCloser` fecha jornada com `status='completed'`, `end_time`, `work_date` corretos, `onConflict='legacy_agent_id,work_date'`.
-- `dwr-rebuild.test.ts` — chama RPC `rebuild_daily_work_records`, verifica idempotência (2 chamadas → mesmo estado).
-- `dashboard-vs-dwr.test.ts` — totais do dashboard batem com soma de DWR.
-- `reports-vs-dwr.test.ts` — relatórios semanais consistentes com DWR.
-- `session-visits.test.ts` — RPC `get_session_visits` + filtros Pendentes/Visitados/Fechados.
+## 4. Escrita — pipeline de visita
 
-## 4. Offline (`tests/offline/`)
+Em `PropertyVisitButtons` / `useOfflineMutation('visit')` (após enfileirar a mutação de `visits`):
 
-- `dexie-queue.test.ts` — enfileirar mutação offline, `pendingMutationCount`.
-- `sync-flush.test.ts` — reconexão dispara `flushMutations`, remove itens ok.
-- `sync-retry.test.ts` — erro incrementa `tries`, respeita `MAX_RETRIES`.
-- `sync-conflict.test.ts` — `23505` tratado como sucesso.
-- `sync-rebuild.test.ts` — `purgeInvalidTmpMutations` remove IDs legados.
+1. Chamar `applyLocalVisitDelta(...)` (atualiza `block_progress` local imediatamente).
+2. Enfileirar `rpc: recompute_block_progress` para o par (bloco, agente).
+3. Log `[BLOCK_PROGRESS_UPDATE]`.
+4. Se `pending === 0` → marcar `COMPLETED` + `completed_at` + log `[BLOCK_PROGRESS_COMPLETED]`.
 
-Reutiliza `tests/offline/offline-suite.spec.ts` existente para E2E offline.
+## 5. Encerramento do expediente
 
-## 5. Playwright E2E (`tests/e2e/`)
+`DailyWorkCloser.handleCloseDay`:
 
-Session Supabase injetada via `LOVABLE_BROWSER_SUPABASE_*` (skip gracioso se ausente).
+- Se restarem pendentes: setar `status = PAUSED` no `block_progress` do bloco ativo + log `[BLOCK_PROGRESS_PAUSED]`.
+- Não alterar `daily_work_records` (continua usando `operational_date`).
 
-- `jornada.spec.ts` — iniciar, continuar, encerrar.
-- `trabalho.spec.ts` — abrir tela de trabalho, navegar entre imóveis.
-- `rg.spec.ts` — gerar RG.
-- `pdf.spec.ts` — exportar PDF (verifica download).
-- `dashboard.spec.ts` — carrega KPIs.
-- `relatorios.spec.ts` — carrega relatórios.
+## 6. Retomada da jornada
 
-## 6. CI (`.github/workflows/ci.yml`)
+`src/routes/_authenticated.field-work.tsx` — `assessSessionForResume`:
 
-Jobs em PRs:
-1. `lint-typecheck` — `tsgo`.
-2. `unit` — `bun test:unit --coverage`.
-3. `integration` — `bun test:integration`.
-4. `e2e` — `bun run build && bun test:e2e`.
+- Primeira consulta passa a ser `block_progress` (`status === PAUSED`).
+- `field_work_sessions` vira apenas timeline. Se `block_progress.status === COMPLETED`, bloqueia retomada com `blocked_by_block_progress`.
 
-Todos required checks; falha em qualquer suíte de Produção/Jornada/Dashboard/Relatórios/DWR bloqueia merge (via matriz de jobs nomeados e branch protection).
+## 7. Consumidores migrados para `useBlockProgress`
 
-Documentação `docs/testing.md` explicando como rodar e adicionar testes.
+- Tela de Trabalho (barras/percentual)
+- `OperationalPanel` / cards de quarteirão
+- `AgentDashboard` cards
+- `SupervisionDashboard` / `AgentProductionRanking`
+- `RGOperationalMap` (barra de progresso)
+- `BlockOperationalMap` (legenda de status)
+
+Cada consumidor emite `[BLOCK_PROGRESS_READ] { module }`.
+
+## 8. Produção Diária permanece separada
+
+Não alterar: `DailyWorkCloser` (cálculo do DWR), PDFs, boletins, `_authenticated.relatorios`, `_authenticated.reports`. Continuam usando `visits` filtrado por `operational_date`.
+
+## 9. Sincronização
+
+`src/lib/offline/sync.ts` — após drain da fila de `visits`, chamar `recompute_block_progress` para cada `(cycle_id, block_number, agent_id)` distinto processado + log `[BLOCK_PROGRESS_SYNC]`.
+
+## 10. Auditoria e integridade
+
+`src/lib/block-progress-audit.ts`:
+
+- Logs: `[BLOCK_PROGRESS_UPDATE]`, `[BLOCK_PROGRESS_SYNC]`, `[BLOCK_PROGRESS_COMPLETED]`, `[BLOCK_PROGRESS_PAUSED]`, `[BLOCK_PROGRESS_RESUMED]`, `[BLOCK_PROGRESS_RECALCULATED]`.
+- Validação `visited + pending === total` → `[BLOCK_PROGRESS_INTEGRITY_ERROR]` com esperado/encontrado/origem.
+- Nova rota admin `/admin/block-progress-audit` (tabela simples) listando divergências.
 
 ## Detalhes técnicos
 
-- Mock do Supabase usa chain builder retornando `{ data, error }` para `.from().select().eq()...` e `.rpc()`.
-- Dexie usa `fake-indexeddb/auto` no setup, resetado em `beforeEach`.
-- Geolocation via `Object.defineProperty(navigator, 'geolocation', { value: mock })`.
-- Playwright roda contra dev server já ativo em `:8080`; sem gerenciar ciclo de vida.
-- Testes de integridade SQL (pgTAP) ficam fora — exigem banco Postgres dedicado; será TODO documentado.
+- Migration Postgres em uma única chamada (`CREATE TABLE` → `GRANT` → `RLS` → `POLICY` → função + triggers).
+- Dexie `version(3)` adiciona store `block_progress: "id, cycle_id, block_number, agent_id, status, updated_at"`.
+- Realtime opcional (`supabase.channel('block_progress')`) — habilitar no `useBlockProgress` só quando `navigator.onLine`.
+- Rollout: entrega em 3 PRs internos — (a) migration + repo + hook; (b) escrita/pause/complete + sync; (c) migração dos consumidores + auditoria.
 
-## Entrega
-
-Vou executar em 2 turnos:
-- **Turno 1 (este):** config, setup, mocks, todos os unitários e de integração, offline unit tests, workflow CI, docs.
-- **Turno 2 (próximo):** specs Playwright E2E (após confirmar que unit/integration passam).
-
-Confirma para eu começar?
+Aprove para eu começar pelo passo 1 (migration).
