@@ -188,11 +188,11 @@ export function RGOperationalMap({
     }
     setGpsError(null);
     const id = navigator.geolocation.watchPosition(
-      (pos) => setUserPos({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy ?? null,
-      }),
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null };
+        setUserPos(p);
+        console.log("[RG_MAP_GPS]", p);
+      },
       (err) => {
         setGpsError(err.message || "Falha ao obter localização.");
         setGpsOn(false);
@@ -214,6 +214,7 @@ export function RGOperationalMap({
     if (!gpsOn) { centeredOnceRef.current = false; return; }
     if (!mapInst || !userPos || centeredOnceRef.current) return;
     mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
+    console.log("[RG_MAP_CENTER]", { target: "user", lat: userPos.lat, lng: userPos.lng });
     centeredOnceRef.current = true;
   }, [gpsOn, userPos, mapInst]);
 
@@ -222,7 +223,19 @@ export function RGOperationalMap({
     if (!selectedId || !listRef.current) return;
     const el = listRef.current.querySelector<HTMLElement>(`[data-prop-id="${selectedId}"]`);
     if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    console.log("[RG_MAP_CENTER]", { target: "property", id: selectedId });
   }, [selectedId]);
+
+  const handleSelectFromList = useCallback((id: string) => {
+    console.log("[RG_MAP_RG_SELECTED]", { id });
+    onSelect(id);
+  }, [onSelect]);
+
+  const handleSelectFromMap = useCallback((id: string) => {
+    console.log("[RG_MAP_PROPERTY_SELECTED]", { id });
+    onSelect(id);
+  }, [onSelect]);
+
 
   return (
     <section className={cn("grid gap-3 md:grid-cols-[320px_minmax(0,1fr)]", "brg-no-print", className)}>
