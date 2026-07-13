@@ -1856,14 +1856,14 @@ export function DailyWorkCloser({
 
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Focos & Larvicida</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Focos (+)" value={snapshot.focusCount || stats.focus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Focos (+)" value={displayFocus} icon={CheckCircle2} />
               <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
               <SummaryItemSmall
                 label="Larvicida"
-                value={`${snapshot.larvicideAmount || stats.larvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
+                value={`${displayLarvicideUsed || 0}${snapshot.larvicideUnit || "g"}`}
                 icon={Droplets}
               />
-              <SummaryItemSmall label="Imóveis Trat." value={snapshot.treatedPropsCount || stats.treated} icon={Layers} />
+              <SummaryItemSmall label="Imóveis Trat." value={displayTreated} icon={Layers} />
             </div>
 
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Tubitos & Amostras</h4>
