@@ -1959,12 +1959,50 @@ export function DailyWorkCloser({
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-red-600">Erros críticos</p>
                       {criticals.map((i) => (
-                        <div key={i.code} className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                          <div className="flex-1">
-                            <p className="font-semibold">{i.message}</p>
-                            <p className="text-[10px] font-mono opacity-70">{i.code}</p>
+                        <div key={i.code} className="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <div className="flex-1">
+                              <p className="font-semibold">{i.message}</p>
+                              <p className="text-[10px] font-mono opacity-70">{i.code}</p>
+                            </div>
+                            {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[10px] text-red-700 hover:bg-red-100"
+                                onClick={() => setShowFailedDetails((v) => !v)}
+                              >
+                                {showFailedDetails ? "Ocultar" : "Ver detalhes"}
+                              </Button>
+                            )}
                           </div>
+                          {i.code === "FAILED_MUTATIONS" && showFailedDetails && failedMutations.length > 0 && (
+                            <div className="space-y-1.5 border-t border-red-200 pt-2">
+                              {failedMutations.map((fm) => (
+                                <div key={fm.id} className="flex items-start gap-2 rounded bg-white/60 p-2 text-[11px]">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-mono font-semibold truncate">{fm.op} · {fm.table}</p>
+                                    <p className="opacity-70 truncate">{fm.lastError || "sem detalhes"}</p>
+                                    <p className="opacity-50 text-[10px]">tentativas: {fm.tries}</p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 px-2 text-[10px] border-red-300 text-red-700 hover:bg-red-100"
+                                    onClick={() => handleDiscardFailed(fm.id)}
+                                  >
+                                    Descartar
+                                  </Button>
+                                </div>
+                              ))}
+                              <p className="text-[10px] opacity-70 pt-1">
+                                Descartar remove permanentemente a mutação da fila local. Use apenas quando o dado já foi corrigido de outra forma.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
