@@ -388,6 +388,8 @@ export function DailyWorkCloser({
   const [showFailedDetails, setShowFailedDetails] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [discardTarget, setDiscardTarget] = useState<FailedMutationInfo | null>(null);
+  const [dayCloseDiagnostic, setDayCloseDiagnostic] = useState<DayCloseDiagnostic | null>(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
 
   const refreshFailedMutations = useCallback(async () => {
     try {
