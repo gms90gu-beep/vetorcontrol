@@ -2355,10 +2355,109 @@ export function DailyWorkCloser({
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={showDiagnostic} onOpenChange={setShowDiagnostic}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              Diagnóstico de encerramento
+            </DialogTitle>
+            <DialogDescription>
+              Comparação entre <b>Snapshot</b> e <b>Metrics</b> para identificar a origem da divergência.
+            </DialogDescription>
+          </DialogHeader>
+          {dayCloseDiagnostic && (
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto text-xs">
+              <div className="rounded border p-2 bg-slate-50 grid grid-cols-2 gap-1">
+                <span><b>Agente:</b> <span className="font-mono">{dayCloseDiagnostic.agent_id.slice(0, 8)}</span></span>
+                <span><b>Ciclo:</b> <span className="font-mono">{dayCloseDiagnostic.cycle_id?.slice(0, 8) ?? "—"}</span></span>
+                <span><b>Data:</b> {dayCloseDiagnostic.operational_date}</span>
+                <span><b>Blocos:</b> {dayCloseDiagnostic.blocks.length}</span>
+                <span className="col-span-2 opacity-70"><b>Fonte snapshot:</b> {dayCloseDiagnostic.source_snapshot}</span>
+                <span className="col-span-2 opacity-70"><b>Fonte metrics:</b> {dayCloseDiagnostic.source_metrics}</span>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Totais</p>
+                <table className="w-full border-collapse text-[11px]">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="border p-1 text-left">Campo</th>
+                      <th className="border p-1">Snapshot</th>
+                      <th className="border p-1">Metrics</th>
+                      <th className="border p-1">Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["visited","closed","pending","recovered","focus","total_properties"] as const).map((k) => {
+                      const s = (dayCloseDiagnostic.totals.snapshot as any)[k];
+                      const m = (dayCloseDiagnostic.totals.metrics as any)[k];
+                      const d = Number(s) - Number(m);
+                      return (
+                        <tr key={k} className={d !== 0 ? "bg-red-50" : ""}>
+                          <td className="border p-1 font-mono">{k}</td>
+                          <td className="border p-1 text-center">{s}</td>
+                          <td className="border p-1 text-center">{m}</td>
+                          <td className={cn("border p-1 text-center font-bold", d !== 0 && "text-red-700")}>{d > 0 ? `+${d}` : d}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {dayCloseDiagnostic.blocks.filter((b) => b.has_divergence).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Quarteirões com divergência</p>
+                  {dayCloseDiagnostic.blocks.filter((b) => b.has_divergence).map((b) => (
+                    <div key={b.block_number} className="rounded border border-red-200 bg-red-50 p-2 mb-2">
+                      <p className="font-bold mb-1">Quarteirão {b.block_number}</p>
+                      <table className="w-full border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-white">
+                            <th className="border p-1 text-left">Campo</th>
+                            <th className="border p-1">Snapshot</th>
+                            <th className="border p-1">Metrics</th>
+                            <th className="border p-1">Δ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(["visited","closed","pending","recovered","focus"] as const).map((k) => {
+                            const s = (b.snapshot as any)[k];
+                            const m = (b.metrics as any)[k];
+                            const d = Number(s) - Number(m);
+                            return (
+                              <tr key={k} className={d !== 0 ? "bg-red-100" : ""}>
+                                <td className="border p-1 font-mono">{k}</td>
+                                <td className="border p-1 text-center">{s}</td>
+                                <td className="border p-1 text-center">{m}</td>
+                                <td className={cn("border p-1 text-center font-bold", d !== 0 && "text-red-700")}>{d > 0 ? `+${d}` : d}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[10px] opacity-70">
+                Detalhes completos enviados ao console via <span className="font-mono">[DAY_CLOSE_DIAGNOSTIC]</span>.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDiagnostic(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </Dialog>
 
   );
 }
+
 
 
 function SummaryItem({ icon: Icon, label, value, color }: any) {
