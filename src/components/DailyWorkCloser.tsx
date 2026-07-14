@@ -50,6 +50,38 @@ import {
 } from "@/lib/shift-validation";
 import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, type FailedMutationInfo } from "@/lib/offline/sync";
 import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// ─── FAILED_MUTATIONS: classificação e helpers ───────────────────────
+type MutationCategory = "recoverable" | "conflict" | "critical";
+const CRITICAL_TABLES = new Set([
+  "daily_work_records",
+  "block_progress",
+  "field_work_sessions",
+]);
+function classifyMutation(fm: FailedMutationInfo): MutationCategory {
+  const tableKey = (fm.table || "").replace(/^rpc:/, "").toLowerCase();
+  if (CRITICAL_TABLES.has(tableKey)) return "critical";
+  if (tableKey.includes("daily_work") || tableKey.includes("close_shift") || tableKey.includes("shift_close")) return "critical";
+  const err = String(fm.lastError || "").toLowerCase();
+  if (err.includes("duplicate key") || err.includes("conflict") || err.includes("23505")) return "conflict";
+  if (err.includes("rls") || err.includes("policy") || err.includes("permission") || err.includes("42501")) return "critical";
+  return "recoverable";
+}
+const CATEGORY_META: Record<MutationCategory, { label: string; dot: string; badge: string }> = {
+  recoverable: { label: "Recuperável", dot: "🟢", badge: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  conflict:    { label: "Conflito",    dot: "🟡", badge: "bg-amber-100 text-amber-800 border-amber-300" },
+  critical:    { label: "Crítica",     dot: "🔴", badge: "bg-red-100 text-red-800 border-red-300" },
+};
 
 type DepKey = "A1" | "A2" | "B" | "C" | "D1" | "D2" | "E";
 
@@ -354,10 +386,18 @@ export function DailyWorkCloser({
   const [validating, setValidating] = useState(false);
   const [failedMutations, setFailedMutations] = useState<FailedMutationInfo[]>([]);
   const [showFailedDetails, setShowFailedDetails] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<FailedMutationInfo | null>(null);
 
   const refreshFailedMutations = useCallback(async () => {
     try {
-      setFailedMutations(await listFailedMutations());
+      const list = await listFailedMutations();
+      setFailedMutations(list);
+      list.forEach((fm) => {
+        const category = classifyMutation(fm);
+        console.log("[MUTATION_CLASSIFIED]", { mutation_id: fm.id, table: fm.table, op: fm.op, category, tries: fm.tries, error: fm.lastError });
+        if (category === "critical") console.warn("[MUTATION_CRITICAL]", { mutation_id: fm.id, table: fm.table, error: fm.lastError });
+      });
     } catch (e) {
       console.warn("[FAILED_MUTATIONS_LOAD_ERR]", e);
     }
@@ -367,10 +407,20 @@ export function DailyWorkCloser({
     if (showValidation) void refreshFailedMutations();
   }, [showValidation, validation, refreshFailedMutations]);
 
-  const handleDiscardFailed = async (id: number) => {
-    await discardFailedMutation(id);
+  const handleDiscardFailed = async (fm: FailedMutationInfo) => {
+    const category = classifyMutation(fm);
+    if (category === "critical") {
+      console.warn("[MUTATION_CRITICAL]", { mutation_id: fm.id, reason: "discard_blocked" });
+      toast.error("Mutação crítica não pode ser descartada.");
+      return;
+    }
+    await discardFailedMutation(fm.id);
+    console.log("[MUTATION_DISCARDED]", { mutation_id: fm.id, table: fm.table, op: fm.op, category, ts: new Date().toISOString() });
     await refreshFailedMutations();
+    console.log("[MUTATION_VALIDATION]", { trigger: "discard" });
+    await handlePreClose();
   };
+
 
   const stats = externalStats || localStats;
 
@@ -482,15 +532,27 @@ export function DailyWorkCloser({
 
   const handleSyncNow = async () => {
     setValidating(true);
+    setRetrying(true);
+    const before = failedMutations.length;
+    console.log("[MUTATION_RETRY]", { count: before, ts: new Date().toISOString() });
     try {
       await retryFailedMutations();
       const { ok, failed } = await flushMutations();
-      toast.success(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+      if (failed === 0) {
+        console.log("[MUTATION_RETRY_SUCCESS]", { ok, previously_failed: before });
+        toast.success(`✔ ${ok} mutações sincronizadas com sucesso.`);
+      } else {
+        console.warn("[MUTATION_RETRY_FAILED]", { ok, failed });
+        toast.warning(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+      }
+      console.log("[MUTATION_VALIDATION]", { trigger: "retry" });
       await handlePreClose();
     } finally {
+      setRetrying(false);
       setValidating(false);
     }
   };
+
 
   const handleForceClose = async () => {
     console.log("[DAY_CLOSE_ALLOWED]", { reason: "warnings_acknowledged", role: userRole });
@@ -1972,37 +2034,69 @@ export function DailyWorkCloser({
                                 size="sm"
                                 variant="ghost"
                                 className="h-6 px-2 text-[10px] text-red-700 hover:bg-red-100"
-                                onClick={() => setShowFailedDetails((v) => !v)}
+                                onClick={() => {
+                                  setShowFailedDetails((v) => !v);
+                                  console.log("[MUTATION_DETAILS]", { toggled: !showFailedDetails, count: failedMutations.length });
+                                }}
                               >
-                                {showFailedDetails ? "Ocultar" : "Ver detalhes"}
+                                {showFailedDetails ? "Ocultar" : "▼ Ver detalhes"}
                               </Button>
                             )}
                           </div>
+                          {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleSyncNow}
+                              disabled={retrying || validating}
+                              className="w-full bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              <RefreshCw className={cn("h-4 w-4 mr-2", (retrying || validating) && "animate-spin")} />
+                              🔄 Reenviar Mutações ({failedMutations.length})
+                            </Button>
+                          )}
                           {i.code === "FAILED_MUTATIONS" && showFailedDetails && failedMutations.length > 0 && (
                             <div className="space-y-1.5 border-t border-red-200 pt-2">
-                              {failedMutations.map((fm) => (
-                                <div key={fm.id} className="flex items-start gap-2 rounded bg-white/60 p-2 text-[11px]">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-mono font-semibold truncate">{fm.op} · {fm.table}</p>
-                                    <p className="opacity-70 truncate">{fm.lastError || "sem detalhes"}</p>
-                                    <p className="opacity-50 text-[10px]">tentativas: {fm.tries}</p>
+                              {failedMutations.map((fm) => {
+                                const category = classifyMutation(fm);
+                                const meta = CATEGORY_META[category];
+                                const lastTry = new Date(fm.createdAt).toLocaleString("pt-BR");
+                                return (
+                                  <div key={fm.id} className="flex items-start gap-2 rounded bg-white/60 p-2 text-[11px]">
+                                    <div className="flex-1 min-w-0 space-y-0.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={cn("px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase", meta.badge)}>
+                                          {meta.dot} {meta.label}
+                                        </span>
+                                        <span className="font-mono font-semibold truncate">{fm.op} · {fm.table}</span>
+                                      </div>
+                                      <p className="opacity-80"><b>Erro:</b> {fm.lastError || "sem detalhes"}</p>
+                                      <p className="opacity-60 text-[10px]">Tentativas: {fm.tries} · Última: {lastTry}</p>
+                                    </div>
+                                    {category !== "critical" ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 px-2 text-[10px] border-red-300 text-red-700 hover:bg-red-100"
+                                        onClick={() => setDiscardTarget(fm)}
+                                      >
+                                        🗑 Descartar
+                                      </Button>
+                                    ) : (
+                                      <span className="h-6 px-2 text-[10px] text-red-600 font-bold flex items-center">
+                                        <Lock className="h-3 w-3 mr-1" /> Protegida
+                                      </span>
+                                    )}
                                   </div>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-6 px-2 text-[10px] border-red-300 text-red-700 hover:bg-red-100"
-                                    onClick={() => handleDiscardFailed(fm.id)}
-                                  >
-                                    Descartar
-                                  </Button>
-                                </div>
-                              ))}
+                                );
+                              })}
                               <p className="text-[10px] opacity-70 pt-1">
-                                Descartar remove permanentemente a mutação da fila local. Use apenas quando o dado já foi corrigido de outra forma.
+                                Mutações críticas não podem ser descartadas. Corrija a causa e reenvie.
                               </p>
                             </div>
                           )}
+
                         </div>
                       ))}
                     </div>
@@ -2083,7 +2177,42 @@ export function DailyWorkCloser({
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!discardTarget} onOpenChange={(o) => !o && setDiscardTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar mutação?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>Esta ação removerá permanentemente esta mutação da fila offline.</p>
+                <p>Os dados <b>não</b> serão sincronizados com o servidor.</p>
+                {discardTarget && (
+                  <div className="rounded bg-slate-50 p-2 text-[11px] font-mono">
+                    <p>{discardTarget.op} · {discardTarget.table}</p>
+                    <p className="opacity-70 break-words">{discardTarget.lastError}</p>
+                  </div>
+                )}
+                <p>Deseja realmente continuar?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => {
+                const t = discardTarget;
+                setDiscardTarget(null);
+                if (t) await handleDiscardFailed(t);
+              }}
+            >
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Dialog>
+
   );
 }
 
