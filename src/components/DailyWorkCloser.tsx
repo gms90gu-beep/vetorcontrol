@@ -325,7 +325,43 @@ async function buildDailySnapshot(
   return snap;
 }
 
-
+interface DayCloseDiagnosticSide {
+  total_properties: number;
+  visited: number;
+  closed: number;
+  pending: number;
+  recovered: number;
+  focus: number;
+}
+interface DayCloseDiagnosticBlock {
+  block_number: string;
+  snapshot: DayCloseDiagnosticSide;
+  metrics: DayCloseDiagnosticSide;
+  delta_visited: number;
+  delta_closed: number;
+  delta_pending: number;
+  delta_recovered: number;
+  delta_focus: number;
+  has_divergence: boolean;
+}
+interface DayCloseDiagnostic {
+  agent_id: string;
+  cycle_id: string | null;
+  operational_date: string;
+  source_snapshot: string;
+  source_metrics: string;
+  totals: {
+    snapshot: DayCloseDiagnosticSide;
+    metrics: DayCloseDiagnosticSide;
+    delta_visited: number;
+    delta_closed: number;
+    delta_pending: number;
+    delta_recovered: number;
+    delta_focus: number;
+  };
+  blocks: DayCloseDiagnosticBlock[];
+  divergences: Array<{ module: string; field: string; expected: number; found: number }>;
+}
 
 
 interface DailyWorkCloserProps {
