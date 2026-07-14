@@ -325,7 +325,43 @@ async function buildDailySnapshot(
   return snap;
 }
 
-
+interface DayCloseDiagnosticSide {
+  total_properties: number;
+  visited: number;
+  closed: number;
+  pending: number;
+  recovered: number;
+  focus: number;
+}
+interface DayCloseDiagnosticBlock {
+  block_number: string;
+  snapshot: DayCloseDiagnosticSide;
+  metrics: DayCloseDiagnosticSide;
+  delta_visited: number;
+  delta_closed: number;
+  delta_pending: number;
+  delta_recovered: number;
+  delta_focus: number;
+  has_divergence: boolean;
+}
+interface DayCloseDiagnostic {
+  agent_id: string;
+  cycle_id: string | null;
+  operational_date: string;
+  source_snapshot: string;
+  source_metrics: string;
+  totals: {
+    snapshot: DayCloseDiagnosticSide;
+    metrics: DayCloseDiagnosticSide;
+    delta_visited: number;
+    delta_closed: number;
+    delta_pending: number;
+    delta_recovered: number;
+    delta_focus: number;
+  };
+  blocks: DayCloseDiagnosticBlock[];
+  divergences: Array<{ module: string; field: string; expected: number; found: number }>;
+}
 
 
 interface DailyWorkCloserProps {
@@ -388,6 +424,8 @@ export function DailyWorkCloser({
   const [showFailedDetails, setShowFailedDetails] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [discardTarget, setDiscardTarget] = useState<FailedMutationInfo | null>(null);
+  const [dayCloseDiagnostic, setDayCloseDiagnostic] = useState<DayCloseDiagnostic | null>(null);
+  const [showDiagnostic, setShowDiagnostic] = useState(false);
 
   const refreshFailedMutations = useCallback(async () => {
     try {
@@ -1101,6 +1139,95 @@ export function DailyWorkCloser({
         divergent: __cacheDiv,
       });
 
+      // ─── Diagnóstico rico (snapshot × metrics, agregado + por quarteirão) ───
+      const __snapVisitedByBlock = new Map<string, { visited: number; closed: number; focus: number }>();
+      for (const v of visitsByAllSessions) {
+        const bn = __propBlock.get(v.property_id) ?? "";
+        if (!bn) continue;
+        const cur = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const status = String((v as any).status ?? "").toLowerCase();
+        if (status === "closed" || status === "fechado") cur.closed += 1;
+        else cur.visited += 1;
+        if ((v as any).positive_focus || (v as any).has_focus) cur.focus += 1;
+        __snapVisitedByBlock.set(bn, cur);
+      }
+      const __diagBlocks: DayCloseDiagnosticBlock[] = __perBlockAudit.map((m) => {
+        const bn = String(m.block_number);
+        const snapB = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const total = Number(m.totalProperties || 0);
+        const snapshot: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: snapB.visited,
+          closed: snapB.closed,
+          pending: Math.max(0, total - snapB.visited - snapB.closed),
+          recovered: 0,
+          focus: snapB.focus,
+        };
+        const metrics: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: Number(m.visitedProperties || 0),
+          closed: Number(m.closedProperties || 0),
+          pending: Number(m.pendingProperties || 0),
+          recovered: Number(m.recoveredProperties || 0),
+          focus: Number((m as any).focusProperties || (m as any).positiveFocus || 0),
+        };
+        const delta_visited = snapshot.visited - metrics.visited;
+        const delta_closed = snapshot.closed - metrics.closed;
+        const delta_pending = snapshot.pending - metrics.pending;
+        const delta_recovered = snapshot.recovered - metrics.recovered;
+        const delta_focus = snapshot.focus - metrics.focus;
+        return {
+          block_number: bn,
+          snapshot,
+          metrics,
+          delta_visited, delta_closed, delta_pending, delta_recovered, delta_focus,
+          has_divergence: !!(delta_visited || delta_closed || delta_pending || delta_recovered || delta_focus),
+        };
+      });
+
+      const __totalsSnapshot: DayCloseDiagnosticSide = {
+        total_properties: snap.workedCount,
+        visited: snap.visitedCount,
+        closed: snap.closedCount,
+        pending: snap.pendingLocal,
+        recovered: Number((snap as any).recoveredCount || 0),
+        focus: snap.focusCount,
+      };
+      const __totalsMetrics: DayCloseDiagnosticSide = {
+        total_properties: __dwrProperties.total,
+        visited: __dwrProperties.visited,
+        closed: __dwrProperties.closed,
+        pending: __dwrProperties.pending,
+        recovered: __dwrProperties.recovered,
+        focus: __dwrProperties.focuses,
+      };
+      const __diag: DayCloseDiagnostic = {
+        agent_id: user.id,
+        cycle_id: activeCycle?.id ?? null,
+        operational_date: operationalWorkDate,
+        source_snapshot: "get_session_visits + block_progress + daily_work_records",
+        source_metrics: "operational-metrics (block_progress)",
+        totals: {
+          snapshot: __totalsSnapshot,
+          metrics: __totalsMetrics,
+          delta_visited: __totalsSnapshot.visited - __totalsMetrics.visited,
+          delta_closed: __totalsSnapshot.closed - __totalsMetrics.closed,
+          delta_pending: __totalsSnapshot.pending - __totalsMetrics.pending,
+          delta_recovered: __totalsSnapshot.recovered - __totalsMetrics.recovered,
+          delta_focus: __totalsSnapshot.focus - __totalsMetrics.focus,
+        },
+        blocks: __diagBlocks,
+        divergences: __divergences,
+      };
+
+      if (__divergences.length > 0 || __diagBlocks.some((b) => b.has_divergence)) {
+        console.error("[DAY_CLOSE_DIAGNOSTIC]", __diag);
+        setDayCloseDiagnostic(__diag);
+        setShowDiagnostic(true);
+      } else {
+        setDayCloseDiagnostic(null);
+      }
+
       if (__divergences.length > 0) {
         for (const d of __divergences) console.error("[DAY_CLOSE_METRICS_DIVERGENCE]", d);
         const first = __divergences[0];
@@ -1110,12 +1237,14 @@ export function DailyWorkCloser({
           expected: first.expected,
           found: first.found,
           reason: `Divergência entre ${first.module} no campo ${first.field}: esperado ${first.expected}, encontrado ${first.found}`,
+          diagnostic: __diag,
         });
         toast.error(
-          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}.`,
+          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}. Toque em "Ver diagnóstico" para detalhes.`,
         );
         throw new Error(`[DAY_CLOSE_BLOCK_REASON] ${first.module}/${first.field}`);
       }
+
       console.log("[DAY_CLOSE_POST_SNAPSHOT]", __snapshotView);
       // ═════════════════════════════════════════════════
 
@@ -2136,6 +2265,21 @@ export function DailyWorkCloser({
                       <span>Fila com erro: <b>{validation.counters.failedMutations}</b></span>
                     </div>
                   )}
+
+                  {dayCloseDiagnostic && (
+                    <div className="border-t pt-2 mt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-amber-400 text-amber-700 hover:bg-amber-50"
+                        onClick={() => setShowDiagnostic(true)}
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Ver diagnóstico ({dayCloseDiagnostic.divergences.length} divergência(s))
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <DialogFooter className="flex-col gap-2 sm:flex-col">
@@ -2211,10 +2355,109 @@ export function DailyWorkCloser({
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={showDiagnostic} onOpenChange={setShowDiagnostic}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              Diagnóstico de encerramento
+            </DialogTitle>
+            <DialogDescription>
+              Comparação entre <b>Snapshot</b> e <b>Metrics</b> para identificar a origem da divergência.
+            </DialogDescription>
+          </DialogHeader>
+          {dayCloseDiagnostic && (
+            <div className="space-y-3 max-h-[65vh] overflow-y-auto text-xs">
+              <div className="rounded border p-2 bg-slate-50 grid grid-cols-2 gap-1">
+                <span><b>Agente:</b> <span className="font-mono">{dayCloseDiagnostic.agent_id.slice(0, 8)}</span></span>
+                <span><b>Ciclo:</b> <span className="font-mono">{dayCloseDiagnostic.cycle_id?.slice(0, 8) ?? "—"}</span></span>
+                <span><b>Data:</b> {dayCloseDiagnostic.operational_date}</span>
+                <span><b>Blocos:</b> {dayCloseDiagnostic.blocks.length}</span>
+                <span className="col-span-2 opacity-70"><b>Fonte snapshot:</b> {dayCloseDiagnostic.source_snapshot}</span>
+                <span className="col-span-2 opacity-70"><b>Fonte metrics:</b> {dayCloseDiagnostic.source_metrics}</span>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Totais</p>
+                <table className="w-full border-collapse text-[11px]">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="border p-1 text-left">Campo</th>
+                      <th className="border p-1">Snapshot</th>
+                      <th className="border p-1">Metrics</th>
+                      <th className="border p-1">Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["visited","closed","pending","recovered","focus","total_properties"] as const).map((k) => {
+                      const s = (dayCloseDiagnostic.totals.snapshot as any)[k];
+                      const m = (dayCloseDiagnostic.totals.metrics as any)[k];
+                      const d = Number(s) - Number(m);
+                      return (
+                        <tr key={k} className={d !== 0 ? "bg-red-50" : ""}>
+                          <td className="border p-1 font-mono">{k}</td>
+                          <td className="border p-1 text-center">{s}</td>
+                          <td className="border p-1 text-center">{m}</td>
+                          <td className={cn("border p-1 text-center font-bold", d !== 0 && "text-red-700")}>{d > 0 ? `+${d}` : d}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {dayCloseDiagnostic.blocks.filter((b) => b.has_divergence).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Quarteirões com divergência</p>
+                  {dayCloseDiagnostic.blocks.filter((b) => b.has_divergence).map((b) => (
+                    <div key={b.block_number} className="rounded border border-red-200 bg-red-50 p-2 mb-2">
+                      <p className="font-bold mb-1">Quarteirão {b.block_number}</p>
+                      <table className="w-full border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-white">
+                            <th className="border p-1 text-left">Campo</th>
+                            <th className="border p-1">Snapshot</th>
+                            <th className="border p-1">Metrics</th>
+                            <th className="border p-1">Δ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(["visited","closed","pending","recovered","focus"] as const).map((k) => {
+                            const s = (b.snapshot as any)[k];
+                            const m = (b.metrics as any)[k];
+                            const d = Number(s) - Number(m);
+                            return (
+                              <tr key={k} className={d !== 0 ? "bg-red-100" : ""}>
+                                <td className="border p-1 font-mono">{k}</td>
+                                <td className="border p-1 text-center">{s}</td>
+                                <td className="border p-1 text-center">{m}</td>
+                                <td className={cn("border p-1 text-center font-bold", d !== 0 && "text-red-700")}>{d > 0 ? `+${d}` : d}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[10px] opacity-70">
+                Detalhes completos enviados ao console via <span className="font-mono">[DAY_CLOSE_DIAGNOSTIC]</span>.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDiagnostic(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </Dialog>
 
   );
 }
+
 
 
 function SummaryItem({ icon: Icon, label, value, color }: any) {
