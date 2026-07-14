@@ -386,10 +386,18 @@ export function DailyWorkCloser({
   const [validating, setValidating] = useState(false);
   const [failedMutations, setFailedMutations] = useState<FailedMutationInfo[]>([]);
   const [showFailedDetails, setShowFailedDetails] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<FailedMutationInfo | null>(null);
 
   const refreshFailedMutations = useCallback(async () => {
     try {
-      setFailedMutations(await listFailedMutations());
+      const list = await listFailedMutations();
+      setFailedMutations(list);
+      list.forEach((fm) => {
+        const category = classifyMutation(fm);
+        console.log("[MUTATION_CLASSIFIED]", { mutation_id: fm.id, table: fm.table, op: fm.op, category, tries: fm.tries, error: fm.lastError });
+        if (category === "critical") console.warn("[MUTATION_CRITICAL]", { mutation_id: fm.id, table: fm.table, error: fm.lastError });
+      });
     } catch (e) {
       console.warn("[FAILED_MUTATIONS_LOAD_ERR]", e);
     }
@@ -399,10 +407,20 @@ export function DailyWorkCloser({
     if (showValidation) void refreshFailedMutations();
   }, [showValidation, validation, refreshFailedMutations]);
 
-  const handleDiscardFailed = async (id: number) => {
-    await discardFailedMutation(id);
+  const handleDiscardFailed = async (fm: FailedMutationInfo) => {
+    const category = classifyMutation(fm);
+    if (category === "critical") {
+      console.warn("[MUTATION_CRITICAL]", { mutation_id: fm.id, reason: "discard_blocked" });
+      toast.error("Mutação crítica não pode ser descartada.");
+      return;
+    }
+    await discardFailedMutation(fm.id);
+    console.log("[MUTATION_DISCARDED]", { mutation_id: fm.id, table: fm.table, op: fm.op, category, ts: new Date().toISOString() });
     await refreshFailedMutations();
+    console.log("[MUTATION_VALIDATION]", { trigger: "discard" });
+    await handlePreClose();
   };
+
 
   const stats = externalStats || localStats;
 
