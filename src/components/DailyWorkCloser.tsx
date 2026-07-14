@@ -2177,7 +2177,42 @@ export function DailyWorkCloser({
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!discardTarget} onOpenChange={(o) => !o && setDiscardTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar mutação?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>Esta ação removerá permanentemente esta mutação da fila offline.</p>
+                <p>Os dados <b>não</b> serão sincronizados com o servidor.</p>
+                {discardTarget && (
+                  <div className="rounded bg-slate-50 p-2 text-[11px] font-mono">
+                    <p>{discardTarget.op} · {discardTarget.table}</p>
+                    <p className="opacity-70 break-words">{discardTarget.lastError}</p>
+                  </div>
+                )}
+                <p>Deseja realmente continuar?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={async () => {
+                const t = discardTarget;
+                setDiscardTarget(null);
+                if (t) await handleDiscardFailed(t);
+              }}
+            >
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Dialog>
+
   );
 }
 
