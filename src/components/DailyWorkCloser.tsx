@@ -532,15 +532,27 @@ export function DailyWorkCloser({
 
   const handleSyncNow = async () => {
     setValidating(true);
+    setRetrying(true);
+    const before = failedMutations.length;
+    console.log("[MUTATION_RETRY]", { count: before, ts: new Date().toISOString() });
     try {
       await retryFailedMutations();
       const { ok, failed } = await flushMutations();
-      toast.success(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+      if (failed === 0) {
+        console.log("[MUTATION_RETRY_SUCCESS]", { ok, previously_failed: before });
+        toast.success(`✔ ${ok} mutações sincronizadas com sucesso.`);
+      } else {
+        console.warn("[MUTATION_RETRY_FAILED]", { ok, failed });
+        toast.warning(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+      }
+      console.log("[MUTATION_VALIDATION]", { trigger: "retry" });
       await handlePreClose();
     } finally {
+      setRetrying(false);
       setValidating(false);
     }
   };
+
 
   const handleForceClose = async () => {
     console.log("[DAY_CLOSE_ALLOWED]", { reason: "warnings_acknowledged", role: userRole });
