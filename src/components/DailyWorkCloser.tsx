@@ -2022,37 +2022,69 @@ export function DailyWorkCloser({
                                 size="sm"
                                 variant="ghost"
                                 className="h-6 px-2 text-[10px] text-red-700 hover:bg-red-100"
-                                onClick={() => setShowFailedDetails((v) => !v)}
+                                onClick={() => {
+                                  setShowFailedDetails((v) => !v);
+                                  console.log("[MUTATION_DETAILS]", { toggled: !showFailedDetails, count: failedMutations.length });
+                                }}
                               >
-                                {showFailedDetails ? "Ocultar" : "Ver detalhes"}
+                                {showFailedDetails ? "Ocultar" : "▼ Ver detalhes"}
                               </Button>
                             )}
                           </div>
+                          {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleSyncNow}
+                              disabled={retrying || validating}
+                              className="w-full bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              <RefreshCw className={cn("h-4 w-4 mr-2", (retrying || validating) && "animate-spin")} />
+                              🔄 Reenviar Mutações ({failedMutations.length})
+                            </Button>
+                          )}
                           {i.code === "FAILED_MUTATIONS" && showFailedDetails && failedMutations.length > 0 && (
                             <div className="space-y-1.5 border-t border-red-200 pt-2">
-                              {failedMutations.map((fm) => (
-                                <div key={fm.id} className="flex items-start gap-2 rounded bg-white/60 p-2 text-[11px]">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-mono font-semibold truncate">{fm.op} · {fm.table}</p>
-                                    <p className="opacity-70 truncate">{fm.lastError || "sem detalhes"}</p>
-                                    <p className="opacity-50 text-[10px]">tentativas: {fm.tries}</p>
+                              {failedMutations.map((fm) => {
+                                const category = classifyMutation(fm);
+                                const meta = CATEGORY_META[category];
+                                const lastTry = new Date(fm.createdAt).toLocaleString("pt-BR");
+                                return (
+                                  <div key={fm.id} className="flex items-start gap-2 rounded bg-white/60 p-2 text-[11px]">
+                                    <div className="flex-1 min-w-0 space-y-0.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className={cn("px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase", meta.badge)}>
+                                          {meta.dot} {meta.label}
+                                        </span>
+                                        <span className="font-mono font-semibold truncate">{fm.op} · {fm.table}</span>
+                                      </div>
+                                      <p className="opacity-80"><b>Erro:</b> {fm.lastError || "sem detalhes"}</p>
+                                      <p className="opacity-60 text-[10px]">Tentativas: {fm.tries} · Última: {lastTry}</p>
+                                    </div>
+                                    {category !== "critical" ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 px-2 text-[10px] border-red-300 text-red-700 hover:bg-red-100"
+                                        onClick={() => setDiscardTarget(fm)}
+                                      >
+                                        🗑 Descartar
+                                      </Button>
+                                    ) : (
+                                      <span className="h-6 px-2 text-[10px] text-red-600 font-bold flex items-center">
+                                        <Lock className="h-3 w-3 mr-1" /> Protegida
+                                      </span>
+                                    )}
                                   </div>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-6 px-2 text-[10px] border-red-300 text-red-700 hover:bg-red-100"
-                                    onClick={() => handleDiscardFailed(fm.id)}
-                                  >
-                                    Descartar
-                                  </Button>
-                                </div>
-                              ))}
+                                );
+                              })}
                               <p className="text-[10px] opacity-70 pt-1">
-                                Descartar remove permanentemente a mutação da fila local. Use apenas quando o dado já foi corrigido de outra forma.
+                                Mutações críticas não podem ser descartadas. Corrija a causa e reenvie.
                               </p>
                             </div>
                           )}
+
                         </div>
                       ))}
                     </div>
