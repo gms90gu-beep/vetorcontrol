@@ -50,6 +50,38 @@ import {
 } from "@/lib/shift-validation";
 import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, type FailedMutationInfo } from "@/lib/offline/sync";
 import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// ─── FAILED_MUTATIONS: classificação e helpers ───────────────────────
+type MutationCategory = "recoverable" | "conflict" | "critical";
+const CRITICAL_TABLES = new Set([
+  "daily_work_records",
+  "block_progress",
+  "field_work_sessions",
+]);
+function classifyMutation(fm: FailedMutationInfo): MutationCategory {
+  const tableKey = (fm.table || "").replace(/^rpc:/, "").toLowerCase();
+  if (CRITICAL_TABLES.has(tableKey)) return "critical";
+  if (tableKey.includes("daily_work") || tableKey.includes("close_shift") || tableKey.includes("shift_close")) return "critical";
+  const err = String(fm.lastError || "").toLowerCase();
+  if (err.includes("duplicate key") || err.includes("conflict") || err.includes("23505")) return "conflict";
+  if (err.includes("rls") || err.includes("policy") || err.includes("permission") || err.includes("42501")) return "critical";
+  return "recoverable";
+}
+const CATEGORY_META: Record<MutationCategory, { label: string; dot: string; badge: string }> = {
+  recoverable: { label: "Recuperável", dot: "🟢", badge: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+  conflict:    { label: "Conflito",    dot: "🟡", badge: "bg-amber-100 text-amber-800 border-amber-300" },
+  critical:    { label: "Crítica",     dot: "🔴", badge: "bg-red-100 text-red-800 border-red-300" },
+};
 
 type DepKey = "A1" | "A2" | "B" | "C" | "D1" | "D2" | "E";
 
