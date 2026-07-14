@@ -1223,7 +1223,7 @@ export function DailyWorkCloser({
       if (__divergences.length > 0 || __diagBlocks.some((b) => b.has_divergence)) {
         console.error("[DAY_CLOSE_DIAGNOSTIC]", __diag);
         setDayCloseDiagnostic(__diag);
-        setShowDiagnostic(false);
+        setShowDiagnostic(true);
       } else {
         setDayCloseDiagnostic(null);
       }
