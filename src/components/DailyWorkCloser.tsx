@@ -1139,6 +1139,95 @@ export function DailyWorkCloser({
         divergent: __cacheDiv,
       });
 
+      // ─── Diagnóstico rico (snapshot × metrics, agregado + por quarteirão) ───
+      const __snapVisitedByBlock = new Map<string, { visited: number; closed: number; focus: number }>();
+      for (const v of visitsByAllSessions) {
+        const bn = __propBlock.get(v.property_id) ?? "";
+        if (!bn) continue;
+        const cur = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const status = String((v as any).status ?? "").toLowerCase();
+        if (status === "closed" || status === "fechado") cur.closed += 1;
+        else cur.visited += 1;
+        if ((v as any).positive_focus || (v as any).has_focus) cur.focus += 1;
+        __snapVisitedByBlock.set(bn, cur);
+      }
+      const __diagBlocks: DayCloseDiagnosticBlock[] = __perBlockAudit.map((m) => {
+        const bn = String(m.block_number);
+        const snapB = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const total = Number(m.totalProperties || 0);
+        const snapshot: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: snapB.visited,
+          closed: snapB.closed,
+          pending: Math.max(0, total - snapB.visited - snapB.closed),
+          recovered: 0,
+          focus: snapB.focus,
+        };
+        const metrics: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: Number(m.visitedProperties || 0),
+          closed: Number(m.closedProperties || 0),
+          pending: Number(m.pendingProperties || 0),
+          recovered: Number(m.recoveredProperties || 0),
+          focus: Number((m as any).focusProperties || (m as any).positiveFocus || 0),
+        };
+        const delta_visited = snapshot.visited - metrics.visited;
+        const delta_closed = snapshot.closed - metrics.closed;
+        const delta_pending = snapshot.pending - metrics.pending;
+        const delta_recovered = snapshot.recovered - metrics.recovered;
+        const delta_focus = snapshot.focus - metrics.focus;
+        return {
+          block_number: bn,
+          snapshot,
+          metrics,
+          delta_visited, delta_closed, delta_pending, delta_recovered, delta_focus,
+          has_divergence: !!(delta_visited || delta_closed || delta_pending || delta_recovered || delta_focus),
+        };
+      });
+
+      const __totalsSnapshot: DayCloseDiagnosticSide = {
+        total_properties: snap.workedCount,
+        visited: snap.visitedCount,
+        closed: snap.closedCount,
+        pending: snap.pendingLocal,
+        recovered: Number((snap as any).recoveredCount || 0),
+        focus: snap.focusCount,
+      };
+      const __totalsMetrics: DayCloseDiagnosticSide = {
+        total_properties: __dwrProperties.total,
+        visited: __dwrProperties.visited,
+        closed: __dwrProperties.closed,
+        pending: __dwrProperties.pending,
+        recovered: __dwrProperties.recovered,
+        focus: __dwrProperties.focuses,
+      };
+      const __diag: DayCloseDiagnostic = {
+        agent_id: user.id,
+        cycle_id: activeCycle?.id ?? null,
+        operational_date: operationalWorkDate,
+        source_snapshot: "get_session_visits + block_progress + daily_work_records",
+        source_metrics: "operational-metrics (block_progress)",
+        totals: {
+          snapshot: __totalsSnapshot,
+          metrics: __totalsMetrics,
+          delta_visited: __totalsSnapshot.visited - __totalsMetrics.visited,
+          delta_closed: __totalsSnapshot.closed - __totalsMetrics.closed,
+          delta_pending: __totalsSnapshot.pending - __totalsMetrics.pending,
+          delta_recovered: __totalsSnapshot.recovered - __totalsMetrics.recovered,
+          delta_focus: __totalsSnapshot.focus - __totalsMetrics.focus,
+        },
+        blocks: __diagBlocks,
+        divergences: __divergences,
+      };
+
+      if (__divergences.length > 0 || __diagBlocks.some((b) => b.has_divergence)) {
+        console.error("[DAY_CLOSE_DIAGNOSTIC]", __diag);
+        setDayCloseDiagnostic(__diag);
+        setShowDiagnostic(false);
+      } else {
+        setDayCloseDiagnostic(null);
+      }
+
       if (__divergences.length > 0) {
         for (const d of __divergences) console.error("[DAY_CLOSE_METRICS_DIVERGENCE]", d);
         const first = __divergences[0];
@@ -1148,12 +1237,14 @@ export function DailyWorkCloser({
           expected: first.expected,
           found: first.found,
           reason: `Divergência entre ${first.module} no campo ${first.field}: esperado ${first.expected}, encontrado ${first.found}`,
+          diagnostic: __diag,
         });
         toast.error(
-          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}.`,
+          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}. Toque em "Ver diagnóstico" para detalhes.`,
         );
         throw new Error(`[DAY_CLOSE_BLOCK_REASON] ${first.module}/${first.field}`);
       }
+
       console.log("[DAY_CLOSE_POST_SNAPSHOT]", __snapshotView);
       // ═════════════════════════════════════════════════
 
