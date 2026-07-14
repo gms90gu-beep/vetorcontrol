@@ -2265,6 +2265,21 @@ export function DailyWorkCloser({
                       <span>Fila com erro: <b>{validation.counters.failedMutations}</b></span>
                     </div>
                   )}
+
+                  {dayCloseDiagnostic && (
+                    <div className="border-t pt-2 mt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full border-amber-400 text-amber-700 hover:bg-amber-50"
+                        onClick={() => setShowDiagnostic(true)}
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Ver diagnóstico ({dayCloseDiagnostic.divergences.length} divergência(s))
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <DialogFooter className="flex-col gap-2 sm:flex-col">
