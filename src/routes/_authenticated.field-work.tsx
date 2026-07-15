@@ -153,15 +153,75 @@ async function assessSessionForResume(session: any): Promise<{ show: boolean; re
       .maybeSingle();
     const dwrClosed = !!dwr && ((dwr as any).status === "completed" || !!(dwr as any).end_time);
 
-    // Operational block status (RPC opcional)
+    // Operational block status (RPC opcional) + auditoria RPC × Snapshot
     let blockStatusRemote: any = null;
     try {
-      const { data: bs } = await supabase.rpc("get_operational_block_status" as any, {
+      const { data: bs, error: rpcErr } = await supabase.rpc("get_operational_block_status" as any, {
         _block_id: session.block_id,
         _work_date: session.session_date,
       });
+      if (rpcErr) throw rpcErr;
       blockStatusRemote = Array.isArray(bs) ? bs[0] : bs;
-    } catch {}
+
+      console.log("[RPC_BLOCK_STATUS_RESULT]", {
+        agent_id: session.user_id,
+        cycle_id: session.cycle_id ?? null,
+        block_number: session.block_number ?? null,
+        operational_date: session.session_date,
+        total_properties: Number(blockStatusRemote?.total ?? 0),
+        visited_properties: Number(blockStatusRemote?.visited ?? 0),
+        closed_properties: Number(blockStatusRemote?.closed ?? 0),
+        pending_properties: Number(blockStatusRemote?.pending ?? 0),
+        recovered_properties: Number(blockStatusRemote?.recovered ?? 0),
+        completion_percentage: Number(blockStatusRemote?.completion_percentage ?? 0),
+        status: blockStatusRemote?.status ?? null,
+      });
+
+      if (blockStatusRemote) {
+        const snap = {
+          total: canonical.totalProperties,
+          visited: canonical.visitedProperties,
+          closed: canonical.closedProperties,
+          pending: canonical.pendingProperties,
+          recovered: canonical.recoveredProperties,
+        };
+        const rpc = {
+          total: Number(blockStatusRemote.total ?? 0),
+          visited: Number(blockStatusRemote.visited ?? 0),
+          closed: Number(blockStatusRemote.closed ?? 0),
+          pending: Number(blockStatusRemote.pending ?? 0),
+          recovered: Number(blockStatusRemote.recovered ?? 0),
+        };
+        const delta = {
+          total: rpc.total - snap.total,
+          visited: rpc.visited - snap.visited,
+          closed: rpc.closed - snap.closed,
+          pending: rpc.pending - snap.pending,
+          recovered: rpc.recovered - snap.recovered,
+        };
+        const diverged = Object.values(delta).some((d) => d !== 0);
+        if (diverged) {
+          console.warn("[RPC_BLOCK_STATUS_DIVERGENCE]", {
+            agent_id: session.user_id,
+            cycle_id: session.cycle_id ?? null,
+            block_number: session.block_number ?? null,
+            operational_date: session.session_date,
+            snapshot: snap,
+            rpc,
+            delta,
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn("[RPC_BLOCK_STATUS_FALLBACK]", {
+        agent_id: session.user_id,
+        block_id: session.block_id,
+        operational_date: session.session_date,
+        error: e?.message ?? String(e),
+        fallback: "snapshot",
+      });
+    }
+
 
     const audit = {
       ...base,
