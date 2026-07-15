@@ -500,6 +500,114 @@ export function DailyWorkCloser({
     compare("pending",  externalStats.pending,  snapshot.pendingLocal);
   }, [isOpen, externalStats, snapshot.workedCount, snapshot.closedCount, snapshot.refusedCount, snapshot.focusCount, snapshot.pendingLocal]);
 
+  const runDayCloseDiagnostic = async (userId: string, workDate: string, activeCycleId: string | null) => {
+    console.log("[DAY_CLOSE_FLOW]", { etapa: "start" });
+    console.log("[DAY_CLOSE_START]", { agent_id: userId, operational_date: workDate, cycle_id: activeCycleId, ts: new Date().toISOString() });
+    try {
+      const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
+      const __propsAll = await listLocal<any>("properties");
+      const __propBlock = new Map<string, string>();
+      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
+
+      const dayAllSessions = await listLocal<any>(
+        "field_work_sessions",
+        (s) => s.user_id === userId && s.session_date === workDate,
+      );
+      const visitsByAllSessions = await listLocal<any>(
+        "visits",
+        (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === workDate,
+      );
+
+      console.log("[DAY_CLOSE_FLOW]", { etapa: "metrics" });
+      const agg = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0 };
+      for (const s of dayAllSessions) {
+        const bn = String(s.block_number ?? "");
+        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const metrics = __getMetrics({
+          module: "DailyWorkCloser/preDiagnostic",
+          productionDate: workDate,
+          blockId: s.block_id,
+          sessionId: s.id,
+          propertyIds: propIds,
+          visits: vs,
+          fallbackTotal: Number(s.property_count || 0),
+        });
+        console.log("[METRICS_QUERY]", {
+          agent_id: userId,
+          cycle_id: activeCycleId,
+          operational_date: workDate,
+          block_number: bn,
+          filter: { agent_id: userId, cycle_id: activeCycleId, block_number: bn, property_ids_count: propIds.length, visits_scoped_count: vs.length },
+          result: { total: metrics.totalProperties, visited: metrics.visitedProperties, closed: metrics.closedProperties, pending: metrics.pendingProperties },
+        });
+        agg.total += metrics.totalProperties;
+        agg.visited += metrics.visitedProperties;
+        agg.pending += metrics.pendingProperties;
+        agg.closed += metrics.closedProperties;
+        agg.recovered += metrics.recoveredProperties;
+      }
+
+      console.log("[DAY_CLOSE_FLOW]", { etapa: "block_progress" });
+      try {
+        const { db: __offlineDb } = await import("@/lib/offline/db");
+        const __bpAll = await __offlineDb.block_progress.toArray();
+        const __bpMatch = __bpAll
+          .map((r) => r.data as any)
+          .filter((r) => r && r.agent_id === userId && (!activeCycleId || r.cycle_id === activeCycleId));
+        const __agg = __bpMatch.reduce(
+          (a, r) => {
+            a.count += 1;
+            a.total += Number(r.total_properties || 0);
+            a.visited += Number(r.visited_properties || 0);
+            a.closed += Number(r.closed_properties || 0);
+            a.pending += Number(r.pending_properties || 0);
+            return a;
+          },
+          { count: 0, total: 0, visited: 0, closed: 0, pending: 0 },
+        );
+        console.log("[BLOCK_PROGRESS_CHECK]", {
+          source: "dexie(block_progress)",
+          filter: { agent_id: userId, cycle_id: activeCycleId, operational_date: workDate },
+          ...__agg,
+        });
+        if (__agg.count === 0) {
+          console.error("[BLOCK_PROGRESS_NOT_UPDATED]", {
+            agent_id: userId, cycle_id: activeCycleId, operational_date: workDate,
+            reason: "Nenhuma linha em block_progress para o agente/ciclo.",
+          });
+        } else if (__agg.total > 0 && agg.total === 0) {
+          console.error("[BLOCK_PROGRESS_FILTER_ERROR]", {
+            agent_id: userId, cycle_id: activeCycleId, operational_date: workDate,
+            block_progress_aggregate: __agg, metrics_aggregate: agg,
+            reason: "block_progress possui dados mas metrics retornou zero — verificar filtros/hidratação.",
+          });
+        }
+      } catch (e) {
+        console.warn("[BLOCK_PROGRESS_CHECK_FAIL]", e);
+      }
+
+      console.log("[DAY_CLOSE_FLOW]", { etapa: "compare" });
+      try {
+        const snap = await buildDailySnapshot(userId, workDate);
+        const snapView = { total: snap.workedCount, visited: snap.visitedCount, closed: snap.closedCount, pending: snap.pendingLocal };
+        const divergence =
+          snapView.total !== agg.total ||
+          snapView.visited !== agg.visited ||
+          snapView.closed !== agg.closed ||
+          snapView.pending !== agg.pending;
+        console.log("[DAY_CLOSE_DIAGNOSTIC]", {
+          agent_id: userId, cycle_id: activeCycleId, operational_date: workDate,
+          snapshot: snapView, metrics: agg, divergence,
+        });
+      } catch (e) {
+        console.warn("[DAY_CLOSE_DIAGNOSTIC_FAIL]", e);
+      }
+    } catch (e) {
+      console.warn("[DAY_CLOSE_DIAGNOSTIC_FATAL]", e);
+    }
+  };
+
   const handlePreClose = async () => {
     console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
     setValidating(true);
@@ -528,6 +636,10 @@ export function DailyWorkCloser({
         });
       }
 
+      // ═══ DIAGNÓSTICO OBRIGATÓRIO ANTES DE QUALQUER BLOQUEIO ═══
+      await runDayCloseDiagnostic(user.id, workDate, activeCycle?.id ?? null);
+
+      console.log("[DAY_CLOSE_FLOW]", { etapa: "validate" });
       const report = await runShiftValidation({
         userId: user.id,
         sessionId: active?.id ?? null,
@@ -547,14 +659,17 @@ export function DailyWorkCloser({
       });
 
       if (critical === 0 && warnings === 0) {
+        console.log("[DAY_CLOSE_FLOW]", { etapa: "success" });
         console.log("[DAY_CLOSE_ALLOWED]", { reason: "no_issues" });
         await handleCloseDay();
       } else if (critical > 0) {
+        console.log("[DAY_CLOSE_FLOW]", { etapa: "blocked" });
         console.warn("[DAY_CLOSE_BLOCKED]", {
           codes: report.issues.filter((i) => i.severity === "error").map((i) => i.code),
         });
         setShowValidation(true);
       } else {
+        console.log("[DAY_CLOSE_FLOW]", { etapa: "blocked", severity: "warning" });
         console.log("[DAY_CLOSE_WARNING]", {
           codes: report.issues.map((i) => i.code),
         });
