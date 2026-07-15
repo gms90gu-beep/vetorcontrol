@@ -1738,6 +1738,21 @@ export type Database = {
         }
       }
       get_epi_week: { Args: { d: string }; Returns: number }
+      get_operational_block_status: {
+        Args: { _block_id: string; _work_date: string }
+        Returns: {
+          block_id: string
+          closed: number
+          completion_percentage: number
+          pending: number
+          recovered: number
+          refused: number
+          status: string
+          total: number
+          visited: number
+          work_date: string
+        }[]
+      }
       get_session_visits: {
         Args: { _agent_id: string; _session_date: string }
         Returns: {
