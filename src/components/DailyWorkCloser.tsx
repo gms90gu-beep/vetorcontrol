@@ -1064,6 +1064,30 @@ export function DailyWorkCloser({
           visits: vs,
           fallbackTotal: Number(s.property_count || 0),
         });
+        // Log detalhado da consulta de métricas por bloco
+        console.log("[METRICS_QUERY]", {
+          agent_id: user.id,
+          cycle_id: activeCycle?.id ?? null,
+          operational_date: operationalWorkDate,
+          work_date: operationalWorkDate,
+          block_number: bn,
+          session_date: s.session_date ?? s.started_at ?? null,
+          filter: {
+            agent_id: user.id,
+            cycle_id: activeCycle?.id ?? null,
+            block_number: bn,
+            property_ids_count: propIds.length,
+            visits_scoped_count: vs.length,
+          },
+          result: {
+            properties_found: propIds.length,
+            visits_found: vs.length,
+            total: metrics.totalProperties,
+            visited: metrics.visitedProperties,
+            closed: metrics.closedProperties,
+            pending: metrics.pendingProperties,
+          },
+        });
         __perBlockAudit.push({ block_number: bn, ...metrics });
         __dwrProperties.total += metrics.totalProperties;
         __dwrProperties.visited += metrics.visitedProperties;
@@ -1089,6 +1113,85 @@ export function DailyWorkCloser({
       console.log("[DAY_CLOSE_UI]", __uiPayload);
       console.log("[DAY_CLOSE_METRICS]", { ...__uiPayload, source: "operational-metrics" });
       console.log("[DAY_CLOSE_BLOCK_STATUS]", { blocks: __perBlockAudit });
+
+      // ─── Validação cruzada: snapshot tem dados mas metrics veio zero? ───
+      try {
+        const __snapTotal = Number(snap.workedCount || 0);
+        const __snapVisited = Number(snap.visitedCount || 0) + Number(snap.closedCount || 0);
+        if ((__snapTotal > 0 || __snapVisited > 0) && __dwrProperties.total === 0 && __dwrProperties.visited === 0) {
+          console.error("[METRICS_EMPTY_RESULT]", {
+            agent_id: user.id,
+            cycle_id: activeCycle?.id ?? null,
+            operational_date: operationalWorkDate,
+            snapshot: {
+              total: __snapTotal,
+              visited: snap.visitedCount,
+              closed: snap.closedCount,
+              pending: snap.pendingLocal,
+            },
+            metrics: __dwrProperties,
+            empty_query: "operational-metrics/getOperationalMetrics (propertyIds/visits vazios por bloco)",
+            hint: "dayAllSessions.length=" + dayAllSessions.length +
+                  " | propertyIds_total=" + __propsAll.length +
+                  " | visits_scoped_total=" + visitsByAllSessions.length,
+          });
+
+          // Cross-check direto em block_progress (Dexie + Supabase)
+          try {
+            const { db: __offlineDb } = await import("@/lib/offline/db");
+            const __bpAll = await __offlineDb.block_progress.toArray();
+            const __bpMatch = __bpAll
+              .map((r) => r.data as any)
+              .filter((r) =>
+                r &&
+                r.agent_id === user.id &&
+                (!activeCycle?.id || r.cycle_id === activeCycle.id),
+              );
+            const __agg = __bpMatch.reduce(
+              (a, r) => {
+                a.count += 1;
+                a.total += Number(r.total_properties || 0);
+                a.visited += Number(r.visited_properties || 0);
+                a.closed += Number(r.closed_properties || 0);
+                a.pending += Number(r.pending_properties || 0);
+                return a;
+              },
+              { count: 0, total: 0, visited: 0, closed: 0, pending: 0 },
+            );
+            console.log("[BLOCK_PROGRESS_CHECK]", {
+              source: "dexie(block_progress)",
+              filter: {
+                agent_id: user.id,
+                cycle_id: activeCycle?.id ?? null,
+                operational_date: operationalWorkDate,
+              },
+              ...__agg,
+            });
+            if (__agg.count === 0) {
+              console.error("[BLOCK_PROGRESS_NOT_UPDATED]", {
+                agent_id: user.id,
+                cycle_id: activeCycle?.id ?? null,
+                operational_date: operationalWorkDate,
+                reason: "Nenhuma linha em block_progress para o agente/ciclo — trigger de recompute pode não ter executado.",
+              });
+            } else if (__agg.total > 0 && __dwrProperties.total === 0) {
+              console.error("[BLOCK_PROGRESS_FILTER_ERROR]", {
+                agent_id: user.id,
+                cycle_id: activeCycle?.id ?? null,
+                operational_date: operationalWorkDate,
+                block_progress_aggregate: __agg,
+                metrics_aggregate: __dwrProperties,
+                reason: "block_progress possui dados mas o loop por sessão não encontrou propriedades/visitas — verificar filtros (block_number, cycle_id) ou hidratação de properties/visits no cache.",
+              });
+            }
+          } catch (e) {
+            console.warn("[BLOCK_PROGRESS_CHECK_FAIL]", e);
+          }
+        }
+      } catch (e) {
+        console.warn("[METRICS_CROSS_CHECK_FAIL]", e);
+      }
+
 
       const __snapshotView = {
         total_properties: snap.workedCount,
