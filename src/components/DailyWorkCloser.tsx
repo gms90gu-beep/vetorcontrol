@@ -9,7 +9,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
+import { getOperationalDate, epiWeekFromDate, toOperationalDate } from "@/lib/operational-date";
 import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
