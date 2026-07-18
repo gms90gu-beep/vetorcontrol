@@ -176,27 +176,6 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     setVisits(vs);
     audit("OP_PANEL_VISITS", { count: vs.length, source: (vs as any).source, session_date: session.session_date });
 
-    // Cross-day: visitas do bloco/ciclo inteiro para o status por imóvel na lista
-    // (última visita "de sempre" no ciclo — corrige imóveis trabalhados em dias anteriores
-    // que apareciam como "Pendente" apenas por não terem visita hoje).
-    if (session.block_id && session.cycle_id) {
-      const bv = await listRemoteOrCache<any>({
-        name: "visits",
-        remote: () =>
-          supabase.from("visits")
-            .select("id, property_id, status, has_focus, visit_date, is_recovery, cycle_id, agent_id")
-            .eq("cycle_id", session.cycle_id)
-            .in("property_id", (properties.length ? properties : []).map((p: any) => p.id)) as any,
-        filter: (v) =>
-          v.cycle_id === session.cycle_id &&
-          v.property_id != null,
-      });
-      setBlockVisits(bv || []);
-      audit("OP_PANEL_BLOCK_VISITS", { count: (bv || []).length, cycle_id: session.cycle_id });
-    } else {
-      setBlockVisits([]);
-    }
-
     if (vs.length) {
       const { data: deps } = await supabase.from("visit_deposits")
         .select("id, visit_id, type_code, quantity, is_positive")
