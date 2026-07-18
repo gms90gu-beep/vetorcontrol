@@ -190,6 +190,35 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
   useEffect(() => { loadAll(); }, [loadAll, refreshTick]);
 
+  // Cross-day: visitas do bloco/ciclo inteiro para status por imóvel na lista
+  // (última visita "de sempre" no ciclo — corrige imóveis trabalhados em dias
+  // anteriores que apareciam como "Pendente" só por não terem visita hoje).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!session?.cycle_id || !properties.length) {
+        if (!cancelled) setBlockVisits([]);
+        return;
+      }
+      const propIds = properties.map((p) => p.id);
+      const bv = await listRemoteOrCache<any>({
+        name: "visits",
+        remote: () =>
+          supabase.from("visits")
+            .select("id, property_id, status, has_focus, visit_date, is_recovery, cycle_id, agent_id")
+            .eq("cycle_id", session.cycle_id)
+            .in("property_id", propIds) as any,
+        filter: (v) =>
+          v.cycle_id === session.cycle_id && propIds.includes(v.property_id),
+      });
+      if (!cancelled) {
+        setBlockVisits(bv || []);
+        audit("OP_PANEL_BLOCK_VISITS", { count: (bv || []).length, cycle_id: session.cycle_id });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.cycle_id, properties, refreshTick]);
+
   // Realtime: escuta visitas/depósitos/pendências e recarrega
   useEffect(() => {
     if (!session?.user_id || !session?.block_id) return;
