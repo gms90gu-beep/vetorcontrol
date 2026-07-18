@@ -9,7 +9,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
+import { getOperationalDate, epiWeekFromDate, toOperationalDate } from "@/lib/operational-date";
 import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -161,7 +161,7 @@ async function buildDailySnapshot(
     "visits",
     (v) => {
       if (v.agent_id !== userId) return false;
-      if (String(v.visit_date || "").slice(0, 10) !== opDateStr) return false;
+      if (toOperationalDate(v.visit_date) !== opDateStr) return false;
       // Filtro por sessão explícita (quando disponível)
       if (scope?.sessionId && v.field_work_session_id && v.field_work_session_id !== scope.sessionId) return false;
       // Filtro por quarteirão da jornada ativa
@@ -515,7 +515,7 @@ export function DailyWorkCloser({
       );
       const visitsByAllSessions = await listLocal<any>(
         "visits",
-        (v) => v.agent_id === userId && String(v.visit_date || "").slice(0, 10) === workDate,
+        (v) => v.agent_id === userId && toOperationalDate(v.visit_date) === workDate,
       );
 
       console.log("[DAY_CLOSE_FLOW]", { etapa: "metrics" });
@@ -1092,7 +1092,7 @@ export function DailyWorkCloser({
         "visits",
         (v) =>
           v.agent_id === user.id &&
-          String(v.visit_date || "").slice(0, 10) === operationalWorkDate,
+          toOperationalDate(v.visit_date) === operationalWorkDate,
       );
       const visitsPerSession: Record<string, number> = {};
       for (const v of visitsByAllSessions) {
@@ -1780,7 +1780,7 @@ export function DailyWorkCloser({
         // Fallback offline — monta a partir do Dexie
         const localVisits = await listLocal<any>(
           "visits",
-          (v) => v.agent_id === user.id && String(v.visit_date || "").slice(0, 10) === opDateStr,
+          (v) => v.agent_id === user.id && toOperationalDate(v.visit_date) === opDateStr,
         );
         const localDeposits = await listLocal<any>("visit_deposits");
         const localProps = await listLocal<any>("properties");
