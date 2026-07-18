@@ -122,6 +122,19 @@ export function getOperationalDate(now: Date = new Date()): string {
 }
 
 /**
+ * Converte um timestamp (ISO/Date) para a data operacional (YYYY-MM-DD) em
+ * America/Sao_Paulo. Espelha `public.operational_date(timestamptz)` no banco
+ * e substitui `String(ts).slice(0,10)` (que devolve UTC e desloca visitas
+ * noturnas para o dia seguinte).
+ */
+export function toOperationalDate(ts: string | Date | null | undefined): string | null {
+  if (!ts) return null;
+  const d = ts instanceof Date ? ts : new Date(ts);
+  if (isNaN(d.getTime())) return null;
+  return getOperationalDate(d);
+}
+
+/**
  * Semana e ano epidemiológicos (ISO) calculados a partir de uma data-only
  * (YYYY-MM-DD) já normalizada para America/Sao_Paulo. Uso interno de UTC
  * aqui é seguro porque a entrada é uma data de calendário, não timestamp.
