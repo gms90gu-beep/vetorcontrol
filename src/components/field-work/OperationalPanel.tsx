@@ -265,12 +265,14 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const total = bp?.total_properties ?? properties.length ?? session?.property_count ?? 0;
   const lastVisitByProp = useMemo(() => {
     const m = new Map<string, any>();
-    for (const v of [...visits].sort((a, b) =>
+    // Prefere visitas do ciclo inteiro; fallback para as visitas do dia.
+    const source = blockVisits.length ? blockVisits : visits;
+    for (const v of [...source].sort((a, b) =>
       String(a.visit_date).localeCompare(String(b.visit_date)))) {
       if (v.property_id) m.set(v.property_id, v);
     }
     return m;
-  }, [visits]);
+  }, [visits, blockVisits]);
 
   const stats = useMemo(() => {
     let focus = 0;
