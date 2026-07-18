@@ -92,6 +92,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const [week, setWeek] = useState<any>(null);
   const [properties, setProperties] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
+  const [blockVisits, setBlockVisits] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [pendencies, setPendencies] = useState<any[]>([]);
   const [filter, setFilter] = useState<FilterKey>("all");
