@@ -92,6 +92,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const [week, setWeek] = useState<any>(null);
   const [properties, setProperties] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
+  const [blockVisits, setBlockVisits] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [pendencies, setPendencies] = useState<any[]>([]);
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -189,6 +190,35 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
   useEffect(() => { loadAll(); }, [loadAll, refreshTick]);
 
+  // Cross-day: visitas do bloco/ciclo inteiro para status por imóvel na lista
+  // (última visita "de sempre" no ciclo — corrige imóveis trabalhados em dias
+  // anteriores que apareciam como "Pendente" só por não terem visita hoje).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!session?.cycle_id || !properties.length) {
+        if (!cancelled) setBlockVisits([]);
+        return;
+      }
+      const propIds = properties.map((p) => p.id);
+      const bv = await listRemoteOrCache<any>({
+        name: "visits",
+        remote: () =>
+          supabase.from("visits")
+            .select("id, property_id, status, has_focus, visit_date, is_recovery, cycle_id, agent_id")
+            .eq("cycle_id", session.cycle_id)
+            .in("property_id", propIds) as any,
+        filter: (v) =>
+          v.cycle_id === session.cycle_id && propIds.includes(v.property_id),
+      });
+      if (!cancelled) {
+        setBlockVisits(bv || []);
+        audit("OP_PANEL_BLOCK_VISITS", { count: (bv || []).length, cycle_id: session.cycle_id });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session?.cycle_id, properties, refreshTick]);
+
   // Realtime: escuta visitas/depósitos/pendências e recarrega
   useEffect(() => {
     if (!session?.user_id || !session?.block_id) return;
@@ -235,12 +265,14 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const total = bp?.total_properties ?? properties.length ?? session?.property_count ?? 0;
   const lastVisitByProp = useMemo(() => {
     const m = new Map<string, any>();
-    for (const v of [...visits].sort((a, b) =>
+    // Prefere visitas do ciclo inteiro; fallback para as visitas do dia.
+    const source = blockVisits.length ? blockVisits : visits;
+    for (const v of [...source].sort((a, b) =>
       String(a.visit_date).localeCompare(String(b.visit_date)))) {
       if (v.property_id) m.set(v.property_id, v);
     }
     return m;
-  }, [visits]);
+  }, [visits, blockVisits]);
 
   const stats = useMemo(() => {
     let focus = 0;
