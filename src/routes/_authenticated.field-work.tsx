@@ -582,11 +582,20 @@ function FieldWorkPage() {
         console.log("[SESSION_LOOKUP]", {
           user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
         });
-        // Busca primeiro uma sessão da MESMA Data da Produção selecionada
-        // (retomada legítima). Antes, a busca ignorava session_date e podia
-        // trazer uma sessão de outra data mais recente, que era então
-        // bloqueada erroneamente por assessSessionForResume (bug #3).
-        let { data: existing } = await supabase
+        // Busca apenas sessão da MESMA Data da Produção selecionada
+        // (retomada legítima). O banco tem UNIQUE INDEX em
+        // (user_id, session_date, block_id) — ou seja, cada Data da
+        // Produção tem sua própria sessão independente para o mesmo
+        // quarteirão, e uma sessão pausada/em andamento de OUTRA data
+        // não deve impedir o início de uma jornada nova nesta data.
+        //
+        // Uma versão anterior deste fix ainda caía para uma sessão de
+        // outra data quando não achava uma para a data selecionada, só
+        // para mostrar a mensagem "outra Data da Produção" — na prática
+        // isso bloqueava indevidamente o início de jornadas novas sempre
+        // que existisse qualquer sessão pausada antiga do mesmo bloco em
+        // outra data (bug reportado após o fix anterior). Removido.
+        const { data: existing } = await supabase
           .from("field_work_sessions")
           .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
           .eq("user_id", userId)
@@ -596,22 +605,6 @@ function FieldWorkPage() {
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-
-        if (!existing) {
-          // Nenhuma sessão para a data selecionada: verifica se existe uma
-          // sessão de OUTRA data para dar o feedback correto ("outra Data
-          // da Produção") em vez de simplesmente criar uma jornada nova.
-          const { data: otherDate } = await supabase
-            .from("field_work_sessions")
-            .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
-            .eq("user_id", userId)
-            .eq("block_id", selectedBlock.id)
-            .in("status", ["in_progress", "paused"])
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          existing = otherDate ?? null;
-        }
 
         if (existing) {
           console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
