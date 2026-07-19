@@ -1,5 +1,5 @@
 // Shared map infrastructure (Leaflet/OSM) — single source of truth.
-// Used by BlockMapDialog, OperationalMapView, GeorefAuditMap.
+// Used by OperationalMapView, GeorefAuditMap.
 
 export type TileProvider = {
   id: string;
