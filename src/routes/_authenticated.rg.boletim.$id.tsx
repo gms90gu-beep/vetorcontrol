@@ -43,6 +43,10 @@ type Property = {
   geocoded_at: string | null;
   had_previous_focus: boolean | null;
   status: string | null;
+  // Status real de campo, derivado da última visita (tabela visits/visit_status) —
+  // NÃO confundir com `status` acima, que é property_status (raramente muda).
+  visit_status?: string | null;
+  last_visit_date?: string | null;
 };
 
 type Boletim = {
@@ -305,6 +309,42 @@ function BoletimView() {
       if (!props.length) {
         console.log("[RG_VIEWER_EMPTY]", { boletim_id: b.id, block_id: b.block_id, block_number: b.block_number, online });
         console.log("[RG_VIEWER_EMPTY_FILTER]", lookupFilters);
+      }
+
+      // Enriquecer com o status REAL de campo (última visita), lido de `visits`.
+      // `properties.status` (property_status) é um enum praticamente estático — usar
+      // só ele faz o mapa/KPIs do RG mostrarem quase tudo como "Pendente" mesmo com
+      // visitas registradas.
+      const propertyIds = props.map((p) => p.id).filter(Boolean);
+      if (propertyIds.length) {
+        try {
+          const visitsForProps = await listRemoteOrCache<any>({
+            name: "visits",
+            remote: () =>
+              supabase
+                .from("visits")
+                .select("id, property_id, status, visit_date")
+                .in("property_id", propertyIds)
+                .order("visit_date", { ascending: false }) as any,
+            filter: (v: any) => propertyIds.includes(v.property_id),
+          });
+          const lastVisitByProperty = new Map<string, { status: string | null; visit_date: string | null }>();
+          for (const v of ((visitsForProps || []) as any[])) {
+            if (!v?.property_id) continue;
+            const existing = lastVisitByProperty.get(v.property_id);
+            if (!existing || String(v.visit_date || "") > String(existing.visit_date || "")) {
+              lastVisitByProperty.set(v.property_id, { status: v.status ?? null, visit_date: v.visit_date ?? null });
+            }
+          }
+          for (const p of props) {
+            const last = lastVisitByProperty.get(p.id);
+            p.visit_status = last?.status ?? null;
+            p.last_visit_date = last?.visit_date ?? null;
+          }
+          console.log("[RG_VIEWER_VISIT_STATUS]", { boletim_id: b.id, properties: props.length, withVisit: lastVisitByProperty.size });
+        } catch (e) {
+          console.warn("[RG_VIEWER_VISITS_ERR]", e);
+        }
       }
       setImoveis(props);
     } catch (e: any) {
