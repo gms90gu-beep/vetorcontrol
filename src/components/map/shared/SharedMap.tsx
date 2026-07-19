@@ -110,6 +110,12 @@ export function SharedMap({
     const cfg = BASE_LAYERS[id];
     const base = L.tileLayer(cfg.baseUrl, {
       maxZoom: cfg.maxZoom,
+      // Sem isto, zoom além da resolução nativa do provedor (comum em
+      // satélite fora de grandes centros urbanos) pedia tiles inexistentes e
+      // o Esri respondia com um tile cinza/em branco — parecia que trocar de
+      // camada "não fazia nada". Com maxNativeZoom, o Leaflet passa a
+      // ampliar (upscale) o último tile real em vez de pedir um vazio.
+      maxNativeZoom: cfg.maxNativeZoom,
       subdomains: (cfg.baseSubdomains ?? "abc") as any,
       attribution: cfg.baseAttribution,
       crossOrigin: true,
@@ -119,6 +125,7 @@ export function SharedMap({
     if (cfg.overlayUrl) {
       const overlay = L.tileLayer(cfg.overlayUrl, {
         maxZoom: cfg.maxZoom,
+        maxNativeZoom: cfg.overlayMaxNativeZoom ?? cfg.maxNativeZoom,
         subdomains: (cfg.overlaySubdomains ?? "abc") as any,
         attribution: cfg.overlayAttribution,
         crossOrigin: true,

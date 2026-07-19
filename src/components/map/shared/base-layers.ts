@@ -13,9 +13,19 @@ export type BaseLayerDef = {
   baseAttribution: string;
   baseSubdomains?: string;
   maxZoom: number;
+  /**
+   * Zoom máximo em que o provedor realmente TEM imagem própria (nativa).
+   * Além desse nível o Leaflet passa a ampliar (upscale) o último tile
+   * disponível em vez de pedir um tile que não existe. Sem isso, provedores
+   * de satélite sem cobertura em alta resolução (comum em cidades pequenas
+   * do interior do Brasil) respondem com um tile cinza/em branco em vez de
+   * erro — dando a falsa impressão de que trocar de camada "não fez nada".
+   */
+  maxNativeZoom?: number;
   overlayUrl?: string;
   overlayAttribution?: string;
   overlaySubdomains?: string;
+  overlayMaxNativeZoom?: number;
 };
 
 export const BASE_LAYERS: Record<BaseLayerId, BaseLayerDef> = {
@@ -38,6 +48,10 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerDef> = {
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     baseAttribution: "© Esri, Maxar, Earthstar Geographics",
     maxZoom: 19,
+    // Cobertura em alta resolução do Esri World Imagery é irregular fora de
+    // grandes centros urbanos; em cidades pequenas do interior geralmente só
+    // existe imagem nativa até ~17. Acima disso, upscale em vez de branco.
+    maxNativeZoom: 17,
   },
   hybrid: {
     id: "hybrid",
@@ -48,9 +62,11 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerDef> = {
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     baseAttribution: "© Esri, Maxar, Earthstar Geographics",
     maxZoom: 19,
+    maxNativeZoom: 17,
     overlayUrl:
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     overlayAttribution: "Rótulos © Esri",
+    overlayMaxNativeZoom: 18,
   },
   terrain: {
     id: "terrain",
