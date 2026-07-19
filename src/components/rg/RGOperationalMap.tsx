@@ -96,7 +96,12 @@ export function RGOperationalMap({
   const ordered = useMemo(() => [...properties].sort(comparePropertyOrder), [properties]);
   const enriched = useMemo(() => ordered.map((p, i) => {
     const kind = classify(p);
-    const label = p.sequence != null ? p.sequence : i + 1;
+    // Numeração sempre sequencial (1, 2, 3...) na ordem geográfica/operacional
+    // (comparePropertyOrder), e NÃO o campo bruto `sequence` do cadastro —
+    // esse valor vem do boletim impresso e pode ter lacunas/repetições
+    // (ex.: reaproveitado por lado da rua), o que deixava a numeração do
+    // mapa "fora de ordem" (1, 4, 6, 14, 23...) em vez de 1, 2, 3, 4, 5...
+    const label = i + 1;
     return { p, kind, label };
   }), [ordered]);
 
