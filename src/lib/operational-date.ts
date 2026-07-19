@@ -66,6 +66,28 @@ export function getOperationalVisitDate(
   return iso;
 }
 
+/**
+ * Instante UTC (ISO 8601 com offset explícito) correspondente ao início ou
+ * fim de um dia operacional (America/Sao_Paulo), a partir de uma data
+ * YYYY-MM-DD. Use SEMPRE que uma data operacional precisar virar um filtro
+ * de timestamp enviado diretamente ao Supabase/Postgres
+ * (`.gte`/`.lte` em colunas timestamptz) — nunca envie
+ * `"YYYY-MM-DDT00:00:00"` cru como filtro: essa string não carrega fuso
+ * horário, então o Postgres a interpreta usando o fuso da SESSÃO DO BANCO
+ * (tipicamente UTC), não o de São Paulo, deslocando o corte do dia em
+ * ~3 horas e fazendo visitas feitas à noite (~21h-24h) contarem no dia
+ * seguinte (ou o contrário, dependendo do lado do corte).
+ *
+ * Brasil não observa horário de verão desde 2019 (mesma premissa já usada
+ * em getOperationalDate), então o offset -03:00 é fixo e seguro aqui.
+ */
+export function operationalDateBoundsUtcIso(dateOnly: string): { startIso: string; endIso: string } {
+  return {
+    startIso: `${dateOnly}T00:00:00-03:00`,
+    endIso: `${dateOnly}T23:59:59.999-03:00`,
+  };
+}
+
 export function getOperationalDayRange(sessionDate?: string | null): { start: string; end: string; dateOnly: string } {
   const base = sessionDate ? new Date(`${sessionDate}T00:00:00`) : new Date();
   const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
