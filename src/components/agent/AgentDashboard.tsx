@@ -25,7 +25,7 @@ import { InstallPromoCard } from "@/components/InstallPromoCard";
 import { RunningAsAppBadge } from "@/components/InstallAppButton";
 import { MyWeeklyConsolidation } from "@/components/agent/MyWeeklyConsolidation";
 import { BulletinPreview } from "@/components/agent/BulletinPreview";
-import { getOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
 import { listBlockProgress } from "@/lib/offline/repos/blockProgress";
 
 const DAILY_GOAL = 30;
@@ -74,7 +74,7 @@ export function AgentDashboard() {
   const [cycleInfo, setCycleInfo] = useState<{ number: number; year: number } | null>(null);
   const [todayDeposits, setTodayDeposits] = useState({ tratados: 0, focos: 0 });
   const [weekFocos, setWeekFocos] = useState(0);
-  const [blockStats, setBlockStats] = useState({ atual: "—", concluidos: 0, pendentes: 0 });
+  const [blockStats, setBlockStats] = useState({ atual: "—", concluidos: 0, concluidosSemana: 0, pendentes: 0 });
   const [hasActiveSession, setHasActiveSession] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -98,6 +98,12 @@ export function AgentDashboard() {
       setProfile(p ?? null);
 
       const todayIso = getOperationalDate();
+      // Início do dia operacional em UTC com offset explícito (-03:00),
+      // não a string naive "YYYY-MM-DDT00:00:00" — essa era interpretada
+      // pelo Postgres no fuso da sessão do banco (não o de São Paulo),
+      // deslocando o corte de "hoje" em ~3 horas e contando visitas da
+      // noite anterior como se fossem de hoje (ou o contrário).
+      const { startIso: todayStartUtcIso } = operationalDateBoundsUtcIso(todayIso);
       const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
@@ -113,7 +119,7 @@ export function AgentDashboard() {
         .from("visits")
         .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount, property_id")
         .eq("agent_id", user.id)
-        .gte("visit_date", `${todayIso}T00:00:00`)
+        .gte("visit_date", todayStartUtcIso)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qToday = qToday.eq("cycle_id", activeCycleId);
       const { data: vToday } = await qToday;
@@ -186,14 +192,21 @@ export function AgentDashboard() {
 
 
       // Sessão ativa (apenas para saber se há jornada em curso — timeline).
-      const { data: active } = await supabase
+      // O status real gravado ao iniciar uma jornada é "in_progress" (ver
+      // field-work.tsx), não "active" — esse valor nunca é escrito por
+      // nenhum fluxo atual do app, então esta checagem nunca encontrava
+      // nada e "Quart. atual"/hasActiveSession ficavam sempre vazios.
+      // Também restrita ao ciclo ativo, para não exibir uma sessão de um
+      // ciclo antigo/encerrado ao lado dos contadores do ciclo atual.
+      let qActive = supabase
         .from("field_work_sessions")
-        .select("id, block_number, status")
+        .select("id, block_number, status, cycle_id")
         .eq("user_id", user.id)
-        .eq("status", "active")
+        .eq("status", "in_progress")
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+      if (activeCycleId) qActive = qActive.eq("cycle_id", activeCycleId);
+      const { data: active } = await qActive.maybeSingle();
 
       // BLOCK_PROGRESS_SOURCE_OF_TRUTH — nunca contar blocos via field_work_sessions.
       const allProgress = await listBlockProgress(user.id);
@@ -207,9 +220,23 @@ export function AgentDashboard() {
         const pendentes = cycleProgress.filter(
           (p) => p.status === "IN_PROGRESS" || p.status === "PAUSED",
         ).length;
+        // Quarteirões concluídos DENTRO da semana atual (Sunday-Saturday,
+        // igual à Semana Epidemiológica), usando completed_at do
+        // block_progress. Antes este card reaproveitava `concluidos`
+        // (total do ciclo inteiro) sob o rótulo "(semana)" — mostrava o
+        // mesmo número que o card do ciclo, mas com um rótulo que não
+        // correspondia ao que estava sendo exibido.
+        const weekStartMs = new Date(weekStart).getTime();
+        const weekEndMs = weekStartMs + 7 * 86400000;
+        const concluidosSemana = cycleProgress.filter((p) => {
+          if (p.status !== "COMPLETED" || !p.completed_at) return false;
+          const t = new Date(p.completed_at).getTime();
+          return t >= weekStartMs && t < weekEndMs;
+        }).length;
         setBlockStats({
           atual: active?.block_number || "—",
           concluidos,
+          concluidosSemana,
           pendentes,
         });
         console.info("[BLOCK_PROGRESS_MIGRATION]", {
@@ -217,6 +244,7 @@ export function AgentDashboard() {
           hook: "listBlockProgress",
           version: 1,
           concluidos,
+          concluidosSemana,
           pendentes,
         });
       }
@@ -410,7 +438,7 @@ export function AgentDashboard() {
             <MetricBox icon={Home} label="Visitados (semana)" value={semVisitados} color="#185fa5" />
             <MetricBox icon={Bug} label="Focos (semana)" value={weekFocos} color="#dc2626" />
             <MetricBox icon={XCircle} label="Recusas (semana)" value={semRecusas} color="#a32d2d" />
-            <MetricBox icon={MapPin} label="Quart. concl. (semana)" value={blockStats.concluidos} color="#3b6d11" />
+            <MetricBox icon={MapPin} label="Quart. concl. (semana)" value={blockStats.concluidosSemana} color="#3b6d11" />
           </div>
         </section>
 
