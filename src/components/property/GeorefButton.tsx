@@ -10,7 +10,7 @@ interface Props {
   actorId: string | null;
   hasCoords: boolean;
   size?: "sm" | "default" | "icon";
-  onDone?: (lat: number, lng: number) => void;
+  onDone?: (lat: number, lng: number, accuracy?: number | null) => void;
   label?: string;
 }
 
@@ -28,7 +28,7 @@ export function GeorefButton({ propertyId, actorId, hasCoords, size = "sm", onDo
     try {
       const coords = await georeferenceProperty(propertyId, actorId);
       toast.success("Imóvel georreferenciado.");
-      onDone?.(coords.latitude, coords.longitude);
+      onDone?.(coords.latitude, coords.longitude, coords.accuracy ?? null);
     } catch (err: any) {
       toast.error(err?.message || "Falha ao georreferenciar.");
     } finally {
