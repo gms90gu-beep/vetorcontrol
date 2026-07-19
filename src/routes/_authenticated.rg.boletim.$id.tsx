@@ -40,6 +40,7 @@ type Property = {
   inhabitants: number | null;
   latitude: number | null;
   longitude: number | null;
+  accuracy: number | null;
   geocoded_at: string | null;
   had_previous_focus: boolean | null;
   status: string | null;
@@ -257,7 +258,7 @@ function BoletimView() {
         remote: () =>
           supabase
             .from("properties")
-            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
+            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, accuracy, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
             .eq("boletim_id", b!.id)
             .order("sequence", { ascending: true }) as any,
         filter: (p) => p.boletim_id === b!.id,
@@ -275,7 +276,7 @@ function BoletimView() {
           remote: () =>
             supabase
               .from("properties")
-              .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
+              .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, accuracy, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
               .eq("block_id", b!.block_id as string)
               .order("sequence", { ascending: true }) as any,
           filter: (p) => p.block_id === b!.block_id,
@@ -371,11 +372,11 @@ function BoletimView() {
     return out;
   }, [imoveisFiltrados, totalFolhas]);
 
-  function handleGeorefUpdate(propertyId: string, lat: number, lng: number) {
+  function handleGeorefUpdate(propertyId: string, lat: number, lng: number, accuracy?: number | null) {
     setImoveis((prev) =>
       prev.map((p) =>
         p.id === propertyId
-          ? { ...p, latitude: lat, longitude: lng, geocoded_at: new Date().toISOString() }
+          ? { ...p, latitude: lat, longitude: lng, accuracy: accuracy ?? null, geocoded_at: new Date().toISOString() }
           : p,
       ),
     );
@@ -883,7 +884,7 @@ function BoletimView() {
                                 propertyId={p.id}
                                 actorId={currentUserId}
                                 hasCoords={hasCoords}
-                                onDone={(lat, lng) => handleGeorefUpdate(p.id, lat, lng)}
+                                onDone={(lat, lng, accuracy) => handleGeorefUpdate(p.id, lat, lng, accuracy)}
                                 label={hasCoords ? "Atualizar" : "Georref."}
                               />
                             </div>
