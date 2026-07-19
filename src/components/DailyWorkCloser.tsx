@@ -11,6 +11,7 @@ import {
 import { isOnline } from "@/lib/offline/safe-fetch";
 import { getOperationalDate, epiWeekFromDate, toOperationalDate } from "@/lib/operational-date";
 import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
+import { pauseBlockProgress, enqueueRecomputeBlockProgress } from "@/lib/offline/repos/blockProgress";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -1648,24 +1649,86 @@ export function DailyWorkCloser({
         (s) => s.user_id === user.id && s.status === "in_progress",
       );
       const localVisitsAll = await listLocal<any>("visits", (v) => v.agent_id === user.id);
+
+      // Métricas com escopo por bloco (cycle_id/property_id), já calculadas
+      // acima na auditoria do encerramento (__perBlockAudit). Usamos essa
+      // fonte — em vez de recontar visitas filtradas por field_work_session_id
+      // — para decidir completed/paused (ver diagnóstico bug #2): a contagem
+      // por session_id ignorava visitas feitas em sessões anteriores/pausadas
+      // do mesmo quarteirão e podia marcar o dia como "paused" mesmo com
+      // tudo trabalhado, além de depender de s.property_count, que é um
+      // snapshot que pode estar desatualizado.
+      const blockMetricsByNumber = new Map<string, any>(
+        (__perBlockAudit || []).map((b: any) => [String(b.block_number), b]),
+      );
+
       for (const s of sessionsToClose) {
-        const total = Number(s.property_count || 0);
-        const workedIds = new Set<string>();
-        for (const v of localVisitsAll) {
-          if (v.field_work_session_id !== s.id) continue;
-          if (!v.property_id) continue;
-          if (v.status === "visited" || v.status === "closed" || v.status === "refused") {
-            workedIds.add(v.property_id);
+        const bn = String(s.block_number ?? "");
+        const blockMetrics = blockMetricsByNumber.get(bn);
+
+        let total: number;
+        let worked: number;
+        let allDone: boolean;
+        let statusSource: "block-metrics" | "session-fallback";
+
+        if (blockMetrics && Number(blockMetrics.totalProperties || 0) > 0) {
+          total = Number(blockMetrics.totalProperties || 0);
+          const pending = Number(blockMetrics.pendingProperties || 0);
+          worked = total - pending;
+          allDone = pending === 0;
+          statusSource = "block-metrics";
+        } else {
+          // Fallback: sem métricas de auditoria para este bloco, mantém o
+          // cálculo local anterior (apenas visitas desta sessão específica).
+          total = Number(s.property_count || 0);
+          const workedIds = new Set<string>();
+          for (const v of localVisitsAll) {
+            if (v.field_work_session_id !== s.id) continue;
+            if (!v.property_id) continue;
+            if (v.status === "visited" || v.status === "closed" || v.status === "refused") {
+              workedIds.add(v.property_id);
+            }
           }
+          worked = workedIds.size;
+          allDone = total > 0 && worked >= total;
+          statusSource = "session-fallback";
         }
-        const worked = workedIds.size;
-        const allDone = total > 0 && worked >= total;
+
         const nextStatus = allDone ? "completed" : "paused";
         const prevStatus = s.status;
         await updateOffline("field_work_sessions", s.id, {
           status: nextStatus,
           updated_at: new Date().toISOString(),
         });
+
+        // Reconcilia block_progress com a decisão de fechamento (bug #2):
+        // antes essa tabela nunca era atualizada aqui e podia ficar
+        // dessincronizada do status real da sessão/dia.
+        const bpCycleId = s.cycle_id ?? activeCycle?.id ?? null;
+        if (bpCycleId && s.block_number != null) {
+          try {
+            if (allDone) {
+              await enqueueRecomputeBlockProgress({
+                cycle_id: bpCycleId,
+                block_number: String(s.block_number),
+                agent_id: user.id,
+              });
+            } else {
+              await pauseBlockProgress({
+                cycle_id: bpCycleId,
+                block_number: String(s.block_number),
+                agent_id: user.id,
+              });
+            }
+          } catch (e) {
+            console.warn("[BLOCK_PROGRESS_RECONCILE_ERROR]", {
+              session_id: s.id,
+              block_number: s.block_number,
+              message: (e as any)?.message,
+            });
+          }
+        }
+
         const logPayload = {
           user_id: user.id,
           session_id: s.id,
@@ -1677,6 +1740,7 @@ export function DailyWorkCloser({
           new_status: nextStatus,
           worked,
           total,
+          source: statusSource,
         };
         if (allDone) {
           console.log("[JOURNEY_FINISHED]", logPayload);

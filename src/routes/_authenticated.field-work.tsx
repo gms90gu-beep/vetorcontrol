@@ -65,7 +65,10 @@ async function autoRecoverSession(sessionId: string) {
  * Se o quarteirão já estiver CONCLUÍDO na Data da Produção ou o DWR já tiver sido
  * encerrado, auto-repara a sessão (marca como closed) e suprime o modal.
  */
-async function assessSessionForResume(session: any): Promise<{ show: boolean; reason: string; decision: string }> {
+async function assessSessionForResume(
+  session: any,
+  referenceDate?: string,
+): Promise<{ show: boolean; reason: string; decision: string }> {
   const base = {
     session_id: session?.id,
     agent_id: session?.user_id,
@@ -84,14 +87,24 @@ async function assessSessionForResume(session: any): Promise<{ show: boolean; re
     return { show, reason, decision };
   };
 
-  // 1) Data da Produção — jornada só pode ser retomada na Data da Produção ativa.
-  const opDate = getOperationalDate();
+  // 1) Data da Produção — jornada só pode ser retomada na Data da Produção
+  // selecionada pelo usuário (referenceDate). Quando não há uma data
+  // selecionada (ex.: checagem automática de retomada no boot da página),
+  // usa a data operacional real como padrão.
+  //
+  // Antes, esta comparação usava sempre getOperationalDate() (a data real de
+  // "hoje"), mesmo quando o usuário havia selecionado deliberadamente uma
+  // Data da Produção retroativa (até MAX_RETROACTIVE_DAYS dias). Isso
+  // bloqueava retomadas legítimas com o erro "Esta jornada é de outra Data
+  // da Produção", mesmo quando session.session_date era exatamente a data
+  // selecionada. Ver diagnóstico bug #3.
+  const opDate = referenceDate ?? getOperationalDate();
   if (!session?.session_date || session.session_date !== opDate) {
     console.log("[JOURNEY_EXPIRED]", {
       session_id: base.session_id,
       session_date: base.session_date,
       operational_date: opDate,
-      motivo: "session_date diferente da Data da Produção ativa",
+      motivo: "session_date diferente da Data da Produção selecionada",
     });
     return decide("blocked_by_date", false, "data expirada", { operational_date: opDate });
   }
@@ -569,15 +582,36 @@ function FieldWorkPage() {
         console.log("[SESSION_LOOKUP]", {
           user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
         });
-        const { data: existing } = await supabase
+        // Busca primeiro uma sessão da MESMA Data da Produção selecionada
+        // (retomada legítima). Antes, a busca ignorava session_date e podia
+        // trazer uma sessão de outra data mais recente, que era então
+        // bloqueada erroneamente por assessSessionForResume (bug #3).
+        let { data: existing } = await supabase
           .from("field_work_sessions")
           .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
           .eq("user_id", userId)
           .eq("block_id", selectedBlock.id)
+          .eq("session_date", sessionDateStr)
           .in("status", ["in_progress", "paused"])
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        if (!existing) {
+          // Nenhuma sessão para a data selecionada: verifica se existe uma
+          // sessão de OUTRA data para dar o feedback correto ("outra Data
+          // da Produção") em vez de simplesmente criar uma jornada nova.
+          const { data: otherDate } = await supabase
+            .from("field_work_sessions")
+            .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
+            .eq("user_id", userId)
+            .eq("block_id", selectedBlock.id)
+            .in("status", ["in_progress", "paused"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          existing = otherDate ?? null;
+        }
 
         if (existing) {
           console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
@@ -590,10 +624,13 @@ function FieldWorkPage() {
               existing_status: (existing as any).status,
             });
           }
-          const decision = await assessSessionForResume({
-            ...(existing as any),
-            user_id: userId,
-          });
+          const decision = await assessSessionForResume(
+            {
+              ...(existing as any),
+              user_id: userId,
+            },
+            sessionDateStr,
+          );
           if (decision.show) {
             setOpenSession(existing as any);
             setOpenSessionModal(true);
