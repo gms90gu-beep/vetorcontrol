@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import {
   listLocal,
+  listRemoteOrCache,
   upsertOffline,
   updateOffline,
   enqueueRpcOffline,
@@ -189,7 +190,26 @@ async function buildDailySnapshot(
     visit_ids: allVisits.map((v: any) => v.id),
     source: "dexie",
   });
-  const allDeposits = await listLocal<any>("visit_deposits");
+  // RC-DEP: não usar listLocal("visit_deposits") sem escopo — essa tabela do Dexie só é
+  // populada por escritas diretas (saveVisitOffline) ou pela tela de detalhe do imóvel;
+  // não existe hidratação em lote a partir do Supabase. Visitas sincronizadas por outras
+  // telas (via listRemoteOrCache com join aninhado) ficam com depósitos "fantasma": a
+  // visita aparece no cache local, mas seus registros de visit_deposits nunca chegam à
+  // tabela dedicada — resultando em Depósitos/Detalhamento por Tipo zerados no fechamento.
+  // Buscamos online-first, com fallback ao cache local filtrado pelos IDs das visitas do dia.
+  const visitIdsForDeposits = allVisits.map((v: any) => v.id).filter(Boolean);
+  const visitIdSetForDeposits = new Set(visitIdsForDeposits);
+  const allDeposits = visitIdsForDeposits.length
+    ? await listRemoteOrCache<any>({
+        name: "visit_deposits",
+        remote: () =>
+          supabase
+            .from("visit_deposits")
+            .select("*")
+            .in("visit_id", visitIdsForDeposits) as any,
+        filter: (d: any) => visitIdSetForDeposits.has(d.visit_id),
+      })
+    : [];
   const depByVisit = new Map<string, any[]>();
   for (const d of allDeposits) {
     const arr = depByVisit.get(d.visit_id) || [];
