@@ -7,7 +7,9 @@ import {
   SharedMap,
   SharedMapControls,
   SharedNumberedMarkerLayer,
+  SharedRouteLayer,
   SharedUserLocationLayer,
+  useFitBounds,
   type NumberedPoint,
 } from "@/components/map/shared";
 import { cn } from "@/lib/utils";
@@ -156,8 +158,32 @@ export function RGOperationalMap({
 
   const geoCount = points.length;
 
+  // Pontos na ORDEM operacional (mesma ordem de `points`, já ordenada por
+  // comparePropertyOrder) — usados para a linha de sequência e para o
+  // auto-enquadramento do mapa ao abrir/atualizar, igual ao mapa usado
+  // durante o expediente (OperationalMapView).
+  const routePoints = useMemo(
+    () => points.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [points],
+  );
+  const routeLatLngs = useMemo(
+    () => points.map((p) => [p.lat, p.lng] as [number, number]),
+    [points],
+  );
+
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
+
+  // Auto-enquadra o mapa nos imóveis do quarteirão assim que ele carrega ou
+  // quando a lista de pontos georreferenciados muda — sem isso o mapa abria
+  // centralizado num ponto genérico e era preciso descobrir manualmente o
+  // botão "Centralizar quarteirão" antes de conseguir ver a rua de perto.
+  // Opções memoizadas: useFitBounds usa os valores como dependências de efeito
+  // por referência — um objeto/array novo a cada render faria o mapa voltar a
+  // se re-enquadrar (perdendo zoom/pan manual do usuário) a cada atualização
+  // de GPS ou outro estado não relacionado aos pontos.
+  const fitBoundsOpts = useMemo(() => ({ maxZoom: 18, padding: [32, 32] as [number, number] }), []);
+  useFitBounds(mapInst, routeLatLngs, fitBoundsOpts);
 
   // Geolocalização — apenas sob demanda.
   const [gpsOn, setGpsOn] = useState(false);
@@ -347,6 +373,15 @@ export function RGOperationalMap({
           legend="none"
           onReady={setMapInst}
         >
+          {routePoints.length > 1 && (
+            <SharedRouteLayer
+              points={routePoints}
+              color="#94a3b8"
+              weight={2}
+              opacity={0.75}
+              dashArray="4 7"
+            />
+          )}
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
