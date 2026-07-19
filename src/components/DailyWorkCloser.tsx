@@ -9,7 +9,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { getOperationalDate, epiWeekFromDate, toOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, toOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
 import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
 import { pauseBlockProgress, enqueueRecomputeBlockProgress } from "@/lib/offline/repos/blockProgress";
 import { jsPDF } from "jspdf";
@@ -1342,12 +1342,17 @@ export function DailyWorkCloser({
       let __remoteCount = 0;
       try {
         if (isOnline()) {
+          // Bounds em UTC com offset explícito (-03:00), não a string naive
+          // "YYYY-MM-DDT00:00:00" — essa era interpretada pelo Postgres no
+          // fuso da sessão do banco, deslocando o corte do dia em ~3h e
+          // gerando falsos positivos de "[DAY_CLOSE_CACHE] divergent".
+          const { startIso: __dayStartUtc, endIso: __dayEndUtc } = operationalDateBoundsUtcIso(operationalWorkDate);
           const { count } = await supabase
             .from("visits")
             .select("id", { count: "exact", head: true })
             .eq("agent_id", user.id)
-            .gte("visit_date", `${operationalWorkDate}T00:00:00`)
-            .lte("visit_date", `${operationalWorkDate}T23:59:59.999`);
+            .gte("visit_date", __dayStartUtc)
+            .lte("visit_date", __dayEndUtc);
           __remoteCount = count || 0;
         }
       } catch {}
@@ -1812,8 +1817,14 @@ export function DailyWorkCloser({
       const startOfDay = new Date(`${opDateStr}T00:00:00`);
       const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
 
-      // Semana epidemiológica derivada da data operacional (America/Sao_Paulo).
-      const epiWeek = epiWeekFromDate(opDateStr).week;
+      // Semana epidemiológica (SINAN, domingo-sábado) derivada da data
+      // operacional (America/Sao_Paulo). Usa getEpiWeek — a MESMA função
+      // usada acima em handleCloseDay ao gravar daily_work_records.epi_week
+      // (linha ~1477). Antes este PDF diário usava epiWeekFromDate (semana
+      // ISO), que diverge da semana realmente gravada no registro,
+      // mostrando um número de "Semana Epidemiológica" errado no PDF.
+      const { getEpiWeek: getEpiWeekForPdf } = await import("@/lib/cycle-week");
+      const epiWeek = getEpiWeekForPdf(new Date(`${opDateStr}T12:00:00`)).week;
 
       let visits: any[] | null = null;
       if (isOnline()) {

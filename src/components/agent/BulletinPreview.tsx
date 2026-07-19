@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getOperationalDate } from "@/lib/operational-date";
 import { FileText } from "lucide-react";
 
 import { logDirectSource } from "@/lib/operational-metrics";
@@ -36,9 +37,14 @@ export function BulletinPreview({ userId }: Props) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const today = new Date();
+      // "Hoje" e semana epidemiológica derivados da data operacional
+      // (America/Sao_Paulo), não do relógio/fuso local do dispositivo nem
+      // de today.toISOString() (que é UTC e pode cair no dia errado).
+      const todayOpStr = getOperationalDate();
+      const [__y, __m, __d] = todayOpStr.split("-").map(Number);
+      const today = new Date(__y, __m - 1, __d);
       const epi = getEpiWeek(today);
-      console.log("[SE]", { work_date: today.toISOString().split("T")[0], epi_week: epi.week, epi_year: epi.year });
+      console.log("[SE]", { work_date: todayOpStr, epi_week: epi.week, epi_year: epi.year });
       if (!cancel) setSe(epi);
 
       // DWR.agent_id == profile_id

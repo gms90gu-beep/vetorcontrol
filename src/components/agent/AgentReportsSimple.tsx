@@ -19,6 +19,7 @@ import {
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
 import { getEpiWeek } from "@/lib/cycle-week";
+import { getOperationalDate } from "@/lib/operational-date";
 import {
   generateDailyReportPDF,
 } from "@/components/reports/DailyReportGenerator";
@@ -53,8 +54,13 @@ export function AgentReportsSimple() {
   });
   const [dailies, setDailies] = useState<Daily[]>([]);
 
-  const today = format(new Date(), "yyyy-MM-dd");
-  const epi = useMemo(() => getEpiWeek(new Date()), []);
+  // "Hoje" e semana epidemiológica derivados da data operacional
+  // (America/Sao_Paulo), não do relógio/fuso local do dispositivo.
+  const today = getOperationalDate();
+  const epi = useMemo(() => {
+    const [y, m, d] = today.split("-").map(Number);
+    return getEpiWeek(new Date(y, m - 1, d));
+  }, [today]);
 
   const fetchDailies = useCallback(async (aId: string) => {
     const { data, error } = await supabase

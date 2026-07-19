@@ -5,14 +5,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
-import { getOperationalDate, epiWeekFromDate } from "@/lib/operational-date";
+import { getOperationalDate } from "@/lib/operational-date";
 
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "reports/WeeklyReportGenerator", file: "src/components/reports/WeeklyReportGenerator.tsx", source: "daily_work_records", note: "gerador PDF semanal — usar getWeekMetrics após refator" });
 
-// Semana epidemiológica derivada da DATA OPERACIONAL (America/Sao_Paulo).
+// Semana epidemiológica (padrão SINAN, domingo-sábado) derivada da DATA
+// OPERACIONAL (America/Sao_Paulo). Usa getEpiWeek — a MESMA função usada
+// por DailyWorkCloser.tsx ao gravar daily_work_records.epi_week. Antes
+// esta função usava epiWeekFromDate (semana ISO, segunda-domingo), uma
+// fórmula diferente da que grava os dados — a consulta abaixo por
+// epi_week podia não encontrar as diárias certas (ou nenhuma) sempre que
+// as duas semanas divergissem, gerando um boletim semanal vazio ou com a
+// semana errada mesmo com dados reais no banco.
 function epiWeekOf(date: Date): { week: number; year: number } {
-  return epiWeekFromDate(getOperationalDate(date));
+  const opDate = getOperationalDate(date); // "YYYY-MM-DD" em America/Sao_Paulo
+  const [y, m, d] = opDate.split("-").map(Number);
+  return getEpiWeek(new Date(y, m - 1, d));
 }
 
 function pct(n: number, d: number) {

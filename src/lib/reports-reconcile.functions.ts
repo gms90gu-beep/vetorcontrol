@@ -8,7 +8,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { epiWeekFromDate } from "@/lib/operational-date";
+import { getEpiWeek } from "@/lib/cycle-week";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
@@ -218,7 +218,14 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       } else {
         // Missing DWR: create one. Data operacional derivada 100% em America/Sao_Paulo.
         const todayOp = localDate(new Date().toISOString());
-        const epi = epiWeekFromDate(g.work_date);
+        // Semana epidemiológica SINAN (domingo-sábado), a MESMA usada por
+        // DailyWorkCloser.tsx ao gravar epi_week no fluxo normal de
+        // fechamento. Antes esta reconstrução usava epiWeekFromDate
+        // (semana ISO), gravando um epi_week/epi_year DIVERGENTE do que o
+        // resto do app grava e consulta — corrompendo silenciosamente
+        // qualquer DWR recriado por este reparo administrativo.
+        const [epiY, epiM, epiD] = g.work_date.split("-").map(Number);
+        const epi = getEpiWeek(new Date(epiY, epiM - 1, epiD));
         const insert = {
           ...payload,
           agent_id: g.agent_id,

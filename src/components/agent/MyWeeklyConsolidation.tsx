@@ -53,7 +53,12 @@ export function MyWeeklyConsolidation({ userId }: Props) {
     let cancel = false;
     (async () => {
       setLoading(true);
-      const today = new Date();
+      // "Hoje" derivado da data operacional (America/Sao_Paulo), não do
+      // relógio/fuso local do dispositivo — antes epi.week/epi.year vinham
+      // de `new Date()` cru enquanto a janela de busca (sinanWeekStartOf/
+      // sinanWeekEndOf) já usava a data operacional, uma inconsistência
+      // interna dentro do mesmo efeito.
+      const today = localFromOp(new Date());
       const epi = getEpiWeek(today);
       if (!cancel) setSe(epi);
 
@@ -67,8 +72,8 @@ export function MyWeeklyConsolidation({ userId }: Props) {
         .from("daily_work_records")
         .select("*")
         .eq("agent_id", userId)
-        .gte("work_date", isoMondayOf(today))
-        .lte("work_date", isoSundayOf(today));
+        .gte("work_date", sinanWeekStartOf(today))
+        .lte("work_date", sinanWeekEndOf(today));
 
       const allRows = (rawAll as any[]) || [];
       const diagList: Diag[] = [];
@@ -213,8 +218,13 @@ function Cell({ icon: Icon, label, value, highlight }: {
   );
 }
 
-// ── Helpers de janela semanal (segunda → domingo da semana atual) ───────────
+// ── Helpers de janela semanal (domingo → sábado da semana atual) ────────────
 // Base sempre na data operacional (America/Sao_Paulo) para evitar drift de UTC.
+// A janela é domingo-sábado para bater com a Semana Epidemiológica (SINAN)
+// usada por getEpiWeek/epi_week — antes esta janela era segunda-domingo
+// (semana ISO), um dia "atrasada" em relação à semana SINAN: o domingo
+// inicial da semana SINAN atual ficava de fora da busca e nunca aparecia
+// nem nos totais nem no painel de diagnóstico "ignoradas".
 function fmtLocal(x: Date): string {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
 }
@@ -222,15 +232,15 @@ function localFromOp(d: Date): Date {
   const [y, m, dd] = getOperationalDate(d).split("-").map(Number);
   return new Date(y, m - 1, dd);
 }
-function isoMondayOf(d: Date): string {
+function sinanWeekStartOf(d: Date): string {
   const x = localFromOp(d);
-  const day = x.getDay() || 7; // domingo=0 → 7
-  x.setDate(x.getDate() - day + 1);
+  const day = x.getDay(); // domingo=0
+  x.setDate(x.getDate() - day);
   return fmtLocal(x);
 }
-function isoSundayOf(d: Date): string {
+function sinanWeekEndOf(d: Date): string {
   const x = localFromOp(d);
-  const day = x.getDay() || 7;
-  x.setDate(x.getDate() + (7 - day));
+  const day = x.getDay();
+  x.setDate(x.getDate() + (6 - day));
   return fmtLocal(x);
 }
