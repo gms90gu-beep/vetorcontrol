@@ -857,7 +857,15 @@ function BoletimView() {
                     ) : folha.map((p) => {
                       const hasCoords = p.latitude != null && p.longitude != null;
                       return (
-                        <tr key={p.id}>
+                        <tr
+                          key={p.id}
+                          onClick={() => {
+                            setSelectedPropertyId(p.id);
+                            setMapOpen(true);
+                          }}
+                          className="brg-row-clickable cursor-pointer hover:bg-blue-50/70"
+                          title="Ver no mapa"
+                        >
                           <td>{p.street_name || ""}</td>
                           <td className="text-center">{p.side || ""}</td>
                           <td className="text-center font-bold">{p.number}</td>
@@ -865,7 +873,7 @@ function BoletimView() {
                           <td className="text-center">{p.complement || ""}</td>
                           <td className="text-center font-bold">{tipoCodigo(p.type)}</td>
                           <td className="text-center">{p.inhabitants ?? 0}</td>
-                          <td className="brg-no-print text-center">
+                          <td className="brg-no-print text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1.5">
                               <span
                                 title={hasCoords ? "Georreferenciado" : "Pendente"}
