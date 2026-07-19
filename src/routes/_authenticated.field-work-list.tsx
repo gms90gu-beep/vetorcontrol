@@ -575,7 +575,7 @@ function FieldWorkListPage() {
           `;
 
           let blockCycleVisits: any[] = [];
-          let matchStrategy: "SESSION" | "CYCLE" | "LEGACY_DATE" | "NONE" = "NONE";
+          let matchStrategy: "SESSION" | "CYCLE" | "LEGACY_DATE" | "UNION" | "NONE" = "NONE";
           try {
             // Carrega superset (todas visitas dos property_ids) uma única vez,
             // depois aplica a hierarquia SESSION → CYCLE → LEGACY_DATE.
@@ -591,73 +591,69 @@ function FieldWorkListPage() {
             })) || [];
             const inScopeVisits = visitsAll.filter(inScope);
 
-            // Estratégia 1: SESSION (fonte mais confiável)
+            // Estratégia 1: SESSION (visitas feitas dentro desta sessão específica)
             console.log("[VISIT_MATCH_STRATEGY]", { strategy: "SESSION", session_id: session.id });
             const bySession = inScopeVisits.filter(
               (v: any) => v.field_work_session_id && String(v.field_work_session_id) === String(session.id),
             );
-            if (bySession.length > 0) {
-              blockCycleVisits = bySession;
-              matchStrategy = "SESSION";
-              console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
-            } else {
-              console.log("[VISIT_MATCH_FALLBACK]", {
-                from: "SESSION",
-                to: "CYCLE",
-                reason: "0 visitas com field_work_session_id=session.id",
+            console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
+
+            // Estratégia 2: CYCLE (mesmo ciclo da jornada) — jamais remover filtro de ciclo
+            const sessionCycleId = session.cycle_id ?? null;
+            console.log("[VISIT_MATCH_STRATEGY]", { strategy: "CYCLE", cycle_id: sessionCycleId });
+            const byCycle = sessionCycleId
+              ? inScopeVisits.filter(
+                  (v: any) => v.cycle_id && String(v.cycle_id) === String(sessionCycleId),
+                )
+              : [];
+            console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
+
+            // Estratégia 3: LEGACY_DATE — apenas quando a sessão não tem cycle_id
+            // (jornadas antigas, anteriores ao campo cycle_id). Complementa
+            // SESSION/CYCLE em vez de substituí-los.
+            let byDate: any[] = [];
+            if (!sessionCycleId) {
+              const startTs = session.session_date
+                ? new Date(`${session.session_date}T00:00:00`).getTime()
+                : null;
+              const endTs = session.closed_at
+                ? new Date(session.closed_at).getTime()
+                : Date.now();
+              console.log("[VISIT_MATCH_STRATEGY]", {
+                strategy: "LEGACY_DATE",
+                from: startTs ? new Date(startTs).toISOString() : null,
+                to: new Date(endTs).toISOString(),
               });
-
-              // Estratégia 2: CYCLE (mesmo ciclo da jornada) — jamais remover filtro de ciclo
-              const sessionCycleId = session.cycle_id ?? null;
-              console.log("[VISIT_MATCH_STRATEGY]", { strategy: "CYCLE", cycle_id: sessionCycleId });
-              const byCycle = sessionCycleId
-                ? inScopeVisits.filter(
-                    (v: any) => v.cycle_id && String(v.cycle_id) === String(sessionCycleId),
-                  )
+              byDate = startTs
+                ? inScopeVisits.filter((v: any) => {
+                    if (!v.visit_date) return false;
+                    const t = new Date(v.visit_date).getTime();
+                    return t >= startTs && t <= endTs;
+                  })
                 : [];
-              if (byCycle.length > 0) {
-                blockCycleVisits = byCycle;
-                matchStrategy = "CYCLE";
-                console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
-              } else {
-                console.log("[VISIT_MATCH_FALLBACK]", {
-                  from: "CYCLE",
-                  to: "LEGACY_DATE",
-                  reason: sessionCycleId
-                    ? "0 visitas com cycle_id=session.cycle_id"
-                    : "session sem cycle_id",
-                });
-
-                // Estratégia 3: LEGACY_DATE — apenas para jornadas antigas
-                const startTs = session.session_date
-                  ? new Date(`${session.session_date}T00:00:00`).getTime()
-                  : null;
-                const endTs = session.closed_at
-                  ? new Date(session.closed_at).getTime()
-                  : Date.now();
-                console.log("[VISIT_MATCH_STRATEGY]", {
-                  strategy: "LEGACY_DATE",
-                  from: startTs ? new Date(startTs).toISOString() : null,
-                  to: new Date(endTs).toISOString(),
-                });
-                const byDate = startTs
-                  ? inScopeVisits.filter((v: any) => {
-                      if (!v.visit_date) return false;
-                      const t = new Date(v.visit_date).getTime();
-                      return t >= startTs && t <= endTs;
-                    })
-                  : [];
-                if (byDate.length > 0) {
-                  blockCycleVisits = byDate;
-                  matchStrategy = "LEGACY_DATE";
-                  console.log("[VISIT_MATCH_RESULT]", { strategy: "LEGACY_DATE", found: byDate.length });
-                } else {
-                  blockCycleVisits = [];
-                  matchStrategy = "NONE";
-                  console.log("[VISIT_MATCH_RESULT]", { strategy: "NONE", found: 0 });
-                }
-              }
+              console.log("[VISIT_MATCH_RESULT]", { strategy: "LEGACY_DATE", found: byDate.length });
             }
+
+            // Fonte de verdade: UNIÃO das estratégias (dedupe por visit.id).
+            // Antes, a primeira estratégia com >0 resultados descartava as
+            // demais, escondendo visitas feitas em sessões anteriores do
+            // mesmo quarteirão (bug: imóvel já visitado aparecia como
+            // "Pendente" mesmo tendo registro de visita). Ver diagnóstico bug #1.
+            const mergedById = new Map<string, any>();
+            [...bySession, ...byCycle, ...byDate].forEach((v: any) => {
+              if (v?.id) mergedById.set(String(v.id), v);
+            });
+            blockCycleVisits = Array.from(mergedById.values());
+            matchStrategy =
+              blockCycleVisits.length === 0
+                ? "NONE"
+                : bySession.length > 0 && byCycle.length > 0
+                  ? "UNION"
+                  : bySession.length > 0
+                    ? "SESSION"
+                    : byCycle.length > 0
+                      ? "CYCLE"
+                      : "LEGACY_DATE";
           } catch (e) {
             console.warn("[SESSION_RESTORE_VISITS] fallback empty:", e);
           }
