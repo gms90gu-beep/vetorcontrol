@@ -261,7 +261,7 @@ function DesignSystemPage() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Mapas migrados: <strong>BlockMapDialog</strong>, <strong>GeorefAuditMap</strong>, rota <strong>/heatmap</strong>.
+              Mapas migrados: <strong>GeorefAuditMap</strong>, rota <strong>/heatmap</strong>.
               Detalhes em <code>docs/map-library.md</code>.
             </p>
           </div>

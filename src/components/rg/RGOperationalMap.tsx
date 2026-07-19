@@ -30,6 +30,9 @@ export type RGMapProperty = {
   longitude: number | null;
   had_previous_focus?: boolean | null;
   status?: string | null;
+  // Status real de campo (última visita), fonte preferida para classify() — vem de
+  // `visits.status`, não confundir com `status` acima (property_status, quase estático).
+  visit_status?: string | null;
   accuracy?: number | null;
   last_visit_date?: string | null;
 };
@@ -61,7 +64,9 @@ function classify(p: RGMapProperty): Kind {
   const t = normType(p.type);
   if (t === "strategic_point" || t === "pe") return "strategic";
   if (t === "vacant_lot" || t === "tb") return "vacant";
-  const s = (p.status || "").toLowerCase();
+  // Fonte de verdade: visit_status (tabela visits/visit_status). `status` (property_status)
+  // é mantido só como fallback para dados antigos que ainda não têm visit_status calculado.
+  const s = (p.visit_status ?? p.status ?? "").toLowerCase();
   if (s === "closed" || s === "refused") return "closed";
   if (s === "visited") return "visited";
   return "pending";
@@ -151,21 +156,6 @@ export function RGOperationalMap({
 
   const geoCount = points.length;
 
-  // Logs de ciclo de vida do mapa.
-  useEffect(() => {
-    console.log("[RG_MAP_LOAD]", { block: blockNumber, total: ordered.length });
-  }, [blockNumber, ordered.length]);
-  useEffect(() => {
-    console.log("[RG_MAP_RENDER]", { block: blockNumber, rendered: geoCount, missing: missingGeo.length });
-    if (missingGeo.length > 0) {
-      console.log("[RG_MAP_MISSING_COORDINATES]", {
-        block: blockNumber,
-        properties: missingGeo.map((e) => ({ id: e.p.id, number: e.p.number, sequence: e.label })),
-      });
-    }
-  }, [blockNumber, geoCount, missingGeo]);
-
-
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
 
@@ -192,7 +182,6 @@ export function RGOperationalMap({
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null };
         setUserPos(p);
-        console.log("[RG_MAP_GPS]", p);
       },
       (err) => {
         setGpsError(err.message || "Falha ao obter localização.");
@@ -215,7 +204,6 @@ export function RGOperationalMap({
     if (!gpsOn) { centeredOnceRef.current = false; return; }
     if (!mapInst || !userPos || centeredOnceRef.current) return;
     mapInst.setView([userPos.lat, userPos.lng], Math.max(mapInst.getZoom(), 17), { animate: true });
-    console.log("[RG_MAP_CENTER]", { target: "user", lat: userPos.lat, lng: userPos.lng });
     centeredOnceRef.current = true;
   }, [gpsOn, userPos, mapInst]);
 
@@ -224,16 +212,13 @@ export function RGOperationalMap({
     if (!selectedId || !listRef.current) return;
     const el = listRef.current.querySelector<HTMLElement>(`[data-prop-id="${selectedId}"]`);
     if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    console.log("[RG_MAP_CENTER]", { target: "property", id: selectedId });
   }, [selectedId]);
 
   const handleSelectFromList = useCallback((id: string) => {
-    console.log("[RG_MAP_RG_SELECTED]", { id });
     onSelect(id);
   }, [onSelect]);
 
   const handleSelectFromMap = useCallback((id: string) => {
-    console.log("[RG_MAP_PROPERTY_SELECTED]", { id });
     onSelect(id);
   }, [onSelect]);
 
@@ -378,7 +363,6 @@ export function RGOperationalMap({
             autoNight
             fitPoints={points.map((p) => [p.lat, p.lng] as [number, number])}
             onRefresh={() => {
-              console.log("[RG_MAP_REFRESH]", { block: blockNumber });
               if (mapInst) mapInst.invalidateSize();
             }}
           />

@@ -40,6 +40,10 @@ export function StreetAutocomplete({
   const [resolving, setResolving] = useState(false);
   const [skipNext, setSkipNext] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  // Guarda de "última requisição vence": cada busca ganha um id incremental; se uma
+  // resposta mais antiga chegar depois de uma mais nova (rede lenta/fora de ordem),
+  // ela é descartada em vez de sobrescrever as sugestões corretas já exibidas.
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (skipNext) {
@@ -47,16 +51,19 @@ export function StreetAutocomplete({
       return;
     }
     if (!value || value.trim().length < 3) {
+      requestIdRef.current += 1;
       setSuggestions([]);
       setOpen(false);
       return;
     }
     const t = setTimeout(async () => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       try {
         const res = await autocompleteFn({
           data: { input: value, lat: bias?.lat, lng: bias?.lng },
         });
+        if (requestId !== requestIdRef.current) return; // resposta obsoleta — descarta
         if (res.ok && res.suggestions) {
           setSuggestions(res.suggestions);
           setOpen(res.suggestions.length > 0);
@@ -65,7 +72,7 @@ export function StreetAutocomplete({
           setOpen(false);
         }
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
     }, 350);
     return () => clearTimeout(t);
