@@ -12,6 +12,7 @@ import { Download, FileSpreadsheet, Loader2, MapPin } from "lucide-react";
 import {
   SharedMap,
   SharedMarkerLayer,
+  SharedAgentTerritoryLayer,
   classifyProperty,
   type SharedMarkerPoint,
 } from "@/components/map/shared";
@@ -112,6 +113,11 @@ function HeatmapPage() {
     [geoPoints],
   );
 
+  const territoryPoints = useMemo(
+    () => geoPoints.map((p) => ({ lat: p.latitude, lng: p.longitude, agentLabel: p.agent_name ?? null })),
+    [geoPoints],
+  );
+
   const isLoading = blocks.isLoading || props.isLoading;
   const isError = blocks.isError || props.isError;
   const refetchAll = () => {
@@ -157,6 +163,11 @@ function HeatmapPage() {
               <Stat label="Depósitos" value={blocks.data.totals.deposits_total} />
             </div>
           )}
+          {props.data?.truncated && (
+            <p className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -175,8 +186,10 @@ function HeatmapPage() {
           >
             <SharedMarkerLayer
               points={markers}
+              cluster={false}
               onClick={(m) => setSelected((m.data as PropertyMapPoint) ?? null)}
             />
+            <SharedAgentTerritoryLayer points={territoryPoints} />
           </SharedMap>
         </CardContent>
       </Card>
