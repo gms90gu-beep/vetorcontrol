@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { safeFetch } from "@/lib/offline/safe-fetch";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { 
   Filter, 
   User, 
-  MapPin, 
   Calendar, 
   Layers,
   Search,
@@ -30,12 +28,10 @@ interface ReportsFiltersProps {
 export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProps) {
   const [agents, setAgents] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
-  const [areas, setAreas] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
-  
+
   const [selectedAgent, setSelectedAgent] = useState<string>("all");
   const [selectedCycle, setSelectedCycle] = useState<string>("all");
-  const [selectedArea, setSelectedArea] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<string>("all");
 
   useEffect(() => {
@@ -44,35 +40,33 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
 
   async function fetchFiltersData() {
     try {
-      const [agentsData, cyclesData, areasData, weeksData] = await Promise.all([
+      const [agentsData, cyclesData, weeksData] = await Promise.all([
         listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name") }),
         listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
-        safeFetch<any[]>(
-          async () => {
-            const { data, error } = await supabase.from("areas").select("id, name");
-            if (error) throw error;
-            return data ?? [];
-          },
-          async () => [],
-          { label: "areas" },
-        ),
         listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
 
       if (agentsData) setAgents(agentsData);
       if (cyclesData) setCycles(cyclesData);
-      if (areasData) setAreas(areasData);
       if (weeksData) setWeeks(weeksData);
     } catch (error) {
       console.error("Error fetching filters data:", error);
     }
   }
 
+  // Semanas pertencem a um ciclo (weeks.cycle_id) — só oferece semanas do ciclo selecionado.
+  // Ao trocar de ciclo, uma semana já selecionada de outro ciclo deixa de fazer sentido.
+  const weeksForCycle = selectedCycle === "all" ? weeks : weeks.filter((w) => w.cycle_id === selectedCycle);
+
+  function handleCycleChange(value: string) {
+    setSelectedCycle(value);
+    setSelectedWeek("all");
+  }
+
   const handleApply = () => {
     onFilterChange({
       agent: selectedAgent,
       cycle: selectedCycle,
-      area: selectedArea,
       week: selectedWeek
     });
   };
@@ -80,17 +74,15 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
   const clearFilters = () => {
     setSelectedAgent("all");
     setSelectedCycle("all");
-    setSelectedArea("all");
     setSelectedWeek("all");
     onFilterChange({
       agent: "all",
       cycle: "all",
-      area: "all",
       week: "all"
     });
   };
 
-  const hasFilters = selectedAgent !== "all" || selectedCycle !== "all" || selectedArea !== "all" || selectedWeek !== "all";
+  const hasFilters = selectedAgent !== "all" || selectedCycle !== "all" || selectedWeek !== "all";
 
   return (
     <div className={cn("bg-white p-4 rounded-3xl border border-slate-100 shadow-sm space-y-4", className)}>
@@ -113,7 +105,7 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {/* Agente */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -137,7 +129,7 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
             <Layers className="h-3 w-3" /> Ciclo
           </label>
-          <Select value={selectedCycle} onValueChange={setSelectedCycle}>
+          <Select value={selectedCycle} onValueChange={handleCycleChange}>
             <SelectTrigger className="h-10 rounded-xl border-slate-100 bg-slate-50 text-xs font-bold">
               <SelectValue placeholder="Todos os Ciclos" />
             </SelectTrigger>
@@ -150,7 +142,7 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
           </Select>
         </div>
 
-        {/* Semana */}
+        {/* Semana (do ciclo selecionado) */}
         <div className="space-y-1.5">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
             <Calendar className="h-3 w-3" /> Semana
@@ -161,26 +153,8 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-slate-100">
               <SelectItem value="all">Todas as Semanas</SelectItem>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                <SelectItem key={num} value={num.toString()}>Semana {num}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Área */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-            <MapPin className="h-3 w-3" /> Área
-          </label>
-          <Select value={selectedArea} onValueChange={setSelectedArea}>
-            <SelectTrigger className="h-10 rounded-xl border-slate-100 bg-slate-50 text-xs font-bold">
-              <SelectValue placeholder="Todas as Áreas" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl border-slate-100">
-              <SelectItem value="all">Todas as Áreas</SelectItem>
-              {areas.map(area => (
-                <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+              {weeksForCycle.map(week => (
+                <SelectItem key={week.id} value={week.id}>Semana {week.number}</SelectItem>
               ))}
             </SelectContent>
           </Select>
