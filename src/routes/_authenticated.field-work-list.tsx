@@ -54,6 +54,8 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
+import { getOperationalDate } from "@/lib/operational-date";
+import { closeExpiredInProgressSessions } from "@/lib/session-state";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
@@ -139,6 +141,19 @@ function FieldWorkListPage() {
 
       const { listRemoteOrCache } = await import("@/lib/offline/repos");
       const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+      const todayOperational = getOperationalDate();
+
+      // Fecha sozinho qualquer jornada "in_progress" de uma Data da Produção
+      // anterior antes de decidir qual é a "jornada ativa" — sem isso, uma
+      // sessão esquecida (app fechado sem clicar "Encerrar Jornada") ficava
+      // sendo tratada como ativa para sempre, em qualquer dia futuro.
+      if (online) {
+        try {
+          await closeExpiredInProgressSessions(user.id, todayOperational);
+        } catch (e) {
+          console.warn("[JOURNEY_AUTO_EXPIRE_ERR]", e);
+        }
+      }
 
       const sessions = await listRemoteOrCache<any>({
         name: "field_work_sessions",
@@ -148,9 +163,10 @@ function FieldWorkListPage() {
             .select("*")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
+            .eq("session_date", todayOperational)
             .order("created_at", { ascending: false })
             .limit(5) as any,
-        filter: (s) => s.user_id === user.id && s.status === "in_progress",
+        filter: (s) => s.user_id === user.id && s.status === "in_progress" && s.session_date === todayOperational,
       });
       const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))

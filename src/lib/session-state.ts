@@ -84,6 +84,56 @@ export async function findSession(lookup: SessionLookup): Promise<SessionRow | n
   }
 }
 
+/**
+ * Fecha automaticamente sessões "in_progress" cuja Data da Produção (session_date)
+ * já ficou no passado em relação à data operacional (America/Sao_Paulo) atual.
+ *
+ * Cada jornada pertence a UMA única Data da Produção — não existe "carregar"
+ * uma jornada aberta de um dia para o outro (ver resolveOperationalSession /
+ * assessSessionForResume, que já bloqueiam retomada quando session_date !=
+ * data operacional). Porém, se o agente nunca clicar em "Encerrar Jornada"
+ * (app fechado, sem sinal, esqueceu), a linha continua com status
+ * 'in_progress' para sempre — uma jornada "fantasma" que:
+ *   1. o field-work-list.tsx tratava como "jornada ativa hoje" mesmo sendo
+ *      de outro dia (bug: consulta sem filtro de session_date);
+ *   2. voltava a aparecer no modal "Jornada em andamento" toda vez que o
+ *      agente tentava iniciar uma jornada nova para o mesmo quarteirão.
+ *
+ * Esta função fecha (status='closed') qualquer sessão nessas condições no
+ * boot das telas de campo, antes de qualquer decisão de "jornada ativa".
+ * Só roda online (chamada direta ao Supabase) — não enfileira no Sync
+ * Engine porque é uma correção de estado, não um dado de produção do agente.
+ */
+export async function closeExpiredInProgressSessions(
+  userId: string,
+  todayOperational: string,
+): Promise<number> {
+  if (!userId || !todayOperational) return 0;
+  try {
+    const { data, error } = await supabase
+      .from("field_work_sessions")
+      .update({ status: "closed", updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("status", "in_progress")
+      .lt("session_date", todayOperational)
+      .select("id, session_date, block_number, block_id");
+    if (error) throw error;
+    const closed = data ?? [];
+    if (closed.length > 0) {
+      console.warn("[SESSION_STATE_AUTO_EXPIRE]", {
+        userId,
+        todayOperational,
+        closed_count: closed.length,
+        closed_sessions: closed,
+      });
+    }
+    return closed.length;
+  } catch (e: any) {
+    logErr("closeExpiredInProgressSessions", { userId, todayOperational, error: e?.message });
+    return 0;
+  }
+}
+
 export async function findInProgressSession(userId: string): Promise<SessionRow | null> {
   const { data, error } = await supabase
     .from("field_work_sessions")

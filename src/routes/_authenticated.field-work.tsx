@@ -38,6 +38,7 @@ import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 import { getOperationalDate } from "@/lib/operational-date";
+import { closeExpiredInProgressSessions } from "@/lib/session-state";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -361,6 +362,19 @@ function FieldWorkPage() {
         if (!user) return;
         setUserId(user.id);
         await fetchBlocks(user.id);
+
+        // Fecha sozinho qualquer jornada "in_progress" esquecida de um dia
+        // anterior (bug: "Jornada em andamento" fantasma reaparecendo em
+        // outro dia — ver auditoria). Roda antes de qualquer checagem de
+        // jornada ativa/pausada, para que field-work e field-work-list
+        // nunca mais tratem uma sessão de outra Data da Produção como ativa.
+        if (isOnline()) {
+          try {
+            await closeExpiredInProgressSessions(user.id, getOperationalDate());
+          } catch (e) {
+            console.warn("[JOURNEY_AUTO_EXPIRE_ERR]", e);
+          }
+        }
 
         // Retomada automática: procura jornada PAUSED do agente.
         // Antes, isso só rodava com isOnline() e ficava sem checar nada
