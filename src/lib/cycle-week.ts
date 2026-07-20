@@ -11,17 +11,18 @@ export type CycleWeekInfo = {
  * Semana começa no domingo e termina no sábado.
  * SE 1 = semana que contém o sábado mais próximo de 1º de janeiro.
  */
+function firstSundayOfEpiYear(y: number): Date {
+  const jan1 = new Date(y, 0, 1);
+  const dow = jan1.getDay(); // 0=dom..6=sab
+  const diffToSat = ((6 - dow) + 7) % 7;
+  const sat = new Date(y, 0, 1 + diffToSat);
+  if (diffToSat >= 4) sat.setDate(sat.getDate() - 7); // sábado mais próximo
+  const sun = new Date(sat);
+  sun.setDate(sun.getDate() - 6);
+  return sun;
+}
+
 export function getEpiWeek(d: Date = new Date()): { week: number; year: number } {
-  const firstSundayOfEpiYear = (y: number): Date => {
-    const jan1 = new Date(y, 0, 1);
-    const dow = jan1.getDay(); // 0=dom..6=sab
-    const diffToSat = ((6 - dow) + 7) % 7;
-    const sat = new Date(y, 0, 1 + diffToSat);
-    if (diffToSat >= 4) sat.setDate(sat.getDate() - 7); // sábado mais próximo
-    const sun = new Date(sat);
-    sun.setDate(sun.getDate() - 6);
-    return sun;
-  };
   const ref = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   let year = ref.getFullYear();
   let firstSun = firstSundayOfEpiYear(year);
@@ -37,6 +38,25 @@ export function getEpiWeek(d: Date = new Date()): { week: number; year: number }
   }
   const week = Math.floor((ref.getTime() - firstSun.getTime()) / 86400000 / 7) + 1;
   return { week, year };
+}
+
+/**
+ * Inverso de getEpiWeek(): dado uma SE (semana epidemiológica SINAN) + ano,
+ * retorna o intervalo de datas [domingo, sábado] correspondente, em formato ISO (YYYY-MM-DD).
+ *
+ * Usado para consultar `daily_work_records` por `work_date` em vez das colunas
+ * `epi_week`/`epi_year`, que são recalculadas por trigger no banco usando semana
+ * ISO (segunda-domingo) — divergente do padrão SINAN usado pelo restante do app.
+ */
+export function epiWeekToDateRange(week: number, year: number): { start: string; end: string } {
+  const firstSun = firstSundayOfEpiYear(year);
+  const start = new Date(firstSun);
+  start.setDate(start.getDate() + (week - 1) * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { start: fmt(start), end: fmt(end) };
 }
 
 /**

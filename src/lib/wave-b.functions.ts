@@ -4,6 +4,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { epiWeekToDateRange, getEpiWeek } from "@/lib/cycle-week";
 
 export interface AgentProductionRow {
   agent_id: string;
@@ -198,9 +199,13 @@ function emptyWeeklyTotals(): WeeklyComparisonTotals {
 }
 
 function prevEpiWeek(week: number, year: number): { week: number; year: number } {
-  if (week > 1) return { week: week - 1, year };
-  // approx — assume previous year had 52 weeks
-  return { week: 52, year: year - 1 };
+  // Calcula a SE anterior por aritmética de datas real (não assume 52 semanas —
+  // alguns anos SINAN têm 53), voltando 7 dias a partir do início da SE atual.
+  const { start } = epiWeekToDateRange(week, year);
+  const [y, m, d] = start.split("-").map(Number);
+  const prevStart = new Date(y, m - 1, d);
+  prevStart.setDate(prevStart.getDate() - 7);
+  return getEpiWeek(prevStart);
 }
 
 export const getWeeklyComparison = createServerFn({ method: "POST" })
@@ -228,12 +233,16 @@ export const getWeeklyComparison = createServerFn({ method: "POST" })
     const fetchWeek = async (week: number, year: number) => {
       const totals = emptyWeeklyTotals();
       if (agentIds.length === 0) return totals;
+      // Filtra por work_date (intervalo domingo-sábado da SE), não por epi_week/epi_year:
+      // essas colunas são recalculadas por trigger no banco usando semana ISO
+      // (segunda-domingo), divergente do padrão SINAN usado aqui e no restante do app.
+      const { start, end } = epiWeekToDateRange(week, year);
       const { data: rows, error } = await supabase
         .from("daily_work_records")
         .select("*")
         .in("agent_id", agentIds)
-        .eq("epi_week", week)
-        .eq("epi_year", year);
+        .gte("work_date", start)
+        .lte("work_date", end);
       if (error) throw new Error(error.message);
       for (const r of (rows ?? []) as any[]) {
         totals.records += 1;
