@@ -625,7 +625,7 @@ function EditarBoletim() {
 
       const { data: lastProps } = await supabase
         .from("properties")
-        .select("number, street_name, side, type, block_id")
+        .select("number, street_name, side, type, block_id, sequence")
         .eq("boletim_id", boletimId)
         .order("sequence", { ascending: false })
         .limit(1);
@@ -633,6 +633,13 @@ function EditarBoletim() {
       const last = lastProps?.[0];
       const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
       let nextNum = Number.isFinite(parsed) ? parsed + 1 : 1;
+      // Bug: sequence sempre saía null para TODO imóvel adicionado em lote —
+      // nenhuma linha do lote recebia um número de sequência, diferente do
+      // "number", que é incrementado corretamente. Isso deixava os imóveis
+      // sem ordenação (comparePropertyOrder) e é uma das causas de boletim
+      // aparecer com linhas "em branco" (sem rua/sequência) na tela de RG.
+      const lastSeq = Number.isFinite(last?.sequence) ? (last!.sequence as number) : 0;
+      const nextSeq = lastSeq + 1;
 
       const payload: any[] = [];
       for (let i = 0; i < qty; i++) {
@@ -640,7 +647,7 @@ function EditarBoletim() {
           street_name: last?.street_name || blockLoc.address || form.locality || null,
           side: last?.side || form.side || null,
           number: String(nextNum + i),
-          sequence: null,
+          sequence: nextSeq + i,
           complement: null,
           type: last?.type || "residence",
           inhabitants: 0,
