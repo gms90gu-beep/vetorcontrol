@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { updateOffline } from "@/lib/offline/repos";
-import { db } from "@/lib/offline/db";
+import { listRemoteOrCache, removeOffline, updateOffline } from "@/lib/offline/repos";
 import { toast } from "sonner";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
+import { getOperationalDate } from "@/lib/operational-date";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -61,12 +61,24 @@ interface SessionStats {
 }
 
 function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Data operacional oficial (America/Sao_Paulo) — não usar new Date() cru: o fuso
+  // do navegador do agente pode divergir e classificar errado jornadas perto da
+  // virada do dia (mesma classe de bug já corrigida no painel do agente).
+  return getOperationalDate();
 }
 function daysAgoISO(n: number) {
-  const d = new Date(); d.setDate(d.getDate() - n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return getOperationalDate(d);
+}
+
+// Sem estatísticas carregadas (ex.: offline — os contadores só são calculados
+// online) não há como confirmar se a jornada tem visitas registradas. Assume que
+// pode ter, para não liberar a exclusão de uma jornada com dados de campo reais
+// por engano.
+function hasRecordedVisits(row: SessionRow): boolean {
+  if (!row.stats) return true;
+  return (row.stats.visited || 0) + (row.stats.closed || 0) + (row.stats.refused || 0) > 0;
 }
 
 function MySessionsPage() {
@@ -86,40 +98,30 @@ function MySessionsPage() {
       const { data: { user } } = await safeGetUser();
       if (!user) { toast.error("Sessão expirada."); return; }
 
-      let remote: SessionRow[] = [];
-      if (isOnline()) {
-        const { data, error } = await supabase
-          .from("field_work_sessions")
-          .select("id, user_id, session_date, status, block_number, block_id, property_count, street_name, cycle_id, week_id, started_at, created_at, updated_at")
-          .eq("user_id", user.id)
-          .order("session_date", { ascending: false })
-          .order("created_at", { ascending: false })
-          .limit(200);
-        if (error) console.warn("[MY_SESSIONS_LOAD] remote error", error);
-        remote = (data as any) || [];
-      }
-
-      // Offline fallback / merge from Dexie
-      let localRows: SessionRow[] = [];
-      try {
-        const local = await db.table("field_work_sessions").toArray();
-        localRows = (local || []).filter((r: any) => r.user_id === user.id);
-      } catch (e) {
-        console.warn("[MY_SESSIONS_LOAD] dexie error", e);
-      }
-
-      const map = new Map<string, SessionRow>();
-      remote.forEach((r) => map.set(r.id, { ...r, _synced: true }));
-      localRows.forEach((r: any) => {
-        const prev = map.get(r.id);
-        map.set(r.id, {
-          ...(prev || r),
-          ...r,
-          _synced: prev ? true : Boolean(r._synced),
-          _lastError: r._lastError ?? null,
-        });
+      // listRemoteOrCache: online usa o servidor como fonte de verdade (e hidrata o
+      // cache local); offline cai para o cache Dexie já hidratado por outras telas
+      // (field-work-list.tsx, etc). Antes daqui era uma mesclagem manual remoto+Dexie
+      // que lia os campos direto da linha do Dexie em vez de `.data` (formato
+      // {id, data, updatedAt} usado por todo o resto do app) — o filtro por user_id
+      // nunca batia, então o fallback local nunca contribuía nada e a tela ficava
+      // vazia sempre que o agente estava offline.
+      const sessionsResult = await listRemoteOrCache<SessionRow>({
+        name: "field_work_sessions",
+        remote: () =>
+          supabase
+            .from("field_work_sessions")
+            .select("id, user_id, session_date, status, block_number, block_id, property_count, street_name, cycle_id, week_id, started_at, created_at, updated_at")
+            .eq("user_id", user.id)
+            .order("session_date", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(200) as any,
+        filter: (r: any) => r.user_id === user.id,
       });
-      const all = Array.from(map.values());
+      const all: SessionRow[] = sessionsResult.map((r) => ({
+        ...r,
+        _synced: sessionsResult.source === "remote",
+        _lastError: null,
+      }));
 
       // Enrich with cycle/week numbers
       const cycleIds = Array.from(new Set(all.map((r) => r.cycle_id).filter(Boolean))) as string[];
@@ -262,20 +264,29 @@ function MySessionsPage() {
   }
 
   async function handleDelete(r: SessionRow) {
-    if ((r.stats?.visited || 0) + (r.stats?.closed || 0) + (r.stats?.refused || 0) > 0) {
-      toast.error("Não é possível excluir jornada com visitas registradas.");
+    if (hasRecordedVisits(r)) {
+      toast.error(
+        r.stats
+          ? "Não é possível excluir jornada com visitas registradas."
+          : "Sem conexão, não é possível confirmar se há visitas registradas. Conecte-se à internet para excluir.",
+      );
       return;
     }
     if (!confirm("Excluir esta jornada?")) return;
     setWorking(r.id);
     console.log("[MY_SESSIONS_DELETE]", { id: r.id });
     try {
-      if (isOnline()) {
-        const { error } = await supabase.from("field_work_sessions").delete().eq("id", r.id);
-        if (error) throw error;
-      }
-      try { await db.table("field_work_sessions").delete(r.id); } catch {}
-      toast.success("Jornada excluída.");
+      // removeOffline apaga do Dexie e enfileira a mutação de delete para o
+      // SyncEngine — offline, o registro some da lista aqui e é sincronizado (e
+      // efetivamente apagado no servidor) assim que a conexão voltar. Antes, o
+      // delete offline só removia do Dexie sem enfileirar nada: a jornada
+      // reaparecia na próxima sincronização, apesar do toast de sucesso.
+      await removeOffline("field_work_sessions", r.id);
+      toast.success(
+        isOnline()
+          ? "Jornada excluída."
+          : "Jornada excluída localmente — será sincronizada quando a conexão voltar.",
+      );
       await load();
     } catch (e: any) {
       toast.error("Falha ao excluir: " + (e?.message || e));
@@ -378,7 +389,7 @@ function SessionCard({
     ? format(new Date(row.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
     : "—";
   const isInProgress = row.status === "in_progress";
-  const hasVisits = (row.stats?.visited || 0) + (row.stats?.closed || 0) + (row.stats?.refused || 0) > 0;
+  const hasVisits = hasRecordedVisits(row);
 
   return (
     <Card className="rounded-3xl shadow-sm">
