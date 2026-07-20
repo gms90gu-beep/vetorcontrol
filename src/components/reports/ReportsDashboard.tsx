@@ -27,8 +27,7 @@ export function ReportsDashboard() {
   const [filters, setFilters] = useState({
     agent: "all",
     cycle: "all",
-    area: "all",
-    week: "all"
+    week: "all" // week_id (weeks.id), não epi_week
   });
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
   const [dailies, setDailies] = useState<any[]>([]);
@@ -97,11 +96,13 @@ export function ReportsDashboard() {
           let query = supabase.from("daily_work_records").select("*");
           if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
           if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
+          if (filters.week !== "all") query = query.eq("week_id", filters.week);
           return await query.order("work_date", { ascending: false });
         },
         filter: (r) =>
           (!cycleFilter || r.cycle_id === cycleFilter) &&
-          (filters.agent === "all" || r.agent_id === filters.agent),
+          (filters.agent === "all" || r.agent_id === filters.agent) &&
+          (filters.week === "all" || r.week_id === filters.week),
       });
       const rows = records || [];
       console.log("[REPORT_SOURCE]", {
@@ -173,8 +174,32 @@ export function ReportsDashboard() {
           visitas: Number(r.properties_worked) || 0,
         }));
 
+      // Ranking de produtividade por agente (top performers do período filtrado)
+      const byAgent = new Map<string, { worked: number; pending: number }>();
+      for (const r of rows as any[]) {
+        if (!r.agent_id) continue;
+        const cur = byAgent.get(r.agent_id) || { worked: 0, pending: 0 };
+        cur.worked += Number(r.properties_worked) || 0;
+        cur.pending += Number(r.pending_visits) || 0;
+        byAgent.set(r.agent_id, cur);
+      }
+      let production: any[] = [];
+      if (byAgent.size > 0) {
+        const agentIds = Array.from(byAgent.keys());
+        const { data: agentRows } = await supabase.from("agents").select("id, name").in("id", agentIds);
+        const nameMap = new Map((agentRows || []).map((a: any) => [a.id, a.name]));
+        production = agentIds
+          .map((aid) => {
+            const { worked, pending } = byAgent.get(aid)!;
+            const visitable = worked + pending;
+            const agentCoverage = visitable > 0 ? Math.round((worked / visitable) * 100) : 0;
+            return { name: nameMap.get(aid) || "Agente", visits: worked, coverage: agentCoverage };
+          })
+          .sort((a, b) => b.visits - a.visits);
+      }
+
       setChartData({
-        production: [],
+        production,
         deposits,
         coverage: coverageMock,
         evolution,
@@ -434,7 +459,7 @@ export function ReportsDashboard() {
         </div>
       </div>
 
-      {(isSupervisor || true) && ( // Allow viewing for now to test
+      {isSupervisor && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden group shadow-2xl shadow-slate-200">
             <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">

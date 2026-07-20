@@ -4,20 +4,24 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
-import { getEpiWeek, resolveCycleWeek } from "@/lib/cycle-week";
+import { getEpiWeek, epiWeekToDateRange, resolveCycleWeek } from "@/lib/cycle-week";
 import { getOperationalDate } from "@/lib/operational-date";
+import { computePropertyTypeComposition } from "@/lib/property-composition";
 
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "reports/WeeklyReportGenerator", file: "src/components/reports/WeeklyReportGenerator.tsx", source: "daily_work_records", note: "gerador PDF semanal — usar getWeekMetrics após refator" });
 
 // Semana epidemiológica (padrão SINAN, domingo-sábado) derivada da DATA
 // OPERACIONAL (America/Sao_Paulo). Usa getEpiWeek — a MESMA função usada
-// por DailyWorkCloser.tsx ao gravar daily_work_records.epi_week. Antes
-// esta função usava epiWeekFromDate (semana ISO, segunda-domingo), uma
-// fórmula diferente da que grava os dados — a consulta abaixo por
-// epi_week podia não encontrar as diárias certas (ou nenhuma) sempre que
-// as duas semanas divergissem, gerando um boletim semanal vazio ou com a
-// semana errada mesmo com dados reais no banco.
+// por DailyWorkCloser.tsx ao gravar daily_work_records.epi_week.
+//
+// A consulta abaixo NÃO filtra pelas colunas epi_week/epi_year do banco:
+// elas são recalculadas por um trigger (populate_daily_epi_week) usando
+// semana ISO (segunda-domingo), sempre, independente do que a aplicação
+// grava — então filtrar por essas colunas com um valor SINAN diverge
+// silenciosamente aos domingos e na virada do ano. Em vez disso, convertemos
+// a SE para um intervalo de work_date (epiWeekToDateRange) e filtramos por
+// data, que é a coluna confiável.
 function epiWeekOf(date: Date): { week: number; year: number } {
   const opDate = getOperationalDate(date); // "YYYY-MM-DD" em America/Sao_Paulo
   const [y, m, d] = opDate.split("-").map(Number);
@@ -60,12 +64,16 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     console.log("[SEMANA_CICLO]", { work_date: refOpDate, cycle_id: activeCycle?.id ?? null, cycle_week: refCycleWeek?.number ?? null });
     console.log(`[CICLO] WeeklyReport usando ciclo ${activeCycle?.name || activeCycle?.id || "—"}`);
 
+    // Filtra por work_date (intervalo domingo-sábado da SE), não por epi_week/epi_year:
+    // essas colunas são recalculadas por trigger no banco usando semana ISO
+    // (segunda-domingo), divergente do padrão SINAN usado aqui e no restante do app.
+    const { start: seStart, end: seEnd } = epiWeekToDateRange(epiWeek, epiYear);
     let dailiesQuery = supabase
       .from("daily_work_records")
       .select("*")
       .eq("agent_id", agentAuthId)
-      .eq("epi_week", epiWeek)
-      .eq("epi_year", epiYear)
+      .gte("work_date", seStart)
+      .lte("work_date", seEnd)
       .order("work_date", { ascending: true });
     if (activeCycle?.id) dailiesQuery = dailiesQuery.eq("cycle_id", activeCycle.id);
 
@@ -136,125 +144,30 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     const positivity = pct(t.focos, t.depInspected || t.worked);
     const pendOpen = Math.max(0, t.pending - t.recovered);
 
-    // Composição por tipo de imóvel — 1 imóvel = 1 registro (visita mais recente da SE)
-    const propTypes = { residence: 0, commerce: 0, vacant_lot: 0, strategic_point: 0, others: 0 };
-    let uniquePropertiesCount = 0;
-    let totalVisitsFound = 0;
-    {
-      const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean) as string[];
-      let vrows: any[] = [];
-      if (workDates.length > 0) {
-        const sorted = [...workDates].sort();
-        const minDate = sorted[0];
-        const maxDate = sorted[sorted.length - 1];
-        // visit_date é timestamptz — filtrar por range e casar via operational_date (America/Sao_Paulo)
-        const startIso = `${minDate}T00:00:00-03:00`;
-        const endIso = `${maxDate}T23:59:59.999-03:00`;
-        let vq = supabase
-          .from("visits")
-          .select("id, property_id, status, visit_date, visit_type, created_at, properties(type, block_id, number, sequence, complement)")
-          .eq("agent_id", agentAuthId)
-          .gte("visit_date", startIso)
-          .lte("visit_date", endIso);
-        if (activeCycle?.id) vq = vq.eq("cycle_id", activeCycle.id);
-        const { data, error: vErr } = await vq;
-        if (vErr) console.warn("[WEEKLY_REPORT_VISITS_QUERY_ERROR]", vErr);
-        const workDateSet = new Set(workDates);
-        vrows = ((data as any[]) || []).filter((r) => {
-          const opDate = getOperationalDate(new Date(r.visit_date));
-          return workDateSet.has(opDate);
-        });
-        console.log("[WEEKLY_REPORT_VISITS_FETCH]", {
-          workDates,
-          range: { startIso, endIso },
-          returned: (data as any[])?.length ?? 0,
-          matched_by_operational_date: vrows.length,
-        });
-      }
-      const workedStatuses = new Set(["visited", "refused", "treated", "closed", "abandoned"]);
-      const workedVisits = vrows.filter((r) => workedStatuses.has(String(r.status)));
-      totalVisitsFound = workedVisits.length;
-
-      for (const v of workedVisits) {
-        console.log("[WEEKLY_REPORT_VISIT]", { visitId: v.id, propertyId: v.property_id });
-        console.log("[WEEKLY_REPORT_PROPERTY]", { propertyId: v.property_id, property: v.properties });
-      }
-
-      // Agrupar por property_id (fallback: block_id+number+sequence+complement)
-      const groups = new Map<string, any[]>();
-      for (const r of workedVisits) {
-        const p = r.properties || {};
-        const key =
-          r.property_id ||
-          `${p.block_id ?? ""}|${p.number ?? ""}|${p.sequence ?? ""}|${p.complement ?? ""}`;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key)!.push(r);
-      }
-
-      for (const [key, visits] of groups) {
-        visits.sort((a, b) => {
-          const d = String(b.visit_date).localeCompare(String(a.visit_date));
-          if (d !== 0) return d;
-          return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
-        });
-        const chosen = visits[0];
-        const discarded = visits.slice(1);
-        if (discarded.length > 0) {
-          console.log("[WEEKLY_REPORT_DUPLICATE_PROPERTY]", {
-            property_id: chosen.property_id ?? key,
-            visitas: visits.length,
-            visita_utilizada: { id: chosen.id, visit_date: chosen.visit_date, status: chosen.status },
-            visitas_descartadas: discarded.map((v) => ({ id: v.id, visit_date: v.visit_date, status: v.status })),
-          });
-        }
-        // Prioridade: properties.type (vigente) → visit.visit_type → outros
-        const rawType = chosen.properties?.type ?? chosen.visit_type ?? null;
-        const typeOrigin = chosen.properties?.type
-          ? "properties.type"
-          : chosen.visit_type
-            ? "visits.visit_type"
-            : "fallback:others";
-        const type = String(rawType || "others");
-        if (type in propTypes) (propTypes as any)[type] += 1;
-        else propTypes.others += 1;
-        console.log("[WEEKLY_REPORT_PROPERTY_DEBUG]", {
-          property_id: chosen.property_id ?? key,
-          tipo: type,
-          origem: typeOrigin,
-          visita: { id: chosen.id, visit_date: chosen.visit_date, status: chosen.status },
-        });
-        if (!chosen.properties) {
-          console.warn("[WEEKLY_REPORT_PROPERTY_FALLBACK]", {
-            property_id: chosen.property_id ?? key,
-            origem: typeOrigin,
-            motivo: "properties join vazio",
-          });
-        }
-      }
-      console.log("[WEEKLY_REPORT_PROPERTY_COUNTS]", {
-        residencial: propTypes.residence,
-        comercial: propTypes.commerce,
-        terreno_baldio: propTypes.vacant_lot,
-        pe: propTypes.strategic_point,
-        outros: propTypes.others,
-        total: propTypes.residence + propTypes.commerce + propTypes.vacant_lot + propTypes.strategic_point + propTypes.others,
+    // Composição por tipo de imóvel — 1 imóvel = 1 registro (visita mais recente da SE).
+    // Consulta compartilhada com o boletim diário (src/lib/property-composition.ts).
+    const workDates = Array.from(new Set(records.map((r: any) => r.work_date))).filter(Boolean) as string[];
+    const { propTypes, totalTypes, uniquePropertiesCount, totalVisitsFound } =
+      await computePropertyTypeComposition({
+        agentAuthId,
+        workDates,
+        cycleId: activeCycle?.id ?? null,
       });
-      uniquePropertiesCount = groups.size;
+    console.log("[WEEKLY_REPORT_PROPERTY_COUNTS]", {
+      residencial: propTypes.residence,
+      comercial: propTypes.commerce,
+      terreno_baldio: propTypes.vacant_lot,
+      pe: propTypes.strategic_point,
+      outros: propTypes.others,
+      total: totalTypes,
+    });
+    console.log("[WEEKLY_REPORT_PROPERTY_UNIQUE]", {
+      visitas_encontradas: totalVisitsFound,
+      imoveis_unicos: uniquePropertiesCount,
+      diferenca: totalVisitsFound - uniquePropertiesCount,
+      composicao_final: { ...propTypes },
+    });
 
-      console.log("[WEEKLY_REPORT_PROPERTY_UNIQUE]", {
-        visitas_encontradas: totalVisitsFound,
-        imoveis_unicos: uniquePropertiesCount,
-        diferenca: totalVisitsFound - uniquePropertiesCount,
-        composicao_final: { ...propTypes },
-      });
-      if (totalVisitsFound > uniquePropertiesCount) {
-        console.log("Foram encontradas revisitas na semana. A composição considera apenas imóveis únicos.");
-      }
-    }
-
-    const totalTypes =
-      propTypes.residence + propTypes.commerce + propTypes.vacant_lot +
-      propTypes.strategic_point + propTypes.others;
     const habitados = propTypes.residence + propTypes.commerce + propTypes.strategic_point;
     const naoHabitados = propTypes.vacant_lot + propTypes.others;
     const avgPerDaily = records.length > 0 ? (t.worked / records.length) : 0;

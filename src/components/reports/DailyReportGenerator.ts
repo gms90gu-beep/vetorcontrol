@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { computePropertyTypeComposition } from "@/lib/property-composition";
 
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "reports/DailyReportGenerator", file: "src/components/reports/DailyReportGenerator.ts", source: "daily_work_records", note: "gerador PDF diário — usar getDateMetrics após refator" });
@@ -81,6 +82,46 @@ export async function generateDailyReportPDF(recordId: string, meta?: DailyPdfMe
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
 
+    // Composição da produção imobiliária por tipo de imóvel (mesma consulta do boletim semanal)
+    const { propTypes, totalTypes } = await computePropertyTypeComposition({
+      agentAuthId: r.agent_id,
+      workDates: [r.work_date],
+      cycleId: r.cycle_id ?? null,
+    });
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.text("COMPOSIÇÃO DA PRODUÇÃO IMOBILIÁRIA", 14, y);
+    y += 2;
+    autoTable(pdf, {
+      startY: y + 1,
+      head: [["Residencial (R)", "Comercial (C)", "Terreno Baldio (TB)", "Ponto Estratégico (PE)", "Outros (O)", "Total"]],
+      body: [[
+        propTypes.residence,
+        propTypes.commerce,
+        propTypes.vacant_lot,
+        propTypes.strategic_point,
+        propTypes.others,
+        totalTypes,
+      ].map(String)],
+      theme: "grid",
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontSize: 7.5, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 1;
+    if (totalTypes !== (r.properties_worked ?? 0)) {
+      pdf.setFontSize(7);
+      pdf.setTextColor(180, 83, 9);
+      pdf.text(
+        `Atenção: total por tipo (${totalTypes}) difere dos trabalhados (${r.properties_worked ?? 0}).`,
+        14, y + 3
+      );
+      pdf.setTextColor(15, 23, 42);
+      y += 4;
+    }
+    y += 3;
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
     pdf.text("DADOS DO LI", 14, y);
     y += 2;
     autoTable(pdf, {
