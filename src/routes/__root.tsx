@@ -1,3 +1,6 @@
+// Precisa ser o primeiro import: instala o gate de console.log/debug antes
+// de qualquer outro módulo (inclusive o [APP_START] logo abaixo) rodar.
+import "@/lib/debug-console";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
