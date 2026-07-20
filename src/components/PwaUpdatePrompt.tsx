@@ -15,11 +15,26 @@ import { Download, X } from "lucide-react";
  */
 export function PwaUpdatePrompt() {
   const [, force] = useState(0);
+  // Ocultação LOCAL (só desta tela) do aviso durante jornada ativa — usada
+  // pelo "X". Não deve chamar dismissPwaUpdate(): isso zera o hasUpdate
+  // global, e o auto-apply ao finalizar a jornada (setJourneyActive(false)
+  // em update-state.ts) só dispara se hasUpdate ainda for true. Zerá-lo aqui
+  // quebrava silenciosamente a promessa "será aplicada ao finalizar a
+  // jornada" — a atualização nunca mais era aplicada nem reaparecia.
+  const [hiddenDuringJourney, setHiddenDuringJourney] = useState(false);
 
   useEffect(() => subscribePwaUpdate(() => force((n) => n + 1)), []);
 
   const { hasUpdate, journeyActive, canApply } = getPwaUpdateState();
+
+  // Jornada terminou: a ocultação local perde o sentido (ou já foi aplicada
+  // automaticamente, ou os botões normais devem voltar a aparecer).
+  useEffect(() => {
+    if (!journeyActive) setHiddenDuringJourney(false);
+  }, [journeyActive]);
+
   if (!hasUpdate || !canApply) return null;
+  if (journeyActive && hiddenDuringJourney) return null;
 
   return (
     <div
@@ -71,7 +86,7 @@ export function PwaUpdatePrompt() {
                 variant="ghost"
                 className="h-8"
                 aria-label="Fechar aviso"
-                onClick={() => dismissPwaUpdate()}
+                onClick={() => setHiddenDuringJourney(true)}
               >
                 <X className="h-4 w-4" />
               </Button>
