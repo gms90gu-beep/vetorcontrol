@@ -351,38 +351,47 @@ function FieldWorkPage() {
         setUserId(user.id);
         await fetchBlocks(user.id);
 
-        // Retomada automática: procura jornada PAUSED do agente
-        if (isOnline()) {
-          try {
-            const { data: paused } = await supabase
-              .from("field_work_sessions")
-              .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
-              .eq("user_id", user.id)
-              .eq("status", "paused")
-              .order("updated_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (paused) {
-              console.log("[JOURNEY_RESUMED]", {
-                user_id: user.id,
-                session_id: (paused as any).id,
-                block_id: (paused as any).block_id,
-                block_number: (paused as any).block_number,
-                cycle_id: (paused as any).cycle_id,
-                session_date: (paused as any).session_date,
-                previous_status: "paused",
-                new_status: "prompt",
-              });
-              const decision = await assessSessionForResume(paused);
-              if (decision.show) {
-                setOpenSession(paused as any);
-                setOpenSessionModal(true);
-              }
+        // Retomada automática: procura jornada PAUSED do agente.
+        // Antes, isso só rodava com isOnline() e ficava sem checar nada
+        // offline — exatamente o cenário que mais importa (agente sem
+        // sinal, app fechado/recarregado com uma jornada pausada), o que
+        // deixava o agente sem o prompt de retomada e sujeito a criar uma
+        // sessão duplicada pro mesmo quarteirão/data ao clicar "Iniciar"
+        // de novo (ver checagem em handleStart mais abaixo).
+        try {
+          const pausedRows = await listRemoteOrCache<any>({
+            name: "field_work_sessions",
+            remote: () =>
+              supabase
+                .from("field_work_sessions")
+                .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id, updated_at")
+                .eq("user_id", user.id)
+                .eq("status", "paused")
+                .order("updated_at", { ascending: false }) as any,
+            filter: (r) => r.user_id === user.id && r.status === "paused",
+          });
+          const paused = (pausedRows ?? [])
+            .slice()
+            .sort((a: any, b: any) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))[0] ?? null;
+          if (paused) {
+            console.log("[JOURNEY_RESUMED]", {
+              user_id: user.id,
+              session_id: (paused as any).id,
+              block_id: (paused as any).block_id,
+              block_number: (paused as any).block_number,
+              cycle_id: (paused as any).cycle_id,
+              session_date: (paused as any).session_date,
+              previous_status: "paused",
+              new_status: "prompt",
+            });
+            const decision = await assessSessionForResume(paused);
+            if (decision.show) {
+              setOpenSession(paused as any);
+              setOpenSessionModal(true);
             }
-
-          } catch (e) {
-            console.warn("[JOURNEY_RESUMED_ERR]", e);
           }
+        } catch (e) {
+          console.warn("[JOURNEY_RESUMED_ERR]", e);
         }
       } finally {
         setCheckingBoot(false);
@@ -578,68 +587,86 @@ function FieldWorkPage() {
     try {
       // Verificação estrita: user_id + block_id + status in (in_progress, paused)
       // Sessões pausadas de datas anteriores são retomadas neste bloco.
-      if (isOnline()) {
-        console.log("[SESSION_LOOKUP]", {
-          user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
-        });
-        // Busca apenas sessão da MESMA Data da Produção selecionada
-        // (retomada legítima). O banco tem UNIQUE INDEX em
-        // (user_id, session_date, block_id) — ou seja, cada Data da
-        // Produção tem sua própria sessão independente para o mesmo
-        // quarteirão, e uma sessão pausada/em andamento de OUTRA data
-        // não deve impedir o início de uma jornada nova nesta data.
-        //
-        // Uma versão anterior deste fix ainda caía para uma sessão de
-        // outra data quando não achava uma para a data selecionada, só
-        // para mostrar a mensagem "outra Data da Produção" — na prática
-        // isso bloqueava indevidamente o início de jornadas novas sempre
-        // que existisse qualquer sessão pausada antiga do mesmo bloco em
-        // outra data (bug reportado após o fix anterior). Removido.
-        const { data: existing } = await supabase
-          .from("field_work_sessions")
-          .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
-          .eq("user_id", userId)
-          .eq("block_id", selectedBlock.id)
-          .eq("session_date", sessionDateStr)
-          .in("status", ["in_progress", "paused"])
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      //
+      // Antes, essa checagem só rodava com isOnline() — offline ela era
+      // pulada inteiramente, então um agente sem sinal que clicasse
+      // "Iniciar" de novo pro mesmo quarteirão/data (ex.: depois de
+      // reabrir o app) criava uma SEGUNDA sessão local em vez de retomar
+      // a existente. O banco tem UNIQUE INDEX em (user_id, session_date,
+      // block_id), então essa duplicata falha silenciosamente (ou perde
+      // dados) na hora de sincronizar. Agora usa listRemoteOrCache, que
+      // lê do cache local (Dexie) quando offline e do Supabase quando
+      // online, então a checagem vale nos dois casos.
+      console.log("[SESSION_LOOKUP]", {
+        user_id: userId, session_date: sessionDateStr, block_id: selectedBlock.id,
+      });
+      // Busca apenas sessão da MESMA Data da Produção selecionada
+      // (retomada legítima). O banco tem UNIQUE INDEX em
+      // (user_id, session_date, block_id) — ou seja, cada Data da
+      // Produção tem sua própria sessão independente para o mesmo
+      // quarteirão, e uma sessão pausada/em andamento de OUTRA data
+      // não deve impedir o início de uma jornada nova nesta data.
+      //
+      // Uma versão anterior deste fix ainda caía para uma sessão de
+      // outra data quando não achava uma para a data selecionada, só
+      // para mostrar a mensagem "outra Data da Produção" — na prática
+      // isso bloqueava indevidamente o início de jornadas novas sempre
+      // que existisse qualquer sessão pausada antiga do mesmo bloco em
+      // outra data (bug reportado após o fix anterior). Removido.
+      const existingRows = await listRemoteOrCache<any>({
+        name: "field_work_sessions",
+        remote: () =>
+          supabase
+            .from("field_work_sessions")
+            .select("id, status, session_date, cycle_id, week_id, block_id, block_number, property_count, street_name, created_at, started_at, user_id")
+            .eq("user_id", userId)
+            .eq("block_id", selectedBlock.id)
+            .eq("session_date", sessionDateStr)
+            .in("status", ["in_progress", "paused"])
+            .order("created_at", { ascending: false }) as any,
+        filter: (r) =>
+          r.user_id === userId &&
+          r.block_id === selectedBlock.id &&
+          r.session_date === sessionDateStr &&
+          ["in_progress", "paused"].includes(r.status),
+      });
+      const existing = (existingRows ?? [])
+        .slice()
+        .sort((a: any, b: any) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0] ?? null;
 
-        if (existing) {
-          console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
-          if ((existing as any).status === "paused") {
-            console.log("[JOURNEY_DUPLICATE_BLOCKED]", {
-              user_id: userId,
-              block_id: selectedBlock.id,
-              cycle_id: autoCycle.id,
-              existing_session_id: existing.id,
-              existing_status: (existing as any).status,
-            });
-          }
-          const decision = await assessSessionForResume(
-            {
-              ...(existing as any),
-              user_id: userId,
-            },
-            sessionDateStr,
-          );
-          if (decision.show) {
-            setOpenSession(existing as any);
-            setOpenSessionModal(true);
-            return;
-          }
-          if (decision.decision === "blocked_by_block") {
-            toast.info("Este quarteirão já foi concluído nesta Data da Produção.");
-          } else if (decision.decision === "blocked_by_date") {
-            toast.info("Esta jornada é de outra Data da Produção.");
-          } else if (decision.decision === "blocked_by_dwr") {
-            toast.info("Expediente desta data já encerrado (DWR).");
-          } else {
-            toast.info(`Não é possível retomar: ${decision.reason}`);
-          }
+      if (existing) {
+        console.log("[SESSION_FOUND]", { id: existing.id, status: (existing as any).status });
+        if ((existing as any).status === "paused") {
+          console.log("[JOURNEY_DUPLICATE_BLOCKED]", {
+            user_id: userId,
+            block_id: selectedBlock.id,
+            cycle_id: autoCycle.id,
+            existing_session_id: existing.id,
+            existing_status: (existing as any).status,
+          });
+        }
+        const decision = await assessSessionForResume(
+          {
+            ...(existing as any),
+            user_id: userId,
+          },
+          sessionDateStr,
+        );
+        if (decision.show) {
+          setOpenSession(existing as any);
+          setOpenSessionModal(true);
           return;
         }
+        if (decision.decision === "blocked_by_block") {
+          toast.info("Este quarteirão já foi concluído nesta Data da Produção.");
+        } else if (decision.decision === "blocked_by_date") {
+          toast.info("Esta jornada é de outra Data da Produção.");
+        } else if (decision.decision === "blocked_by_dwr") {
+          toast.info("Expediente desta data já encerrado (DWR).");
+        } else {
+          toast.info(`Não é possível retomar: ${decision.reason}`);
+        }
+        return;
       }
 
 
