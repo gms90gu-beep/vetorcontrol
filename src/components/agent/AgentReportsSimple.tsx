@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Eye,
   RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
@@ -24,6 +25,7 @@ import {
   generateDailyReportPDF,
 } from "@/components/reports/DailyReportGenerator";
 import { generateWeeklyReportPDF } from "@/components/reports/WeeklyReportGenerator";
+import { computePropertyTypeComposition } from "@/lib/property-composition";
 
 type Daily = {
   id: string;
@@ -150,6 +152,30 @@ export function AgentReportsSimple() {
     foci: sum(weekRecords, "positive_foci"),
     pending: sum(weekRecords, "pending_visits"),
   };
+
+  // Alerta de composição: mesma checagem que o Boletim Semanal já faz ao gerar o
+  // PDF (totalTypes vs. imóveis trabalhados), mas exibida ANTES de gerar/enviar o
+  // boletim — hoje esse alerta só aparecia em console.warn e numa linha discreta
+  // dentro do PDF já pronto, então divergências (ex.: imóvel sem tipo cadastrado)
+  // só eram percebidas depois de já ter enviado o boletim oficial.
+  const [compositionDiff, setCompositionDiff] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!authId || weekRecords.length === 0) {
+      setCompositionDiff(null);
+      return;
+    }
+    computePropertyTypeComposition({
+      agentAuthId: authId,
+      workDates: weekRecords.map((d) => d.work_date),
+      cycleId: weekRecords[0]?.cycle_id ?? null,
+    })
+      .then((res) => {
+        if (!cancelled) setCompositionDiff(res.totalTypes - weekStats.worked);
+      })
+      .catch((e) => console.warn("[AGENT_REPORTS_COMPOSITION_CHECK_ERROR]", e));
+    return () => { cancelled = true; };
+  }, [authId, weekRecords, weekStats.worked]);
 
   const buildDailyPdf = async (id: string) =>
     generateDailyReportPDF(id, {
@@ -321,6 +347,17 @@ export function AgentReportsSimple() {
           <Stat label="Focos" value={weekStats.foci} accent="rose" />
           <Stat label="Pendências" value={weekStats.pending} accent="amber" />
         </div>
+
+        {!!compositionDiff && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-800">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <p className="text-xs font-semibold">
+              Divergência de composição: {Math.abs(compositionDiff)} imóvel(is){" "}
+              {compositionDiff > 0 ? "a mais" : "sem tipo cadastrado"} em relação aos
+              imóveis trabalhados. Confira antes de enviar o boletim oficial.
+            </p>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
