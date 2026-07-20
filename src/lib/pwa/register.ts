@@ -13,6 +13,14 @@
 
 const APP_SW_URL = "/sw.js";
 
+// Evita registro duplicado: registerPwa() é chamado a partir de um useEffect
+// em __root.tsx, mas se algum dia voltar a ser chamado no corpo de render
+// (ou de qualquer lugar que possa re-executar), essa guarda impede refazer
+// o fetch de auditoria do manifest e o registerSW() do workbox-window mais
+// de uma vez por carregamento do app — evitando fetches redundantes e
+// listeners duplicados na registration do SW.
+let registered = false;
+
 function isRefusedContext(): boolean {
   if (typeof window === "undefined") return true;
   if (!import.meta.env.PROD) return true;
@@ -82,6 +90,9 @@ function attachLifecycleLogs(reg: ServiceWorkerRegistration) {
 }
 
 export async function registerPwa(): Promise<void> {
+  if (registered) return;
+  registered = true;
+
   // Auditoria do manifest (independente do contexto)
   try {
     const res = await fetch("/manifest.webmanifest", { cache: "no-cache" });
@@ -149,6 +160,18 @@ export async function registerPwa(): Promise<void> {
       onOfflineReady() {
         console.log("[SW_CACHE]", { offlineReady: true });
         console.log("[PWA_CACHE_INSTALL]", { offlineReady: true });
+        // Aquece o cache "pages" (NetworkFirst) com a start_url do manifest.
+        // Sem isso, um usuário que instala o app e nunca abre /dashboard
+        // manualmente enquanto online (ex.: instalou por outra página) fica
+        // sem fallback nenhum se abrir o app já totalmente offline —
+        // navigateFallback é null (app é SSR, não há index.html estático).
+        // Buscar uma vez aqui garante que a rota inicial já esteja no cache
+        // assim que o SW terminar de instalar.
+        if (navigator.onLine) {
+          fetch("/dashboard", { cache: "reload" })
+            .then(() => console.log("[PWA_START_URL_WARMED]", { url: "/dashboard" }))
+            .catch((e) => console.warn("[PWA_START_URL_WARM_FAILED]", { message: String(e?.message || e) }));
+        }
       },
       onRegisterError(err) {
         console.warn("[SW_ROLLBACK]", { stage: "register-error", message: String((err as any)?.message || err) });
