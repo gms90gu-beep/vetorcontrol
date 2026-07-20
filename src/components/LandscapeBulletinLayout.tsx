@@ -1,5 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { getEpiWeek } from "@/lib/cycle-week";
+import { getOperationalDate } from "@/lib/operational-date";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +100,7 @@ export function LandscapeBulletinLayout({
               </div>
               <div>
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Data</p>
-                <p className="text-[10px] font-bold">{new Date().toLocaleDateString('pt-BR')}</p>
+                <p className="text-[10px] font-bold">{new Date(`${getOperationalDate()}T12:00:00`).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
 
@@ -110,7 +112,7 @@ export function LandscapeBulletinLayout({
                 Semana {agentInfo.week}
               </Badge>
               <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[8px] uppercase tracking-widest">
-                SE {(() => { const d=new Date(); const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const dn=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-dn); const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1)); const w=Math.ceil((((dt.getTime()-ys.getTime())/86400000)+1)/7); return `${String(w).padStart(2,'0')}/${dt.getUTCFullYear()}`; })()}
+                SE {(() => { const { week, year } = getEpiWeek(new Date(`${getOperationalDate()}T12:00:00`)); return `${String(week).padStart(2,'0')}/${year}`; })()}
               </Badge>
             </div>
           </CardContent>
