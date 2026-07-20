@@ -49,3 +49,77 @@ export async function blockManagersGuard() {
     throw err;
   }
 }
+
+/**
+ * Route guard for admin_master-only tooling (RG reconciliation, RBAC audit,
+ * system health, data audit, etc). Mirrors the check already used in
+ * /admin-master, but reusable across every /admin/* screen. Without this,
+ * any authenticated user could open these routes directly by URL — the
+ * underlying data was still protected server-side, but the pages themselves
+ * (and their loading states) were not gated at all.
+ */
+export async function requireAdminMasterGuard() {
+  if (typeof window === "undefined") return;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    throw redirect({ to: "/login", replace: true });
+  }
+
+  const { data: verifiedUser } = await supabase.auth.getUser();
+  const user = verifiedUser?.user;
+  if (!user) {
+    throw redirect({ to: "/login", replace: true });
+  }
+
+  if (user.email === "gms90gu@gmail.com") return;
+
+  let role: string | null = null;
+  try {
+    role = await getCachedUserRole(user.id);
+  } catch {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+
+  if (role !== "admin_master") {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+}
+
+/**
+ * Route guard for manager-level tooling (executive dashboard, pendency
+ * report, georef audit) whose server functions already accept
+ * supervisor/coordenador/admin_master. Blocks field agents from opening
+ * pages that would otherwise just render empty/forbidden states for them.
+ */
+export async function requireManagerGuard() {
+  if (typeof window === "undefined") return;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    throw redirect({ to: "/login", replace: true });
+  }
+
+  const { data: verifiedUser } = await supabase.auth.getUser();
+  const user = verifiedUser?.user;
+  if (!user) {
+    throw redirect({ to: "/login", replace: true });
+  }
+
+  if (user.email === "gms90gu@gmail.com") return;
+
+  let role: string | null = null;
+  try {
+    role = await getCachedUserRole(user.id);
+  } catch {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+
+  if (!isManagerRole(role)) {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+}
