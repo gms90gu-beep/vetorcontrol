@@ -551,7 +551,7 @@ async function scopedAgentIds(
 export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { from: string; to: string }) => input)
-  .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[] }> => {
+  .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
@@ -561,7 +561,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     console.log("[MAP_SCOPE_PROFILES]", profileIds?.length ?? "all");
     if (profileIds && profileIds.length === 0) {
       console.log("[MAP_EMPTY] no profiles in scope");
-      return { points: [] };
+      return { points: [], truncated: false };
     }
 
     let boletimIds: string[] | null = null;
@@ -573,7 +573,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
       console.log("[MAP_SCOPE_BOLETINS]", boletimIds.length);
-      if (boletimIds.length === 0) return { points: [] };
+      if (boletimIds.length === 0) return { points: [], truncated: false };
       for (const b of boletins ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
     }
 
@@ -588,7 +588,8 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const { data: props } = await propQ;
     const propList = (props ?? []) as any[];
     console.log("[MAP_TOTAL_GEOREF]", propList.length);
-    if (propList.length === 0) return { points: [] };
+    const truncated = propList.length >= 5000;
+    if (propList.length === 0) return { points: [], truncated: false };
 
     if (!profileIds) {
       const ids = Array.from(new Set(propList.map((p) => p.boletim_id).filter(Boolean)));
@@ -697,7 +698,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       };
     });
 
-    return { points };
+    return { points, truncated };
   });
 
 export const getBlockRiskScores = createServerFn({ method: "POST" })

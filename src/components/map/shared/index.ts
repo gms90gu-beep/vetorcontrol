@@ -7,6 +7,7 @@ export * from "./context";
 export * from "./SharedMap";
 export * from "./SharedMapControls";
 export * from "./SharedMarkerLayer";
+export * from "./SharedAgentTerritoryLayer";
 export * from "./SharedNumberedMarkerLayer";
 export * from "./SharedRouteLayer";
 export * from "./SharedUserLocationLayer";

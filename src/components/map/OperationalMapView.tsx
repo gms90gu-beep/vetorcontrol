@@ -12,7 +12,6 @@ import {
 import L from "leaflet";
 // CSS de Leaflet/MarkerCluster vai no shell (src/styles.css) p/ evitar chunks offline.
 import "leaflet.heat";
-import "leaflet.markercluster";
 
 import {
   getPropertyMapPoints,
@@ -499,6 +498,11 @@ export default function OperationalMapView() {
                     <span className="font-semibold tabular-nums">{visiblePoints.length}</span>
                     <span className="text-muted-foreground">de {allPoints.length} visíveis</span>
                   </div>
+                  {props.data?.truncated && (
+                    <div className="absolute top-3 right-3 z-[400] bg-amber-500/90 text-white backdrop-blur-xl border border-amber-300 rounded-xl px-3 py-1.5 shadow-md text-[11px] font-semibold max-w-[260px] animate-in fade-in slide-in-from-top-2">
+                      Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -989,6 +993,7 @@ function SafeMap({
         zoom={15}
         scrollWheelZoom
         zoomControl
+        preferCanvas
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer key={baseLayer} attribution={base.attribution} url={base.url} />
@@ -1020,7 +1025,10 @@ function SafeMap({
               </CircleMarker>
             ))}
         {!showHeat && showProperties && (
-          <ClusterLayer points={visiblePoints} selectedId={selectedId} onSelect={onSelectPoint} />
+          <>
+            <ClusterLayer points={visiblePoints} selectedId={selectedId} onSelect={onSelectPoint} />
+            <AgentTerritoryLabels points={visiblePoints} />
+          </>
         )}
       </MapContainer>
     );
@@ -1048,34 +1056,20 @@ function FlyController({ target }: { target: { lat: number; lng: number; ts: num
   return null;
 }
 
+// Sem agrupamento: cada imóvel é desenhado individualmente. Usa circleMarker
+// (canvas, via preferCanvas no MapContainer) em vez de L.marker+divIcon —
+// muito mais leve pra renderizar centenas/milhares de pontos de uma vez,
+// já que não há mais cluster escondendo a maioria deles em zoom baixo.
 function ClusterLayer({
   points, selectedId, onSelect,
 }: { points: PropertyMapPoint[]; selectedId: string | null; onSelect: (p: PropertyMapPoint) => void }) {
   const map = useMap();
-  const groupRef = useRef<L.MarkerClusterGroup | null>(null);
+  const groupRef = useRef<L.LayerGroup | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
   useEffect(() => {
-    const group = (L as unknown as { markerClusterGroup: (o?: unknown) => L.MarkerClusterGroup })
-      .markerClusterGroup({
-        showCoverageOnHover: false,
-        spiderfyOnMaxZoom: true,
-        maxClusterRadius: 50,
-        iconCreateFunction: (cluster: { getChildCount: () => number }) => {
-          const n = cluster.getChildCount();
-          const size = n < 10 ? 34 : n < 100 ? 42 : 52;
-          const inner = size - 8;
-          return L.divIcon({
-            html: `<div style="position:relative;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center">
-              <div style="position:absolute;inset:0;border-radius:9999px;background:radial-gradient(circle at 30% 30%, rgba(59,130,246,0.95), rgba(37,99,235,0.85));box-shadow:0 4px 14px rgba(37,99,235,0.45),0 0 0 4px rgba(255,255,255,0.7)"></div>
-              <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${inner}px;height:${inner}px;color:#fff;font-weight:700;font-size:12px;font-family:system-ui">${n}</div>
-            </div>`,
-            className: "rg-cluster-icon",
-            iconSize: [size, size],
-          });
-        },
-      });
+    const group = L.layerGroup();
     groupRef.current = group;
     map.addLayer(group);
     return () => {
@@ -1088,22 +1082,17 @@ function ClusterLayer({
     const group = groupRef.current;
     if (!group) return;
     group.clearLayers();
-    const markers: L.Marker[] = [];
+    const markers: L.CircleMarker[] = [];
     for (const p of points) {
       const cat = classify(p);
       const meta = CATEGORY_META[cat];
       const isSel = selectedId === p.id;
-      const size = isSel ? 22 : 14;
-      const ring = isSel ? "3px solid #fff;box-shadow:0 0 0 3px rgba(37,99,235,0.55),0 2px 6px rgba(0,0,0,0.35)" : "2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4)";
-      const icon = L.divIcon({
-        html: `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${meta.color};border-radius:9999px;${isSel ? "" : ""};transition:all .2s;${ring.replace(/^/, "")}"></div>`,
-        className: "rg-marker-icon",
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-      });
-      const m = L.marker([p.latitude, p.longitude], {
-        icon,
-        title: `${p.street ?? ""} ${p.number ?? ""}`.trim(),
+      const m = L.circleMarker([p.latitude, p.longitude], {
+        radius: isSel ? 11 : 7,
+        fillColor: meta.color,
+        fillOpacity: 1,
+        color: isSel ? "#2563eb" : "#fff",
+        weight: isSel ? 3 : 2,
       });
       // Lightweight hover tooltip
       m.bindTooltip(
@@ -1117,8 +1106,72 @@ function ClusterLayer({
       m.on("click", () => onSelectRef.current(p));
       markers.push(m);
     }
-    group.addLayers(markers);
+    markers.forEach((m) => group.addLayer(m));
   }, [points, selectedId]);
+
+  return null;
+}
+
+// Rótulo de território por agente — some quando o zoom já permite distinguir
+// imóvel a imóvel (o usuário consegue ver os pontos individuais em vez de precisar
+// saber de quem é a área). Abaixo do limiar, mostra o nome do agente no centróide
+// dos imóveis atribuídos a ele.
+const AGENT_LABEL_ZOOM_THRESHOLD = 15;
+
+function AgentTerritoryLabels({ points }: { points: PropertyMapPoint[] }) {
+  const map = useMap();
+  const groupRef = useRef<L.LayerGroup | null>(null);
+  const [zoom, setZoom] = useState(() => map.getZoom());
+
+  useEffect(() => {
+    const onZoom = () => setZoom(map.getZoom());
+    map.on("zoomend", onZoom);
+    return () => { map.off("zoomend", onZoom); };
+  }, [map]);
+
+  useEffect(() => {
+    const group = L.layerGroup();
+    groupRef.current = group;
+    map.addLayer(group);
+    return () => {
+      try { map.removeLayer(group); } catch { /* noop */ }
+      groupRef.current = null;
+    };
+  }, [map]);
+
+  const centroids = useMemo(() => {
+    const byAgent = new Map<string, { latSum: number; lngSum: number; count: number }>();
+    for (const p of points) {
+      const name = p.agent_name ?? "Sem agente";
+      const cur = byAgent.get(name) ?? { latSum: 0, lngSum: 0, count: 0 };
+      cur.latSum += p.latitude;
+      cur.lngSum += p.longitude;
+      cur.count += 1;
+      byAgent.set(name, cur);
+    }
+    return Array.from(byAgent.entries()).map(([name, v]) => ({
+      name,
+      count: v.count,
+      lat: v.latSum / v.count,
+      lng: v.lngSum / v.count,
+    }));
+  }, [points]);
+
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    group.clearLayers();
+    if (zoom > AGENT_LABEL_ZOOM_THRESHOLD) return;
+    for (const c of centroids) {
+      const icon = L.divIcon({
+        className: "rg-agent-territory-label",
+        html: `<div style="background:rgba(15,23,42,0.85);color:#fff;padding:3px 9px;border-radius:9999px;font:700 11px system-ui;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)">${escapeHtml(c.name)} · ${c.count}</div>`,
+        iconAnchor: [0, 0],
+      });
+      const marker = L.marker([c.lat, c.lng], { icon, interactive: false, zIndexOffset: 2000 });
+      group.addLayer(marker);
+    }
+  }, [zoom, centroids]);
 
   return null;
 }
