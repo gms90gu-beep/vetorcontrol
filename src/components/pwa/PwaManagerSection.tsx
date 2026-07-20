@@ -33,8 +33,30 @@ import { db, clearOfflineDB } from "@/lib/offline/db";
 import { flushMutations } from "@/lib/offline/sync";
 import { supabase } from "@/integrations/supabase/client";
 
-const APP_VERSION = "2.1.0";
-const BUILD_DATE = "2026-06-28";
+// Fallback exibido só enquanto o fetch de /sw.js (abaixo) não responde, ou
+// se ele falhar (ex.: offline na primeira visita, sem SW cacheado ainda).
+// Não é mais necessário bumpar isto manualmente a cada deploy — versão e
+// data reais vêm de fetchSwBuildInfo(), que lê os headers do próprio sw.js
+// publicado (troca a cada build, já que o Workbox regenera o precache
+// manifest com novos hashes toda vez).
+const FALLBACK_VERSION = "—";
+const FALLBACK_BUILD_DATE = "—";
+
+async function fetchSwBuildInfo(): Promise<{ version: string; buildDate: string }> {
+  try {
+    const res = await fetch("/sw.js", { cache: "no-cache" });
+    if (!res.ok) return { version: FALLBACK_VERSION, buildDate: FALLBACK_BUILD_DATE };
+    const lastModified = res.headers.get("last-modified");
+    const etag = (res.headers.get("etag") || "").replace(/"/g, "").replace(/^W\//, "");
+    const version = etag ? etag.slice(0, 10) : (lastModified ? new Date(lastModified).toISOString().slice(0, 10) : FALLBACK_VERSION);
+    const buildDate = lastModified
+      ? new Date(lastModified).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+      : FALLBACK_BUILD_DATE;
+    return { version, buildDate };
+  } catch {
+    return { version: FALLBACK_VERSION, buildDate: FALLBACK_BUILD_DATE };
+  }
+}
 
 type SwState = {
   registered: boolean;
@@ -66,9 +88,17 @@ export function PwaManagerSection() {
   const { installed, canInstall, promptInstall } = usePwaInstall();
   const { lastSync, pending, online, syncing } = useSyncStatus();
   const [, force] = useState(0);
+  const [buildInfo, setBuildInfo] = useState<{ version: string; buildDate: string }>({
+    version: FALLBACK_VERSION,
+    buildDate: FALLBACK_BUILD_DATE,
+  });
 
   useEffect(() => subscribePwaUpdate(() => force((n) => n + 1)), []);
   const update = getPwaUpdateState();
+
+  useEffect(() => {
+    fetchSwBuildInfo().then(setBuildInfo);
+  }, []);
 
   useEffect(() => {
     console.log("[PWA_SETTINGS]", { installed, canInstall, online, pending });
@@ -142,9 +172,9 @@ export function PwaManagerSection() {
             tone={installed ? "ok" : "muted"}
           />
           <Separator className="bg-slate-100" />
-          <InfoRow label="Versão atual" value={`${APP_VERSION}`} />
+          <InfoRow label="Versão atual" value={buildInfo.version} />
           <Separator className="bg-slate-100" />
-          <InfoRow label="Última atualização" value={BUILD_DATE} />
+          <InfoRow label="Última atualização" value={buildInfo.buildDate} />
           <Separator className="bg-slate-100" />
           <InfoRow
             label="Status Offline"
@@ -272,6 +302,7 @@ function DiagnosticsDialog() {
     storage?: { usage?: number; quota?: number };
     session: boolean;
     lastSync: number | null;
+    version: string;
   } | null>(null);
 
   const run = useCallback(async () => {
@@ -300,10 +331,14 @@ function DiagnosticsDialog() {
       }
     } catch {}
     // Dexie counts
+    // Lista completa das tabelas Dexie (ver src/lib/offline/db.ts) — antes
+    // faltavam block_progress e property_recovery_attempts, subestimando o
+    // total exibido e escondendo essas duas tabelas do dump técnico, que é
+    // justamente onde se depuraria um problema de dado offline nelas.
     const tables = [
       "properties","blocks","boletins_rg","visits","visit_deposits",
-      "property_pendencies","field_work_sessions","daily_work_records",
-      "cycles","weeks","profiles","agents",
+      "property_pendencies","property_recovery_attempts","field_work_sessions",
+      "daily_work_records","cycles","weeks","profiles","agents","block_progress",
     ] as const;
     const dexie: Record<string, number> = {};
     let dexieTotal = 0;
@@ -336,9 +371,10 @@ function DiagnosticsDialog() {
       session = !!data.session;
     } catch {}
 
+    const { version } = await fetchSwBuildInfo();
     const result = {
       sw, manifestOk, manifestName, dexie, dexieTotal, pending,
-      cacheEntries, cacheNames, storage, session,
+      cacheEntries, cacheNames, storage, session, version,
       lastSync: (await import("@/lib/offline/sync")).getLastSyncAt(),
     };
     setDiag(result);
@@ -383,7 +419,7 @@ function DiagnosticsDialog() {
             <Item label="Última sincronização" ok={!!diag.lastSync} hint={fmtDate(diag.lastSync)} />
             <Item label="Espaço utilizado" ok={!!diag.storage?.usage}
               hint={`${fmtBytes(diag.storage?.usage)} / ${fmtBytes(diag.storage?.quota)}`} />
-            <Item label="Versão instalada" ok={true} hint={APP_VERSION} />
+            <Item label="Versão instalada" ok={true} hint={diag.version} />
 
             <details className="text-xs text-muted-foreground pt-2">
               <summary>Detalhes técnicos</summary>

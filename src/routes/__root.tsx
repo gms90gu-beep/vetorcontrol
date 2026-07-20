@@ -188,17 +188,20 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  if (typeof window !== "undefined") {
+  // Boot roda uma única vez por carregamento do app (não a cada re-render
+  // da raiz, o que acontecia antes por estar direto no corpo do componente).
+  // bootSyncEngine()/installNetworkGuard() já tinham guarda própria contra
+  // reexecução; registerPwa() ganhou uma guarda equivalente em register.ts
+  // como segunda camada de proteção.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     // Boot da camada offline (Dexie + fila de sincronização + guarda de rede)
     import("@/lib/offline/sync").then((m) => m.bootSyncEngine());
     import("@/lib/offline/network-guard").then((m) => m.installNetworkGuard());
     // PWA: registro guardado (não roda em dev/preview/iframe)
     import("@/lib/pwa/register").then((m) => m.registerPwa());
-  }
-
-  if (typeof window !== "undefined") {
     console.log("[AFTER_BOOT]", { sinceBoot: sinceBoot(), online: navigator.onLine });
-  }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

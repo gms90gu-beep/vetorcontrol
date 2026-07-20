@@ -1004,7 +1004,12 @@ export function DailyWorkCloser({
 
   const handleCloseDay = async () => {
     console.log("[ENCERRAR] botão clicado");
-    try { (window as any).__vcSetJourneyActive?.(false); } catch {}
+    // NOTA: __vcSetJourneyActive(false) só é chamado após o encerramento
+    // realmente terminar com sucesso (ver abaixo, perto do toast de sucesso).
+    // Chamá-lo aqui no início liberava uma atualização de PWA pendente para
+    // aplicar reload em segundo plano enquanto o encerramento (que grava
+    // daily_work_records, block_progress, RPC de pendências etc.) ainda
+    // estava em andamento — risco de fechamento parcial/interrompido.
     console.log("[ENCERRAR] pendências", pendingCount);
     console.log("[ENCERRAR] quarteirão aberto", openBlock);
     console.log("[DIÁRIA] Encerramento iniciado");
@@ -1805,6 +1810,9 @@ export function DailyWorkCloser({
       } catch {}
 
       console.log("[ENCERRAR] concluído");
+      // Jornada efetivamente finalizada agora — seguro liberar uma
+      // atualização de PWA pendente (aplicada só a partir daqui).
+      try { (window as any).__vcSetJourneyActive?.(false); } catch {}
       const msg = isOnline()
         ? "Trabalho do dia encerrado com sucesso!"
         : "Jornada encerrada localmente. Será sincronizada quando houver conexão.";
