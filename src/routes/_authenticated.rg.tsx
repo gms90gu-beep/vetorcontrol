@@ -585,8 +585,18 @@ function RGPage() {
       return;
     }
     setViewBusy(b.id);
-    toast.loading("Abrindo...", { id: `view-${b.id}`, duration: 1500 });
-    navigate({ to: "/rg/boletim/$id", params: { id: b.id } });
+    const toastId = `view-${b.id}`;
+    toast.loading("Abrindo...", { id: toastId, duration: 1500 });
+    // navigate() rejeita silenciosamente se o beforeLoad da rota (ou de um
+    // layout pai, como o guard de /rg) lançar um erro inesperado — sem isso,
+    // o usuário via só o toast "Abrindo..." sumir sozinho e nada mais
+    // acontecer, sem nenhuma mensagem de erro.
+    Promise.resolve(navigate({ to: "/rg/boletim/$id", params: { id: b.id } }))
+      .catch((e) => {
+        console.error("[RG] Falha ao abrir boletim:", e);
+        toast.error("Não foi possível abrir o boletim. Tente novamente.", { id: toastId });
+      })
+      .finally(() => setViewBusy(null));
   }
 
   function handleEdit(b: BoletimRow) {
@@ -597,7 +607,12 @@ function RGPage() {
     }
     setEditBusy(b.id);
     toast.dismiss(`edit-${b.id}`);
-    navigate({ to: "/rg/editar/$id", params: { id: b.id } });
+    Promise.resolve(navigate({ to: "/rg/editar/$id", params: { id: b.id } }))
+      .catch((e) => {
+        console.error("[RG] Falha ao abrir edição do boletim:", e);
+        toast.error("Não foi possível abrir a edição. Tente novamente.");
+      })
+      .finally(() => setEditBusy(null));
   }
 
   async function handlePDF(b: BoletimRow) {
