@@ -21,8 +21,10 @@ import {
   Activity, Building2, Bug, Download, FileSpreadsheet, FileText,
   Loader2, Map as MapIcon, Users,
 } from "lucide-react";
+import { requireManagerGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
+  beforeLoad: requireManagerGuard,
   component: ExecutiveDashboardPage,
 });
 

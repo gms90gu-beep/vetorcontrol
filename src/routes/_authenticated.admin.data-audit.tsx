@@ -15,8 +15,10 @@ import {
   RefreshCw, Download, ShieldCheck, AlertTriangle, CheckCircle2, Wrench,
   MapPin, Users, Layers, Home as HomeIcon, ClipboardList, Wifi, Calendar, Bug, Activity,
 } from "lucide-react";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/data-audit")({
+  beforeLoad: requireAdminMasterGuard,
   component: DataAuditPage,
 });
 
@@ -368,10 +370,13 @@ function DataAuditPage() {
             <RefreshCw className="h-4 w-4" /> Corrigir Vínculos de Agente
           </Button>
           <Button disabled={busy !== null} variant="outline" className="gap-2"
-            onClick={() => runAction("clear_offline_errors", async () => {
-              const c = await db.syncQueue.where("status").equals("error").delete();
-              return { removed: c };
-            })}>
+            onClick={() => {
+              if (!window.confirm("Isso apaga permanentemente as mutações offline com erro (edições que nao foram sincronizadas). Continuar?")) return;
+              runAction("clear_offline_errors", async () => {
+                const c = await db.syncQueue.where("status").equals("error").delete();
+                return { removed: c };
+              });
+            }}>
             <RefreshCw className="h-4 w-4" /> Limpar Pendências Offline
           </Button>
         </CardContent>

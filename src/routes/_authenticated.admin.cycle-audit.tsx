@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/admin/cycle-audit")({
+  beforeLoad: requireAdminMasterGuard,
   component: CycleAuditPage,
 });
 
@@ -28,7 +31,7 @@ function CycleAuditPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getOperationalDate();
 
   async function load() {
     setLoading(true);

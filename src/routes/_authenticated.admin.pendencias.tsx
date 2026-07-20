@@ -10,8 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { requireManagerGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/pendencias")({
+  beforeLoad: requireManagerGuard,
   component: PendencyReportPage,
 });
 

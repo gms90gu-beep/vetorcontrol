@@ -27,8 +27,10 @@ import {
   Users, Zap,
 } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/design-system")({
+  beforeLoad: requireAdminMasterGuard,
   component: DesignSystemPage,
 });
 

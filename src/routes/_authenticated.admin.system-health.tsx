@@ -12,8 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Activity, AlertTriangle, Download, Play, FileText, FileSpreadsheet } from "lucide-react";
 import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/institutional-export";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/system-health")({
+  beforeLoad: requireAdminMasterGuard,
   component: SystemHealthPage,
 });
 

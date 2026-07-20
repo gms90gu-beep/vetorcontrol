@@ -16,9 +16,11 @@ import {
   deleteOrphanBlocks,
 } from "@/lib/rg-reconcile.functions";
 import { runRgHomologation, type RgHomologationReport } from "@/lib/rg-homologation.functions";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 
 export const Route = createFileRoute("/_authenticated/admin/rg-reconcile")({
+  beforeLoad: requireAdminMasterGuard,
   component: Page,
 });
 

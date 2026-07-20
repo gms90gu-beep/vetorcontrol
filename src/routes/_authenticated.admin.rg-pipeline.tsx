@@ -25,8 +25,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute('/_authenticated/admin/rg-pipeline')({
+  beforeLoad: requireAdminMasterGuard,
   component: RGPipelinePage,
 });
 
