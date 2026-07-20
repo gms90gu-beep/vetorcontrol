@@ -1,4 +1,4 @@
-import { redirect } from "@tanstack/react-router";
+import { redirect, isRedirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { hasValidLocalSession, getLocalSession } from "@/auth/auth";
 import { getCachedUserRole, readCachedUserRole } from "@/lib/offline/role-cache";
@@ -45,8 +45,21 @@ export async function blockManagersGuard() {
       throw redirect({ to: "/supervision", replace: true });
     }
   } catch (err) {
+    // Redirects thrown by TanStack Router (throw redirect({...}) above) must always
+    // propagate untouched, or the intended redirect never happens.
+    if (isRedirect(err)) throw err;
     if (err instanceof Error && err.message === "timeout") return;
-    throw err;
+    // Anything else (Dexie/IndexedDB hiccup, getCachedUserRole failing, a flaky
+    // Supabase call, etc.) used to re-throw here, which made navigate() reject
+    // silently with zero feedback for the user — this guard runs on every
+    // navigation inside /rg/* (it's the parent layout's beforeLoad), so any
+    // transient error here broke "Ver"/"Editar" clicks: the loading toast
+    // appeared and then nothing happened, no error shown either. This guard's
+    // job is just to steer managers to /supervision, not to be a hard security
+    // boundary — so an inability to determine the role should not block a
+    // legitimate agent's navigation. Fail open instead.
+    console.warn("[blockManagersGuard] erro inesperado ao verificar cargo; liberando navegação", err);
+    return;
   }
 }
 
