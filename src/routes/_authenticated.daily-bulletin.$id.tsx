@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DEP_ORDER, normalizeDepJson } from "@/lib/daily-integrity";
+import { computePropertyTypeComposition, type PropertyTypeComposition } from "@/lib/property-composition";
 import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -35,6 +36,8 @@ function DailyBulletinView() {
   const [registration, setRegistration] = useState<string>("—");
   const [municipality, setMunicipality] = useState<string>("—");
   const [supervisor, setSupervisor] = useState<string>("—");
+  const [propTypes, setPropTypes] = useState<PropertyTypeComposition | null>(null);
+  const [propTypesTotal, setPropTypesTotal] = useState<number>(0);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +53,19 @@ function DailyBulletinView() {
           return;
         }
         setRec(data);
+
+        if (data.agent_id && data.work_date) {
+          computePropertyTypeComposition({
+            agentAuthId: data.agent_id,
+            workDates: [data.work_date],
+            cycleId: data.cycle_id ?? null,
+          })
+            .then((res) => {
+              setPropTypes(res.propTypes);
+              setPropTypesTotal(res.totalTypes);
+            })
+            .catch((e) => console.warn("[DAILY_BULLETIN_PROPERTY_COMPOSITION_ERROR]", e));
+        }
 
         if (data.agent_id) {
           const { data: prof } = await supabase
@@ -124,6 +140,28 @@ function DailyBulletinView() {
       styles: { halign: "center", fontSize: 9 },
     });
     y = (pdf as any).lastAutoTable.finalY + 4;
+
+    if (propTypes) {
+      pdf.text("COMPOSIÇÃO DA PRODUÇÃO IMOBILIÁRIA", 14, y); y += 1;
+      autoTable(pdf, {
+        startY: y + 1,
+        head: [["Residencial (R)", "Comercial (C)", "Terreno Baldio (TB)", "Ponto Estratégico (PE)", "Outros (O)", "Total"]],
+        body: [[
+          propTypes.residence, propTypes.commerce, propTypes.vacant_lot,
+          propTypes.strategic_point, propTypes.others, propTypesTotal,
+        ].map(String)],
+        theme: "grid", headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: "center", fontSize: 7.5 },
+        styles: { halign: "center", fontSize: 9 },
+      });
+      y = (pdf as any).lastAutoTable.finalY + 1;
+      if (propTypesTotal !== (rec.properties_worked ?? 0)) {
+        pdf.setFontSize(7); pdf.setTextColor(180, 83, 9);
+        pdf.text(`Atenção: total por tipo (${propTypesTotal}) difere dos trabalhados (${rec.properties_worked ?? 0}).`, 14, y + 3);
+        pdf.setTextColor(0, 0, 0);
+        y += 4;
+      }
+      y += 3;
+    }
 
     pdf.text("DEPÓSITOS POR TIPO", 14, y); y += 1;
     autoTable(pdf, {
@@ -219,6 +257,28 @@ function DailyBulletinView() {
           <Stat label="Imóveis Fechados" value={rec.properties_closed ?? 0} />
           <Stat label="Pontos Estratégicos" value={rec.strategic_points_worked ?? 0} />
         </div>
+      </Section>
+
+      {/* SEÇÃO 1.1 — COMPOSIÇÃO POR TIPO DE IMÓVEL */}
+      <Section title="1.1 Composição da Produção Imobiliária">
+        {propTypes ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <Stat label="Residencial (R)" value={propTypes.residence} />
+              <Stat label="Comercial (C)" value={propTypes.commerce} />
+              <Stat label="Terreno Baldio (TB)" value={propTypes.vacant_lot} />
+              <Stat label="Ponto Estratégico (PE)" value={propTypes.strategic_point} />
+              <Stat label="Outros (O)" value={propTypes.others} />
+            </div>
+            {propTypesTotal !== (rec.properties_worked ?? 0) && (
+              <div className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                Atenção: total por tipo ({propTypesTotal}) difere dos imóveis trabalhados ({rec.properties_worked ?? 0}).
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-muted-foreground">Carregando composição...</div>
+        )}
       </Section>
 
       {/* SEÇÃO 2 — DEPÓSITOS */}
