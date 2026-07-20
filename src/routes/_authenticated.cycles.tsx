@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect } from "react";
 import { 
-  Plus, 
   Calendar, 
   ChevronRight, 
   Layers, 
@@ -21,9 +20,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { generateInstitutionalPDF } from "@/lib/institutional-export";
+
+// Datas de ciclo vêm como coluna DATE (YYYY-MM-DD, sem hora). Parsear com
+// `new Date(str)` interpreta como UTC meia-noite e, ao formatar de volta pro
+// fuso local (America/Sao_Paulo, UTC-3), pode exibir o dia anterior. Parseia
+// os componentes manualmente pra evitar qualquer conversão de fuso.
+function formatCycleDate(s: string | null | undefined): string {
+  if (!s) return "—";
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return "—";
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
 
 export const Route = createFileRoute("/_authenticated/cycles")({
   beforeLoad: blockManagersGuard,
@@ -34,6 +55,8 @@ function CyclesPage() {
   const [cycles, setCycles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverageData, setCoverageData] = useState<Record<string, any>>({});
+  const [focosData, setFocosData] = useState<Record<string, number>>({});
+  const [cycleToFinish, setCycleToFinish] = useState<any | null>(null);
 
   useEffect(() => {
     fetchCycles();
@@ -64,6 +87,19 @@ function CyclesPage() {
         });
         setCoverageData(coverageMap);
       }
+
+      // Focos positivos por ciclo — não vem na view cycle_coverage_summary,
+      // então busca separado (visits com has_focus=true é sempre um
+      // subconjunto pequeno, não precisa de limite).
+      const { data: focusRows } = await supabase
+        .from("visits")
+        .select("cycle_id")
+        .eq("has_focus", true);
+      const focosMap: Record<string, number> = {};
+      (focusRows ?? []).forEach((r: any) => {
+        if (r.cycle_id) focosMap[r.cycle_id] = (focosMap[r.cycle_id] ?? 0) + 1;
+      });
+      setFocosData(focosMap);
     } catch (error) {
       console.error("Error fetching cycles:", error);
     } finally {
@@ -85,18 +121,42 @@ function CyclesPage() {
     } catch (error) {
       console.error("Error finishing cycle:", error);
       toast.error("Erro ao finalizar ciclo.");
+    } finally {
+      setCycleToFinish(null);
     }
   };
 
   const handleGenerateReport = (cycle: any) => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 2000)),
-      {
-        loading: `Gerando relatório consolidado para ${cycle.name}...`,
-        success: `Relatório do ${cycle.name} gerado com sucesso!`,
-        error: "Erro ao gerar relatório.",
-      }
-    );
+    const coverage = (cycle.id && coverageData[cycle.id]) || { coverage_percentage: 0, worked_properties: 0, total_properties: 0 };
+    const focos = focosData[cycle.id] ?? 0;
+    const statusLabel = cycle.status === "in_progress" ? "Em andamento" : cycle.status === "finished" ? "Concluído" : "Não iniciado";
+    try {
+      generateInstitutionalPDF(
+        `relatorio-ciclo-${cycle.number ?? cycle.id}.pdf`,
+        {
+          title: `Relatório do Ciclo — ${cycle.name}`,
+          subtitle: `Período: ${formatCycleDate(cycle.start_date)} a ${formatCycleDate(cycle.end_date)}`,
+          issuedBy: "VetorControl",
+        },
+        [
+          {
+            title: "Resumo",
+            head: ["Indicador", "Valor"],
+            body: [
+              ["Status", statusLabel],
+              ["Cobertura de visitas", `${coverage.coverage_percentage}%`],
+              ["Imóveis trabalhados", coverage.worked_properties],
+              ["Total de imóveis no ciclo", coverage.total_properties],
+              ["Focos positivos", focos],
+            ],
+          },
+        ],
+      );
+      toast.success(`Relatório do ${cycle.name} gerado.`);
+    } catch (e) {
+      console.error("Error generating cycle report:", e);
+      toast.error("Erro ao gerar relatório.");
+    }
   };
 
   const groupedCycles = cycles.reduce((acc: Record<number, any[]>, cycle) => {
@@ -166,7 +226,7 @@ function CyclesPage() {
                         <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="h-3.5 w-3.5 text-blue-500/70" />
-                            {new Date(cycle.start_date).toLocaleDateString('pt-BR')} - {new Date(cycle.end_date).toLocaleDateString('pt-BR')}
+                            {formatCycleDate(cycle.start_date)} - {formatCycleDate(cycle.end_date)}
                           </div>
                         </div>
                       </CardHeader>
@@ -181,13 +241,13 @@ function CyclesPage() {
 
                         <div className="grid grid-cols-2 gap-3">
                           <CycleStatCard label="Imóveis" value={coverage.worked_properties} icon={Home} color="text-blue-600" bgColor="bg-blue-50/50" />
-                          <CycleStatCard label="Focos" value={isActive ? 12 : 0} icon={AlertTriangle} color="text-red-600" bgColor="bg-red-50/50" />
+                          <CycleStatCard label="Focos" value={focosData[cycle.id] ?? 0} icon={AlertTriangle} color="text-red-600" bgColor="bg-red-50/50" />
                         </div>
 
                         <div className="flex flex-col gap-3">
                           {isActive && (
                             <Button 
-                              onClick={() => handleFinishCycle(cycle.id)}
+                              onClick={() => setCycleToFinish(cycle)}
                               className="w-full h-16 rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] gap-2 bg-emerald-500 hover:bg-emerald-600 text-white border-none transition-all shadow-lg active:scale-95 shadow-emerald-100"
                             >
                               <CheckCircle2 className="h-4 w-4" /> Finalizar Ciclo Atual
@@ -214,9 +274,22 @@ function CyclesPage() {
         </div>
       )}
 
-      <Button className="fixed bottom-24 right-6 h-16 w-16 rounded-[2rem] shadow-2xl shadow-primary/40 p-0 active:scale-90 transition-all z-40 bg-primary hover:bg-primary/90 flex items-center justify-center">
-        <Plus className="h-8 w-8 text-white" />
-      </Button>
+      <AlertDialog open={!!cycleToFinish} onOpenChange={(open) => !open && setCycleToFinish(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalizar {cycleToFinish?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação marca o ciclo como concluído. O próximo ciclo será iniciado automaticamente. Não é possível desfazer pela tela.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => cycleToFinish && handleFinishCycle(cycleToFinish.id)}>
+              Finalizar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

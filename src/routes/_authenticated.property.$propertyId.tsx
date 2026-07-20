@@ -39,7 +39,7 @@ import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
-import { getOperationalVisitDate, assertProductionDate } from "@/lib/operational-date";
+import { getOperationalVisitDate, assertProductionDate, getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
 import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
 import { FirstVisitStreetPrompt } from "@/components/property/FirstVisitStreetPrompt";
 import { getBlockCurrentStreet, detectFromGPS, isSameStreet } from "@/lib/current-street";
@@ -312,15 +312,16 @@ function PropertyVisitPage() {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Fronteira do dia calculada com fuso fixo America/Sao_Paulo (-03:00),
+      // em vez de depender do relógio/fuso local do aparelho.
+      const { startIso: todayStartIso } = operationalDateBoundsUtcIso(getOperationalDate());
 
       const { data: visits } = await supabase
         .from("visits")
         .select("status, treatment_amount, treated_deposits, tubitos_coletados")
         .eq("agent_id", user.id)
         .in("status", ["visited", "closed", "refused", "abandoned"])
-        .gte("visit_date", today.toISOString());
+        .gte("visit_date", todayStartIso);
 
       if (visits) {
         const stats = visits.reduce((acc, v) => ({
@@ -1467,7 +1468,13 @@ function PropertyVisitPage() {
           {/* Linha 2: Ações secundárias */}
           <div className="flex items-center justify-between gap-2 w-full">
             <button
-              onClick={() => { if (confirmLeaveIfDirty()) handleEndBlock(); }}
+              onClick={() => {
+                if (!confirmLeaveIfDirty()) return;
+                const ok = window.confirm(
+                  "Encerrar este quarteirão? Todos os imóveis serão marcados como concluídos. Essa ação não pode ser desfeita por aqui.",
+                );
+                if (ok) handleEndBlock();
+              }}
               className="flex-1 min-w-0 text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest py-1 flex items-center justify-center gap-1 truncate"
             >
               <AlertCircle className="h-3 w-3 shrink-0" />
