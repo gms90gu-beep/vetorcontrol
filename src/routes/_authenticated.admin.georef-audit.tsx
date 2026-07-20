@@ -27,10 +27,12 @@ import {
   downloadCSV, downloadXLSX, generateInstitutionalPDF,
 } from "@/lib/institutional-export";
 import { toast } from "sonner";
+import { requireManagerGuard } from "@/lib/role-guards";
 
 const AuditMap = lazy(() => import("@/components/map/GeorefAuditMap"));
 
 export const Route = createFileRoute("/_authenticated/admin/georef-audit")({
+  beforeLoad: requireManagerGuard,
   component: GeorefAuditPage,
 });
 

@@ -7,8 +7,10 @@ import { RefreshCw, ShieldAlert, Database, Activity, AlertTriangle } from "lucid
 import { getAuditSnapshot } from "@/lib/audit.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/auditoria")({
+  beforeLoad: requireAdminMasterGuard,
   component: AuditPage,
 });
 

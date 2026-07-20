@@ -28,8 +28,10 @@ import { downloadMarkdown, downloadPdf } from "@/lib/audit/rc1-report";
 import { runGoLive, getLastGoLiveReport, type GoLiveReport } from "@/lib/audit/go-live";
 import { downloadMarkdown as downloadGoLiveMd, downloadPdf as downloadGoLivePdf } from "@/lib/audit/go-live-report";
 import { FileDown, FileText, PlayCircle, Award } from "lucide-react";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/offline-audit")({
+  beforeLoad: requireAdminMasterGuard,
   ssr: false,
   component: OfflineAuditPage,
 });
