@@ -6,6 +6,7 @@
  */
 import { db } from "@/lib/offline/db";
 import { listLocal } from "@/lib/offline/repos";
+import { toOperationalDate } from "@/lib/operational-date";
 
 export type ShiftIssueSeverity = "error" | "warning";
 
@@ -78,7 +79,11 @@ export async function runShiftValidation(
   // ── Visitas da jornada ─────────────────────────────────────────────────
   const visits = await listLocal<any>("visits", (v) => {
     if (v.agent_id !== scope.userId) return false;
-    if (String(v.visit_date || "").slice(0, 10) !== scope.workDate) return false;
+    // Comparação em America/Sao_Paulo (toOperationalDate), nunca slice(0,10) cru:
+    // visit_date é timestamptz (UTC) — cortar a string sem fuso desloca visitas
+    // feitas ~21h-24h (fim de expediente) para o dia seguinte, fazendo a validação
+    // de encerramento ignorá-las (falso "jornada parcial", falso depósito/foco órfão).
+    if (toOperationalDate(v.visit_date) !== scope.workDate) return false;
     if (scope.sessionId && v.field_work_session_id && v.field_work_session_id !== scope.sessionId)
       return false;
     if (propIds.size > 0 && v.property_id && !propIds.has(v.property_id)) return false;

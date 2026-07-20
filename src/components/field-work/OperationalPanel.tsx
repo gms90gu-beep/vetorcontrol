@@ -71,6 +71,14 @@ function operationalDateBR(iso: string | Date | null | undefined): string | null
   return _opDateFmt.format(d);
 }
 
+/** "YYYY-MM-DD" (America/Sao_Paulo) -> "DD/MM" para exibição no card do imóvel. */
+function fmtWorkedDate(iso: string | Date | null | undefined): string | null {
+  const opDate = operationalDateBR(iso);
+  if (!opDate) return null;
+  const [, m, d] = opDate.split("-");
+  return `${d}/${m}`;
+}
+
 
 
 // Ordenação operacional canônica — número, sequência, complemento.
@@ -633,6 +641,11 @@ const PropertyRow = memo(function PropertyRow({
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">
           {typeLabel(p.type)}{p.street_name ? ` · ${p.street_name}` : ""}
         </p>
+        {visit?.visit_date && (
+          <p className="text-[10px] font-bold text-emerald-600 tracking-wide truncate">
+            Trabalhado em {fmtWorkedDate(visit.visit_date)}
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <IconPill Icon={Navigation} on={hasGeo} onColor="text-emerald-600" offColor="text-slate-300" title={hasGeo ? "Georreferenciado" : "Sem GPS"} />

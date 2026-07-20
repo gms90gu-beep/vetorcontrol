@@ -51,6 +51,17 @@ function toDateOnly(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * "Hoje" (meia-noite local) alinhado à Data Operacional (America/Sao_Paulo),
+ * em vez de `new Date()` cru (hora do aparelho). Evita divergir da mesma
+ * "hoje" usada no resto do app (getOperationalDate()) quando o fuso do
+ * dispositivo não é o de Brasília.
+ */
+function operationalTodayDate(): Date {
+  const [y, m, d] = getOperationalDate().split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 async function autoRecoverSession(sessionId: string) {
   if (!isOnline()) return;
   try {
@@ -320,7 +331,7 @@ function FieldWorkPage() {
   const navigate = useNavigate();
 
   const [userId, setUserId] = useState<string | undefined>(undefined);
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(() => operationalTodayDate());
   const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -573,8 +584,8 @@ function FieldWorkPage() {
 
     const sessionDateStr = toDateOnly(date);
 
-    // Regra de janela retroativa
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Regra de janela retroativa (hoje = Data Operacional, America/Sao_Paulo)
+    const today = operationalTodayDate();
     const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
     const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
     if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
@@ -778,7 +789,7 @@ function FieldWorkPage() {
                   }}
                   locale={ptBR}
                   disabled={(d) => {
-                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const today = operationalTodayDate();
                     const min = new Date(today); min.setDate(min.getDate() - MAX_RETROACTIVE_DAYS);
                     const t = new Date(d); t.setHours(0, 0, 0, 0);
                     return t > today || t < min;
@@ -966,7 +977,7 @@ function FieldWorkPage() {
           const wasPaused = (s as any).status === "paused";
           let resumed = s;
           if (wasPaused) {
-            const todayStr = toDateOnly(new Date());
+            const todayStr = getOperationalDate();
             try {
               await updateOffline("field_work_sessions", s.id, {
                 status: "in_progress",
