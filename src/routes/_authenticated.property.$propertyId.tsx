@@ -27,7 +27,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { usePropertyRecords } from "@/hooks/useOfflineData";
 import { sortPropertiesOperational } from "@/lib/property-order";
 import { listRemoteOrCache, safeSupabaseRead, updateOffline } from "@/lib/offline/repos";
 import { saveVisitOffline } from "@/lib/offline/repos/visits";
@@ -154,7 +153,6 @@ function PropertyVisitPage() {
     detected: string | null;
   }>({ open: false, mode: "first-visit", info: null, coords: null, detected: null });
   const [geoPromptedFor, setGeoPromptedFor] = useState<string | null>(null);
-  const { data, loading, error: propertyError } = usePropertyRecords(userId);
   useEffect(() => {
     (async () => {
       const { data: { user } } = await safeGetUser();
