@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { useAuth } from "@/hooks/useAuth";
-import { usePendingRecords } from "@/hooks/useOfflineData";
 import {
   AlertTriangle,
   Home,
@@ -126,8 +125,6 @@ function StatusBadge({ status }: { status: RecoveryResult }) {
 
 function PendingPage() {
   const { user, role } = useAuth();
-  const userId = user?.id;
-  const { data, loading: pendingLoading, error: pendingError } = usePendingRecords(userId);
   const [loading, setLoading] = useState(true);
   const [pendencies, setPendencies] = useState<EnrichedPendency[]>([]);
   const [search, setSearch] = useState("");
@@ -141,8 +138,8 @@ function PendingPage() {
     document.title = "Pendências — VetorControl";
   }, []);
 
-  const load = async () => {
-    if (!user) return;
+  const load = async (): Promise<EnrichedPendency[]> => {
+    if (!user) return [];
     setLoading(true);
     try {
       const pends = await listRemoteOrCache<any>({
@@ -191,16 +188,17 @@ function PendingPage() {
       const propMap = new Map((props || []).map((p: any) => [p.id, p]));
       const agentMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
 
-      setPendencies(
-        sorted.map((p: any) => ({
-          ...p,
-          property: propMap.get(p.property_id),
-          agent_name: agentMap.get(p.agent_id) || "—",
-        }))
-      );
+      const enriched: EnrichedPendency[] = sorted.map((p: any) => ({
+        ...p,
+        property: propMap.get(p.property_id),
+        agent_name: agentMap.get(p.agent_id) || "—",
+      }));
+      setPendencies(enriched);
+      return enriched;
     } catch (e: any) {
       console.error("[Pendências] erro ao carregar:", e);
       toast.error("Erro ao carregar pendências");
+      return [] as EnrichedPendency[];
     } finally {
       setLoading(false);
     }
@@ -211,7 +209,14 @@ function PendingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Guarda de staleness: se o agente abrir os detalhes de um imóvel e, antes da
+  // busca terminar, abrir outro, a resposta mais lenta do primeiro não pode
+  // sobrescrever o histórico de tentativas do segundo (mesma corrida já
+  // corrigida no StreetAutocomplete da área RG).
+  const attemptsRequestRef = useRef(0);
+
   const loadAttempts = async (propertyId: string) => {
+    const requestId = ++attemptsRequestRef.current;
     try {
       const data = await listRemoteOrCache<any>({
         name: "property_recovery_attempts",
@@ -228,6 +233,7 @@ function PendingPage() {
         const tb = b.attempted_at ? new Date(b.attempted_at).getTime() : 0;
         return ta - tb;
       });
+      if (requestId !== attemptsRequestRef.current) return; // resposta obsoleta, descarta
       setAttempts(sorted as any[]);
     } catch (e) {
       console.error(e);
@@ -380,9 +386,14 @@ function PendingPage() {
           onCreated={async () => {
             setAttemptDialogOpen(false);
             await loadAttempts(selected.property_id);
-            await load();
-            // refresh selected
-            const fresh = pendencies.find((x) => x.property_id === selected.property_id);
+            // `load()` retorna a lista recém-buscada — usar isso em vez do estado
+            // `pendencies` (que, neste closure, ainda é a versão anterior à
+            // atualização: setPendencies agenda o novo valor para o próximo
+            // render, não o disponibiliza de volta nesta chamada). Sem isso, o
+            // painel de detalhes continuava mostrando o status/tentativas
+            // antigos até o agente fechar e reabrir.
+            const refreshed = await load();
+            const fresh = refreshed.find((x) => x.property_id === selected.property_id);
             if (fresh) setSelected(fresh);
           }}
         />
