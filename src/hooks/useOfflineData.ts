@@ -14,7 +14,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type RGRecord, type FieldWorkRecord, type PendingRecord, type PropertyRecord } from '@/db/database';
 import { db as offlineDb } from '@/lib/offline/db';
 import { supabase } from '@/auth/auth';
-import { isOnline } from '@/sync/networkMonitor';
 import { reconcile } from '@/lib/offline/reconciler';
 
 interface UseOfflineDataResult<T> {
@@ -170,7 +169,7 @@ export function useRGRecords(userId?: string): UseOfflineDataResult<RGRecord> {
 
   const fetchFromAPI = useCallback(async () => {
     if (!userId) return;
-    if (!isOnline()) return;
+    if (!navigator.onLine) return;
     setLoading(true);
     setError(null);
     try {
@@ -237,7 +236,7 @@ export function useFieldWorkRecords(userId?: string): UseOfflineDataResult<Field
   ) ?? [];
 
   const fetchFromAPI = useCallback(async () => {
-    if (!isOnline() || !userId) return;
+    if (!navigator.onLine || !userId) return;
     setLoading(true);
     try {
       const { data: rows } = await (supabase as any)
@@ -290,7 +289,7 @@ export function usePendingRecords(userId?: string): UseOfflineDataResult<Pending
   ) ?? [];
 
   const fetchFromAPI = useCallback(async () => {
-    if (!isOnline() || !userId) return;
+    if (!navigator.onLine || !userId) return;
     setLoading(true);
     try {
       const { data: rows } = await (supabase as any)
@@ -342,7 +341,7 @@ export function usePropertyRecords(userId?: string): UseOfflineDataResult<Proper
   ) ?? [];
 
   const fetchFromAPI = useCallback(async () => {
-    if (!isOnline() || !userId) return;
+    if (!navigator.onLine || !userId) return;
     setLoading(true);
     try {
       const { data: rows } = await (supabase as any)
@@ -397,7 +396,7 @@ export function useOfflineSyncStatus() {
     hasPending: pendingCount > 0,
     pendingCount,
     errorCount,
-    isSyncing: pendingCount > 0 && isOnline(),
+    isSyncing: pendingCount > 0 && navigator.onLine,
   };
 }
 

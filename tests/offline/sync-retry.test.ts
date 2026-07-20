@@ -35,9 +35,35 @@ describe("sync: retry increments tries and caps at MAX_RETRIES", () => {
 
   it("stops retrying after MAX_RETRIES (5)", async () => {
     await enqueueMutation({ table: "visits", op: "insert", payload: { id: "v1" } });
-    for (let i = 0; i < 6; i++) await flushMutations();
+    for (let i = 0; i < 6; i++) {
+      await flushMutations();
+      // O backoff mantém a mutação em "error" até nextRetryAt; aqui simulamos
+      // que o prazo já passou para isolar o teto de tentativas (MAX_RETRIES)
+      // do comportamento de backoff, que tem teste próprio abaixo.
+      await db.mutations.toCollection().modify({ nextRetryAt: 0 });
+    }
     const remaining = await db.mutations.toArray();
     expect(remaining[0].tries).toBe(5);
     expect(remaining[0].status).toBe("error");
+  });
+
+  it("does not retry before nextRetryAt (backoff)", async () => {
+    await enqueueMutation({ table: "visits", op: "insert", payload: { id: "v1" } });
+    await flushMutations();
+    let remaining = await db.mutations.toArray();
+    expect(remaining[0].tries).toBe(1);
+    expect(remaining[0].nextRetryAt).toBeGreaterThan(Date.now());
+
+    // Chamada imediata seguinte: ainda dentro da janela de backoff, não deve
+    // reprocessar a mutação (tries permanece 1).
+    await flushMutations();
+    remaining = await db.mutations.toArray();
+    expect(remaining[0].tries).toBe(1);
+
+    // Passado o prazo do backoff, a próxima flush deve tentar de novo.
+    await db.mutations.toCollection().modify({ nextRetryAt: 0 });
+    await flushMutations();
+    remaining = await db.mutations.toArray();
+    expect(remaining[0].tries).toBe(2);
   });
 });

@@ -17,6 +17,7 @@ export interface Mutation {
   tries: number;
   status: MutationStatus;
   lastError?: string;
+  nextRetryAt?: number;    // backoff — não reenviar antes deste timestamp (ms)
 }
 
 export interface CachedRow {

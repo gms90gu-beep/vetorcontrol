@@ -10,8 +10,6 @@ import {
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { initNetworkMonitor, onConnectivityChange } from "@/sync/networkMonitor";
-import { SyncStatusBadge } from "@/components/SyncStatusBadge";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PostBootErrorBoundary } from "@/components/PostBootErrorBoundary";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
@@ -198,12 +196,9 @@ function RootComponent() {
     import("@/lib/pwa/register").then((m) => m.registerPwa());
   }
 
-  useEffect(() => {
-    initNetworkMonitor();
-    const unsub = onConnectivityChange(() => {});
+  if (typeof window !== "undefined") {
     console.log("[AFTER_BOOT]", { sinceBoot: sinceBoot(), online: navigator.onLine });
-    return unsub;
-  }, []);
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -211,7 +206,6 @@ function RootComponent() {
         <PostBootErrorBoundary>
           <Outlet />
         </PostBootErrorBoundary>
-        <SyncStatusBadge />
         <OfflineBanner />
         <PwaUpdatePrompt />
       </AuthProvider>
