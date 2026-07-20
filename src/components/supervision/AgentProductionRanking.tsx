@@ -8,19 +8,24 @@ import { Button } from "@/components/ui/button";
 import { Trophy, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { getOperationalDate } from "@/lib/operational-date";
+import { getEpiWeek, epiWeekToDateRange } from "@/lib/cycle-week";
 
-function isoDays(offsetDaysFromMonday: number, base = new Date()) {
-  const today = getOperationalDate(base);
-  const [y, m, d] = today.split("-").map(Number);
-  const local = new Date(y, m - 1, d);
-  const day = local.getDay() || 7;
-  local.setDate(local.getDate() - (day - 1) + offsetDaysFromMonday);
-  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
+// Intervalo padrão "esta semana" — semana epidemiológica SINAN (domingo a
+// sábado), a mesma usada em Boletim Semanal e Relatórios. Antes calculava
+// segunda a domingo (semana ISO), então "esta semana" aqui mostrava um
+// intervalo diferente do resto do app para o mesmo período.
+function currentEpiWeekRange(base = new Date()): { start: string; end: string } {
+  const opDate = getOperationalDate(base);
+  const [y, m, d] = opDate.split("-").map(Number);
+  const local = new Date(y, m - 1, d, 12); // meio-dia evita drift de DST/timezone
+  const { week, year } = getEpiWeek(local);
+  return epiWeekToDateRange(week, year);
 }
 
 export function AgentProductionRanking() {
-  const [from, setFrom] = useState(isoDays(0));
-  const [to, setTo] = useState(isoDays(6));
+  const defaultRange = currentEpiWeekRange();
+  const [from, setFrom] = useState(defaultRange.start);
+  const [to, setTo] = useState(defaultRange.end);
   const fetchProduction = useServerFn(getAgentProduction);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
