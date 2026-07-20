@@ -4,6 +4,11 @@ import { db, type Mutation } from "./db";
 
 let running = false;
 const MAX_RETRIES = 5;
+// Backoff exponencial por mutação — evita que uma falha transitória (rede
+// instável em campo) esgote as 5 tentativas em menos de um minuto só porque
+// o app troca de foco/visibilidade com frequência (cada troca dispara um
+// flush). Índice = tries-1 (capado no último valor).
+const RETRY_DELAYS = [2_000, 5_000, 15_000, 30_000, 60_000];
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let syncingFlag = false;
 let lastSyncAt: number | null = null;
@@ -48,7 +53,9 @@ const TABLES_WITHOUT_UPDATED_AT = new Set([
   "properties",
   "blocks",
   "property_recovery_attempts",
-  "weeks",
+  // "weeks" TEM updated_at no servidor (ao contrário das demais desta lista) —
+  // não incluir aqui, senão updateOffline/createOffline nessa tabela descartam
+  // o campo silenciosamente antes de enviar ao Supabase.
 ]);
 
 function stripUpdatedAt(table: string, payload: any): any {
@@ -161,9 +168,10 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     await db.mutations
       .where("status").equals("syncing")
       .modify({ status: "pending" });
+    const now = Date.now();
     await db.mutations
       .where("status").equals("error")
-      .and((m) => (m.tries || 0) < MAX_RETRIES)
+      .and((m) => (m.tries || 0) < MAX_RETRIES && (!m.nextRetryAt || m.nextRetryAt <= now))
       .modify({ status: "pending" });
 
     // FIFO — apenas pending agora
@@ -175,17 +183,31 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
 
     for (const m of pending) {
       if (typeof navigator !== "undefined" && !navigator.onLine) break;
-      try {
+
+      // Claim atômico: outra aba pode ter lido a mesma lista de "pending" e já
+      // começado a processar esta mutação. A transação Dexie/IndexedDB serializa
+      // leitura+escrita entre abas na mesma origem, então só uma aba consegue
+      // marcar "syncing" com sucesso — a outra vê status !== "pending" e pula.
+      const claimed = await db.transaction("rw", db.mutations, async () => {
+        const fresh = await db.mutations.get(m.id!);
+        if (!fresh || fresh.status !== "pending") return false;
         await db.mutations.update(m.id!, { status: "syncing" });
+        return true;
+      });
+      if (!claimed) continue;
+
+      try {
         await applyMutation(m);
         await db.mutations.delete(m.id!); // só remove após confirmação do Supabase
         ok++;
       } catch (e: any) {
         failed++;
+        const tries = (m.tries || 0) + 1;
         await db.mutations.update(m.id!, {
           status: "error",
-          tries: (m.tries || 0) + 1,
+          tries,
           lastError: e?.message || String(e),
+          nextRetryAt: Date.now() + RETRY_DELAYS[Math.min(tries - 1, RETRY_DELAYS.length - 1)],
         });
         console.warn(`[SYNC] Falha em ${m.op} ${m.table}:`, e?.message || e);
       }
@@ -255,7 +277,7 @@ export async function listFailedMutations(): Promise<FailedMutationInfo[]> {
 export async function retryFailedMutations(): Promise<number> {
   const n = await db.mutations
     .where("status").equals("error")
-    .modify({ status: "pending", tries: 0, lastError: undefined });
+    .modify({ status: "pending", tries: 0, lastError: undefined, nextRetryAt: undefined });
   notify();
   void flushMutations();
   return n;
