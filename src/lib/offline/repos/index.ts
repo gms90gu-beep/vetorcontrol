@@ -23,11 +23,33 @@ export type DexieTableName =
   | "block_progress";
 
 
+// MESCLA (não substitui) — várias telas hidratam a mesma tabela com
+// subconjuntos de campos diferentes (ex.: field-work.tsx busca só
+// "id, agent_id" de boletins_rg para escopar blocks, enquanto a tela RG
+// busca "*"). Um bulkPut substituindo o registro inteiro apagava campos
+// como block_number/locality/block_id já cacheados por outra tela —
+// o boletim ficava "vazio" offline (e sumia da busca por texto).
+// Buscamos o cache existente e fazemos merge raso: campos ausentes no
+// fetch parcial são preservados; campos presentes são atualizados.
 async function hydrate(name: DexieTableName, rows: any[]) {
-  if (!rows?.length) return 0;
-  const mapped: CachedRow[] = rows
-    .filter((r) => r && r.id)
-    .map((r) => ({ id: r.id, data: r, updatedAt: r.updated_at }));
+  const incoming = (rows ?? []).filter((r) => r && r.id);
+  if (!incoming.length) return 0;
+  const ids = incoming.map((r) => r.id);
+  let existingRows: (CachedRow | undefined)[] = [];
+  try {
+    existingRows = await (db as any)[name].bulkGet(ids);
+  } catch (e) {
+    console.warn(`[OFFLINE] hydrate ${name} — bulkGet falhou, seguindo sem merge`, e);
+  }
+  const mapped: CachedRow[] = incoming.map((r, i) => {
+    const existing = existingRows[i];
+    const mergedData = existing?.data ? { ...existing.data, ...r } : r;
+    return {
+      id: r.id,
+      data: mergedData,
+      updatedAt: r.updated_at ?? existing?.updatedAt,
+    };
+  });
   if (name === "boletins_rg") {
     mapped.forEach((row) => console.log("[RG_DEXIE_SAVE]", row.data));
   }
