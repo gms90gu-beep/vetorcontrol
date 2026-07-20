@@ -18,6 +18,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { getOperationalDate } from "@/lib/operational-date";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { getBlockProgressBatch } from "@/lib/offline/repos/blockProgress";
 
 function initials(name?: string | null) {
   if (!name) return "??";
@@ -31,6 +33,7 @@ export function CoordinatorDashboard() {
   const [supervisors, setSupervisors] = useState<any[]>([]);
   const [agents, setAgents] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [finishedBlocks, setFinishedBlocks] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +88,28 @@ export function CoordinatorDashboard() {
       setSupervisors(supWithStats);
       setAgents(agList);
       setSessions(openSessions || []);
+
+      // Quarteirões finalizados pela equipe (block_progress é a fonte única
+      // — nunca recalcular a partir de visits). Escopo explícito por
+      // agent_ids: a policy de block_progress libera leitura para qualquer
+      // supervisor/coordenador/admin_master, então o filtro de equipe tem
+      // que ser feito aqui, não confiar só no RLS.
+      try {
+        const agentIds = agList.map((a: any) => a.id).filter(Boolean);
+        if (agentIds.length) {
+          const activeCycle = await getActiveCycleForUser(user?.id ?? null);
+          const progress = await getBlockProgressBatch({
+            cycle_id: activeCycle?.id ?? undefined,
+            agent_ids: agentIds,
+          });
+          setFinishedBlocks(progress.filter((p) => p.status === "COMPLETED").length);
+        } else {
+          setFinishedBlocks(0);
+        }
+      } catch (e) {
+        console.warn("[CoordinatorDashboard] block_progress falhou", e);
+        setFinishedBlocks(0);
+      }
     } catch (e: any) {
       console.error(e);
       toast.error("Erro ao carregar dados da coordenação");
@@ -99,9 +124,9 @@ export function CoordinatorDashboard() {
       supervisors: supervisors.length,
       agents: agents.length,
       activeSessions,
-      finishedBlocks: 0, // pode ser ligado a `blocks.status='finished'` filtrado se necessário
+      finishedBlocks,
     };
-  }, [supervisors, agents, sessions]);
+  }, [supervisors, agents, sessions, finishedBlocks]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

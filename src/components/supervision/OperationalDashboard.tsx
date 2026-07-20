@@ -11,7 +11,6 @@ import {
   Trophy,
   AlertTriangle,
   FileDown,
-  MapPin,
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,11 +24,22 @@ type AgentRow = {
   focos: number;
 };
 
+type PendencyRow = {
+  id: string;
+  agent_id: string;
+  current_status: string;
+  resolved_at: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
+
 export function OperationalDashboard() {
   const [agents, setAgents] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
+  const [pendencies, setPendencies] = useState<PendencyRow[]>([]);
   const [cycleFilter, setCycleFilter] = useState<string>("all");
   const [weekFilter, setWeekFilter] = useState<string>("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
@@ -39,7 +49,7 @@ export function OperationalDashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [profs, vs, cs, ws] = await Promise.all([
+        const [profs, vs, cs, ws, pends] = await Promise.all([
           listRemoteOrCache<any>({
             name: "profiles",
             remote: () => supabase.from("profiles").select("id, full_name, role").eq("role", "agente") as any,
@@ -57,11 +67,17 @@ export function OperationalDashboard() {
             name: "weeks",
             remote: () => supabase.from("weeks").select("id, number, cycle_id, start_date, end_date") as any,
           }),
+          listRemoteOrCache<any>({
+            name: "property_pendencies",
+            remote: () => supabase.from("property_pendencies").select("id, agent_id, current_status, resolved_at, reason, created_at") as any,
+            filter: (r: any) => !r.resolved_at,
+          }),
         ]);
         setAgents(profs || []);
         setVisits(vs || []);
         setCycles(cs || []);
         setWeeks(ws || []);
+        setPendencies(((pends || []) as PendencyRow[]).filter((p) => !p.resolved_at));
       } catch (e) {
         console.error("[OFFLINE_ERROR] OperationalDashboard", e);
         toast.error("Erro ao carregar dados operacionais");
@@ -130,6 +146,23 @@ export function OperationalDashboard() {
   };
 
   const weeksOfCycle = weeks.filter((w) => cycleFilter === "all" || w.cycle_id === cycleFilter);
+
+  const pendencyStats = useMemo(() => {
+    const byAgent = new Map<string, number>();
+    const byStatus: Record<string, number> = { refused: 0, absent: 0, not_located: 0 };
+    for (const p of pendencies) {
+      byAgent.set(p.agent_id, (byAgent.get(p.agent_id) || 0) + 1);
+      if (p.current_status in byStatus) byStatus[p.current_status] += 1;
+    }
+    const byAgentRows = Array.from(byAgent.entries())
+      .map(([agentId, count]) => ({
+        agentId,
+        fullName: agents.find((a) => a.id === agentId)?.full_name || "Agente removido",
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+    return { total: pendencies.length, byStatus, byAgentRows };
+  }, [pendencies, agents]);
 
   return (
     <div className="space-y-5">
@@ -257,33 +290,67 @@ export function OperationalDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="pendencias" className="mt-3">
+        <TabsContent value="pendencias" className="mt-3 space-y-3">
           <div className="bg-white rounded-2xl p-4 border border-slate-100">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
               <AlertTriangle className="h-3.5 w-3.5 text-amber-500" /> Pendências da equipe
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-amber-50 rounded-xl p-3">
-                <MapPin className="h-4 w-4 text-amber-600" />
-                <p className="text-2xl font-black text-amber-700 mt-1">
-                  {agents.length}
-                </p>
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <p className="text-2xl font-black text-amber-700 mt-1">{pendencyStats.total}</p>
                 <p className="text-[10px] font-bold text-amber-700/70 uppercase tracking-wider mt-1">
-                  Agentes na equipe
+                  Pendentes
                 </p>
               </div>
-              <div className="bg-rose-50 rounded-xl p-3">
-                <AlertTriangle className="h-4 w-4 text-rose-600" />
-                <p className="text-2xl font-black text-rose-700 mt-1">{totals.focos}</p>
-                <p className="text-[10px] font-bold text-rose-700/70 uppercase tracking-wider mt-1">
-                  Focos no período
+              <div className="bg-red-50 rounded-xl p-3">
+                <p className="text-2xl font-black text-red-700 mt-1">{pendencyStats.byStatus.refused}</p>
+                <p className="text-[10px] font-bold text-red-700/70 uppercase tracking-wider mt-1">
+                  Recusados
+                </p>
+              </div>
+              <div className="bg-slate-100 rounded-xl p-3">
+                <p className="text-2xl font-black text-slate-700 mt-1">{pendencyStats.byStatus.absent}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                  Ausentes
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <p className="text-2xl font-black text-purple-700 mt-1">{pendencyStats.byStatus.not_located}</p>
+                <p className="text-[10px] font-bold text-purple-700/70 uppercase tracking-wider mt-1">
+                  Não localizados
                 </p>
               </div>
             </div>
-            <p className="text-[10px] text-slate-400 mt-3">
-              Use a aba <strong>Equipe</strong> para abrir o detalhe de cada agente.
-            </p>
           </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="p-3 border-b border-slate-100">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                Pendências por agente
+              </h3>
+            </div>
+            {pendencyStats.byAgentRows.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-sm">
+                Nenhuma pendência em aberto na equipe.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {pendencyStats.byAgentRows.map((r) => (
+                  <div key={r.agentId} className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-xs font-bold text-slate-800 truncate">{r.fullName}</span>
+                    <Badge className="bg-amber-100 text-amber-700 border-none text-xs font-black">
+                      {r.count}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="text-[10px] text-slate-400">
+            Use a aba <strong>Equipe</strong> para abrir o detalhe de cada agente.
+          </p>
         </TabsContent>
       </Tabs>
     </div>
