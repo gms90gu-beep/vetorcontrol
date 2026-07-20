@@ -29,6 +29,9 @@ export function MunicipalIntelligence() {
   const [properties, setProperties] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visitsTruncated, setVisitsTruncated] = useState(false);
+
+  const VISITS_LIMIT = 20000;
 
   useEffect(() => {
     (async () => {
@@ -36,7 +39,10 @@ export function MunicipalIntelligence() {
       try {
         const [profs, vs, props, cs] = await Promise.all([
           listRemoteOrCache<any>({ name: "profiles", remote: async () => await supabase.from("profiles").select("id, full_name, email, city, role, supervisor_id, coordinator_id, is_active") }),
-          listRemoteOrCache<any>({ name: "visits", remote: async () => await supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, property_id") }),
+          // Sem filtro de período: dado cresce sem limite ao longo dos anos.
+          // Aplica um teto de segurança + ordena mais recentes primeiro, pra
+          // não travar o dashboard nem estourar o tamanho de resposta.
+          listRemoteOrCache<any>({ name: "visits", remote: async () => await supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, property_id").order("visit_date", { ascending: false }).limit(VISITS_LIMIT) }),
           listRemoteOrCache<any>({ name: "properties", remote: async () => await supabase.from("properties").select("id, neighborhood, block_id") }),
           listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }) }),
         ]);
@@ -45,6 +51,7 @@ export function MunicipalIntelligence() {
         setSupervisors(sups);
         setAgents(ags);
         setVisits(vs || []);
+        setVisitsTruncated((vs || []).length >= VISITS_LIMIT);
         setProperties(props || []);
         setCycles(cs || []);
       } catch (e) {
@@ -129,7 +136,7 @@ export function MunicipalIntelligence() {
       ["Tipo", "Nome", "Total", "Trabalhados", "Focos", "%"],
       ...supervisorRows.map((s) => ["Supervisor", s.full_name, s.team, s.trabalhados, s.focos, "—"]),
       ...neighborhoods.map((n) => ["Bairro", n.name, n.total, n.visited, "—", `${n.pct}%`]),
-      ...cycleRows.map((c) => ["Ciclo", c.name, c.trabalhados, c.trabalhados, c.focos, `${c.pct}%`]),
+      ...cycleRows.map((c) => ["Ciclo", c.name, totals.totalProps, c.trabalhados, c.focos, `${c.pct}%`]),
     ];
     const csv = rows.map((r) => r.join(";")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -150,7 +157,7 @@ export function MunicipalIntelligence() {
         </Badge>
         <h1 className="text-2xl font-black">Painel do Coordenador</h1>
         <p className="text-xs text-white/60 mt-1">
-          Visão estratégica de toda a operação municipal
+          Visão estratégica da sua coordenação
         </p>
         <p className="text-[10px] text-white/40 mt-2 uppercase tracking-widest">
           {role} · {user?.email}
@@ -165,6 +172,12 @@ export function MunicipalIntelligence() {
           <KPI label="Focos" value={totals.focos} icon={AlertTriangle} color="#dc2626" />
           <KPI label="Recusas" value={totals.recusas} icon={Users} color="#a32d2d" />
         </div>
+
+        {visitsTruncated && (
+          <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            Limite de {VISITS_LIMIT.toLocaleString("pt-BR")} visitas atingido — os indicadores acima consideram só as mais recentes.
+          </p>
+        )}
 
         <Tabs defaultValue="bairros" className="w-full">
           <TabsList className="grid grid-cols-4 w-full bg-slate-100">
