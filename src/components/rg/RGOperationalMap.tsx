@@ -13,6 +13,7 @@ import {
   type NumberedPoint,
 } from "@/components/map/shared";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { comparePropertyOrder } from "@/lib/property-order";
 import {
   Home, AlertTriangle, Flame, CheckCircle2,
@@ -247,7 +248,16 @@ export function RGOperationalMap({
 
   const handleSelectFromList = useCallback((id: string) => {
     onSelect(id);
-  }, [onSelect]);
+    // Imóveis sem GPS não têm marcador no mapa (o layer filtra por lat/lng
+    // válidos), então clicar neles aqui só destacava a linha na lista — sem
+    // nenhum feedback de que "o mapa não mexeu de propósito". Isso é
+    // exatamente o bug relatado: clicar no número do imóvel parece não fazer
+    // nada quando o imóvel ainda não foi georreferenciado.
+    const clicked = enriched.find((e) => e.p.id === id)?.p;
+    if (clicked && (clicked.latitude == null || clicked.longitude == null)) {
+      toast.info(`Imóvel Nº ${clicked.number ?? "—"} ainda não tem localização GPS registrada.`);
+    }
+  }, [onSelect, enriched]);
 
   const handleSelectFromMap = useCallback((id: string) => {
     onSelect(id);
