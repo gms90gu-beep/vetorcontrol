@@ -465,7 +465,14 @@ function RGPage() {
         block_id: blockId,
         locality,
         municipality: agentDefaults.municipality || null,
-        uf: "CE",
+        // Bug: "uf" saía sempre fixo em "CE" (Ceará), não importa onde o
+        // agente realmente trabalhe — não existe campo de estado em
+        // agents/profiles para derivar isso automaticamente, e o valor
+        // fixo gravava um dado errado num documento oficial (BRG/FUNASA)
+        // para qualquer agente fora do Ceará (ex.: boletins reais deste
+        // banco com uf = "BA"). Deixa null — o campo é editável e também
+        // auto-preenchido via GPS em rg.editar.$id.tsx.
+        uf: null,
         agent_name: agentDefaults.name || null,
         agent_registration: agentDefaults.registration_id || null,
       };
