@@ -191,7 +191,13 @@ function BoletimView() {
           block_id: blockRow.id,
           block_number: blockRow.number ?? null,
           agent_id: user.id,
-          uf: "CE",
+          // Bug: "uf" saía sempre fixo em "CE" (Ceará), não importa onde o
+          // agente realmente trabalhe — não existe campo de estado em
+          // agents/profiles para derivar isso automaticamente, e o valor
+          // fixo gravava um dado errado num documento oficial (BRG/FUNASA)
+          // para qualquer agente fora do Ceará. Deixa null — o campo é
+          // editável e também auto-preenchido via GPS em rg.editar.$id.tsx.
+          uf: null,
           municipality: agentRow?.municipality ?? profile?.city ?? null,
           agent_name: agentRow?.name ?? profile?.full_name ?? null,
           agent_registration: agentRow?.registration_id ?? profile?.registration_number ?? null,
