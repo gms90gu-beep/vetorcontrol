@@ -27,6 +27,7 @@ export interface OperationalBlockStats {
   visitedProperties: number;
   closedProperties: number;
   refusedProperties: number;
+  abandonedProperties: number;
   recoveredProperties: number;
   pendingProperties: number;
   completionPercentage: number;
@@ -66,7 +67,13 @@ export function getOperationalBlockStatus(input: BlockStatusInput): OperationalB
     if (v.property_id) lastByProp.set(v.property_id, v);
   }
 
-  let visited = 0, closed = 0, refused = 0, recovered = 0;
+  // Bug: "abandoned" e um 4o desfecho valido e selecionavel na tela de
+  // visita (property.$propertyId.tsx), tratado como "trabalhado" em outros
+  // pontos do app (workedStatuses em property-composition.ts). Antes nao
+  // entrava em "done" aqui, entao um quarteirao com qualquer imovel
+  // abandonado nunca batia 100%/CONCLUIDO nesta funcao (fonte unica usada
+  // por Trabalho, Dashboard, Encerramento, Minhas Jornadas, Relatorios e PDFs).
+  let visited = 0, closed = 0, refused = 0, abandoned = 0, recovered = 0;
   const scope = propertyIds.length ? propertyIds : Array.from(lastByProp.keys());
   for (const pid of scope) {
     const v = lastByProp.get(pid);
@@ -75,9 +82,10 @@ export function getOperationalBlockStatus(input: BlockStatusInput): OperationalB
     if (v.status === "visited") visited++;
     else if (v.status === "closed") closed++;
     else if (v.status === "refused") refused++;
+    else if (v.status === "abandoned") abandoned++;
   }
 
-  const done = visited + closed + refused;
+  const done = visited + closed + refused + abandoned;
   const pending = Math.max(0, total - done);
   const status: OperationalBlockStatus =
     total > 0 && pending === 0 ? "CONCLUIDO" : done > 0 ? "EM_ANDAMENTO" : "PENDENTE";
@@ -88,6 +96,7 @@ export function getOperationalBlockStatus(input: BlockStatusInput): OperationalB
     visitedProperties: visited,
     closedProperties: closed,
     refusedProperties: refused,
+    abandonedProperties: abandoned,
     recoveredProperties: recovered,
     pendingProperties: pending,
     completionPercentage: pct,
@@ -115,6 +124,7 @@ export function logBlockStatusShared(meta: BlockStatusAuditMeta, stats: Operatio
     visitados: stats.visitedProperties,
     fechados: stats.closedProperties,
     recusas: stats.refusedProperties,
+    abandonados: stats.abandonedProperties,
     pendentes: stats.pendingProperties,
     status: stats.status,
   });

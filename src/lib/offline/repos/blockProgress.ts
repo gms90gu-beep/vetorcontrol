@@ -260,7 +260,17 @@ export async function applyLocalVisitDelta(input: {
   const doneNow = (patch.visited_properties || 0) + (patch.closed_properties || 0);
   if (patch.total_properties > 0) {
     patch.pending_properties = Math.max(0, patch.total_properties - doneNow);
-    patch.completion_percentage = Math.round((doneNow / patch.total_properties) * 100 * 100) / 100;
+    // Bug: "refused" e "abandoned" não têm coluna própria neste schema
+    // (mesmo tratamento que o recompute_block_progress do servidor já dava
+    // a "refused") e não entravam em `doneNow` acima — o otimista local
+    // ignorava esses dois desfechos por completo, então marcar uma recusa
+    // ou um abandono não atualizava "Pendentes" na tela até o próximo
+    // recompute do servidor sobrescrever. Reduz pending manualmente aqui.
+    if (status === "refused" || status === "abandoned") {
+      patch.pending_properties = Math.max(0, patch.pending_properties - 1);
+    }
+    const doneEstimate = patch.total_properties - patch.pending_properties;
+    patch.completion_percentage = Math.round((doneEstimate / patch.total_properties) * 100 * 100) / 100;
   }
   patch.last_visit_at = visit_date ?? now;
   patch.started_at = base.started_at ?? now;
