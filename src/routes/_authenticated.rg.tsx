@@ -591,7 +591,17 @@ function RGPage() {
     // layout pai, como o guard de /rg) lançar um erro inesperado — sem isso,
     // o usuário via só o toast "Abrindo..." sumir sozinho e nada mais
     // acontecer, sem nenhuma mensagem de erro.
+    //
+    // Bug: toast.loading (sonner) não respeita "duration" — ele só fecha
+    // sozinho para os tipos default/success/error/info. Um toast "loading"
+    // fica preso na tela até alguém chamar toast.dismiss/success/error com o
+    // mesmo id. O catch() abaixo cobria o caminho de erro, mas o caminho de
+    // sucesso (o mais comum) nunca encerrava o toast — "Abrindo..." ficava
+    // exibido para sempre, sobreposto à página já carregada.
     Promise.resolve(navigate({ to: "/rg/boletim/$id", params: { id: b.id } }))
+      .then(() => {
+        toast.dismiss(toastId);
+      })
       .catch((e) => {
         console.error("[RG] Falha ao abrir boletim:", e);
         toast.error("Não foi possível abrir o boletim. Tente novamente.", { id: toastId });
