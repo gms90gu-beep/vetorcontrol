@@ -393,28 +393,51 @@ function PropertyVisitPage() {
       // Get current active session
       const { data: { user } } = await safeGetUser();
       if (user) {
-        const { data: session } = await supabase
-          .from("field_work_sessions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("status", "in_progress")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // Bug: estas duas consultas eram chamadas diretas ao Supabase, sem
+        // fallback de cache offline (diferente de praticamente todo o resto
+        // deste arquivo). Se o agente abrisse este imóvel para revisitar
+        // estando sem sinal, a busca da "visita existente" falhava/voltava
+        // vazia, currentVisitId ficava null, e o salvamento seguinte criava
+        // uma visita NOVA em vez de atualizar a anterior — duas linhas de
+        // visits para o mesmo imóvel/agente/ciclo com status diferentes, o
+        // que infla a contagem em recompute_block_progress (ver auditoria).
+        const sessionRows = await listRemoteOrCache<any>({
+          name: "field_work_sessions",
+          remote: () =>
+            supabase
+              .from("field_work_sessions")
+              .select("*")
+              .eq("user_id", user.id)
+              .eq("status", "in_progress")
+              .order("created_at", { ascending: false }) as any,
+          filter: (r) => r.user_id === user.id && r.status === "in_progress",
+        });
+        const session = (sessionRows ?? [])
+          .slice()
+          .sort((a: any, b: any) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0] ?? null;
         
         if (session) {
           setActiveSession(session);
           
           // Check for existing visit for this property in the current cycle
-          const { data: existingVisit } = await supabase
-            .from("visits")
-            .select("id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered")
-            .eq("property_id", propertyId as string)
-            .eq("agent_id", user.id)
-            .eq("cycle_id", session.cycle_id as string)
-            .order("visit_date", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const visitRows = await listRemoteOrCache<any>({
+            name: "visits",
+            remote: () =>
+              supabase
+                .from("visits")
+                .select("id, property_id, agent_id, cycle_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
+                .eq("property_id", propertyId as string)
+                .eq("agent_id", user.id)
+                .eq("cycle_id", session.cycle_id as string)
+                .order("visit_date", { ascending: false }) as any,
+            filter: (v) =>
+              v.property_id === propertyId &&
+              v.agent_id === user.id &&
+              v.cycle_id === session.cycle_id,
+          });
+          const existingVisit = (visitRows ?? [])
+            .slice()
+            .sort((a: any, b: any) => String(b.visit_date || "").localeCompare(String(a.visit_date || "")))[0] ?? null;
           
           if (existingVisit) {
             setCurrentVisitId(existingVisit.id);

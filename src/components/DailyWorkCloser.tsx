@@ -330,6 +330,7 @@ async function buildDailySnapshot(
       visitedProperties: snap.visitedCount,
       closedProperties: snap.closedCount,
       refusedProperties: snap.refusedCount,
+      abandonedProperties: 0,
       recoveredProperties: 0,
       pendingProperties: snap.pendingLocal,
       completionPercentage: 0,
