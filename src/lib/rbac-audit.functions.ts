@@ -48,6 +48,7 @@ export interface RBACAuditResult {
     obtained: number;
     diff: number;
     status: "ok" | "warning" | "error";
+    note?: string;
   }>;
   crossCheck: Array<{
     scope: string;
@@ -161,15 +162,18 @@ export const runRbacAudit = createServerFn({ method: "POST" })
     const { data: meProfile } = await supabase.from("profiles").select("id, full_name").eq("id", userId).maybeSingle();
     rbacByRole.push({
       role: "admin_master", user_id: userId, user_name: meProfile?.full_name || "(eu)",
-      module: "boletins_rg", expected: totalBoletins || 0, obtained: totalBoletins || 0, diff: 0, status: "ok",
+      module: "boletins_rg", expected: totalBoletins || 0, obtained: totalBoletins || 0, diff: 0, status: "warning",
+      note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
     });
     rbacByRole.push({
       role: "admin_master", user_id: userId, user_name: meProfile?.full_name || "(eu)",
-      module: "properties", expected: totalProps || 0, obtained: totalProps || 0, diff: 0, status: "ok",
+      module: "properties", expected: totalProps || 0, obtained: totalProps || 0, diff: 0, status: "warning",
+      note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
     });
     rbacByRole.push({
       role: "admin_master", user_id: userId, user_name: meProfile?.full_name || "(eu)",
-      module: "daily_work_records", expected: totalDwr || 0, obtained: totalDwr || 0, diff: 0, status: "ok",
+      module: "daily_work_records", expected: totalDwr || 0, obtained: totalDwr || 0, diff: 0, status: "warning",
+      note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
     });
 
     // Supervisores
@@ -186,11 +190,13 @@ export const runRbacAudit = createServerFn({ method: "POST" })
         : { count: 0 };
       rbacByRole.push({
         role: "supervisor", user_id: sup.id, user_name: sup.full_name,
-        module: "boletins_rg", expected: bExp || 0, obtained: bExp || 0, diff: 0, status: "ok",
+        module: "boletins_rg", expected: bExp || 0, obtained: bExp || 0, diff: 0, status: "warning",
+        note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
       });
       rbacByRole.push({
         role: "supervisor", user_id: sup.id, user_name: sup.full_name,
-        module: "daily_work_records", expected: dExp || 0, obtained: dExp || 0, diff: 0, status: "ok",
+        module: "daily_work_records", expected: dExp || 0, obtained: dExp || 0, diff: 0, status: "warning",
+        note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
       });
     }
 
@@ -208,7 +214,8 @@ export const runRbacAudit = createServerFn({ method: "POST" })
         : { count: 0 };
       rbacByRole.push({
         role: "coordenador", user_id: co.id, user_name: co.full_name,
-        module: "boletins_rg", expected: bExp || 0, obtained: bExp || 0, diff: 0, status: "ok",
+        module: "boletins_rg", expected: bExp || 0, obtained: bExp || 0, diff: 0, status: "warning",
+        note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
       });
     }
 
@@ -219,11 +226,13 @@ export const runRbacAudit = createServerFn({ method: "POST" })
       const { count: d } = await supabase.from("daily_work_records").select("id", { count: "exact", head: true }).eq("agent_id", ag.id);
       rbacByRole.push({
         role: "agente", user_id: ag.id, user_name: ag.full_name,
-        module: "boletins_rg", expected: b || 0, obtained: b || 0, diff: 0, status: "ok",
+        module: "boletins_rg", expected: b || 0, obtained: b || 0, diff: 0, status: "warning",
+        note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
       });
       rbacByRole.push({
         role: "agente", user_id: ag.id, user_name: ag.full_name,
-        module: "daily_work_records", expected: d || 0, obtained: d || 0, diff: 0, status: "ok",
+        module: "daily_work_records", expected: d || 0, obtained: d || 0, diff: 0, status: "warning",
+        note: "expected e obtido vêm da mesma consulta (admin) — não valida RLS real por sessão do usuário",
       });
     }
 
@@ -274,21 +283,23 @@ export const runRbacAudit = createServerFn({ method: "POST" })
     const tests: RBACAuditResult["tests"] = [];
     tests.push({
       id: "T1", name: "Agente visualiza apenas seus dados",
-      status: (agentsSample || []).every((ag: any) =>
-        rbacByRole.filter((r) => r.user_id === ag.id).every((r) => r.diff === 0),
-      ) ? "pass" : "fail",
+      status: "skip",
+      detail: "Nao verificavel sem sessao do usuario auditado: expected/obtained vem da mesma query admin (ver rbacByRole[].note). Requer RPC server-side que aplique RLS como o usuario alvo.",
     });
     tests.push({
       id: "T2", name: "Supervisor visualiza apenas agentes vinculados",
-      status: rbacByRole.filter((r) => r.role === "supervisor").every((r) => r.diff === 0) ? "pass" : "fail",
+      status: "skip",
+      detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
-      id: "T3", name: "Coordenador visualiza apenas sua coordenação",
-      status: rbacByRole.filter((r) => r.role === "coordenador").every((r) => r.diff === 0) ? "pass" : "fail",
+      id: "T3", name: "Coordenador visualiza apenas sua coordenacao",
+      status: "skip",
+      detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
       id: "T4", name: "Admin Master visualiza todos os dados",
-      status: rbacByRole.filter((r) => r.role === "admin_master").every((r) => r.diff === 0) ? "pass" : "fail",
+      status: "skip",
+      detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
       id: "T5", name: "Módulos retornam mesmos totais",
@@ -320,6 +331,10 @@ export const runRbacAudit = createServerFn({ method: "POST" })
       identifiers.filter((i) => i.status === "warning").length +
       relationships.filter((r) => r.status === "warning").length +
       queries.filter((q) => q.status === "warning").length;
+    // rbacByRole agora usa status "warning" por padrao pois expected/obtained
+    // vem da mesma query admin (nao valida RLS por sessao real do usuario).
+    // Isso e uma limitacao conhecida da ferramenta, nao uma divergencia real,
+    // entao nao entra no calculo do score.
     const score = Math.max(0, Math.round(100 - (failures * 10 + warnings * 1.5)));
     const health: RBACAuditResult["health"] = score >= 95 ? "healthy" : score >= 80 ? "warning" : "critical";
 

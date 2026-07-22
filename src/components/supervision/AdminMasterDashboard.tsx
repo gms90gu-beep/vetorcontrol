@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { isOwnerBypass } from "@/lib/role-guards";
 
 type ProfileRow = {
   id: string;
@@ -104,7 +105,7 @@ function roleBadgeClass(role: string): string {
 export function AdminMasterDashboard() {
   const { role: currentUserRole, user: currentUser } = useAuth();
   const isAdminMaster =
-    currentUserRole === "admin_master" || currentUser?.email === "gms90gu@gmail.com";
+    currentUserRole === "admin_master" || isOwnerBypass(currentUser?.email);
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);

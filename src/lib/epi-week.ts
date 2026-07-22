@@ -41,10 +41,19 @@ export function currentEpiRange(): EpiRange {
   return { ...epiWeekRange(year, week), label: `SE Atual (${week}/${year})` };
 }
 
+// Um ano ISO tem 52 ou 53 semanas — verifica olhando se a quinta-feira da
+// semana 53 ainda cai dentro do mesmo ano (regra ISO 8601).
+function weeksInIsoYear(year: number): number {
+  const week53Monday = isoWeekStart(year, 53);
+  const week53Thursday = new Date(week53Monday);
+  week53Thursday.setUTCDate(week53Monday.getUTCDate() + 3);
+  return week53Thursday.getUTCFullYear() === year ? 53 : 52;
+}
+
 export function previousEpiRange(): EpiRange {
   const { year, week } = getCurrentEpiWeek();
-  const prevWeek = week > 1 ? week : 52;
   const prevYear = week > 1 ? year : year - 1;
+  const prevWeek = week > 1 ? week - 1 : weeksInIsoYear(prevYear);
   return {
     ...epiWeekRange(prevYear, prevWeek),
     label: `SE Anterior (${prevWeek}/${prevYear})`,
@@ -58,8 +67,8 @@ export function lastNWeeksRange(n: number): EpiRange {
   let w = week - (n - 1);
   let y = year;
   while (w < 1) {
-    w += 52;
     y -= 1;
+    w += weeksInIsoYear(y);
   }
   const start = epiWeekRange(y, w).from;
   return { from: start, to: end, label: `Últimas ${n} semanas` };

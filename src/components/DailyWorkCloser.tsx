@@ -645,9 +645,14 @@ export function DailyWorkCloser({
       );
       const active = localSessions
         .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
-      // Data da Produção ativa (hoje, America/Sao_Paulo). Nunca usar session_date:
-      // a jornada do quarteirão pode ter começado em dias anteriores.
-      const workDate: string = getOperationalDate();
+      // Data da Produção: hoje (America/Sao_Paulo) por padrão — a jornada de
+      // um quarteirão pode atravessar vários dias e cada dia fecha com sua
+      // própria produção. EXCEÇÃO: sessão retroativa (is_retroactive=true,
+      // criada via "Alterar Data") tem session_date fixado deliberadamente
+      // no passado — usar "hoje" nesse caso fecha o dia errado (zerado) e
+      // deixa o dia retroativo real sem daily_work_record. Ver session-state.ts.
+      const workDate: string =
+        active?.is_retroactive && active?.session_date ? active.session_date : getOperationalDate();
       if (active?.session_date && active.session_date !== workDate) {
         console.log("[DAY_CLOSE_CROSS_DAY_SESSION]", {
           module: "DailyWorkCloser.handlePreClose",
@@ -1044,11 +1049,19 @@ export function DailyWorkCloser({
       const activeSessionForClose = localSessions
         .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
 
-      // REGRA: o encerramento fecha SEMPRE a Data da Produção ativa (hoje).
-      // A jornada de um quarteirão pode atravessar vários dias — as visitas
+      // REGRA: o encerramento fecha a Data da Produção ativa (hoje) — a
+      // jornada de um quarteirão pode atravessar vários dias, e as visitas
       // realizadas hoje pertencem exclusivamente a operational_date.
-      const operationalWorkDate: string = getOperationalDate();
+      // EXCEÇÃO: sessão retroativa (is_retroactive=true, criada via "Alterar
+      // Data" para registrar trabalho de um dia anterior) tem session_date
+      // fixado deliberadamente no passado. Antes desta correção, o
+      // encerramento ignorava isso e sempre usava "hoje", fechando o dia
+      // errado com produção zerada enquanto o dia retroativo real (com as
+      // visitas já salvas) nunca recebia seu daily_work_record.
       const sessionStartedAt: string | null = activeSessionForClose?.session_date ?? null;
+      const sessionIsRetro: boolean = !!activeSessionForClose?.is_retroactive;
+      const operationalWorkDate: string =
+        sessionIsRetro && sessionStartedAt ? sessionStartedAt : getOperationalDate();
       const sessionLastResumedAt: string | null =
         (activeSessionForClose as any)?.last_resumed_at ?? null;
       const sessionCompletedAt: string | null =
@@ -1056,9 +1069,8 @@ export function DailyWorkCloser({
       const closingDate: string = new Date().toISOString();
       const isCrossDaySession =
         !!sessionStartedAt && sessionStartedAt !== operationalWorkDate;
-      // Compatibilidade — nunca marcar DWR como retroativo por session_date antiga.
-      const sessionIsRetro = false;
-      const sessionRetroReason: string | null = null;
+      const sessionRetroReason: string | null =
+        (activeSessionForClose as any)?.retroactive_reason ?? null;
 
       console.log("[DAY_CLOSE_OPERATIONAL_DATE]", {
         operational_date: operationalWorkDate,
@@ -2320,10 +2332,22 @@ export function DailyWorkCloser({
           <div className="mt-4 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2">
             <Calendar className="h-3.5 w-3.5" />
             <span className="text-[11px] font-black uppercase tracking-widest">
-              Produção de {new Date(`${operationalDate}T12:00:00`).toLocaleDateString('pt-BR')}
+              {/* Sessão retroativa (is_retroactive=true, "Alterar Data"): o
+                  encerramento consolida em jornadaDate (session_date), não em
+                  hoje — este rótulo tinha ficado dessincronizado do que era
+                  realmente salvo, mostrando "hoje" mesmo fechando um dia
+                  anterior. Ver correção em handleClose/handlePreClose. */}
+              Produção de {new Date(`${(sessionRetro.retro && jornadaDate) ? jornadaDate : operationalDate}T12:00:00`).toLocaleDateString('pt-BR')}
             </span>
           </div>
-          {jornadaDate && jornadaDate !== operationalDate && (
+          {sessionRetro.retro && jornadaDate && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2 max-w-[520px]">
+              <span className="text-[10px] font-bold uppercase tracking-wide leading-snug text-left text-white/90">
+                Jornada retroativa — a produção será consolidada em {new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR')}, não hoje.
+              </span>
+            </div>
+          )}
+          {!sessionRetro.retro && jornadaDate && jornadaDate !== operationalDate && (
             <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-2 max-w-[520px]">
               <span className="text-[10px] font-bold uppercase tracking-wide leading-snug text-left text-white/90">
                 Quarteirão iniciado em {new Date(`${jornadaDate}T12:00:00`).toLocaleDateString('pt-BR')} e concluído hoje.

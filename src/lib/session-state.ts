@@ -103,6 +103,17 @@ export async function findSession(lookup: SessionLookup): Promise<SessionRow | n
  * boot das telas de campo, antes de qualquer decisão de "jornada ativa".
  * Só roda online (chamada direta ao Supabase) — não enfileira no Sync
  * Engine porque é uma correção de estado, não um dado de produção do agente.
+ *
+ * BUG CORRIGIDO: sessões com is_retroactive=true (criadas via "Alterar Data"
+ * para registrar trabalho de um dia anterior) SEMPRE têm session_date no
+ * passado por definição — antes desta correção, esta função as tratava como
+ * "esquecidas" e fechava com status='closed' assim que o relógio virasse o
+ * dia, sem nenhuma reconciliação de daily_work_records. Resultado: visitas
+ * do dia retroativo continuavam salvas, mas a jornada some ("Inicie uma
+ * jornada de trabalho primeiro" ao tentar adicionar/trabalhar novos imóveis)
+ * e o Encerrar Expediente subsequente fechava o dia ERRADO (hoje, zerado),
+ * em vez do dia selecionado. Sessões retroativas só podem ser fechadas pelo
+ * fluxo manual "Encerrar Expediente", nunca por este job automático.
  */
 export async function closeExpiredInProgressSessions(
   userId: string,
@@ -115,6 +126,7 @@ export async function closeExpiredInProgressSessions(
       .update({ status: "closed", updated_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("status", "in_progress")
+      .eq("is_retroactive", false)
       .lt("session_date", todayOperational)
       .select("id, session_date, block_number, block_id");
     if (error) throw error;

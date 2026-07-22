@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, ShieldCheck, AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/institutional-export";
-import { requireAdminMasterGuard } from "@/lib/role-guards";
+import { requireAdminMasterGuard, isOwnerBypass } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/rbac-audit")({
   beforeLoad: requireAdminMasterGuard,
@@ -37,7 +37,7 @@ function RbacAuditPage() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || u.user.email === "gms90gu@gmail.com");
+      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
     })();
   }, []);
 

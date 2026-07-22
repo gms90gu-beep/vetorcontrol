@@ -58,6 +58,7 @@ async function pruneDuplicates(store: any): Promise<number> {
     if (a > b) { dupIds.push(cur.id); byId.set(r.id, r); }
     else dupIds.push(r.id);
   }
+  if (dupIds.length) await store.bulkDelete(dupIds);
   return dupIds.length;
 }
 

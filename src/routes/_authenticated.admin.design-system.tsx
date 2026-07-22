@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
+import { isOwnerBypass } from "@/lib/role-guards";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -45,7 +46,7 @@ function DesignSystemPage() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || u.user.email === "gms90gu@gmail.com");
+      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
     })();
   }, []);
 
