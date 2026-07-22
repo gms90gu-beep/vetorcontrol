@@ -155,6 +155,16 @@ function FieldWorkListPage() {
         }
       }
 
+      // Bug: esta consulta só reconhecia como "ativa" uma sessão cujo
+      // session_date fosse exatamente hoje. Uma jornada retroativa
+      // (is_retroactive=true, criada via "Alterar Data" para registrar
+      // trabalho de um dia anterior) fica com session_date no passado por
+      // definição — assim que o relógio virava o dia, esta tela deixava de
+      // encontrá-la, mostrando "Nenhuma sessão de trabalho ativa" mesmo com
+      // a jornada ainda in_progress no banco. Agora busca todas as sessões
+      // in_progress do usuário (mesmo padrão já usado em
+      // property.$propertyId.tsx) e só depois decide qual é a "ativa":
+      // prioriza a de hoje; na ausência dela, aceita uma retroativa aberta.
       const sessions = await listRemoteOrCache<any>({
         name: "field_work_sessions",
         remote: () =>
@@ -163,17 +173,19 @@ function FieldWorkListPage() {
             .select("*")
             .eq("user_id", user.id)
             .eq("status", "in_progress")
-            .eq("session_date", todayOperational)
             .order("created_at", { ascending: false })
-            .limit(5) as any,
-        filter: (s) => s.user_id === user.id && s.status === "in_progress" && s.session_date === todayOperational,
+            .limit(10) as any,
+        filter: (s) => s.user_id === user.id && s.status === "in_progress",
       });
       const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
       );
+      const sessionsToday = sorted.filter((s: any) => s.session_date === todayOperational);
+      const sessionsRetro = sorted.filter((s: any) => s.session_date !== todayOperational && s.is_retroactive);
+      const candidates = [...sessionsToday, ...sessionsRetro];
       const session =
-        (preferSessionId && sorted.find((s: any) => s.id === preferSessionId)) ||
-        sorted[0] ||
+        (preferSessionId && candidates.find((s: any) => s.id === preferSessionId)) ||
+        candidates[0] ||
         null;
 
       if (session) {

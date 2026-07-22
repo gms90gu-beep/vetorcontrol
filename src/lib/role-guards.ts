@@ -6,6 +6,25 @@ import { getCachedUserRole, readCachedUserRole } from "@/lib/offline/role-cache"
 export const MANAGER_ROLES = ["supervisor", "coordenador", "admin_master"] as const;
 export type ManagerRole = (typeof MANAGER_ROLES)[number];
 
+/**
+ * ATENCAO — bypass hardcoded por e-mail.
+ *
+ * Isso concede acesso de admin_master no CLIENTE para esta conta especifica,
+ * independente do que estiver em profiles.role. E' uma rede de seguranca para
+ * nao trancar o dono do projeto fora das telas /admin/* caso a role no banco
+ * fique dessincronizada — mas e' fragil (duplicada por varios arquivos antes
+ * desta refatoracao) e um risco se este e-mail for reaproveitado por outra
+ * conta. As RPCs server-side (assert_admin_master, etc.) continuam validando
+ * a role de verdade, entao isso nao expande acesso a dados — so a navegacao
+ * do lado do cliente. Se a role admin_master no banco esta confiavel, o ideal
+ * e remover esse bypass.
+ */
+const OWNER_BYPASS_EMAIL = "gms90gu@gmail.com";
+
+export function isOwnerBypass(email: string | null | undefined): boolean {
+  return !!email && email === OWNER_BYPASS_EMAIL;
+}
+
 export function isManagerRole(role: string | null | undefined): boolean {
   return !!role && (MANAGER_ROLES as readonly string[]).includes(role);
 }
@@ -87,7 +106,7 @@ export async function requireAdminMasterGuard() {
     throw redirect({ to: "/login", replace: true });
   }
 
-  if (user.email === "gms90gu@gmail.com") return;
+  if (isOwnerBypass(user.email)) return;
 
   let role: string | null = null;
   try {
@@ -123,7 +142,7 @@ export async function requireManagerGuard() {
     throw redirect({ to: "/login", replace: true });
   }
 
-  if (user.email === "gms90gu@gmail.com") return;
+  if (isOwnerBypass(user.email)) return;
 
   let role: string | null = null;
   try {

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LogOut, ArrowLeft, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { isOwnerBypass } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/admin-master")({
   beforeLoad: async () => {
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/admin-master")({
     const user = verifiedUser.user;
 
     // Acesso direto pelo e-mail do criador do sistema — sem query no banco
-    if (user.email === "gms90gu@gmail.com") {
+    if (isOwnerBypass(user.email)) {
       console.debug("[Admin-Master Guard] Acesso permitido via e-mail direto");
       return;
     }
@@ -75,7 +76,7 @@ function AdminMasterPage() {
   const router = useRouter();
   const navigate = useNavigate();
   const { user, role, isReady, isRoleLoading, signOut } = useAuth();
-  const hasAdminAccess = user?.email === "gms90gu@gmail.com" || role === "admin_master";
+  const hasAdminAccess = isOwnerBypass(user?.email) || role === "admin_master";
 
   useEffect(() => {
     if (!isReady || isRoleLoading) return;

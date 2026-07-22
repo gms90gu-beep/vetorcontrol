@@ -15,6 +15,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { isOnline } from "@/lib/offline/safe-fetch";
+import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
 
 export interface IntegrityDivergence {
   field: string;
@@ -79,8 +80,7 @@ export async function runProductionIntegrity(
   console.log("[PRODUCTION_INTEGRITY_START]", { agentId, workDate, cycleId });
 
   const divergences: IntegrityDivergence[] = [];
-  const startOfDay = `${workDate}T00:00:00`;
-  const endOfDay = `${workDate}T23:59:59.999`;
+  const { startIso: startOfDay, endIso: endOfDay } = operationalDateBoundsUtcIso(workDate);
   let totalChecks = 0;
 
   try {
