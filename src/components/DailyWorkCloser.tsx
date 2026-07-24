@@ -630,6 +630,39 @@ export function DailyWorkCloser({
     }
   };
 
+  /**
+   * Resolve qual sessão in_progress representa "a jornada ativa" para fins
+   * de Data da Produção / encerramento.
+   *
+   * Bug corrigido: escolher simplesmente a mais recente por created_at
+   * falha sempre que existe mais de uma sessão in_progress ao mesmo tempo
+   * (ex.: uma jornada retroativa antiga ainda aberta + uma nova criada sem
+   * querer para hoje, cenário que já aconteceu na prática — ver auditoria
+   * de sessões retroativas). A sessão criada por último nem sempre é a que
+   * o agente está tentando fechar agora.
+   *
+   * Prioridade:
+   *   1) sessão com session_date === hoje e NÃO retroativa (fluxo normal)
+   *   2) sessão retroativa (is_retroactive=true) mais recentemente
+   *      ATUALIZADA (não criada) — reflete em qual jornada retroativa o
+   *      agente mexeu por último
+   *   3) fallback: mais recente por created_at (comportamento antigo)
+   */
+  function resolveActiveSessionForDayClose(sessions: any[], todayOperational: string): any | null {
+    if (!sessions || sessions.length === 0) return null;
+    const byCreatedDesc = (a: any, b: any) =>
+      String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    const today = sessions.filter((s) => s.session_date === todayOperational && !s.is_retroactive);
+    if (today.length) return [...today].sort(byCreatedDesc)[0];
+    const retro = sessions.filter((s) => s.is_retroactive);
+    if (retro.length) {
+      return [...retro].sort((a, b) =>
+        String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || "")),
+      )[0];
+    }
+    return [...sessions].sort(byCreatedDesc)[0];
+  }
+
   const handlePreClose = async () => {
     console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
     setValidating(true);
@@ -643,8 +676,7 @@ export function DailyWorkCloser({
         "field_work_sessions",
         (s) => s.user_id === user.id && s.status === "in_progress",
       );
-      const active = localSessions
-        .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0];
+      const active = resolveActiveSessionForDayClose(localSessions, getOperationalDate());
       // Data da Produção: hoje (America/Sao_Paulo) por padrão — a jornada de
       // um quarteirão pode atravessar vários dias e cada dia fecha com sua
       // própria produção. EXCEÇÃO: sessão retroativa (is_retroactive=true,
@@ -768,15 +800,17 @@ export function DailyWorkCloser({
       if (cycle) {
         setActiveCycle(cycle);
 
-        // Considera a data da jornada ativa (se existir) como referência operacional
-        const { data: activeSession } = await supabase
+        // Considera a data da jornada ativa (se existir) como referência
+        // operacional. Busca TODAS as sessões in_progress (não só a mais
+        // recente por created_at) e usa resolveActiveSessionForDayClose —
+        // ver comentário na definição da função para o motivo.
+        const { data: activeSessionRows } = await supabase
           .from("field_work_sessions")
-          .select("id, session_date, block_number, is_retroactive, retroactive_reason, created_at")
+          .select("id, session_date, block_number, is_retroactive, retroactive_reason, created_at, updated_at")
           .eq("user_id", user.id)
           .eq("status", "in_progress")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .order("created_at", { ascending: false });
+        const activeSession = resolveActiveSessionForDayClose(activeSessionRows || [], getOperationalDate());
 
         setActiveSessionId(activeSession?.id ?? null);
         setOpenBlock(activeSession?.block_number ?? null);
@@ -1046,8 +1080,7 @@ export function DailyWorkCloser({
         "field_work_sessions",
         (s) => s.user_id === user.id && s.status === "in_progress",
       );
-      const activeSessionForClose = localSessions
-        .sort((a, b) => String(b.created_at || b.updated_at || "").localeCompare(String(a.created_at || a.updated_at || "")))[0];
+      const activeSessionForClose = resolveActiveSessionForDayClose(localSessions, getOperationalDate());
 
       // REGRA: o encerramento fecha a Data da Produção ativa (hoje) — a
       // jornada de um quarteirão pode atravessar vários dias, e as visitas
