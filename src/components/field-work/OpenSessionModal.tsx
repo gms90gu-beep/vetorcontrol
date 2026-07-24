@@ -62,10 +62,46 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
     if (!isOnline()) return;
     setLoadingStats(true);
     try {
-      const { data: visits } = await supabase
+      // Bug: antes só contava visitas com field_work_session_id === s.id.
+      // Quando a sessão é reaberta/duplicada (ver auditoria de sessões
+      // retroativas — closeExpiredInProgressSessions podia fechar uma
+      // jornada retroativa em aberto, levando o agente a iniciar outra
+      // sessão nova para o mesmo quarteirão), as visitas reais continuam
+      // vinculadas ao session_id ANTIGO. Este modal mostrava
+      // "Visitados: 0 / Pendentes: total" mesmo com produção real feita
+      // hoje. Agora usa a mesma estratégia já corrigida em
+      // field-work-list.tsx: união de visitas por field_work_session_id
+      // OU por cycle_id, restrita aos imóveis deste quarteirão quando
+      // block_id está disponível.
+      let propertyIds: string[] | null = null;
+      if (s.block_id) {
+        const { data: props } = await supabase
+          .from("properties")
+          .select("id")
+          .eq("block_id", s.block_id);
+        propertyIds = (props || []).map((p: any) => p.id);
+      }
+
+      let visitsQuery = supabase
         .from("visits")
-        .select("id, status, has_focus, treatment_amount, property_id")
-        .eq("field_work_session_id", s.id);
+        .select("id, status, has_focus, treatment_amount, property_id, field_work_session_id, cycle_id");
+      visitsQuery = propertyIds && propertyIds.length > 0
+        ? visitsQuery.in("property_id", propertyIds)
+        : visitsQuery.eq("field_work_session_id", s.id);
+
+      const { data: visitsRaw } = await visitsQuery;
+
+      const bySession = (visitsRaw || []).filter(
+        (v: any) => v.field_work_session_id && String(v.field_work_session_id) === String(s.id),
+      );
+      const byCycle = s.cycle_id
+        ? (visitsRaw || []).filter((v: any) => v.cycle_id && String(v.cycle_id) === String(s.cycle_id))
+        : [];
+      const mergedById = new Map<string, any>();
+      [...bySession, ...byCycle].forEach((v: any) => {
+        if (v?.id) mergedById.set(String(v.id), v);
+      });
+      const visits = Array.from(mergedById.values());
 
       const visitedProps = new Set<string>();
       const closedProps = new Set<string>();
