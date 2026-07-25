@@ -9,6 +9,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEpiWeek } from "@/lib/cycle-week";
+import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
@@ -58,9 +59,11 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       return saoPaulo.toISOString().slice(0, 10);
     };
 
-    // Range as timestamps covering local days (UTC-3): pad ±1 day for safety.
-    const fromTs = `${data.from}T00:00:00.000Z`;
-    const toTs = `${data.to}T23:59:59.999Z`;
+    // Range as timestamps covering local (America/Sao_Paulo) day boundaries.
+    // Antes usava sufixo "Z" (UTC), deslocando o corte do dia em 3h e
+    // deixando visitas noturnas fora do rebuild.
+    const fromTs = operationalDateBoundsUtcIso(data.from).startIso;
+    const toTs = operationalDateBoundsUtcIso(data.to).endIso;
 
     let vq = supabaseAdmin
       .from("visits")

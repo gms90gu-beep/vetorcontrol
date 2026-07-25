@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/pending")({
   component: PendingPage,
@@ -758,7 +759,7 @@ function exportCSV(rows: EnrichedPendency[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `pendencias_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `pendencias_${getOperationalDate()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -89,3 +89,22 @@ Somente formatação de nomes de arquivos de exportação; **manter** ou padroni
 4. Itens 23 e Baixa — cosmético.
 
 Aguardando aprovação para aplicar as correções por ordem de criticidade.
+
+---
+
+## ✅ Status da execução — 25/07/2026
+
+Reauditoria completa aplicada. Resultado por categoria:
+
+**Já corrigido antes desta rodada (nada a fazer):** itens 1-3 (migrations superadas por `20260709235339`), 4-7 (`reports-reconcile` / `DailyWorkCloser` já usavam data operacional no fluxo de produção), e todos os itens 8-18 (dashboards, rotas de relatório/admin/heatmap, `active-cycle.ts`, `WeeklyReportGenerator`) — todos já usam `getOperationalDate()`.
+
+**Corrigido nesta rodada:**
+- `src/lib/system-health.functions.ts:159` — `today` em UTC → `getOperationalDate()`.
+- `src/lib/reports-reconcile.functions.ts` — janela de rebuild usava sufixo `Z`; agora usa `operationalDateBoundsUtcIso()` (corte real America/Sao_Paulo).
+- SQL (migrations novas): `get_current_cycle`, `sync_cycle_statuses`, `data_audit_report`, `recover_session_visits`, `fill_cycle_week_from_date`, `rebuild_daily_work_records` e `populate_visit_metadata` → `public.operational_date(now())`.
+- Defaults de coluna: `field_work_sessions.session_date`, `daily_work_records.work_date`, `visits.year` → `public.operational_date(now())`.
+- 🟢 Nomes de arquivos de exportação (pending, data-audit, georef-audit, pendencias, field-work-list) → data local.
+
+**Verificação:** `CURRENT_DATE` = 0 ocorrências em funções e defaults do schema `public`; typecheck limpo; 46 testes passando.
+
+**Mantidos por design:** `src/lib/epi-week.ts` (ISO week sobre data-only), `localDate()` em `reports-reconcile` (offset SP explícito), e nomes de arquivo em relatórios de auditoria RC1/go-live.

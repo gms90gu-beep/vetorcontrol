@@ -28,6 +28,7 @@ import {
 } from "@/lib/institutional-export";
 import { toast } from "sonner";
 import { requireManagerGuard } from "@/lib/role-guards";
+import { getOperationalDate } from "@/lib/operational-date";
 
 const AuditMap = lazy(() => import("@/components/map/GeorefAuditMap"));
 
@@ -115,7 +116,7 @@ function GeorefAuditPage() {
       p.id, p.street_name || "", p.number || "", p.block_number || "", p.locality || "",
       p.agent_name || "", p.latitude ?? "", p.longitude ?? "", p.geocoded_at || "", p.status,
     ]);
-    downloadCSV(`georef-audit-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+    downloadCSV(`georef-audit-${getOperationalDate()}.csv`, header, rows);
   }
 
   function exportXLSX() {
@@ -126,14 +127,14 @@ function GeorefAuditPage() {
       p.id, p.street_name || "", p.number || "", p.block_number || "", p.locality || "",
       p.agent_name || "", p.latitude ?? "", p.longitude ?? "", p.geocoded_at || "", p.status,
     ]);
-    downloadXLSX(`georef-audit-${new Date().toISOString().slice(0, 10)}.xls`, "Auditoria", header, rows);
+    downloadXLSX(`georef-audit-${getOperationalDate()}.xls`, "Auditoria", header, rows);
   }
 
   function exportPDF() {
     if (!data) return;
     console.log("[GEOREF_EXPORT]", "pdf");
     generateInstitutionalPDF(
-      `georef-audit-${new Date().toISOString().slice(0, 10)}.pdf`,
+      `georef-audit-${getOperationalDate()}.pdf`,
       {
         title: "Centro de Qualidade Territorial",
         subtitle: `Gerado em ${new Date(data.generated_at).toLocaleString("pt-BR")} · Índice ${data.quality_score}%`,

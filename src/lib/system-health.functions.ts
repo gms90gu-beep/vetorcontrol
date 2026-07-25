@@ -9,6 +9,7 @@ import { getGeorefAudit } from "./georef-audit.functions";
 import { runRbacAudit } from "./rbac-audit.functions";
 import { runRgHomologation } from "./rg-homologation.functions";
 import { getReconcilePreview } from "./rg-reconcile.functions";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export type HealthStatus = "healthy" | "warning" | "critical";
 
@@ -155,7 +156,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
     // Cycle Audit
     const cs = (cycles.value as any[]) || [];
     const inProgress = cs.filter((c) => c.status === "in_progress");
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getOperationalDate();
     const expired = cs.filter((c) => c.status === "in_progress" && c.end_date < today);
     const cycleIssues = (inProgress.length > 1 ? 1 : 0) + expired.length;
     const cycleScore = Math.max(0, 100 - cycleIssues * 20);
