@@ -946,7 +946,7 @@ function FieldWorkListPage() {
       }
     });
 
-    doc.save(`boletim-diario-${activeSession?.block_number}-${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`boletim-diario-${activeSession?.block_number}-${getOperationalDate()}.pdf`);
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 

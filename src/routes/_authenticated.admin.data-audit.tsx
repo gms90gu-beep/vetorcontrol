@@ -16,6 +16,7 @@ import {
   MapPin, Users, Layers, Home as HomeIcon, ClipboardList, Wifi, Calendar, Bug, Activity,
 } from "lucide-react";
 import { requireAdminMasterGuard } from "@/lib/role-guards";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/admin/data-audit")({
   beforeLoad: requireAdminMasterGuard,
@@ -261,7 +262,7 @@ function DataAuditPage() {
               Object.entries(r).flatMap(([section, vals]) =>
                 Object.entries(vals as object).filter(([, v]) => typeof v !== "object")
                   .map(([k, v]) => ({ section, indicator: k, value: v }))),
-              `auditoria-${new Date().toISOString().slice(0, 10)}.csv`,
+              `auditoria-${getOperationalDate()}.csv`,
             )}
             className="gap-2"
           >

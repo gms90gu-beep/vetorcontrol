@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { requireManagerGuard } from "@/lib/role-guards";
+import { getOperationalDate } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/admin/pendencias")({
   beforeLoad: requireManagerGuard,
@@ -29,7 +30,7 @@ function PendencyReportPage() {
   const exportPDF = () => {
     if (!data) return;
     generateInstitutionalPDF(
-      `pendencias_${new Date().toISOString().slice(0, 10)}.pdf`,
+      `pendencias_${getOperationalDate()}.pdf`,
       {
         title: "Relatório de Pendências",
         subtitle: onlyOpen ? "Pendências abertas" : "Todas as pendências",
