@@ -53,7 +53,10 @@ export async function computePropertyTypeComposition(params: {
 
   let vq = supabase
     .from("visits")
-    .select("id, property_id, status, visit_date, visit_type, created_at, properties(type, block_id, number, sequence, complement)")
+    // ATENÇÃO: não incluir `visit_type` aqui — essa coluna não existe em `visits`.
+    // Um select com coluna inexistente falha por completo (PostgREST 42703),
+    // devolve data=null e zera toda a composição por tipo de imóvel.
+    .select("id, property_id, status, visit_date, created_at, properties(type, block_id, number, sequence, complement)")
     .eq("agent_id", params.agentAuthId)
     .gte("visit_date", startIso)
     .lte("visit_date", endIso);
@@ -61,6 +64,7 @@ export async function computePropertyTypeComposition(params: {
 
   const { data, error } = await vq;
   if (error) console.warn("[PROPERTY_COMPOSITION_VISITS_QUERY_ERROR]", error);
+
 
   const workDateSet = new Set(workDates);
   const vrows = ((data as any[]) || []).filter((r) => {
