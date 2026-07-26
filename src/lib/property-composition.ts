@@ -94,8 +94,9 @@ export async function computePropertyTypeComposition(params: {
       return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
     });
     const chosen = visits[0];
-    // Prioridade: properties.type (vigente) → visit.visit_type → outros
-    const rawType = chosen.properties?.type ?? chosen.visit_type ?? null;
+    // Tipo vem de properties.type (fonte vigente); sem tipo → "outros"
+    const rawType = chosen.properties?.type ?? null;
+
     const type = String(rawType || "others");
     if (type in propTypes) (propTypes as any)[type] += 1;
     else propTypes.others += 1;
