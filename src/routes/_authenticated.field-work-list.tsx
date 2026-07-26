@@ -55,7 +55,7 @@ import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 import { getOperationalDate } from "@/lib/operational-date";
-import { closeExpiredInProgressSessions } from "@/lib/session-state";
+import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
@@ -147,13 +147,8 @@ function FieldWorkListPage() {
       // anterior antes de decidir qual é a "jornada ativa" — sem isso, uma
       // sessão esquecida (app fechado sem clicar "Encerrar Jornada") ficava
       // sendo tratada como ativa para sempre, em qualquer dia futuro.
-      if (online) {
-        try {
-          await closeExpiredInProgressSessions(user.id, todayOperational);
-        } catch (e) {
-          console.warn("[JOURNEY_AUTO_EXPIRE_ERR]", e);
-        }
-      }
+      await ensureExpiredSessionsClosed(user.id);
+
 
       // Bug: esta consulta só reconhecia como "ativa" uma sessão cujo
       // session_date fosse exatamente hoje. Uma jornada retroativa

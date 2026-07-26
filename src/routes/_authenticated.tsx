@@ -17,6 +17,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useSessionExpiryGuard } from "@/hooks/useSessionExpiryGuard";
+import { resetSessionExpiryGuard } from "@/lib/session-expiry";
 import { hasValidLocalSession } from "@/lib/auth";
 import {
   buildNavItems,
@@ -65,6 +67,11 @@ function AuthenticatedLayout() {
   const [bootElapsed, setBootElapsed] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Rede de segurança central: fecha jornadas expiradas no boot de QUALQUER
+  // rota autenticada (não só field-work), com retry automático ao voltar online.
+  useSessionExpiryGuard();
+
+
   // T4 — Safety timeout: nunca bloquear a UI mais de 2s aguardando role/sessão.
   // Após 2s usa sessão + role do cache local (qualquer um já hidratou).
   useEffect(() => {
@@ -104,9 +111,12 @@ function AuthenticatedLayout() {
 
 
   const handleLogout = async () => {
+    // Permite que a verificação rode de novo no próximo login (2ª rede de segurança).
+    resetSessionExpiryGuard();
     await signOut();
     window.location.href = "/login";
   };
+
 
   return (
     <SidebarProvider>
