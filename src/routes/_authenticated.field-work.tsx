@@ -368,13 +368,10 @@ function FieldWorkPage() {
         // outro dia — ver auditoria). Roda antes de qualquer checagem de
         // jornada ativa/pausada, para que field-work e field-work-list
         // nunca mais tratem uma sessão de outra Data da Produção como ativa.
-        if (isOnline()) {
-          try {
-            await closeExpiredInProgressSessions(user.id, getOperationalDate());
-          } catch (e) {
-            console.warn("[JOURNEY_AUTO_EXPIRE_ERR]", e);
-          }
-        }
+        // Idempotente, deduplicado e resiliente a offline (reexecuta quando
+        // a conectividade voltar) — ver src/lib/session-expiry.ts.
+        await ensureExpiredSessionsClosed(user.id);
+
 
         // Retomada automática: procura jornada PAUSED do agente.
         // Antes, isso só rodava com isOnline() e ficava sem checar nada
