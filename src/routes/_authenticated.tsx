@@ -66,6 +66,11 @@ function AuthenticatedLayout() {
   const [bootElapsed, setBootElapsed] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Rede de segurança central: fecha jornadas expiradas no boot de QUALQUER
+  // rota autenticada (não só field-work), com retry automático ao voltar online.
+  useSessionExpiryGuard();
+
+
   // T4 — Safety timeout: nunca bloquear a UI mais de 2s aguardando role/sessão.
   // Após 2s usa sessão + role do cache local (qualquer um já hidratou).
   useEffect(() => {
