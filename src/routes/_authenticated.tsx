@@ -18,6 +18,7 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSessionExpiryGuard } from "@/hooks/useSessionExpiryGuard";
+import { resetSessionExpiryGuard } from "@/lib/session-expiry";
 import { hasValidLocalSession } from "@/lib/auth";
 import {
   buildNavItems,
