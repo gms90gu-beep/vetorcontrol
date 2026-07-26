@@ -55,7 +55,7 @@ import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 import { getOperationalDate } from "@/lib/operational-date";
-import { closeExpiredInProgressSessions } from "@/lib/session-state";
+import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
