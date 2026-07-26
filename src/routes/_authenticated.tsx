@@ -110,9 +110,12 @@ function AuthenticatedLayout() {
 
 
   const handleLogout = async () => {
+    // Permite que a verificação rode de novo no próximo login (2ª rede de segurança).
+    resetSessionExpiryGuard();
     await signOut();
     window.location.href = "/login";
   };
+
 
   return (
     <SidebarProvider>
