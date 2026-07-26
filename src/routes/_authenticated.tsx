@@ -17,6 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useOrientation } from "@/hooks/useOrientation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useSessionExpiryGuard } from "@/hooks/useSessionExpiryGuard";
 import { hasValidLocalSession } from "@/lib/auth";
 import {
   buildNavItems,
