@@ -38,7 +38,7 @@ import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 import { getOperationalDate } from "@/lib/operational-date";
-import { closeExpiredInProgressSessions } from "@/lib/session-state";
+import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
