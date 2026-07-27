@@ -264,7 +264,9 @@ function BoletimView() {
         remote: () =>
           supabase
             .from("properties")
-            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, accuracy, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
+            // NÃO adicionar "accuracy": a coluna não existe em properties e o PostgREST
+            // falha a query inteira (42703), zerando imóveis e georreferência.
+            .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
             .eq("boletim_id", b!.id)
             .order("sequence", { ascending: true }) as any,
         filter: (p) => p.boletim_id === b!.id,
