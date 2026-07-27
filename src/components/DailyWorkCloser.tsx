@@ -1236,6 +1236,21 @@ export function DailyWorkCloser({
       const __propBlock = new Map<string, string>();
       for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
 
+      // Recomputa block_progress de forma SÍNCRONA antes de comparar
+      // Snapshot × Metrics. Sem isso, um bloco cuja linha nunca foi criada
+      // aparece como "0 visitado / tudo pendente" e bloqueia o encerramento.
+      if (activeCycle?.id) {
+        const { recomputeBlockProgressNow: __recompute } = await import(
+          "@/lib/offline/repos/blockProgress"
+        );
+        const __blockNums = Array.from(
+          new Set(dayAllSessions.map((s) => String(s.block_number ?? "")).filter(Boolean)),
+        );
+        for (const bn of __blockNums) {
+          await __recompute({ cycle_id: activeCycle.id, block_number: bn, agent_id: user.id });
+        }
+      }
+
       const __dwrProperties = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0, deposits: 0, focuses: 0 };
       const __perBlockAudit: any[] = [];
       for (const s of dayAllSessions) {
