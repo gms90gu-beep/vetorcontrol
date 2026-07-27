@@ -8,11 +8,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBlockProgress,
   checkIntegrity,
+  recomputeBlockProgressNow,
   type BlockProgress,
 } from "@/lib/offline/repos/blockProgress";
 import { onSyncChange } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
 import { enqueueRpcOffline } from "@/lib/offline/repos";
+
+/** Existe alguma visita local para (ciclo, bloco, agente)? */
+async function hasLocalVisitsForBlock(
+  cycle_id: string,
+  block_number: string,
+  agent_id: string,
+): Promise<boolean> {
+  try {
+    const props = await db.properties.toArray();
+    const ids = new Set(
+      props
+        .filter((p) => String((p.data as any)?.block_number ?? "") === String(block_number))
+        .map((p) => p.id),
+    );
+    if (!ids.size) return false;
+    const visits = await db.visits.toArray();
+    return visits.some((v) => {
+      const d = v.data as any;
+      return (
+        d &&
+        d.agent_id === agent_id &&
+        (!d.cycle_id || d.cycle_id === cycle_id) &&
+        ids.has(d.property_id)
+      );
+    });
+  } catch {
+    return false;
+  }
+}
 
 export interface UseBlockProgressOptions {
   cycle_id: string | null | undefined;
@@ -40,7 +70,29 @@ export function useBlockProgress(opts: UseBlockProgressOptions) {
     if (!cycle_id || !block_number || !agent_id) return;
     setLoading(true);
     try {
-      const row = await getBlockProgress(cycle_id, String(block_number), agent_id);
+      let row = await getBlockProgress(cycle_id, String(block_number), agent_id);
+
+      // Bloco novo: nenhuma linha em block_progress ainda. Se já existem visitas
+      // locais para esse bloco/agente/ciclo, o recompute NUNCA seria disparado
+      // (a checagem antiga exigia `row` existente), e qualquer leitor de métricas
+      // trataria o bloco como "0 visitado / tudo pendente" — origem do bloqueio
+      // [DAY_CLOSE_BLOCK_REASON] Snapshot vs Metrics/visited.
+      if (!row && (await hasLocalVisitsForBlock(cycle_id, String(block_number), agent_id))) {
+        console.warn("[BLOCK_PROGRESS_MISSING_ROW]", {
+          module,
+          cycle_id,
+          block_number: String(block_number),
+          agent_id,
+          action: "recompute_now",
+        });
+        row =
+          (await recomputeBlockProgressNow({
+            cycle_id,
+            block_number: String(block_number),
+            agent_id,
+          })) ?? (await getBlockProgress(cycle_id, String(block_number), agent_id));
+      }
+
       setProgress(row);
       try {
         console.log("[BLOCK_PROGRESS_READ]", {
