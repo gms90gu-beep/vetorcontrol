@@ -40,7 +40,29 @@ export function useBlockProgress(opts: UseBlockProgressOptions) {
     if (!cycle_id || !block_number || !agent_id) return;
     setLoading(true);
     try {
-      const row = await getBlockProgress(cycle_id, String(block_number), agent_id);
+      let row = await getBlockProgress(cycle_id, String(block_number), agent_id);
+
+      // Bloco novo: nenhuma linha em block_progress ainda. Se já existem visitas
+      // locais para esse bloco/agente/ciclo, o recompute NUNCA seria disparado
+      // (a checagem antiga exigia `row` existente), e qualquer leitor de métricas
+      // trataria o bloco como "0 visitado / tudo pendente" — origem do bloqueio
+      // [DAY_CLOSE_BLOCK_REASON] Snapshot vs Metrics/visited.
+      if (!row && (await hasLocalVisitsForBlock(cycle_id, String(block_number), agent_id))) {
+        console.warn("[BLOCK_PROGRESS_MISSING_ROW]", {
+          module,
+          cycle_id,
+          block_number: String(block_number),
+          agent_id,
+          action: "recompute_now",
+        });
+        row =
+          (await recomputeBlockProgressNow({
+            cycle_id,
+            block_number: String(block_number),
+            agent_id,
+          })) ?? (await getBlockProgress(cycle_id, String(block_number), agent_id));
+      }
+
       setProgress(row);
       try {
         console.log("[BLOCK_PROGRESS_READ]", {
