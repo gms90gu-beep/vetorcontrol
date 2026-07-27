@@ -8,11 +8,41 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getBlockProgress,
   checkIntegrity,
+  recomputeBlockProgressNow,
   type BlockProgress,
 } from "@/lib/offline/repos/blockProgress";
 import { onSyncChange } from "@/lib/offline/sync";
 import { db } from "@/lib/offline/db";
 import { enqueueRpcOffline } from "@/lib/offline/repos";
+
+/** Existe alguma visita local para (ciclo, bloco, agente)? */
+async function hasLocalVisitsForBlock(
+  cycle_id: string,
+  block_number: string,
+  agent_id: string,
+): Promise<boolean> {
+  try {
+    const props = await db.properties.toArray();
+    const ids = new Set(
+      props
+        .filter((p) => String((p.data as any)?.block_number ?? "") === String(block_number))
+        .map((p) => p.id),
+    );
+    if (!ids.size) return false;
+    const visits = await db.visits.toArray();
+    return visits.some((v) => {
+      const d = v.data as any;
+      return (
+        d &&
+        d.agent_id === agent_id &&
+        (!d.cycle_id || d.cycle_id === cycle_id) &&
+        ids.has(d.property_id)
+      );
+    });
+  } catch {
+    return false;
+  }
+}
 
 export interface UseBlockProgressOptions {
   cycle_id: string | null | undefined;
