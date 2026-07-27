@@ -183,6 +183,8 @@ function RGPage() {
 
   const [boletins, setBoletins] = useState<BoletimRow[]>([]);
   const [uiDiagnostics, setUiDiagnostics] = useState<RGUIDiagnostics>({});
+  const [propertyCounts, setPropertyCounts] = useState<Map<string, number>>(() => new Map());
+
   const loading = rgLoading;
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [viewBusy, setViewBusy] = useState<string | null>(null);
@@ -347,13 +349,21 @@ function RGPage() {
     return () => { cancelled = true; };
   }, [boletins]);
 
+  // Contagem de imóveis por boletim vive FORA do array `boletins`.
+  // O efeito que reconstrói `boletins` a partir de rgData roda a cada mudança de
+  // referência do hook offline; se a contagem morasse dentro das linhas, ela seria
+  // zerada a cada sync. Aqui ela é um Map separado, mesclado só na renderização.
+  const boletinsKey = useMemo(
+    () => boletins.map((b) => b.id).filter(Boolean).sort().join(","),
+    [boletins],
+  );
+
   useEffect(() => {
-    if (!boletins.length) return;
+    if (!boletinsKey) return;
     let cancelled = false;
     (async () => {
       try {
-        const ids = boletins.map((b) => b.id).filter(Boolean);
-        if (!ids.length) return;
+        const ids = boletinsKey.split(",");
         const { data: props } = await supabase
           .from("properties")
           .select("boletim_id")
@@ -364,17 +374,14 @@ function RGPage() {
           if (!p.boletim_id) continue;
           counts.set(p.boletim_id, (counts.get(p.boletim_id) ?? 0) + 1);
         }
-        setBoletins((prev) => prev.map((b) => ({ ...b, total_imoveis: counts.get(b.id) ?? 0 })));
+        setPropertyCounts(counts);
+        console.log("[RG_COUNTS_LOADED]", Object.fromEntries(counts));
       } catch (e) {
         console.warn("[RG_COUNTS]", e);
       }
     })();
     return () => { cancelled = true; };
-  }, [boletins.length]);
-
-
-
-
+  }, [boletinsKey]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -385,7 +392,6 @@ function RGPage() {
           (b.locality || "").toLowerCase().includes(q) ||
           (b.agent_name || "").toLowerCase().includes(q),
         );
-    console.log("[RG_SORT_INPUT]", base.map((r) => ({ id: r.id, block: r.block_number, locality: r.locality })));
     const sorted = [...base].sort((a, b) => {
       const na = parseInt((a.block_number || "").replace(/\D/g, ""), 10);
       const nb = parseInt((b.block_number || "").replace(/\D/g, ""), 10);
@@ -396,9 +402,13 @@ function RGPage() {
       if (!aHas && bHas) return 1;
       return (a.block_number || "").localeCompare(b.block_number || "");
     });
-    console.log("[RG_SORT_OUTPUT]", sorted.map((r) => ({ id: r.id, block: r.block_number, locality: r.locality })));
-    return sorted;
-  }, [boletins, search]);
+    // Merge da contagem no momento da renderização (nunca dentro do state `boletins`).
+    return sorted.map((b) => ({
+      ...b,
+      total_imoveis: propertyCounts.get(b.id) ?? b.total_imoveis ?? 0,
+    }));
+  }, [boletins, search, propertyCounts]);
+
 
   useEffect(() => {
     console.log(`Após filtros restaram ${filtered.length} boletins`, {
