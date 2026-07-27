@@ -299,6 +299,49 @@ export async function applyLocalVisitDelta(input: {
   return patch;
 }
 
+/**
+ * Executa `recompute_block_progress` AGORA (online), hidratando o cache local.
+ * Retorna a linha canônica ou `null` se offline/erro (nesse caso enfileira).
+ * Usar quando a ausência da linha bloquearia uma decisão (ex.: encerramento).
+ */
+export async function recomputeBlockProgressNow(input: {
+  cycle_id: string;
+  block_number: string;
+  agent_id: string;
+}): Promise<BlockProgress | null> {
+  const { cycle_id, block_number, agent_id } = input;
+  if (!cycle_id || !block_number || !agent_id) return null;
+  try {
+    const { data, error } = await supabase.rpc("recompute_block_progress", {
+      _cycle_id: cycle_id,
+      _block_number: String(block_number),
+      _agent_id: agent_id,
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as BlockProgress | null;
+    if (row) {
+      await hydrateLocal([row]);
+      log("BLOCK_PROGRESS_RECALCULATED", {
+        mode: "sync",
+        cycle_id,
+        block_number,
+        agent_id,
+        total: row.total_properties,
+        visitados: row.visited_properties,
+        pendentes: row.pending_properties,
+        status: row.status,
+      });
+    }
+    return row ?? null;
+  } catch (e) {
+    console.warn("[BLOCK_PROGRESS_RECALC_FAIL]", { ...input, error: String(e) });
+    try {
+      await enqueueRecomputeBlockProgress(input);
+    } catch {}
+    return null;
+  }
+}
+
 /** Enfileira a recomputação canônica no servidor (idempotente). */
 export async function enqueueRecomputeBlockProgress(input: {
   cycle_id: string;
