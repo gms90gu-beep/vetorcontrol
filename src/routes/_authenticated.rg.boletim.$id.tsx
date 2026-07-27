@@ -284,7 +284,7 @@ function BoletimView() {
           remote: () =>
             supabase
               .from("properties")
-              .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, accuracy, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
+              .select("id, street_name, side, number, sequence, complement, type, inhabitants, latitude, longitude, geocoded_at, had_previous_focus, status, boletim_id, block_id, block_number")
               .eq("block_id", b!.block_id as string)
               .order("sequence", { ascending: true }) as any,
           filter: (p) => p.block_id === b!.block_id,
