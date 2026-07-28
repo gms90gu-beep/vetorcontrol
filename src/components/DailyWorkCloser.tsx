@@ -590,12 +590,9 @@ export function DailyWorkCloser({
         "field_work_sessions",
         (s) => s.user_id === userId && s.session_date === workDate,
       );
-      const __propsAll = await listLocal<any>("properties");
+      const __propsAll = await loadDayCloseProperties(dayAllSessions);
       const { byPropertyId: __propertyById } = mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
-      const visitsByAllSessions = await listLocal<any>(
-        "visits",
-        (v) => v.agent_id === userId && toOperationalDate(v.visit_date) === workDate,
-      );
+      const visitsByAllSessions = await loadDayCloseVisits(userId, workDate);
 
       console.log("[DAY_CLOSE_FLOW]", { etapa: "metrics" });
       const agg = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0 };
@@ -1292,7 +1289,7 @@ export function DailyWorkCloser({
       // Regra: o encerramento consome exclusivamente `operational-metrics`.
       // Compara UI (Tela de Trabalho) × Metrics × BlockStatus × Snapshot × DWR.
       const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
-      const __propsAll = await listLocal<any>("properties");
+      const __propsAll = await loadDayCloseProperties(dayAllSessions);
       const { byPropertyId: __propertyById, blockNumberByPropertyId: __propBlock } =
         mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
       const __cycleIdForClose =
