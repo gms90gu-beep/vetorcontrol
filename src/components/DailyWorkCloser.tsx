@@ -1343,7 +1343,7 @@ export function DailyWorkCloser({
 
       const __uiPayload = {
         operational_date: operationalWorkDate,
-        cycle: activeCycle?.id ?? null,
+        cycle: __cycleIdForClose,
         blocks: __perBlockAudit.map((b) => b.block_number),
         total_properties: __dwrProperties.total,
         visited: __dwrProperties.visited,
@@ -1364,7 +1364,7 @@ export function DailyWorkCloser({
         if ((__snapTotal > 0 || __snapVisited > 0) && __dwrProperties.total === 0 && __dwrProperties.visited === 0) {
           console.error("[METRICS_EMPTY_RESULT]", {
             agent_id: user.id,
-            cycle_id: activeCycle?.id ?? null,
+            cycle_id: __cycleIdForClose,
             operational_date: operationalWorkDate,
             snapshot: {
               total: __snapTotal,
@@ -1388,7 +1388,7 @@ export function DailyWorkCloser({
               .filter((r) =>
                 r &&
                 r.agent_id === user.id &&
-                (!activeCycle?.id || r.cycle_id === activeCycle.id),
+                (!__cycleIdForClose || r.cycle_id === __cycleIdForClose),
               );
             const __agg = __bpMatch.reduce(
               (a, r) => {
@@ -1405,7 +1405,7 @@ export function DailyWorkCloser({
               source: "dexie(block_progress)",
               filter: {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
               },
               ...__agg,
@@ -1413,14 +1413,14 @@ export function DailyWorkCloser({
             if (__agg.count === 0) {
               console.error("[BLOCK_PROGRESS_NOT_UPDATED]", {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
                 reason: "Nenhuma linha em block_progress para o agente/ciclo — trigger de recompute pode não ter executado.",
               });
             } else if (__agg.total > 0 && __dwrProperties.total === 0) {
               console.error("[BLOCK_PROGRESS_FILTER_ERROR]", {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
                 block_progress_aggregate: __agg,
                 metrics_aggregate: __dwrProperties,
@@ -1554,10 +1554,10 @@ export function DailyWorkCloser({
       };
       const __diag: DayCloseDiagnostic = {
         agent_id: user.id,
-        cycle_id: activeCycle?.id ?? null,
+        cycle_id: __cycleIdForClose,
         operational_date: operationalWorkDate,
-        source_snapshot: "get_session_visits + block_progress + daily_work_records",
-        source_metrics: "operational-metrics (block_progress)",
+        source_snapshot: "get_session_visits + daily snapshot",
+        source_metrics: "operational-metrics (properties/visits scoped by block_id)",
         totals: {
           snapshot: __totalsSnapshot,
           metrics: __totalsMetrics,
@@ -1608,16 +1608,16 @@ export function DailyWorkCloser({
 
       const { getEpiWeek, resolveCycleWeek } = await import("@/lib/cycle-week");
       const epi = getEpiWeek(new Date(`${operationalWorkDate}T12:00:00`));
-      const resolvedCycleWeek = activeCycle?.id
-        ? await resolveCycleWeek(activeCycle.id, new Date(`${operationalWorkDate}T12:00:00`))
+      const resolvedCycleWeek = __cycleIdForClose
+        ? await resolveCycleWeek(__cycleIdForClose, new Date(`${operationalWorkDate}T12:00:00`))
         : null;
       console.log("[SE]", { work_date: operationalWorkDate, epi_week: epi.week, epi_year: epi.year });
-      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null });
-      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null, cycle_week: resolvedCycleWeek?.number ?? null });
+      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose });
+      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose, cycle_week: resolvedCycleWeek?.number ?? null });
 
       const recordData: any = {
         agent_id: currentAgent.id,
-        cycle_id: activeCycle?.id,
+        cycle_id: __cycleIdForClose,
         week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
         status: 'completed',
