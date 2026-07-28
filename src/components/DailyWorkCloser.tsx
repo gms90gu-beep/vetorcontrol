@@ -416,6 +416,34 @@ function mapPropertiesToSessionBlockNumbers(properties: any[], sessions: any[]) 
   return { byPropertyId, blockNumberByPropertyId };
 }
 
+async function loadDayCloseProperties(sessions: any[]): Promise<any[]> {
+  const blockIds = Array.from(new Set(sessions.map((s) => s?.block_id).filter(Boolean).map(String)));
+  const blockNumbers = Array.from(new Set(sessions.map((s) => normalizeBlockNumber(s?.block_number)).filter(Boolean)));
+  if (blockIds.length === 0 && blockNumbers.length === 0) return [];
+
+  return listRemoteOrCache<any>({
+    name: "properties",
+    remote: () => {
+      const q = supabase.from("properties").select("*");
+      if (blockIds.length > 0) return q.in("block_id", blockIds) as any;
+      return q.in("block_number", blockNumbers) as any;
+    },
+    filter: (property: any) => sessions.some((session) => propertyBelongsToSessionBlock(property, session)),
+  });
+}
+
+async function loadDayCloseVisits(userId: string, workDate: string): Promise<any[]> {
+  return listRemoteOrCache<any>({
+    name: "visits",
+    remote: () =>
+      supabase.rpc("get_session_visits" as any, {
+        _agent_id: userId,
+        _session_date: workDate,
+      }) as any,
+    filter: (visit: any) => visit.agent_id === userId && toOperationalDate(visit.visit_date) === workDate,
+  });
+}
+
 
 interface DailyWorkCloserProps {
   stats?: {
