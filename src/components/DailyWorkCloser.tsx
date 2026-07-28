@@ -1735,7 +1735,7 @@ export function DailyWorkCloser({
         const integrityReport = await runProductionIntegrity({
           agentId: user.id,
           workDate: operationalWorkDate,
-          cycleId: activeCycle?.id ?? null,
+          cycleId: __cycleIdForClose,
           snapshot: {
             workedCount: snap.workedCount,
             closedCount: snap.closedCount,
@@ -1769,7 +1769,7 @@ export function DailyWorkCloser({
       console.log("[ENCERRAR] executando/enfileirando finalize_shift_pendencies");
       await enqueueRpcOffline("finalize_shift_pendencies", {
         p_agent_id: user.id,
-        p_cycle_id: activeCycle?.id,
+        p_cycle_id: __cycleIdForClose,
         p_date: operationalWorkDate,
       });
 
