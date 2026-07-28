@@ -385,6 +385,37 @@ interface DayCloseDiagnostic {
   divergences: Array<{ module: string; field: string; expected: number; found: number }>;
 }
 
+function normalizeBlockNumber(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw.replace(/^0+(?=\d)/, "");
+}
+
+function propertyBelongsToSessionBlock(property: any, session: any): boolean {
+  const propertyBlockId = property?.block_id ? String(property.block_id) : "";
+  const sessionBlockId = session?.block_id ? String(session.block_id) : "";
+  if (propertyBlockId && sessionBlockId && propertyBlockId === sessionBlockId) return true;
+
+  const propertyBlockNumber = normalizeBlockNumber(property?.block_number);
+  const sessionBlockNumber = normalizeBlockNumber(session?.block_number);
+  return !!propertyBlockNumber && !!sessionBlockNumber && propertyBlockNumber === sessionBlockNumber;
+}
+
+function mapPropertiesToSessionBlockNumbers(properties: any[], sessions: any[]) {
+  const byPropertyId = new Map<string, any>();
+  const blockNumberByPropertyId = new Map<string, string>();
+  for (const property of properties) {
+    if (!property?.id) continue;
+    byPropertyId.set(property.id, property);
+    const ownerSession = sessions.find((session) => propertyBelongsToSessionBlock(property, session));
+    const blockNumber = ownerSession?.block_number ?? property.block_number;
+    if (blockNumber != null && normalizeBlockNumber(blockNumber)) {
+      blockNumberByPropertyId.set(property.id, String(blockNumber));
+    }
+  }
+  return { byPropertyId, blockNumberByPropertyId };
+}
+
 
 interface DailyWorkCloserProps {
   stats?: {
