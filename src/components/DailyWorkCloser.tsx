@@ -1265,21 +1265,26 @@ export function DailyWorkCloser({
       // Compara UI (Tela de Trabalho) × Metrics × BlockStatus × Snapshot × DWR.
       const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
       const __propsAll = await listLocal<any>("properties");
-      const __propBlock = new Map<string, string>();
-      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
+      const { byPropertyId: __propertyById, blockNumberByPropertyId: __propBlock } =
+        mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
+      const __cycleIdForClose =
+        activeCycle?.id ??
+        activeSessionForClose?.cycle_id ??
+        dayAllSessions.find((s: any) => s?.cycle_id)?.cycle_id ??
+        null;
 
       // Recomputa block_progress de forma SÍNCRONA antes de comparar
       // Snapshot × Metrics. Sem isso, um bloco cuja linha nunca foi criada
       // aparece como "0 visitado / tudo pendente" e bloqueia o encerramento.
-      if (activeCycle?.id) {
+      if (__cycleIdForClose) {
         const { recomputeBlockProgressNow: __recompute } = await import(
           "@/lib/offline/repos/blockProgress"
         );
         const __blockNums = Array.from(
-          new Set(dayAllSessions.map((s) => String(s.block_number ?? "")).filter(Boolean)),
+          new Set(dayAllSessions.map((s) => normalizeBlockNumber(s.block_number)).filter(Boolean)),
         );
         for (const bn of __blockNums) {
-          await __recompute({ cycle_id: activeCycle.id, block_number: bn, agent_id: user.id });
+          await __recompute({ cycle_id: __cycleIdForClose, block_number: bn, agent_id: user.id });
         }
       }
 
@@ -1287,8 +1292,11 @@ export function DailyWorkCloser({
       const __perBlockAudit: any[] = [];
       for (const s of dayAllSessions) {
         const bn = String(s.block_number ?? "");
-        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
-        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => {
+          const property = __propertyById.get(v.property_id);
+          return propertyBelongsToSessionBlock(property, s);
+        });
         const metrics = __getMetrics({
           module: "DailyWorkCloser/audit",
           productionDate: operationalWorkDate,
@@ -1301,17 +1309,18 @@ export function DailyWorkCloser({
         // Log detalhado da consulta de métricas por bloco
         console.log("[METRICS_QUERY]", {
           agent_id: user.id,
-          cycle_id: activeCycle?.id ?? null,
+          cycle_id: __cycleIdForClose,
           operational_date: operationalWorkDate,
           work_date: operationalWorkDate,
           block_number: bn,
           session_date: s.session_date ?? s.started_at ?? null,
           filter: {
             agent_id: user.id,
-            cycle_id: activeCycle?.id ?? null,
+            cycle_id: __cycleIdForClose,
             block_number: bn,
             property_ids_count: propIds.length,
             visits_scoped_count: vs.length,
+            block_id: s.block_id ?? null,
           },
           result: {
             properties_found: propIds.length,
