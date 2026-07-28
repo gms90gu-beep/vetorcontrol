@@ -385,6 +385,65 @@ interface DayCloseDiagnostic {
   divergences: Array<{ module: string; field: string; expected: number; found: number }>;
 }
 
+function normalizeBlockNumber(value: unknown): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw.replace(/^0+(?=\d)/, "");
+}
+
+function propertyBelongsToSessionBlock(property: any, session: any): boolean {
+  const propertyBlockId = property?.block_id ? String(property.block_id) : "";
+  const sessionBlockId = session?.block_id ? String(session.block_id) : "";
+  if (propertyBlockId && sessionBlockId && propertyBlockId === sessionBlockId) return true;
+
+  const propertyBlockNumber = normalizeBlockNumber(property?.block_number);
+  const sessionBlockNumber = normalizeBlockNumber(session?.block_number);
+  return !!propertyBlockNumber && !!sessionBlockNumber && propertyBlockNumber === sessionBlockNumber;
+}
+
+function mapPropertiesToSessionBlockNumbers(properties: any[], sessions: any[]) {
+  const byPropertyId = new Map<string, any>();
+  const blockNumberByPropertyId = new Map<string, string>();
+  for (const property of properties) {
+    if (!property?.id) continue;
+    byPropertyId.set(property.id, property);
+    const ownerSession = sessions.find((session) => propertyBelongsToSessionBlock(property, session));
+    const blockNumber = ownerSession?.block_number ?? property.block_number;
+    if (blockNumber != null && normalizeBlockNumber(blockNumber)) {
+      blockNumberByPropertyId.set(property.id, String(blockNumber));
+    }
+  }
+  return { byPropertyId, blockNumberByPropertyId };
+}
+
+async function loadDayCloseProperties(sessions: any[]): Promise<any[]> {
+  const blockIds = Array.from(new Set(sessions.map((s) => s?.block_id).filter(Boolean).map(String)));
+  const blockNumbers = Array.from(new Set(sessions.map((s) => normalizeBlockNumber(s?.block_number)).filter(Boolean)));
+  if (blockIds.length === 0 && blockNumbers.length === 0) return [];
+
+  return listRemoteOrCache<any>({
+    name: "properties",
+    remote: () => {
+      const q = supabase.from("properties").select("*");
+      if (blockIds.length > 0) return q.in("block_id", blockIds) as any;
+      return q.in("block_number", blockNumbers) as any;
+    },
+    filter: (property: any) => sessions.some((session) => propertyBelongsToSessionBlock(property, session)),
+  });
+}
+
+async function loadDayCloseVisits(userId: string, workDate: string): Promise<any[]> {
+  return listRemoteOrCache<any>({
+    name: "visits",
+    remote: () =>
+      supabase.rpc("get_session_visits" as any, {
+        _agent_id: userId,
+        _session_date: workDate,
+      }) as any,
+    filter: (visit: any) => visit.agent_id === userId && toOperationalDate(visit.visit_date) === workDate,
+  });
+}
+
 
 interface DailyWorkCloserProps {
   stats?: {
@@ -527,25 +586,23 @@ export function DailyWorkCloser({
     console.log("[DAY_CLOSE_START]", { agent_id: userId, operational_date: workDate, cycle_id: activeCycleId, ts: new Date().toISOString() });
     try {
       const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
-      const __propsAll = await listLocal<any>("properties");
-      const __propBlock = new Map<string, string>();
-      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
-
       const dayAllSessions = await listLocal<any>(
         "field_work_sessions",
         (s) => s.user_id === userId && s.session_date === workDate,
       );
-      const visitsByAllSessions = await listLocal<any>(
-        "visits",
-        (v) => v.agent_id === userId && toOperationalDate(v.visit_date) === workDate,
-      );
+      const __propsAll = await loadDayCloseProperties(dayAllSessions);
+      const { byPropertyId: __propertyById } = mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
+      const visitsByAllSessions = await loadDayCloseVisits(userId, workDate);
 
       console.log("[DAY_CLOSE_FLOW]", { etapa: "metrics" });
       const agg = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0 };
       for (const s of dayAllSessions) {
         const bn = String(s.block_number ?? "");
-        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
-        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => {
+          const property = __propertyById.get(v.property_id);
+          return propertyBelongsToSessionBlock(property, s);
+        });
         const metrics = __getMetrics({
           module: "DailyWorkCloser/preDiagnostic",
           productionDate: workDate,
@@ -1232,22 +1289,27 @@ export function DailyWorkCloser({
       // Regra: o encerramento consome exclusivamente `operational-metrics`.
       // Compara UI (Tela de Trabalho) × Metrics × BlockStatus × Snapshot × DWR.
       const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
-      const __propsAll = await listLocal<any>("properties");
-      const __propBlock = new Map<string, string>();
-      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
+      const __propsAll = await loadDayCloseProperties(dayAllSessions);
+      const { byPropertyId: __propertyById, blockNumberByPropertyId: __propBlock } =
+        mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
+      const __cycleIdForClose =
+        activeCycle?.id ??
+        activeSessionForClose?.cycle_id ??
+        dayAllSessions.find((s: any) => s?.cycle_id)?.cycle_id ??
+        null;
 
       // Recomputa block_progress de forma SÍNCRONA antes de comparar
       // Snapshot × Metrics. Sem isso, um bloco cuja linha nunca foi criada
       // aparece como "0 visitado / tudo pendente" e bloqueia o encerramento.
-      if (activeCycle?.id) {
+      if (__cycleIdForClose) {
         const { recomputeBlockProgressNow: __recompute } = await import(
           "@/lib/offline/repos/blockProgress"
         );
         const __blockNums = Array.from(
-          new Set(dayAllSessions.map((s) => String(s.block_number ?? "")).filter(Boolean)),
+          new Set(dayAllSessions.map((s) => normalizeBlockNumber(s.block_number)).filter(Boolean)),
         );
         for (const bn of __blockNums) {
-          await __recompute({ cycle_id: activeCycle.id, block_number: bn, agent_id: user.id });
+          await __recompute({ cycle_id: __cycleIdForClose, block_number: bn, agent_id: user.id });
         }
       }
 
@@ -1255,8 +1317,11 @@ export function DailyWorkCloser({
       const __perBlockAudit: any[] = [];
       for (const s of dayAllSessions) {
         const bn = String(s.block_number ?? "");
-        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
-        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => {
+          const property = __propertyById.get(v.property_id);
+          return propertyBelongsToSessionBlock(property, s);
+        });
         const metrics = __getMetrics({
           module: "DailyWorkCloser/audit",
           productionDate: operationalWorkDate,
@@ -1269,17 +1334,18 @@ export function DailyWorkCloser({
         // Log detalhado da consulta de métricas por bloco
         console.log("[METRICS_QUERY]", {
           agent_id: user.id,
-          cycle_id: activeCycle?.id ?? null,
+          cycle_id: __cycleIdForClose,
           operational_date: operationalWorkDate,
           work_date: operationalWorkDate,
           block_number: bn,
           session_date: s.session_date ?? s.started_at ?? null,
           filter: {
             agent_id: user.id,
-            cycle_id: activeCycle?.id ?? null,
+            cycle_id: __cycleIdForClose,
             block_number: bn,
             property_ids_count: propIds.length,
             visits_scoped_count: vs.length,
+            block_id: s.block_id ?? null,
           },
           result: {
             properties_found: propIds.length,
@@ -1302,7 +1368,7 @@ export function DailyWorkCloser({
 
       const __uiPayload = {
         operational_date: operationalWorkDate,
-        cycle: activeCycle?.id ?? null,
+        cycle: __cycleIdForClose,
         blocks: __perBlockAudit.map((b) => b.block_number),
         total_properties: __dwrProperties.total,
         visited: __dwrProperties.visited,
@@ -1323,7 +1389,7 @@ export function DailyWorkCloser({
         if ((__snapTotal > 0 || __snapVisited > 0) && __dwrProperties.total === 0 && __dwrProperties.visited === 0) {
           console.error("[METRICS_EMPTY_RESULT]", {
             agent_id: user.id,
-            cycle_id: activeCycle?.id ?? null,
+            cycle_id: __cycleIdForClose,
             operational_date: operationalWorkDate,
             snapshot: {
               total: __snapTotal,
@@ -1347,7 +1413,7 @@ export function DailyWorkCloser({
               .filter((r) =>
                 r &&
                 r.agent_id === user.id &&
-                (!activeCycle?.id || r.cycle_id === activeCycle.id),
+                (!__cycleIdForClose || r.cycle_id === __cycleIdForClose),
               );
             const __agg = __bpMatch.reduce(
               (a, r) => {
@@ -1364,7 +1430,7 @@ export function DailyWorkCloser({
               source: "dexie(block_progress)",
               filter: {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
               },
               ...__agg,
@@ -1372,14 +1438,14 @@ export function DailyWorkCloser({
             if (__agg.count === 0) {
               console.error("[BLOCK_PROGRESS_NOT_UPDATED]", {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
                 reason: "Nenhuma linha em block_progress para o agente/ciclo — trigger de recompute pode não ter executado.",
               });
             } else if (__agg.total > 0 && __dwrProperties.total === 0) {
               console.error("[BLOCK_PROGRESS_FILTER_ERROR]", {
                 agent_id: user.id,
-                cycle_id: activeCycle?.id ?? null,
+                cycle_id: __cycleIdForClose,
                 operational_date: operationalWorkDate,
                 block_progress_aggregate: __agg,
                 metrics_aggregate: __dwrProperties,
@@ -1513,10 +1579,10 @@ export function DailyWorkCloser({
       };
       const __diag: DayCloseDiagnostic = {
         agent_id: user.id,
-        cycle_id: activeCycle?.id ?? null,
+        cycle_id: __cycleIdForClose,
         operational_date: operationalWorkDate,
-        source_snapshot: "get_session_visits + block_progress + daily_work_records",
-        source_metrics: "operational-metrics (block_progress)",
+        source_snapshot: "get_session_visits + daily snapshot",
+        source_metrics: "operational-metrics (properties/visits scoped by block_id)",
         totals: {
           snapshot: __totalsSnapshot,
           metrics: __totalsMetrics,
@@ -1567,16 +1633,16 @@ export function DailyWorkCloser({
 
       const { getEpiWeek, resolveCycleWeek } = await import("@/lib/cycle-week");
       const epi = getEpiWeek(new Date(`${operationalWorkDate}T12:00:00`));
-      const resolvedCycleWeek = activeCycle?.id
-        ? await resolveCycleWeek(activeCycle.id, new Date(`${operationalWorkDate}T12:00:00`))
+      const resolvedCycleWeek = __cycleIdForClose
+        ? await resolveCycleWeek(__cycleIdForClose, new Date(`${operationalWorkDate}T12:00:00`))
         : null;
       console.log("[SE]", { work_date: operationalWorkDate, epi_week: epi.week, epi_year: epi.year });
-      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null });
-      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: activeCycle?.id ?? null, cycle_week: resolvedCycleWeek?.number ?? null });
+      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose });
+      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose, cycle_week: resolvedCycleWeek?.number ?? null });
 
       const recordData: any = {
         agent_id: currentAgent.id,
-        cycle_id: activeCycle?.id,
+        cycle_id: __cycleIdForClose,
         week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
         status: 'completed',
@@ -1694,7 +1760,7 @@ export function DailyWorkCloser({
         const integrityReport = await runProductionIntegrity({
           agentId: user.id,
           workDate: operationalWorkDate,
-          cycleId: activeCycle?.id ?? null,
+          cycleId: __cycleIdForClose,
           snapshot: {
             workedCount: snap.workedCount,
             closedCount: snap.closedCount,
@@ -1728,7 +1794,7 @@ export function DailyWorkCloser({
       console.log("[ENCERRAR] executando/enfileirando finalize_shift_pendencies");
       await enqueueRpcOffline("finalize_shift_pendencies", {
         p_agent_id: user.id,
-        p_cycle_id: activeCycle?.id,
+        p_cycle_id: __cycleIdForClose,
         p_date: operationalWorkDate,
       });
 
