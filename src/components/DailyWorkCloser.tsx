@@ -558,14 +558,12 @@ export function DailyWorkCloser({
     console.log("[DAY_CLOSE_START]", { agent_id: userId, operational_date: workDate, cycle_id: activeCycleId, ts: new Date().toISOString() });
     try {
       const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
-      const __propsAll = await listLocal<any>("properties");
-      const __propBlock = new Map<string, string>();
-      for (const p of __propsAll) if (p?.id && p.block_number != null) __propBlock.set(p.id, String(p.block_number));
-
       const dayAllSessions = await listLocal<any>(
         "field_work_sessions",
         (s) => s.user_id === userId && s.session_date === workDate,
       );
+      const __propsAll = await listLocal<any>("properties");
+      const { byPropertyId: __propertyById } = mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
       const visitsByAllSessions = await listLocal<any>(
         "visits",
         (v) => v.agent_id === userId && toOperationalDate(v.visit_date) === workDate,
@@ -575,8 +573,11 @@ export function DailyWorkCloser({
       const agg = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0 };
       for (const s of dayAllSessions) {
         const bn = String(s.block_number ?? "");
-        const propIds = __propsAll.filter((p) => String(p.block_number ?? "") === bn).map((p) => p.id);
-        const vs = visitsByAllSessions.filter((v) => __propBlock.get(v.property_id) === bn);
+        const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => {
+          const property = __propertyById.get(v.property_id);
+          return propertyBelongsToSessionBlock(property, s);
+        });
         const metrics = __getMetrics({
           module: "DailyWorkCloser/preDiagnostic",
           productionDate: workDate,
