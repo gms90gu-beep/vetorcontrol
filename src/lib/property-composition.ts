@@ -96,7 +96,7 @@ export async function computePropertyTypeComposition(params: {
     visits.sort((a, b) => {
       const d = String(b.visit_date).localeCompare(String(a.visit_date));
       if (d !== 0) return d;
-      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+      return String(b.id ?? "").localeCompare(String(a.id ?? ""));
     });
     const chosen = visits[0];
     // Tipo vem de properties.type (fonte vigente); sem tipo → "outros"
