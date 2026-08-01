@@ -394,7 +394,9 @@ function normalizeBlockNumber(value: unknown): string {
 function propertyBelongsToSessionBlock(property: any, session: any): boolean {
   const propertyBlockId = property?.block_id ? String(property.block_id) : "";
   const sessionBlockId = session?.block_id ? String(session.block_id) : "";
-  if (propertyBlockId && sessionBlockId && propertyBlockId === sessionBlockId) return true;
+  // Quando AMBOS têm block_id, ele é a única verdade: cair no block_number
+  // aqui misturava imóveis de blocos distintos com o mesmo número.
+  if (propertyBlockId && sessionBlockId) return propertyBlockId === sessionBlockId;
 
   const propertyBlockNumber = normalizeBlockNumber(property?.block_number);
   const sessionBlockNumber = normalizeBlockNumber(session?.block_number);
@@ -418,16 +420,33 @@ function mapPropertiesToSessionBlockNumbers(properties: any[], sessions: any[]) 
 
 async function loadDayCloseProperties(sessions: any[]): Promise<any[]> {
   const blockIds = Array.from(new Set(sessions.map((s) => s?.block_id).filter(Boolean).map(String)));
-  const blockNumbers = Array.from(new Set(sessions.map((s) => normalizeBlockNumber(s?.block_number)).filter(Boolean)));
+  // Só usar block_number das sessões que NÃO têm block_id — caso contrário a
+  // consulta por número traz imóveis de outros quarteirões/territórios
+  // homônimos e infla o escopo quando há vários blocos no mesmo dia.
+  const blockNumbers = Array.from(
+    new Set(
+      sessions
+        .filter((s) => !s?.block_id)
+        .map((s) => normalizeBlockNumber(s?.block_number))
+        .filter(Boolean),
+    ),
+  );
   if (blockIds.length === 0 && blockNumbers.length === 0) return [];
 
   return listRemoteOrCache<any>({
     name: "properties",
     remote: () => {
       const q = supabase.from("properties").select("*");
+      if (blockIds.length > 0 && blockNumbers.length > 0) {
+        const idList = blockIds.map((id) => `"${id}"`).join(",");
+        const numList = blockNumbers.map((n) => `"${n}"`).join(",");
+        return q.or(`block_id.in.(${idList}),block_number.in.(${numList})`) as any;
+      }
       if (blockIds.length > 0) return q.in("block_id", blockIds) as any;
       return q.in("block_number", blockNumbers) as any;
     },
+    // Garante que só entra no escopo o imóvel que realmente pertence a um
+    // dos blocos das jornadas do dia (block_id tem precedência).
     filter: (property: any) => sessions.some((session) => propertyBelongsToSessionBlock(property, session)),
   });
 }
@@ -1315,7 +1334,23 @@ export function DailyWorkCloser({
 
       const __dwrProperties = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0, deposits: 0, focuses: 0 };
       const __perBlockAudit: any[] = [];
-      for (const s of dayAllSessions) {
+      // Uma jornada POR BLOCO: se houver 2+ jornadas no mesmo quarteirão no dia,
+      // iterar por sessão contava os mesmos imóveis/visitas duas vezes
+      // (total_properties inflado ~2x no diagnóstico).
+      const __blockSessions = Array.from(
+        dayAllSessions
+          .reduce((map: Map<string, any>, s: any) => {
+            const key = s?.block_id
+              ? `id:${String(s.block_id)}`
+              : `n:${normalizeBlockNumber(s?.block_number)}`;
+            const prev = map.get(key);
+            if (!prev) map.set(key, s);
+            else if (Number(s.property_count || 0) > Number(prev.property_count || 0)) map.set(key, s);
+            return map;
+          }, new Map<string, any>())
+          .values(),
+      );
+      for (const s of __blockSessions) {
         const bn = String(s.block_number ?? "");
         const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
         const vs = visitsByAllSessions.filter((v) => {
@@ -1480,13 +1515,25 @@ export function DailyWorkCloser({
           }
         }
       };
+      // ATENÇÃO: NÃO comparar `pending` aqui.
+      // `metrics.pendingProperties` = imóveis do TERRITÓRIO do quarteirão ainda
+      // não trabalhados (total - trabalhados), enquanto `snap.pendingLocal` =
+      // pendências reais do dia (imóveis fechados/recusados a recuperar).
+      // São definições diferentes; comparar as duas bloqueava o encerramento
+      // sempre que um quarteirão não terminasse 100% no dia (ex.: 3 vs 38).
+      // Idem para total_properties (trabalhados no dia × total do quarteirão).
+      console.log("[DAY_CLOSE_PENDING_SEMANTICS]", {
+        metrics_pending_territory: __dwrProperties.pending,
+        snapshot_pending_recovery: snap.pendingLocal,
+        metrics_total_territory: __dwrProperties.total,
+        snapshot_worked_today: snap.workedCount,
+        note: "definições distintas — não é divergência",
+      });
       __check("Snapshot vs Metrics", {
         visited: __dwrProperties.visited,
-        pending: __dwrProperties.pending,
         closed: __dwrProperties.closed,
       }, {
         visited: snap.visitedCount,
-        pending: snap.pendingLocal,
         closed: snap.closedCount,
       });
 
@@ -1641,7 +1688,10 @@ export function DailyWorkCloser({
       console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose, cycle_week: resolvedCycleWeek?.number ?? null });
 
       const recordData: any = {
-        agent_id: currentAgent.id,
+        // agent_id DEVE ser auth.uid()/profile id (RLS dwr_insert_self_or_admin).
+        // legacy_agent_id é o PK real de `agents` (usado no onConflict).
+        agent_id: user?.id ?? currentAgent.profile_id ?? currentAgent.id,
+        legacy_agent_id: currentAgent.id,
         cycle_id: __cycleIdForClose,
         week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
@@ -1693,7 +1743,7 @@ export function DailyWorkCloser({
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
       const dwrConflictTarget = "legacy_agent_id,work_date";
-      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id, work_date: recordData.work_date });
+      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: recordData.legacy_agent_id, work_date: recordData.work_date });
       console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_date_unique(legacy_agent_id, work_date)" });
       let savedDaily: any;
       try {
@@ -1709,7 +1759,7 @@ export function DailyWorkCloser({
         });
         savedDaily = await upsertOffline(
           "daily_work_records",
-          { ...recordData, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id },
+          { ...recordData },
           { onConflict: dwrConflictTarget },
         );
         console.log("[DAY_CLOSE_DWR_POST]", {
