@@ -1712,7 +1712,7 @@ export function DailyWorkCloser({
         });
         savedDaily = await upsertOffline(
           "daily_work_records",
-          { ...recordData, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id },
+          { ...recordData },
           { onConflict: dwrConflictTarget },
         );
         console.log("[DAY_CLOSE_DWR_POST]", {
