@@ -1480,13 +1480,25 @@ export function DailyWorkCloser({
           }
         }
       };
+      // ATENÇÃO: NÃO comparar `pending` aqui.
+      // `metrics.pendingProperties` = imóveis do TERRITÓRIO do quarteirão ainda
+      // não trabalhados (total - trabalhados), enquanto `snap.pendingLocal` =
+      // pendências reais do dia (imóveis fechados/recusados a recuperar).
+      // São definições diferentes; comparar as duas bloqueava o encerramento
+      // sempre que um quarteirão não terminasse 100% no dia (ex.: 3 vs 38).
+      // Idem para total_properties (trabalhados no dia × total do quarteirão).
+      console.log("[DAY_CLOSE_PENDING_SEMANTICS]", {
+        metrics_pending_territory: __dwrProperties.pending,
+        snapshot_pending_recovery: snap.pendingLocal,
+        metrics_total_territory: __dwrProperties.total,
+        snapshot_worked_today: snap.workedCount,
+        note: "definições distintas — não é divergência",
+      });
       __check("Snapshot vs Metrics", {
         visited: __dwrProperties.visited,
-        pending: __dwrProperties.pending,
         closed: __dwrProperties.closed,
       }, {
         visited: snap.visitedCount,
-        pending: snap.pendingLocal,
         closed: snap.closedCount,
       });
 
