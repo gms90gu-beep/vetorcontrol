@@ -1641,7 +1641,10 @@ export function DailyWorkCloser({
       console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose, cycle_week: resolvedCycleWeek?.number ?? null });
 
       const recordData: any = {
-        agent_id: currentAgent.id,
+        // agent_id DEVE ser auth.uid()/profile id (RLS dwr_insert_self_or_admin).
+        // legacy_agent_id é o PK real de `agents` (usado no onConflict).
+        agent_id: user?.id ?? currentAgent.profile_id ?? currentAgent.id,
+        legacy_agent_id: currentAgent.id,
         cycle_id: __cycleIdForClose,
         week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
         work_date: operationalWorkDate,
