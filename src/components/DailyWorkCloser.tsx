@@ -1334,7 +1334,23 @@ export function DailyWorkCloser({
 
       const __dwrProperties = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0, deposits: 0, focuses: 0 };
       const __perBlockAudit: any[] = [];
-      for (const s of dayAllSessions) {
+      // Uma jornada POR BLOCO: se houver 2+ jornadas no mesmo quarteirão no dia,
+      // iterar por sessão contava os mesmos imóveis/visitas duas vezes
+      // (total_properties inflado ~2x no diagnóstico).
+      const __blockSessions = Array.from(
+        dayAllSessions
+          .reduce((map: Map<string, any>, s: any) => {
+            const key = s?.block_id
+              ? `id:${String(s.block_id)}`
+              : `n:${normalizeBlockNumber(s?.block_number)}`;
+            const prev = map.get(key);
+            if (!prev) map.set(key, s);
+            else if (Number(s.property_count || 0) > Number(prev.property_count || 0)) map.set(key, s);
+            return map;
+          }, new Map<string, any>())
+          .values(),
+      );
+      for (const s of __blockSessions) {
         const bn = String(s.block_number ?? "");
         const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
         const vs = visitsByAllSessions.filter((v) => {
