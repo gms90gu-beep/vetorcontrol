@@ -418,16 +418,33 @@ function mapPropertiesToSessionBlockNumbers(properties: any[], sessions: any[]) 
 
 async function loadDayCloseProperties(sessions: any[]): Promise<any[]> {
   const blockIds = Array.from(new Set(sessions.map((s) => s?.block_id).filter(Boolean).map(String)));
-  const blockNumbers = Array.from(new Set(sessions.map((s) => normalizeBlockNumber(s?.block_number)).filter(Boolean)));
+  // Só usar block_number das sessões que NÃO têm block_id — caso contrário a
+  // consulta por número traz imóveis de outros quarteirões/territórios
+  // homônimos e infla o escopo quando há vários blocos no mesmo dia.
+  const blockNumbers = Array.from(
+    new Set(
+      sessions
+        .filter((s) => !s?.block_id)
+        .map((s) => normalizeBlockNumber(s?.block_number))
+        .filter(Boolean),
+    ),
+  );
   if (blockIds.length === 0 && blockNumbers.length === 0) return [];
 
   return listRemoteOrCache<any>({
     name: "properties",
     remote: () => {
       const q = supabase.from("properties").select("*");
+      if (blockIds.length > 0 && blockNumbers.length > 0) {
+        const idList = blockIds.map((id) => `"${id}"`).join(",");
+        const numList = blockNumbers.map((n) => `"${n}"`).join(",");
+        return q.or(`block_id.in.(${idList}),block_number.in.(${numList})`) as any;
+      }
       if (blockIds.length > 0) return q.in("block_id", blockIds) as any;
       return q.in("block_number", blockNumbers) as any;
     },
+    // Garante que só entra no escopo o imóvel que realmente pertence a um
+    // dos blocos das jornadas do dia (block_id tem precedência).
     filter: (property: any) => sessions.some((session) => propertyBelongsToSessionBlock(property, session)),
   });
 }
