@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getOperationalDate, epiWeekFromDate, getOperationalVisitDate, assertProductionDate } from "@/lib/operational-date";
+import { getOperationalDate, epiWeekFromDate, getOperationalVisitDate, assertProductionDate, resolveOperationalCloseTarget } from "@/lib/operational-date";
 
 describe("getOperationalDate (America/Sao_Paulo)", () => {
   it("22:30 BRT stays on same calendar day", () => {
@@ -17,6 +17,30 @@ describe("getOperationalDate (America/Sao_Paulo)", () => {
   });
   it("format is YYYY-MM-DD", () => {
     expect(getOperationalDate(new Date("2025-01-05T15:00:00Z"))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("resolveOperationalCloseTarget", () => {
+  it("prefers the date of real production over an empty session created today", () => {
+    const result = resolveOperationalCloseTarget(
+      [
+        { id: "old", session_date: "2026-07-27", created_at: "2026-07-27T12:00:00Z" },
+        { id: "today", session_date: "2026-08-01", created_at: "2026-08-01T10:00:00Z" },
+      ],
+      [{ field_work_session_id: "old", visit_date: "2026-07-27T16:00:00Z" }],
+      "2026-08-01",
+    );
+    expect(result).toEqual({ workDate: "2026-07-27", sessionId: "old", source: "visit" });
+  });
+
+  it("uses today for an empty normal session", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "today", session_date: "2026-08-01" }],
+      [],
+      "2026-08-01",
+    );
+    expect(result.workDate).toBe("2026-08-01");
+    expect(result.source).toBe("today_session");
   });
 });
 

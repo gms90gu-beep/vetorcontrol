@@ -156,6 +156,68 @@ export function toOperationalDate(ts: string | Date | null | undefined): string 
   return getOperationalDate(d);
 }
 
+export interface OperationalSessionLike {
+  id?: string | null;
+  session_date?: string | null;
+  is_retroactive?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface OperationalVisitLike {
+  field_work_session_id?: string | null;
+  visit_date?: string | null;
+}
+
+/**
+ * Resolve a Data da Produção que ainda precisa ser encerrada.
+ *
+ * A data de uma visita é mais forte que a data do relógio: isso permite
+ * encerrar uma produção anterior que ficou aberta sem confundi-la com uma
+ * sessão vazia criada hoje. Sem visitas, preserva a intenção de uma jornada
+ * retroativa e, por último, usa hoje em America/Sao_Paulo.
+ */
+export function resolveOperationalCloseTarget(
+  sessions: OperationalSessionLike[],
+  visits: OperationalVisitLike[],
+  todayOperational: string = getOperationalDate(),
+): { workDate: string; sessionId: string | null; source: "visit" | "retroactive_session" | "today_session" | "system_today" } {
+  const sessionIds = new Set(sessions.map((session) => session.id).filter((id): id is string => !!id));
+  const latestVisit = [...visits]
+    .filter((visit) => !!visit.field_work_session_id && sessionIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
+    .sort((a, b) => String(b.visit_date ?? "").localeCompare(String(a.visit_date ?? "")))[0];
+  const visitDate = toOperationalDate(latestVisit?.visit_date);
+  if (latestVisit && visitDate) {
+    return {
+      workDate: visitDate,
+      sessionId: latestVisit.field_work_session_id ? String(latestVisit.field_work_session_id) : null,
+      source: "visit",
+    };
+  }
+
+  const byUpdatedDesc = (a: OperationalSessionLike, b: OperationalSessionLike) =>
+    String(b.updated_at ?? b.created_at ?? "").localeCompare(String(a.updated_at ?? a.created_at ?? ""));
+  const retroactive = sessions
+    .filter((session) => session.is_retroactive && session.session_date)
+    .sort(byUpdatedDesc)[0];
+  if (retroactive?.session_date) {
+    return {
+      workDate: retroactive.session_date,
+      sessionId: retroactive.id ? String(retroactive.id) : null,
+      source: "retroactive_session",
+    };
+  }
+
+  const todaySession = sessions
+    .filter((session) => session.session_date === todayOperational)
+    .sort(byUpdatedDesc)[0];
+  return {
+    workDate: todayOperational,
+    sessionId: todaySession?.id ? String(todaySession.id) : null,
+    source: todaySession ? "today_session" : "system_today",
+  };
+}
+
 /**
  * Semana e ano epidemiológicos (ISO) calculados a partir de uma data-only
  * (YYYY-MM-DD) já normalizada para America/Sao_Paulo. Uso interno de UTC
