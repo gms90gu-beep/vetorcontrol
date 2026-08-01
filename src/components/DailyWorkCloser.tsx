@@ -394,7 +394,9 @@ function normalizeBlockNumber(value: unknown): string {
 function propertyBelongsToSessionBlock(property: any, session: any): boolean {
   const propertyBlockId = property?.block_id ? String(property.block_id) : "";
   const sessionBlockId = session?.block_id ? String(session.block_id) : "";
-  if (propertyBlockId && sessionBlockId && propertyBlockId === sessionBlockId) return true;
+  // Quando AMBOS têm block_id, ele é a única verdade: cair no block_number
+  // aqui misturava imóveis de blocos distintos com o mesmo número.
+  if (propertyBlockId && sessionBlockId) return propertyBlockId === sessionBlockId;
 
   const propertyBlockNumber = normalizeBlockNumber(property?.block_number);
   const sessionBlockNumber = normalizeBlockNumber(session?.block_number);
