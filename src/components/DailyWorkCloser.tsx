@@ -1696,7 +1696,7 @@ export function DailyWorkCloser({
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
       const dwrConflictTarget = "legacy_agent_id,work_date";
-      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: (recordData as any).legacy_agent_id ?? recordData.agent_id, work_date: recordData.work_date });
+      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: recordData.legacy_agent_id, work_date: recordData.work_date });
       console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_date_unique(legacy_agent_id, work_date)" });
       let savedDaily: any;
       try {
