@@ -53,10 +53,15 @@ export async function computePropertyTypeComposition(params: {
 
   let vq = supabase
     .from("visits")
-    // ATENÇÃO: não incluir `visit_type` aqui — essa coluna não existe em `visits`.
+    // ATENÇÃO: não incluir `visit_type` nem `created_at` aqui — essas colunas não
+    // existem em `visits`. Colunas reais: id, property_id, agent_id, cycle_id, status,
+    // activity_type, visit_date, has_focus, sample_collected, treatment_applied,
+    // treatment_amount, elimination_done, elimination_amount, week_number, week_id,
+    // year, notes, guidance_given, is_recovered, larvicide_unit, treated_deposits,
+    // tubitos_coletados, field_work_session_id, block_id.
     // Um select com coluna inexistente falha por completo (PostgREST 42703),
     // devolve data=null e zera toda a composição por tipo de imóvel.
-    .select("id, property_id, status, visit_date, created_at, properties(type, block_id, number, sequence, complement)")
+    .select("id, property_id, status, visit_date, properties(type, block_id, number, sequence, complement)")
     .eq("agent_id", params.agentAuthId)
     .gte("visit_date", startIso)
     .lte("visit_date", endIso);
@@ -91,7 +96,7 @@ export async function computePropertyTypeComposition(params: {
     visits.sort((a, b) => {
       const d = String(b.visit_date).localeCompare(String(a.visit_date));
       if (d !== 0) return d;
-      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+      return String(b.id ?? "").localeCompare(String(a.id ?? ""));
     });
     const chosen = visits[0];
     // Tipo vem de properties.type (fonte vigente); sem tipo → "outros"
