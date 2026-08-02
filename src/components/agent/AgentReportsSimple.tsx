@@ -414,6 +414,20 @@ export function AgentReportsSimple() {
           </Button>
         </div>
 
+        {/* Visão PCFAD diária (formulário oficial em papel) — apenas em paisagem */}
+        {selectedDaily && (
+          <div className="mt-4">
+            <PcfadDailyLandscape
+              recordId={selectedDaily.id}
+              agentName={agentMeta.name}
+              registration={agentMeta.registration}
+              municipality={agentMeta.municipality}
+            />
+          </div>
+        )}
+
+
+
       </Card>
 
       {/* Resumo da Semana */}
