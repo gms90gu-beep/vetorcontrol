@@ -71,10 +71,18 @@ export function SharedNumberedMarkerLayer({
   );
   useFitBounds(map, latLngs, { enabled: fitToPoints });
 
+  // Clicar num marcador troca `selectedId` no consumidor, o que re-executa o
+  // efeito do cluster e RECRIA todos os markers — destruindo o popup que o
+  // Leaflet acabou de abrir (sintoma: "o popup não aparece"). Guardamos o id
+  // do último marcador clicado e reabrimos o popup após a reconstrução.
+  const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const wantOpenRef = useRef<string | null>(null);
+
   useMarkerCluster(
     map,
-    () =>
-      points.map((p) => {
+    () => {
+      markersRef.current = new Map();
+      return points.map((p) => {
         const kind: "default" | "selected" | "next" =
           p.id === selectedId ? "selected" : p.id === nextId ? "next" : "default";
         const marker = L.marker([p.lat, p.lng], {
@@ -83,12 +91,27 @@ export function SharedNumberedMarkerLayer({
         });
         if (p.popupHtml) marker.bindPopup(p.popupHtml);
         if (p.tooltip) marker.bindTooltip(p.tooltip, { direction: "top", offset: [0, -14] });
-        if (onClick) marker.on("click", () => onClick(p.id));
+        marker.on("click", () => {
+          wantOpenRef.current = p.popupHtml ? p.id : null;
+          onClick?.(p.id);
+        });
+        markersRef.current.set(p.id, marker);
         return marker;
-      }),
+      });
+    },
     [points, selectedId, nextId, cluster],
     { enabled: cluster, maxClusterRadius: 35 },
   );
+
+  // Reabre o popup do marcador clicado depois que a camada é reconstruída.
+  useEffect(() => {
+    if (!map) return;
+    const id = wantOpenRef.current;
+    if (!id) return;
+    const marker = markersRef.current.get(id);
+    if (marker && !marker.isPopupOpen()) marker.openPopup();
+  }, [map, points, selectedId, nextId, cluster]);
+
 
 
   // Centraliza no imóvel selecionado (sincronização bidirecional).
