@@ -164,6 +164,16 @@ function DailyBulletinView() {
         </CardContent>
       </Card>
 
+      {/* Formulário oficial diário (PCFAD) — apenas em paisagem */}
+      <PcfadDailyLandscape
+        recordId={rec.id}
+        agentName={agentName}
+        registration={registration}
+        municipality={municipality}
+      />
+
+
+
       {/* SEÇÃO 1 — PRODUÇÃO */}
       <Section title="1. Produção">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
