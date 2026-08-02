@@ -160,6 +160,7 @@ export interface OperationalSessionLike {
   id?: string | null;
   session_date?: string | null;
   is_retroactive?: boolean | null;
+  status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -169,6 +170,15 @@ export interface OperationalVisitLike {
   visit_date?: string | null;
 }
 
+/** Janela máxima (dias) para consolidar visitas recentes no dia de abertura da sessão. */
+const CROSS_DAY_CONSOLIDATION_MAX_DAYS = 7;
+
+function daysBetween(fromDateOnly: string, toDateOnly: string): number {
+  const [fy, fm, fd] = fromDateOnly.split("-").map(Number);
+  const [ty, tm, td] = toDateOnly.split("-").map(Number);
+  return Math.round((Date.UTC(ty, (tm || 1) - 1, td || 1) - Date.UTC(fy, (fm || 1) - 1, fd || 1)) / 86400000);
+}
+
 /**
  * Resolve a Data da Produção que ainda precisa ser encerrada.
  *
@@ -176,24 +186,49 @@ export interface OperationalVisitLike {
  * encerrar uma produção anterior que ficou aberta sem confundi-la com uma
  * sessão vazia criada hoje. Sem visitas, preserva a intenção de uma jornada
  * retroativa e, por último, usa hoje em America/Sao_Paulo.
+ *
+ * Consolidação de virada de dia: quando a sessão dona da visita mais recente
+ * foi ABERTA em um dia anterior (quarteirão começou num dia e está sendo
+ * finalizado depois), toda a produção dessa sessão é contabilizada no
+ * session_date de abertura — desde que a sessão esteja em andamento e a
+ * defasagem seja ≤ 7 dias. Acima disso mantém o comportamento por visita.
  */
 export function resolveOperationalCloseTarget(
   sessions: OperationalSessionLike[],
   visits: OperationalVisitLike[],
   todayOperational: string = getOperationalDate(),
-): { workDate: string; sessionId: string | null; source: "visit" | "retroactive_session" | "today_session" | "system_today" } {
+): { workDate: string; sessionId: string | null; source: "visit" | "session_open" | "retroactive_session" | "today_session" | "system_today" } {
   const sessionIds = new Set(sessions.map((session) => session.id).filter((id): id is string => !!id));
   const latestVisit = [...visits]
     .filter((visit) => !!visit.field_work_session_id && sessionIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
     .sort((a, b) => String(b.visit_date ?? "").localeCompare(String(a.visit_date ?? "")))[0];
   const visitDate = toOperationalDate(latestVisit?.visit_date);
   if (latestVisit && visitDate) {
+    const visitSessionId = latestVisit.field_work_session_id ? String(latestVisit.field_work_session_id) : null;
+    const owner = sessions.find((session) => session.id && String(session.id) === visitSessionId);
+    const openedAt = owner?.session_date ?? null;
+    if (owner && openedAt && openedAt < visitDate) {
+      const gap = daysBetween(openedAt, visitDate);
+      const isOpen = !owner.status || owner.status === "in_progress";
+      if (isOpen && gap <= CROSS_DAY_CONSOLIDATION_MAX_DAYS) {
+        return { workDate: openedAt, sessionId: visitSessionId, source: "session_open" };
+      }
+      console.warn("[DAY_CLOSE_STALE_SESSION]", {
+        session_id: visitSessionId,
+        session_date: openedAt,
+        latest_visit_date: visitDate,
+        gap_days: gap,
+        session_status: owner.status ?? null,
+        decision: "mantido work_date pela visita mais recente",
+      });
+    }
     return {
       workDate: visitDate,
-      sessionId: latestVisit.field_work_session_id ? String(latestVisit.field_work_session_id) : null,
+      sessionId: visitSessionId,
       source: "visit",
     };
   }
+
 
   const byUpdatedDesc = (a: OperationalSessionLike, b: OperationalSessionLike) =>
     String(b.updated_at ?? b.created_at ?? "").localeCompare(String(a.updated_at ?? a.created_at ?? ""));
