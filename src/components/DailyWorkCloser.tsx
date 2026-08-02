@@ -1827,9 +1827,11 @@ export function DailyWorkCloser({
 
       // 1) Upsert do daily_work_records — local + fila
       console.log("[ENCERRAR] salvando daily_work_records");
-      const dwrConflictTarget = "legacy_agent_id,work_date";
+      // agent_id (auth.uid()/profile_id) é estável via RLS; legacy_agent_id já foi instável
+      // e gerou duplicidade de DWR no mesmo dia. Constraint atual: UNIQUE(agent_id, work_date).
+      const dwrConflictTarget = "agent_id,work_date";
       console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: recordData.legacy_agent_id, work_date: recordData.work_date });
-      console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_date_unique(legacy_agent_id, work_date)" });
+      console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_work_date_key(agent_id, work_date)" });
       let savedDaily: any;
       try {
         console.log("[DAY_CLOSE_DWR_PRE]", {
