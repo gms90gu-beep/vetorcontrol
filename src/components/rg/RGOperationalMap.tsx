@@ -176,14 +176,13 @@ export function RGOperationalMap({
   blockNumber, agentName, properties, selectedId, onSelect, onClose, className,
 }: Props) {
   const ordered = useMemo(() => [...properties].sort(comparePropertyOrder), [properties]);
-  const enriched = useMemo(() => ordered.map((p, i) => {
+  const enriched = useMemo(() => ordered.map((p) => {
     const kind = classify(p);
-    // Numeração sempre sequencial (1, 2, 3...) na ordem geográfica/operacional
-    // (comparePropertyOrder), e NÃO o campo bruto `sequence` do cadastro —
-    // esse valor vem do boletim impresso e pode ter lacunas/repetições
-    // (ex.: reaproveitado por lado da rua), o que deixava a numeração do
-    // mapa "fora de ordem" (1, 4, 6, 14, 23...) em vez de 1, 2, 3, 4, 5...
-    const label = i + 1;
+    // Rótulo do pin = número REAL do imóvel (`p.number`), a mesma numeração
+    // exibida no boletim/PDF/painel. Não é rank de posição no array.
+    // Imóveis com mesmo número (complemento/anexo) mostram o número igual,
+    // exatamente como no boletim impresso.
+    const label = String(p.number ?? "—");
     return { p, kind, label };
   }), [ordered]);
 
