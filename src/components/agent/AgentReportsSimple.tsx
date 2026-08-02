@@ -33,6 +33,8 @@ import {
 } from "@/components/reports/DailyReportGenerator";
 import { generateWeeklyReportPDF } from "@/components/reports/WeeklyReportGenerator";
 import { computePropertyTypeComposition } from "@/lib/property-composition";
+import { PcfadWeeklyLandscape } from "@/components/agent/PcfadWeeklyLandscape";
+
 
 type Daily = {
   id: string;
