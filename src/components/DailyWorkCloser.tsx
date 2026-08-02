@@ -533,8 +533,8 @@ async function loadOpenDayCloseContext(userId: string) {
   return { sessions, visits, activeSession, target };
 }
 
-async function loadDayCloseSessions(userId: string, workDate: string): Promise<any[]> {
-  return listRemoteOrCache<any>({
+async function loadDayCloseSessions(userId: string, workDate: string, targetSessionId?: string | null): Promise<any[]> {
+  const byDate = await listRemoteOrCache<any>({
     name: "field_work_sessions",
     remote: () => supabase
       .from("field_work_sessions")
@@ -544,7 +544,29 @@ async function loadDayCloseSessions(userId: string, workDate: string): Promise<a
       .order("created_at", { ascending: true }) as any,
     filter: (session: any) => session.user_id === userId && session.session_date === workDate,
   });
+  if (!targetSessionId || byDate.some((session: any) => String(session.id) === String(targetSessionId))) {
+    return byDate;
+  }
+  // Sessão-alvo com session_date ≠ workDate (jornada que atravessou a virada do
+  // dia): precisa entrar no conjunto agregado para snapshot e métricas baterem.
+  const target = await listRemoteOrCache<any>({
+    name: "field_work_sessions",
+    remote: () => supabase
+      .from("field_work_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("id", targetSessionId) as any,
+    filter: (session: any) => session.user_id === userId && String(session.id) === String(targetSessionId),
+  });
+  console.log("[DAY_CLOSE_SESSION_SET]", {
+    work_date: workDate,
+    by_date: byDate.length,
+    target_session_id: targetSessionId,
+    target_included_by_id: target.length,
+  });
+  return [...byDate, ...target];
 }
+
 
 function resolveActiveSessionCandidate(sessions: any[], todayOperational: string): any | null {
   if (!sessions.length) return null;
