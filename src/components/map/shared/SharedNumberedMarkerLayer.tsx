@@ -1,7 +1,7 @@
 // SharedNumberedMarkerLayer — marcadores com número (sequência) e halo de seleção.
 // Uso operacional: mapa do RG, jornada de campo, etc.
 // Regra da biblioteca: nenhum consumidor fora de shared/ importa Leaflet diretamente.
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import { useSharedMap } from "./context";
 import { useFitBounds } from "./hooks/useFitBounds";
