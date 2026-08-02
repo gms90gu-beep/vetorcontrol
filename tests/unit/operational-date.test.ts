@@ -33,6 +33,36 @@ describe("resolveOperationalCloseTarget", () => {
     expect(result).toEqual({ workDate: "2026-07-27", sessionId: "old", source: "visit" });
   });
 
+  it("A: session opened X, visit recovered X+1 (<=7d) consolidates on session_date", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "s1", session_date: "2026-07-29", status: "in_progress", created_at: "2026-07-29T11:00:00Z" }],
+      [
+        { field_work_session_id: "s1", visit_date: "2026-07-29T17:00:00Z" },
+        { field_work_session_id: "s1", visit_date: "2026-07-30T15:00:00Z" },
+      ],
+      "2026-07-30",
+    );
+    expect(result).toEqual({ workDate: "2026-07-29", sessionId: "s1", source: "session_open" });
+  });
+
+  it("B: session stale for more than 7 days keeps the visit-based work_date", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "s1", session_date: "2026-07-10", status: "in_progress", created_at: "2026-07-10T11:00:00Z" }],
+      [{ field_work_session_id: "s1", visit_date: "2026-07-30T15:00:00Z" }],
+      "2026-07-30",
+    );
+    expect(result).toEqual({ workDate: "2026-07-30", sessionId: "s1", source: "visit" });
+  });
+
+  it("C: retroactive session without visits still uses retroactive_session", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "retro", session_date: "2026-07-27", is_retroactive: true, status: "in_progress", updated_at: "2026-08-01T10:00:00Z" }],
+      [],
+      "2026-08-01",
+    );
+    expect(result).toEqual({ workDate: "2026-07-27", sessionId: "retro", source: "retroactive_session" });
+  });
+
   it("uses today for an empty normal session", () => {
     const result = resolveOperationalCloseTarget(
       [{ id: "today", session_date: "2026-08-01" }],
