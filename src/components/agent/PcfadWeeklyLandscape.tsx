@@ -101,6 +101,12 @@ export function PcfadWeeklyLandscape({
                 <th className={th} rowSpan={2}>Rendim.</th>
               </tr>
               <tr>
+                <th className={th}>R</th>
+                <th className={th}>C</th>
+                <th className={th}>TB</th>
+                <th className={th}>PE</th>
+                <th className={th}>OUT</th>
+                <th className={th}>Total</th>
                 <th className={th}>A1</th>
                 <th className={th}>A2</th>
                 <th className={th}>B</th>
