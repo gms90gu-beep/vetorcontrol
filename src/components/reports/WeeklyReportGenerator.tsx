@@ -398,6 +398,39 @@ export async function generateWeeklyReportPDF(agentAuthId: string, referenceDate
     pdf.setFontSize(10);
     y += 3;
 
+    // 3.2 Imóveis que receberam tratamento (PCFAD)
+    const treatedComp = await computePropertyTypeComposition({
+      agentAuthId,
+      workDates,
+      cycleId: activeCycle?.id ?? null,
+      onlyTreated: true,
+    });
+    console.log("[WEEKLY_REPORT_TREATED_PROPERTIES]", {
+      imoveis_tratados: treatedComp.uniquePropertiesCount,
+      por_tipo: { ...treatedComp.propTypes },
+    });
+    if (y > pageH - 60) { pdf.addPage(); y = 14; }
+    pdf.text("3.2 IMÓVEIS QUE RECEBERAM TRATAMENTO", 14, y);
+    autoTable(pdf, {
+      startY: y + 2,
+      head: [["Total tratados", "R", "C", "TB", "PE", "Outros"]],
+      body: [[
+        String(treatedComp.uniquePropertiesCount),
+        String(treatedComp.propTypes.residence),
+        String(treatedComp.propTypes.commerce),
+        String(treatedComp.propTypes.vacant_lot),
+        String(treatedComp.propTypes.strategic_point),
+        String(treatedComp.propTypes.others),
+      ]],
+      theme: "grid",
+      headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 8, halign: "center" },
+      styles: { fontSize: 9, halign: "center" },
+    });
+    y = (pdf as any).lastAutoTable.finalY + 4;
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(10);
+
+
     // 4. Larvicida + Tubitos
     pdf.text("4. LARVICIDA E TUBITOS", 14, y);
     autoTable(pdf, {
