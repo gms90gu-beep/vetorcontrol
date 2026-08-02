@@ -400,24 +400,6 @@ export function RGOperationalMap({
           </button>
         </div>
 
-        <div className="mt-1.5">
-          <button
-            type="button"
-            onClick={() => setSatOn((v) => !v)}
-            className={cn(
-              "w-full flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
-              satOn
-                ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-            )}
-            title="Alterna entre o mapa padrão e a imagem de satélite"
-          >
-            <Layers className="h-3.5 w-3.5" />
-            {satOn ? "Ocultar satélite" : "Satélite"}
-          </button>
-        </div>
-
-
         {gpsError && (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
             {gpsError}
