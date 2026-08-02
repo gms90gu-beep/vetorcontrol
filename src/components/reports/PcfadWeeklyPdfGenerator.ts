@@ -71,6 +71,12 @@ export async function generatePcfadWeeklyPDF(params: {
 
     const line = (r: PcfadRow, label: string) => [
       label,
+      r.propertiesByType.residence,
+      r.propertiesByType.commerce,
+      r.propertiesByType.vacant_lot,
+      r.propertiesByType.strategic_point,
+      r.propertiesByType.others,
+      r.propertiesByTypeTotal,
       r.a1, r.a2, r.b, r.c, r.d1, r.d2, r.e,
       r.depTotal,
       r.samples,
