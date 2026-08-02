@@ -265,16 +265,18 @@ export function AgentReportsSimple() {
   };
 
 
+  // Boletim Semanal = PCFAD em PAISAGEM (mesmo formato da visão em tela).
   const handleWeeklyPdf = async () => {
     if (!authId) return;
-    toast.info("Gerando Boletim Semanal…");
-    // Data de referência dentro da SE selecionada (meio-dia local evita deslocamento de fuso)
-    const { start } = epiWeekToDateRange(selectedWeek.week, selectedWeek.year);
-    const reference = new Date(`${start}T12:00:00`);
-    const res = await generateWeeklyReportPDF(authId, reference);
+    toast.info("Gerando Boletim Semanal (PCFAD)…");
+    const res = await generatePcfadWeeklyPDF({
+      agentAuthId: authId,
+      week: selectedWeek.week,
+      year: selectedWeek.year,
+    });
     if (res) {
       res.pdf.save(res.fileName);
-      toast.success(`SE ${res.epiWeek}/${res.epiYear} gerado`);
+      toast.success(`SE ${String(res.week).padStart(2, "0")}/${res.year} gerado`);
     }
   };
 
