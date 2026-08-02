@@ -450,7 +450,36 @@ export function AgentReportsSimple() {
           </div>
         )}
 
+        <div className="mt-4">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            Escolher semana epidemiológica
+          </p>
+          <Select
+            value={selectedWeekKey ?? undefined}
+            onValueChange={setSelectedWeekKey}
+            disabled={weekOptions.length === 0}
+          >
+            <SelectTrigger className="rounded-xl h-11 border-slate-200 text-xs font-bold">
+              <SelectValue placeholder="Nenhuma semana disponível" />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map((w) => {
+                const r = epiWeekToDateRange(w.week, w.year);
+                const f = (iso: string) =>
+                  format(new Date(`${iso}T12:00:00`), "dd/MM");
+                return (
+                  <SelectItem key={w.key} value={w.key} className="text-xs font-bold">
+                    SE {String(w.week).padStart(2, "0")}/{w.year} ({f(r.start)}–
+                    {f(r.end)}) — {w.count} diária(s)
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
+
           <Button
             onClick={handleWeeklyPdf}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-5 font-bold text-xs uppercase tracking-wide"
