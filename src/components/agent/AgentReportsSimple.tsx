@@ -31,7 +31,7 @@ import { getOperationalDate } from "@/lib/operational-date";
 import {
   generateDailyReportPDF,
 } from "@/components/reports/DailyReportGenerator";
-import { generateWeeklyReportPDF } from "@/components/reports/WeeklyReportGenerator";
+// Gerador retrato antigo (seções 1–8) permanece em WeeklyReportGenerator.tsx, sem uso aqui.
 import { generatePcfadWeeklyPDF } from "@/components/reports/PcfadWeeklyPdfGenerator";
 import { computePropertyTypeComposition } from "@/lib/property-composition";
 import { PcfadWeeklyLandscape } from "@/components/agent/PcfadWeeklyLandscape";
