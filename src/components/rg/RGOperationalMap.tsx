@@ -509,11 +509,15 @@ export function RGOperationalMap({
               dashArray="4 7"
             />
           )}
+          {/* Sem agrupamento: cada imóvel é desenhado individualmente, para que
+              a sequência numérica nunca seja escondida numa bolha de cluster. */}
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
+            cluster={false}
             onClick={handleSelectFromMap}
           />
+
           {gpsOn && userPos && (
             <SharedUserLocationLayer
               lat={userPos.lat}
