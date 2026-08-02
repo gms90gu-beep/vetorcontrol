@@ -95,7 +95,7 @@ export function PcfadWeeklyLandscape({
                 <th className={th} colSpan={3}>Depósitos</th>
                 <th className={th} colSpan={2}>Larvicida</th>
                 <th className={th} colSpan={2}>Inseticida 2</th>
-                <th className={th} colSpan={4}>Imóveis</th>
+                <th className={th} colSpan={5}>Imóveis</th>
                 <th className={th} rowSpan={2}>IIP</th>
                 <th className={th} rowSpan={2}>Homem-dia</th>
                 <th className={th} rowSpan={2}>Rendim.</th>
@@ -131,12 +131,13 @@ export function PcfadWeeklyLandscape({
                 <th className={th}>Recusa</th>
                 <th className={th}>Fechada</th>
                 <th className={th}>Recup.</th>
+                <th className={th}>Total</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td className={td} colSpan={37}>
+                  <td className={td} colSpan={38}>
                     Sem diárias registradas nesta semana epidemiológica.
                   </td>
                 </tr>
@@ -177,6 +178,7 @@ export function PcfadWeeklyLandscape({
                   <td className={td}>{r.refused}</td>
                   <td className={td}>{r.closed}</td>
                   <td className={td}>{r.recovered}</td>
+                  <td className={`${td} font-bold`}>{r.worked + r.closed}</td>
                   <td className={td}>{pcfadIip(r.positive, r.worked)}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{DASH}</td>
@@ -218,6 +220,7 @@ export function PcfadWeeklyLandscape({
                   <td className={td}>{total.refused}</td>
                   <td className={td}>{total.closed}</td>
                   <td className={td}>{total.recovered}</td>
+                  <td className={`${td} font-black`}>{total.worked + total.closed}</td>
                   <td className={td}>{pcfadIip(total.positive, total.worked)}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{DASH}</td>
