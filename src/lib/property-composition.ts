@@ -37,6 +37,9 @@ export async function computePropertyTypeComposition(params: {
   agentAuthId: string;
   workDates: string[];
   cycleId?: string | null;
+  /** Quando true, considera apenas visitas com treatment_applied = true
+   *  (imóveis que receberam tratamento — formulário PCFAD). */
+  onlyTreated?: boolean;
 }): Promise<PropertyCompositionResult> {
   const propTypes = emptyPropTypes();
   const workDates = Array.from(new Set(params.workDates)).filter(Boolean).sort();
@@ -61,11 +64,12 @@ export async function computePropertyTypeComposition(params: {
     // tubitos_coletados, field_work_session_id, block_id.
     // Um select com coluna inexistente falha por completo (PostgREST 42703),
     // devolve data=null e zera toda a composição por tipo de imóvel.
-    .select("id, property_id, status, visit_date, properties(type, block_id, number, sequence, complement)")
+    .select("id, property_id, status, visit_date, treatment_applied, properties(type, block_id, number, sequence, complement)")
     .eq("agent_id", params.agentAuthId)
     .gte("visit_date", startIso)
     .lte("visit_date", endIso);
   if (params.cycleId) vq = vq.eq("cycle_id", params.cycleId);
+  if (params.onlyTreated) vq = vq.eq("treatment_applied", true);
 
   const { data, error } = await vq;
   if (error) console.warn("[PROPERTY_COMPOSITION_VISITS_QUERY_ERROR]", error);

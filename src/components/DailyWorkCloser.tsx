@@ -240,8 +240,15 @@ async function buildDailySnapshot(
     const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
     snap.depExisting += q;
     snap.depInspected += q;
-    snap.depTreated += deps.filter((d: any) => d.is_treated)
-      .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+    // Depósitos tratados: visit_deposits.is_treated quando existir; senão a
+    // coluna visits.treated_deposits (fonte real gravada pela tela do imóvel).
+    // Sem esse fallback, daily_work_records.deposits_treated ficava sempre 0.
+    snap.depTreated += Math.max(
+      deps.filter((d: any) => d.is_treated)
+        .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0),
+      Number(v.treated_deposits) || 0,
+    );
+
     snap.depEliminated += deps.filter((d: any) => d.is_eliminated)
       .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
     for (const d of deps) {
@@ -1061,8 +1068,12 @@ export function DailyWorkCloser({
             const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
             rebuilt.depExisting += q;
             rebuilt.depInspected += q;
-            rebuilt.depTreated += deps.filter((d: any) => d.is_treated)
-              .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+            rebuilt.depTreated += Math.max(
+              deps.filter((d: any) => d.is_treated)
+                .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0),
+              Number(v.treated_deposits) || 0,
+            );
+
             rebuilt.depEliminated += deps.filter((d: any) => d.is_eliminated)
               .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
             for (const d of deps) {
