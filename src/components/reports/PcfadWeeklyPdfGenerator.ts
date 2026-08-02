@@ -105,7 +105,7 @@ export async function generatePcfadWeeklyPDF(params: {
 
     const body =
       rows.length === 0
-        ? [[{ content: "Sem diárias registradas nesta semana epidemiológica.", colSpan: 31, styles: { halign: "center" as const } }]]
+        ? [[{ content: "Sem diárias registradas nesta semana epidemiológica.", colSpan: 37, styles: { halign: "center" as const } }]]
         : rows.map((r) => line(r, rf(r.work_date)));
 
     if (rows.length > 0) body.push(line(total, "TOTAL") as any);
@@ -115,6 +115,7 @@ export async function generatePcfadWeeklyPDF(params: {
       head: [
         [
           { content: "Data", rowSpan: 2 },
+          { content: "Nº imóveis trabalhados por tipo", colSpan: 6 },
           { content: "Depósitos inspecionados por tipo", colSpan: 7 },
           { content: "Total dep.", rowSpan: 2 },
           { content: "Amostras", rowSpan: 2 },
@@ -129,8 +130,10 @@ export async function generatePcfadWeeklyPDF(params: {
           { content: "Rendim.", rowSpan: 2 },
         ],
         [
+          "R", "C", "TB", "PE", "OUT", "Total",
           "A1", "A2", "B", "C", "D1", "D2", "E",
           "R", "C", "TB", "PE", "OUT", "Total",
+
           "Inspec.", "Trat.", "Elim.",
           "Tipo", "Qtd",
           "Tipo", "Qtd",
