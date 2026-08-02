@@ -19,7 +19,14 @@ import {
 } from "lucide-react";
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
-import { getEpiWeek } from "@/lib/cycle-week";
+import { getEpiWeek, epiWeekToDateRange } from "@/lib/cycle-week";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getOperationalDate } from "@/lib/operational-date";
 import {
   generateDailyReportPDF,
