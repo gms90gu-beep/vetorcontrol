@@ -258,6 +258,19 @@ export function RGOperationalMap({
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
 
+  // Camada de satélite (opt-in, local a esta tela — não altera o SharedMap).
+  // Esri World Imagery é sobreposta ao tile base padrão e removida ao desligar.
+  const [satOn, setSatOn] = useState(false);
+  useEffect(() => {
+    if (!mapInst || !satOn) return;
+    const layer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles &copy; Esri", maxZoom: 19, maxNativeZoom: 17, zIndex: 250 },
+    ).addTo(mapInst);
+    return () => { try { mapInst.removeLayer(layer); } catch { /* noop */ } };
+  }, [mapInst, satOn]);
+
+
   // Auto-enquadra o mapa nos imóveis do quarteirão assim que ele carrega ou
   // quando a lista de pontos georreferenciados muda — sem isso o mapa abria
   // centralizado num ponto genérico e era preciso descobrir manualmente o
