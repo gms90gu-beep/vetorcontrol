@@ -143,11 +143,27 @@ export async function buildPcfadWeekData(params: {
     } catch (e) {
       console.warn("[PCFAD_TREATED_ERROR]", e);
     }
+    // Nº de imóveis TRABALHADOS por tipo (todas as visitas do dia, sem filtro de tratamento)
+    let propertiesByType: PropertyTypeComposition = EMPTY_TREATED;
+    let propertiesByTypeTotal = 0;
+    try {
+      const compAll = await computePropertyTypeComposition({
+        agentAuthId,
+        workDates: [r.work_date],
+        cycleId: r.cycle_id ?? null,
+      });
+      propertiesByType = compAll.propTypes;
+      propertiesByTypeTotal = compAll.uniquePropertiesCount;
+    } catch (e) {
+      console.warn("[PCFAD_WORKED_TYPES_ERROR]", e);
+    }
     const a1 = n(r.deposits_a1), a2 = n(r.deposits_a2), b = n(r.deposits_b);
     const c = n(r.deposits_c), d1 = n(r.deposits_d1), d2 = n(r.deposits_d2);
     const e = n(r.deposits_e);
     rows.push({
       work_date: r.work_date,
+      propertiesByType,
+      propertiesByTypeTotal,
       a1, a2, b, c, d1, d2, e,
       depTotal: a1 + a2 + b + c + d1 + d2 + e,
       samples: n(r.samples_collected),
