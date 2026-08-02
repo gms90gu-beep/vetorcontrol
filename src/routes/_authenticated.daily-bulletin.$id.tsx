@@ -11,8 +11,9 @@ import { ptBR } from "date-fns/locale";
 import { DEP_ORDER, normalizeDepJson } from "@/lib/daily-integrity";
 import { computePropertyTypeComposition, type PropertyTypeComposition } from "@/lib/property-composition";
 import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generatePcfadDailyPDF } from "@/components/reports/PcfadDailyPdfGenerator";
+import { PcfadDailyLandscape } from "@/components/agent/PcfadDailyLandscape";
+
 
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "routes/daily-bulletin", file: "src/routes/_authenticated.daily-bulletin.$id.tsx", source: "daily_work_records", note: "boletim diário por id — usar getDateMetrics após refator" });
@@ -106,104 +107,18 @@ function DailyBulletinView() {
     return `${format(s, "HH:mm")}${e ? ` — ${format(e, "HH:mm")}` : ""}`;
   };
 
-  function downloadPDF() {
+  // PDF do boletim diário = formulário oficial "RESUMO DIÁRIO DO SERVIÇO
+  // ANTIVETORIAL" em paisagem, mesma fonte (buildPcfadDayData) da visão em tela.
+  async function downloadPDF() {
     if (!rec) return;
-    const pdf = new jsPDF();
-    const W = pdf.internal.pageSize.getWidth();
-    let y = 14;
-    pdf.setFontSize(15); pdf.setFont("helvetica", "bold");
-    pdf.text("BOLETIM DIÁRIO DE CAMPO", W / 2, y, { align: "center" });
-    y += 6;
-
-    autoTable(pdf, {
-      startY: y,
-      body: [
-        ["Agente", agentName],
-        ["Matrícula", registration],
-        ["Município", municipality],
-        ["Supervisor", supervisor],
-        ["Data", fmtDate(rec.work_date)],
-        ["Jornada", fmtJornada()],
-        ["SE", rec.epi_week ? `${rec.epi_week}/${rec.epi_year}` : "—"],
-      ],
-      theme: "plain", styles: { fontSize: 9, cellPadding: 1 },
-      columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 } },
+    const res = await generatePcfadDailyPDF(rec.id, {
+      agentName,
+      registration,
+      municipality,
     });
-    y = (pdf as any).lastAutoTable.finalY + 4;
-
-    pdf.setFont("helvetica", "bold"); pdf.text("PRODUÇÃO", 14, y); y += 1;
-    autoTable(pdf, {
-      startY: y + 1,
-      head: [["Quarteirões", "Imóveis Trab.", "Imóveis Fech.", "P. Estratégicos"]],
-      body: [[rec.blocks_worked ?? 0, rec.properties_worked ?? 0, rec.properties_closed ?? 0, rec.strategic_points_worked ?? 0].map(String)],
-      theme: "grid", headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: "center", fontSize: 9 },
-      styles: { halign: "center", fontSize: 9 },
-    });
-    y = (pdf as any).lastAutoTable.finalY + 4;
-
-    if (propTypes) {
-      pdf.text("COMPOSIÇÃO DA PRODUÇÃO IMOBILIÁRIA", 14, y); y += 1;
-      autoTable(pdf, {
-        startY: y + 1,
-        head: [["Residencial (R)", "Comercial (C)", "Terreno Baldio (TB)", "Ponto Estratégico (PE)", "Outros (O)", "Total"]],
-        body: [[
-          propTypes.residence, propTypes.commerce, propTypes.vacant_lot,
-          propTypes.strategic_point, propTypes.others, propTypesTotal,
-        ].map(String)],
-        theme: "grid", headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: "center", fontSize: 7.5 },
-        styles: { halign: "center", fontSize: 9 },
-      });
-      y = (pdf as any).lastAutoTable.finalY + 1;
-      if (propTypesTotal !== (rec.properties_worked ?? 0)) {
-        pdf.setFontSize(7); pdf.setTextColor(180, 83, 9);
-        pdf.text(`Atenção: total por tipo (${propTypesTotal}) difere dos trabalhados (${rec.properties_worked ?? 0}).`, 14, y + 3);
-        pdf.setTextColor(0, 0, 0);
-        y += 4;
-      }
-      y += 3;
-    }
-
-    pdf.text("DEPÓSITOS POR TIPO", 14, y); y += 1;
-    autoTable(pdf, {
-      startY: y + 1,
-      head: [["Tipo", "Quantidade"]],
-      body: [...DEP_ORDER.map((k) => [DEP_LABELS[k], String(depByType[k])]), ["TOTAL", String(totalDep)]],
-      theme: "grid", headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 9 },
-      styles: { fontSize: 9 },
-    });
-    y = (pdf as any).lastAutoTable.finalY + 4;
-
-    pdf.text("TRATAMENTO", 14, y); y += 1;
-    autoTable(pdf, {
-      startY: y + 1,
-      head: [["Dep. Tratados", "Dep. Eliminados", "Tubitos Utilizados", "Tubitos Coletados"]],
-      body: [[rec.deposits_treated ?? 0, rec.deposits_eliminated ?? 0, rec.tubitos_used ?? 0, rec.tubitos_collected ?? 0].map(String)],
-      theme: "grid", headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: "center", fontSize: 9 },
-      styles: { halign: "center", fontSize: 9 },
-    });
-    y = (pdf as any).lastAutoTable.finalY + 4;
-
-    pdf.text("INFORMAÇÕES FOCAIS", 14, y); y += 1;
-    autoTable(pdf, {
-      startY: y + 1,
-      head: [["Tipo", "Focos"]],
-      body: [...DEP_ORDER.map((k) => [DEP_LABELS[k], String(fociByType[k])]), ["TOTAL", String(totalFoci)], ["Focos Positivos (declarado)", String(rec.positive_foci ?? 0)]],
-      theme: "grid", headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 9 },
-      styles: { fontSize: 9 },
-    });
-    y = (pdf as any).lastAutoTable.finalY + 4;
-
-    pdf.text("LARVAS", 14, y); y += 1;
-    autoTable(pdf, {
-      startY: y + 1,
-      head: [["Larvas Coletadas", "Cargas Coletadas"]],
-      body: [[rec.larvae_collected ?? 0, rec.cargas_collected ?? 0].map(String)],
-      theme: "grid", headStyles: { fillColor: [15, 23, 42], textColor: 255, halign: "center", fontSize: 9 },
-      styles: { halign: "center", fontSize: 9 },
-    });
-
-    pdf.save(`Boletim_Diario_${rec.work_date}.pdf`);
+    if (res) res.pdf.save(res.fileName);
   }
+
 
   if (loading) {
     return (
@@ -248,6 +163,16 @@ function DailyBulletinView() {
           <Info label="Status" value={rec.status === "completed" ? "Encerrada" : "Em andamento"} />
         </CardContent>
       </Card>
+
+      {/* Formulário oficial diário (PCFAD) — apenas em paisagem */}
+      <PcfadDailyLandscape
+        recordId={rec.id}
+        agentName={agentName}
+        registration={registration}
+        municipality={municipality}
+      />
+
+
 
       {/* SEÇÃO 1 — PRODUÇÃO */}
       <Section title="1. Produção">
