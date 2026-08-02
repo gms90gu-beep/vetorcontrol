@@ -98,6 +98,7 @@ export async function generatePcfadWeeklyPDF(params: {
       r.refused,
       r.closed,
       r.recovered,
+      r.worked + r.closed,
       pcfadIip(r.positive, r.worked),
       PCFAD_DASH,
       PCFAD_DASH,
@@ -105,7 +106,7 @@ export async function generatePcfadWeeklyPDF(params: {
 
     const body =
       rows.length === 0
-        ? [[{ content: "Sem diárias registradas nesta semana epidemiológica.", colSpan: 37, styles: { halign: "center" as const } }]]
+        ? [[{ content: "Sem diárias registradas nesta semana epidemiológica.", colSpan: 38, styles: { halign: "center" as const } }]]
         : rows.map((r) => line(r, rf(r.work_date)));
 
     if (rows.length > 0) body.push(line(total, "TOTAL") as any);
@@ -124,7 +125,7 @@ export async function generatePcfadWeeklyPDF(params: {
           { content: "Depósitos", colSpan: 3 },
           { content: "Larvicida", colSpan: 2 },
           { content: "Inseticida 2", colSpan: 2 },
-          { content: "Imóveis", colSpan: 4 },
+          { content: "Imóveis", colSpan: 5 },
           { content: "IIP", rowSpan: 2 },
           { content: "Homem-dia", rowSpan: 2 },
           { content: "Rendim.", rowSpan: 2 },
@@ -137,7 +138,7 @@ export async function generatePcfadWeeklyPDF(params: {
           "Inspec.", "Trat.", "Elim.",
           "Tipo", "Qtd",
           "Tipo", "Qtd",
-          "Inspec.", "Recusa", "Fechada", "Recup.",
+          "Inspec.", "Recusa", "Fechada", "Recup.", "Total",
         ],
       ] as any,
       body: body as any,
