@@ -116,6 +116,9 @@ export type RGMapProperty = {
   visit_status?: string | null;
   accuracy?: number | null;
   last_visit_date?: string | null;
+  // Timestamp de georreferenciamento — usado só para desenhar a linha-guia do
+  // mapa na ordem cronológica real da caminhada em campo.
+  geocoded_at?: string | null;
 };
 
 interface Props {
