@@ -86,6 +86,7 @@ export function PcfadWeeklyLandscape({
             <thead>
               <tr>
                 <th className={th} rowSpan={2}>Data</th>
+                <th className={th} colSpan={6}>Nº Imóveis trabalhados por tipo</th>
                 <th className={th} colSpan={7}>Depósitos inspecionados por tipo</th>
                 <th className={th} rowSpan={2}>Total dep.</th>
                 <th className={th} rowSpan={2}>Amostras</th>
@@ -100,6 +101,12 @@ export function PcfadWeeklyLandscape({
                 <th className={th} rowSpan={2}>Rendim.</th>
               </tr>
               <tr>
+                <th className={th}>R</th>
+                <th className={th}>C</th>
+                <th className={th}>TB</th>
+                <th className={th}>PE</th>
+                <th className={th}>OUT</th>
+                <th className={th}>Total</th>
                 <th className={th}>A1</th>
                 <th className={th}>A2</th>
                 <th className={th}>B</th>
@@ -129,7 +136,7 @@ export function PcfadWeeklyLandscape({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td className={td} colSpan={31}>
+                  <td className={td} colSpan={37}>
                     Sem diárias registradas nesta semana epidemiológica.
                   </td>
                 </tr>
@@ -137,6 +144,12 @@ export function PcfadWeeklyLandscape({
               {rows.map((r) => (
                 <tr key={r.work_date}>
                   <td className={`${td} font-bold`}>{rf(r.work_date)}</td>
+                  <td className={td}>{r.propertiesByType.residence}</td>
+                  <td className={td}>{r.propertiesByType.commerce}</td>
+                  <td className={td}>{r.propertiesByType.vacant_lot}</td>
+                  <td className={td}>{r.propertiesByType.strategic_point}</td>
+                  <td className={td}>{r.propertiesByType.others}</td>
+                  <td className={`${td} font-bold`}>{r.propertiesByTypeTotal}</td>
                   <td className={td}>{r.a1}</td>
                   <td className={td}>{r.a2}</td>
                   <td className={td}>{r.b}</td>
@@ -172,6 +185,12 @@ export function PcfadWeeklyLandscape({
               {rows.length > 0 && (
                 <tr className="bg-slate-50 font-black">
                   <td className={`${td} font-black`}>TOTAL</td>
+                  <td className={td}>{total.propertiesByType.residence}</td>
+                  <td className={td}>{total.propertiesByType.commerce}</td>
+                  <td className={td}>{total.propertiesByType.vacant_lot}</td>
+                  <td className={td}>{total.propertiesByType.strategic_point}</td>
+                  <td className={td}>{total.propertiesByType.others}</td>
+                  <td className={td}>{total.propertiesByTypeTotal}</td>
                   <td className={td}>{total.a1}</td>
                   <td className={td}>{total.a2}</td>
                   <td className={td}>{total.b}</td>

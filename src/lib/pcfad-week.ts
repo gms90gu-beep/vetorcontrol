@@ -16,6 +16,9 @@ export const PCFAD_DASH = "—";
 
 export type PcfadRow = {
   work_date: string;
+  /** Nº de imóveis TRABALHADOS por tipo (independente de tratamento). */
+  propertiesByType: PropertyTypeComposition;
+  propertiesByTypeTotal: number;
   a1: number; a2: number; b: number; c: number; d1: number; d2: number; e: number;
   depTotal: number;
   samples: number;
@@ -33,6 +36,7 @@ export type PcfadRow = {
   recovered: number;
   positive: number;
 };
+
 
 export type PcfadWeekData = {
   rows: PcfadRow[];
@@ -58,6 +62,7 @@ export function pcfadIip(positive: number, inspected: number) {
 function emptyTotal(): PcfadRow {
   return {
     work_date: "TOTAL",
+    propertiesByType: { ...EMPTY_TREATED }, propertiesByTypeTotal: 0,
     a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0, depTotal: 0,
     samples: 0, blocks: 0, treated: { ...EMPTY_TREATED }, treatedTotal: 0,
     depInspected: 0, depTreated: 0, depEliminated: 0,
@@ -69,6 +74,14 @@ function emptyTotal(): PcfadRow {
 export function sumPcfadRows(rows: PcfadRow[]): PcfadRow {
   return rows.reduce<PcfadRow>((a, r) => ({
     ...a,
+    propertiesByType: {
+      residence: a.propertiesByType.residence + r.propertiesByType.residence,
+      commerce: a.propertiesByType.commerce + r.propertiesByType.commerce,
+      vacant_lot: a.propertiesByType.vacant_lot + r.propertiesByType.vacant_lot,
+      strategic_point: a.propertiesByType.strategic_point + r.propertiesByType.strategic_point,
+      others: a.propertiesByType.others + r.propertiesByType.others,
+    },
+    propertiesByTypeTotal: a.propertiesByTypeTotal + r.propertiesByTypeTotal,
     a1: a.a1 + r.a1, a2: a.a2 + r.a2, b: a.b + r.b, c: a.c + r.c,
     d1: a.d1 + r.d1, d2: a.d2 + r.d2, e: a.e + r.e,
     depTotal: a.depTotal + r.depTotal,
@@ -130,11 +143,27 @@ export async function buildPcfadWeekData(params: {
     } catch (e) {
       console.warn("[PCFAD_TREATED_ERROR]", e);
     }
+    // Nº de imóveis TRABALHADOS por tipo (todas as visitas do dia, sem filtro de tratamento)
+    let propertiesByType: PropertyTypeComposition = EMPTY_TREATED;
+    let propertiesByTypeTotal = 0;
+    try {
+      const compAll = await computePropertyTypeComposition({
+        agentAuthId,
+        workDates: [r.work_date],
+        cycleId: r.cycle_id ?? null,
+      });
+      propertiesByType = compAll.propTypes;
+      propertiesByTypeTotal = compAll.uniquePropertiesCount;
+    } catch (e) {
+      console.warn("[PCFAD_WORKED_TYPES_ERROR]", e);
+    }
     const a1 = n(r.deposits_a1), a2 = n(r.deposits_a2), b = n(r.deposits_b);
     const c = n(r.deposits_c), d1 = n(r.deposits_d1), d2 = n(r.deposits_d2);
     const e = n(r.deposits_e);
     rows.push({
       work_date: r.work_date,
+      propertiesByType,
+      propertiesByTypeTotal,
       a1, a2, b, c, d1, d2, e,
       depTotal: a1 + a2 + b + c + d1 + d2 + e,
       samples: n(r.samples_collected),
