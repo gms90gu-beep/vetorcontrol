@@ -1068,8 +1068,12 @@ export function DailyWorkCloser({
             const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
             rebuilt.depExisting += q;
             rebuilt.depInspected += q;
-            rebuilt.depTreated += deps.filter((d: any) => d.is_treated)
-              .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
+            rebuilt.depTreated += Math.max(
+              deps.filter((d: any) => d.is_treated)
+                .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0),
+              Number(v.treated_deposits) || 0,
+            );
+
             rebuilt.depEliminated += deps.filter((d: any) => d.is_eliminated)
               .reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
             for (const d of deps) {
