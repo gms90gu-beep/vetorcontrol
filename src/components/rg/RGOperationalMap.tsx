@@ -2,7 +2,7 @@
 // Sem rotas, sem navegação. Apenas distribuição geográfica + sync com a lista do RG.
 // Regra: nenhum import direto de Leaflet — tudo via @/components/map/shared.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type L from "leaflet";
+import L from "leaflet";
 import {
   SharedMap,
   SharedMapControls,
@@ -10,6 +10,7 @@ import {
   SharedRouteLayer,
   SharedUserLocationLayer,
   useFitBounds,
+  useSharedMap,
   type NumberedPoint,
 } from "@/components/map/shared";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,83 @@ import {
   Home, AlertTriangle, Flame, CheckCircle2,
   Landmark, Trees, X, LocateFixed,
 } from "lucide-react";
+
+// ─── Território do agente (aditivo, local a este arquivo) ────────────────────
+// Cor determinística por agente: hash simples do nome → hue estável.
+function agentHue(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+
+// Convex hull (monotone chain) sobre lng/lat.
+function convexHull(pts: { lat: number; lng: number }[]): [number, number][] {
+  const p = [...pts].sort((a, b) => (a.lng - b.lng) || (a.lat - b.lat));
+  if (p.length < 3) return [];
+  const cross = (o: typeof p[0], a: typeof p[0], b: typeof p[0]) =>
+    (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng);
+  const build = (src: typeof p) => {
+    const st: typeof p = [];
+    for (const q of src) {
+      while (st.length >= 2 && cross(st[st.length - 2]!, st[st.length - 1]!, q) <= 0) st.pop();
+      st.push(q);
+    }
+    return st;
+  };
+  const lower = build(p);
+  const upper = build([...p].reverse());
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  if (hull.length < 3) return [];
+  return hull.map((q) => [q.lat, q.lng] as [number, number]);
+}
+
+function escapeLabel(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
+  ));
+}
+
+function AgentTerritoryOverlay({
+  agentName, points,
+}: { agentName: string; points: { lat: number; lng: number }[] }) {
+  const map = useSharedMap();
+  const hull = useMemo(() => convexHull(points), [points]);
+
+  useEffect(() => {
+    if (!map || hull.length < 3) return;
+    const hue = agentHue(agentName);
+    const stroke = `hsl(${hue} 70% 45%)`;
+    const fill = `hsl(${hue} 70% 55%)`;
+    const group = L.layerGroup().addTo(map);
+
+    L.polygon(hull, {
+      color: stroke,
+      weight: 2,
+      opacity: 0.9,
+      fillColor: fill,
+      fillOpacity: 0.18,
+      interactive: false,
+    }).addTo(group);
+
+    const lat = hull.reduce((s, h) => s + h[0], 0) / hull.length;
+    const lng = hull.reduce((s, h) => s + h[1], 0) / hull.length;
+    L.marker([lat, lng], {
+      interactive: false,
+      zIndexOffset: -500,
+      icon: L.divIcon({
+        className: "rg-agent-territory-pill",
+        html: `<div style="transform:translate(-50%,-50%);background:${stroke};color:#fff;padding:3px 9px;border-radius:9999px;font:700 11px system-ui;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)">${escapeLabel(agentName)} · ${points.length}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      }),
+    }).addTo(group);
+
+    return () => { try { map.removeLayer(group); } catch { /* noop */ } };
+  }, [map, hull, agentName, points.length]);
+
+  return null;
+}
+
 
 export type RGMapProperty = {
   id: string;
