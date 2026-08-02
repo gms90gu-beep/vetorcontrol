@@ -74,6 +74,14 @@ function emptyTotal(): PcfadRow {
 export function sumPcfadRows(rows: PcfadRow[]): PcfadRow {
   return rows.reduce<PcfadRow>((a, r) => ({
     ...a,
+    propertiesByType: {
+      residence: a.propertiesByType.residence + r.propertiesByType.residence,
+      commerce: a.propertiesByType.commerce + r.propertiesByType.commerce,
+      vacant_lot: a.propertiesByType.vacant_lot + r.propertiesByType.vacant_lot,
+      strategic_point: a.propertiesByType.strategic_point + r.propertiesByType.strategic_point,
+      others: a.propertiesByType.others + r.propertiesByType.others,
+    },
+    propertiesByTypeTotal: a.propertiesByTypeTotal + r.propertiesByTypeTotal,
     a1: a.a1 + r.a1, a2: a.a2 + r.a2, b: a.b + r.b, c: a.c + r.c,
     d1: a.d1 + r.d1, d2: a.d2 + r.d2, e: a.e + r.e,
     depTotal: a.depTotal + r.depTotal,
