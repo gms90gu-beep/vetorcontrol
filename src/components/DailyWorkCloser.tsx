@@ -533,8 +533,8 @@ async function loadOpenDayCloseContext(userId: string) {
   return { sessions, visits, activeSession, target };
 }
 
-async function loadDayCloseSessions(userId: string, workDate: string): Promise<any[]> {
-  return listRemoteOrCache<any>({
+async function loadDayCloseSessions(userId: string, workDate: string, targetSessionId?: string | null): Promise<any[]> {
+  const byDate = await listRemoteOrCache<any>({
     name: "field_work_sessions",
     remote: () => supabase
       .from("field_work_sessions")
@@ -544,7 +544,29 @@ async function loadDayCloseSessions(userId: string, workDate: string): Promise<a
       .order("created_at", { ascending: true }) as any,
     filter: (session: any) => session.user_id === userId && session.session_date === workDate,
   });
+  if (!targetSessionId || byDate.some((session: any) => String(session.id) === String(targetSessionId))) {
+    return byDate;
+  }
+  // Sessão-alvo com session_date ≠ workDate (jornada que atravessou a virada do
+  // dia): precisa entrar no conjunto agregado para snapshot e métricas baterem.
+  const target = await listRemoteOrCache<any>({
+    name: "field_work_sessions",
+    remote: () => supabase
+      .from("field_work_sessions")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("id", targetSessionId) as any,
+    filter: (session: any) => session.user_id === userId && String(session.id) === String(targetSessionId),
+  });
+  console.log("[DAY_CLOSE_SESSION_SET]", {
+    work_date: workDate,
+    by_date: byDate.length,
+    target_session_id: targetSessionId,
+    target_included_by_id: target.length,
+  });
+  return [...byDate, ...target];
 }
+
 
 function resolveActiveSessionCandidate(sessions: any[], todayOperational: string): any | null {
   if (!sessions.length) return null;
@@ -847,11 +869,16 @@ export function DailyWorkCloser({
         console.log("[DAY_CLOSE_CROSS_DAY_SESSION]", {
           module: "DailyWorkCloser.handlePreClose",
           session_id: active?.id ?? null,
-          session_started_at: active?.session_date ?? null,
-          operational_date: workDate,
-          note: "quarteirão iniciado em data anterior — produção contabilizada em operational_date",
+          session_opened_at: active?.session_date ?? null,
+          latest_visit_date: toOperationalDate(closeContext.visits[0]?.visit_date) ?? null,
+          consolidated_work_date: workDate,
+          source: closeContext.target.source,
+          note: closeContext.target.source === "session_open"
+            ? "produção consolidada no dia de ABERTURA do quarteirão"
+            : "produção contabilizada na data da visita mais recente",
         });
       }
+
 
       // ═══ DIAGNÓSTICO OBRIGATÓRIO ANTES DE QUALQUER BLOQUEIO ═══
       await runDayCloseDiagnostic(user.id, workDate, activeCycle?.id ?? null);
@@ -1308,7 +1335,7 @@ export function DailyWorkCloser({
       // CONSOLIDAÇÃO OFICIAL: soma TODAS as jornadas do agente na mesma
       // Data da Produção. Nunca escopar por currentSession.id — o encerramento
       // do expediente deve refletir a produção do dia inteiro.
-      const dayAllSessions = await loadDayCloseSessions(user.id, operationalWorkDate);
+      const dayAllSessions = await loadDayCloseSessions(user.id, operationalWorkDate, activeSessionForClose?.id ?? null);
       const dayAllSessionIds = dayAllSessions.map((s: any) => s.id);
       console.log("[DAY_CLOSE_SESSIONS]", {
         op_date: operationalWorkDate,
