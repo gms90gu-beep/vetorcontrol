@@ -249,7 +249,7 @@ export function AgentReportsSimple() {
     });
 
   const handleDailyPdf = async (idOverride?: string) => {
-    const targetId = idOverride ?? todayRecord?.id;
+    const targetId = idOverride ?? selectedDaily?.id;
     if (!targetId) {
       toast.info("Nenhum relatório diário encontrado.");
       return;
@@ -266,7 +266,10 @@ export function AgentReportsSimple() {
   const handleWeeklyPdf = async () => {
     if (!authId) return;
     toast.info("Gerando Boletim Semanal…");
-    const res = await generateWeeklyReportPDF(authId, new Date());
+    // Data de referência dentro da SE selecionada (meio-dia local evita deslocamento de fuso)
+    const { start } = epiWeekToDateRange(selectedWeek.week, selectedWeek.year);
+    const reference = new Date(`${start}T12:00:00`);
+    const res = await generateWeeklyReportPDF(authId, reference);
     if (res) {
       res.pdf.save(res.fileName);
       toast.success(`SE ${res.epiWeek}/${res.epiYear} gerado`);
@@ -274,8 +277,8 @@ export function AgentReportsSimple() {
   };
 
   const handleCsv = () => {
-    if (weekRecords.length === 0) {
-      toast.info("Sem dados na semana atual.");
+    if (selectedWeekRecords.length === 0) {
+      toast.info("Sem dados na semana selecionada.");
       return;
     }
     const headers = [
@@ -289,10 +292,10 @@ export function AgentReportsSimple() {
       "Tubitos",
       "Larvicida(g)",
     ];
-    const lines = weekRecords.map((d) =>
+    const lines = selectedWeekRecords.map((d) =>
       [
         d.work_date,
-        `${d.epi_week}/${d.epi_year}`,
+        `${selectedWeek.week}/${selectedWeek.year}`,
         d.properties_worked ?? 0,
         d.properties_closed ?? 0,
         d.deposits_inspected ?? 0,
@@ -307,10 +310,11 @@ export function AgentReportsSimple() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `meus-relatorios-SE${epi.week}-${epi.year}.csv`;
+    a.download = `meus-relatorios-SE${selectedWeek.week}-${selectedWeek.year}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   if (loading) {
     return (
