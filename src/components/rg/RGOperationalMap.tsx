@@ -232,6 +232,14 @@ export function RGOperationalMap({
             <span style="color:#64748b">Longitude</span><b>${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
           </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <a href="https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">
+              📍 Ver no Google Maps
+            </a>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">
+              🧭 Navegar até aqui
+            </a>
+          </div>
         </div>`;
       return {
         id: p.id,
