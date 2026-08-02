@@ -487,7 +487,22 @@ export function AgentReportsSimple() {
             <FileText className="h-4 w-4 mr-2" /> Ver Boletim Semanal
           </Button>
         </div>
+
+        {/* Visão PCFAD (formulário oficial em papel) — apenas em paisagem */}
+        {authId && (
+          <div className="mt-4">
+            <PcfadWeeklyLandscape
+              agentAuthId={authId}
+              week={selectedWeek.week}
+              year={selectedWeek.year}
+              agentName={agentMeta.name}
+              registration={agentMeta.registration}
+              municipality={agentMeta.municipality}
+            />
+          </div>
+        )}
       </Card>
+
 
       {/* Exportação */}
       <Card className="p-5 rounded-3xl border-slate-100 shadow-sm">
