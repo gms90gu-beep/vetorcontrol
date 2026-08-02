@@ -246,12 +246,12 @@ export function AgentReportsSimple() {
     return () => { cancelled = true; };
   }, [authId, weekRecords, weekStats.worked]);
 
+  // Boletim Diário = PCFAD DIÁRIO em PAISAGEM (mesma fonte da visão em tela).
   const buildDailyPdf = async (id: string) =>
-    generateDailyReportPDF(id, {
+    generatePcfadDailyPDF(id, {
       agentName: agentMeta.name,
       registration: agentMeta.registration,
       municipality: agentMeta.municipality,
-      cycleNumber: null,
     });
 
   const handleDailyPdf = async (idOverride?: string) => {
@@ -260,13 +260,14 @@ export function AgentReportsSimple() {
       toast.info("Nenhum relatório diário encontrado.");
       return;
     }
-    toast.info("Gerando PDF diário…");
+    toast.info("Gerando PDF diário (PCFAD)…");
     const res = await buildDailyPdf(targetId);
     if (res) {
       res.pdf.save(res.fileName);
       toast.success("PDF gerado");
     }
   };
+
 
 
   // Boletim Semanal = PCFAD em PAISAGEM (mesmo formato da visão em tela).
