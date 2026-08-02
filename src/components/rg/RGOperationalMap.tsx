@@ -116,6 +116,9 @@ export type RGMapProperty = {
   visit_status?: string | null;
   accuracy?: number | null;
   last_visit_date?: string | null;
+  // Timestamp de georreferenciamento — usado só para desenhar a linha-guia do
+  // mapa na ordem cronológica real da caminhada em campo.
+  geocoded_at?: string | null;
 };
 
 interface Props {
@@ -173,14 +176,13 @@ export function RGOperationalMap({
   blockNumber, agentName, properties, selectedId, onSelect, onClose, className,
 }: Props) {
   const ordered = useMemo(() => [...properties].sort(comparePropertyOrder), [properties]);
-  const enriched = useMemo(() => ordered.map((p, i) => {
+  const enriched = useMemo(() => ordered.map((p) => {
     const kind = classify(p);
-    // Numeração sempre sequencial (1, 2, 3...) na ordem geográfica/operacional
-    // (comparePropertyOrder), e NÃO o campo bruto `sequence` do cadastro —
-    // esse valor vem do boletim impresso e pode ter lacunas/repetições
-    // (ex.: reaproveitado por lado da rua), o que deixava a numeração do
-    // mapa "fora de ordem" (1, 4, 6, 14, 23...) em vez de 1, 2, 3, 4, 5...
-    const label = i + 1;
+    // Rótulo do pin = número REAL do imóvel (`p.number`), a mesma numeração
+    // exibida no boletim/PDF/painel. Não é rank de posição no array.
+    // Imóveis com mesmo número (complemento/anexo) mostram o número igual,
+    // exatamente como no boletim impresso.
+    const label = String(p.number ?? "—");
     return { p, kind, label };
   }), [ordered]);
 
@@ -219,7 +221,7 @@ export function RGOperationalMap({
           </div>
           <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
-            <span style="color:#64748b">Sequência</span><b>#${label}</b>
+            ${p.sequence != null ? `<span style="color:#64748b">Sequência</span><b>${p.sequence}</b>` : ""}
             <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
             <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
             <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
@@ -236,23 +238,37 @@ export function RGOperationalMap({
         lat: p.latitude as number,
         lng: p.longitude as number,
         label, color, popupHtml: popup,
-        tooltip: `#${label} · Nº ${p.number ?? "—"}`,
+        tooltip: `Nº ${p.number ?? "—"}${p.complement ? " · " + p.complement : ""}`,
       };
     }), [enriched, agentName]);
 
   const geoCount = points.length;
 
-  // Pontos na ORDEM operacional (mesma ordem de `points`, já ordenada por
-  // comparePropertyOrder) — usados para a linha de sequência e para o
-  // auto-enquadramento do mapa ao abrir/atualizar, igual ao mapa usado
-  // durante o expediente (OperationalMapView).
+  // Linha-guia: ordem CRONOLÓGICA de georreferenciamento (`geocoded_at`), que
+  // reproduz o perímetro real caminhado no quarteirão — diferente da ordem por
+  // número (comparePropertyOrder), que ziguezagueia entre lados da rua.
+  // Sem `geocoded_at` → vai para o fim, com `id` como desempate estável.
+  const chronological = useMemo(() => {
+    const byId = new Map(enriched.map((e) => [e.p.id, e.p]));
+    return [...points].sort((a, b) => {
+      const pa = byId.get(a.id);
+      const pb = byId.get(b.id);
+      const ta = pa?.geocoded_at ? Date.parse(pa.geocoded_at) : NaN;
+      const tb = pb?.geocoded_at ? Date.parse(pb.geocoded_at) : NaN;
+      const va = Number.isFinite(ta) ? ta : Number.MAX_SAFE_INTEGER;
+      const vb = Number.isFinite(tb) ? tb : Number.MAX_SAFE_INTEGER;
+      if (va !== vb) return va - vb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }, [points, enriched]);
+
   const routePoints = useMemo(
-    () => points.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [points],
+    () => chronological.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [chronological],
   );
   const routeLatLngs = useMemo(
-    () => points.map((p) => [p.lat, p.lng] as [number, number]),
-    [points],
+    () => chronological.map((p) => [p.lat, p.lng] as [number, number]),
+    [chronological],
   );
 
   // Instância do mapa (para centralizar na posição do agente sob demanda).
@@ -473,14 +489,14 @@ export function RGOperationalMap({
               Imóveis sem georreferenciamento ({missingGeo.length})
             </div>
             <ul className="mt-1 max-h-28 overflow-auto">
-              {missingGeo.map(({ p, label }) => (
+              {missingGeo.map(({ p }) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     onClick={() => handleSelectFromList(p.id)}
                     className="w-full text-left text-[11px] px-1 py-0.5 rounded hover:bg-amber-100 text-amber-900 truncate"
                   >
-                    #{label} · Nº {p.number} — {p.street_name || "—"}
+                    Nº {p.number} — {p.street_name || "—"}
                   </button>
                 </li>
               ))}
