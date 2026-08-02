@@ -238,23 +238,37 @@ export function RGOperationalMap({
         lat: p.latitude as number,
         lng: p.longitude as number,
         label, color, popupHtml: popup,
-        tooltip: `#${label} · Nº ${p.number ?? "—"}`,
+        tooltip: `Nº ${p.number ?? "—"}${p.complement ? " · " + p.complement : ""}`,
       };
     }), [enriched, agentName]);
 
   const geoCount = points.length;
 
-  // Pontos na ORDEM operacional (mesma ordem de `points`, já ordenada por
-  // comparePropertyOrder) — usados para a linha de sequência e para o
-  // auto-enquadramento do mapa ao abrir/atualizar, igual ao mapa usado
-  // durante o expediente (OperationalMapView).
+  // Linha-guia: ordem CRONOLÓGICA de georreferenciamento (`geocoded_at`), que
+  // reproduz o perímetro real caminhado no quarteirão — diferente da ordem por
+  // número (comparePropertyOrder), que ziguezagueia entre lados da rua.
+  // Sem `geocoded_at` → vai para o fim, com `id` como desempate estável.
+  const chronological = useMemo(() => {
+    const byId = new Map(enriched.map((e) => [e.p.id, e.p]));
+    return [...points].sort((a, b) => {
+      const pa = byId.get(a.id);
+      const pb = byId.get(b.id);
+      const ta = pa?.geocoded_at ? Date.parse(pa.geocoded_at) : NaN;
+      const tb = pb?.geocoded_at ? Date.parse(pb.geocoded_at) : NaN;
+      const va = Number.isFinite(ta) ? ta : Number.MAX_SAFE_INTEGER;
+      const vb = Number.isFinite(tb) ? tb : Number.MAX_SAFE_INTEGER;
+      if (va !== vb) return va - vb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }, [points, enriched]);
+
   const routePoints = useMemo(
-    () => points.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [points],
+    () => chronological.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [chronological],
   );
   const routeLatLngs = useMemo(
-    () => points.map((p) => [p.lat, p.lng] as [number, number]),
-    [points],
+    () => chronological.map((p) => [p.lat, p.lng] as [number, number]),
+    [chronological],
   );
 
   // Instância do mapa (para centralizar na posição do agente sob demanda).
