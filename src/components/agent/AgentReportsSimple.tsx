@@ -19,7 +19,14 @@ import {
 } from "lucide-react";
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
-import { getEpiWeek } from "@/lib/cycle-week";
+import { getEpiWeek, epiWeekToDateRange } from "@/lib/cycle-week";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getOperationalDate } from "@/lib/operational-date";
 import {
   generateDailyReportPDF,
@@ -123,6 +130,55 @@ export function AgentReportsSimple() {
   );
   const isTodayRecord = todayRecord?.work_date === today;
 
+  // Diária escolhida pelo agente (default: a diária de hoje / mais recente)
+  const [selectedDailyId, setSelectedDailyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedDailyId && todayRecord) setSelectedDailyId(todayRecord.id);
+  }, [todayRecord, selectedDailyId]);
+  const selectedDaily = useMemo(
+    () => dailies.find((d) => d.id === selectedDailyId) || todayRecord,
+    [dailies, selectedDailyId, todayRecord]
+  );
+
+  // Semanas epidemiológicas (SINAN) derivadas de work_date — nunca das colunas
+  // epi_week/epi_year (ISO no banco, divergentes do padrão SINAN).
+  const weekOptions = useMemo(() => {
+    const map = new Map<
+      string,
+      { key: string; week: number; year: number; count: number }
+    >();
+    for (const d of dailies) {
+      const [y, m, dd] = d.work_date.split("-").map(Number);
+      const w = getEpiWeek(new Date(y, m - 1, dd));
+      const key = `${w.year}-${w.week}`;
+      const prev = map.get(key);
+      if (prev) prev.count += 1;
+      else map.set(key, { key, week: w.week, year: w.year, count: 1 });
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => b.year - a.year || b.week - a.week
+    );
+  }, [dailies]);
+
+  const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedWeekKey) return;
+    const current = `${epi.year}-${epi.week}`;
+    if (weekOptions.some((w) => w.key === current)) setSelectedWeekKey(current);
+    else if (weekOptions[0]) setSelectedWeekKey(weekOptions[0].key);
+  }, [weekOptions, selectedWeekKey, epi]);
+
+  const selectedWeek = useMemo(
+    () =>
+      weekOptions.find((w) => w.key === selectedWeekKey) || {
+        key: `${epi.year}-${epi.week}`,
+        week: epi.week,
+        year: epi.year,
+        count: 0,
+      },
+    [weekOptions, selectedWeekKey, epi]
+  );
+
   const weekRecords = useMemo(
     () =>
       dailies.filter(
@@ -130,6 +186,13 @@ export function AgentReportsSimple() {
       ),
     [dailies, epi]
   );
+
+  // Diárias da semana SELECIONADA (usadas no CSV) — SINAN sobre work_date
+  const selectedWeekRecords = useMemo(() => {
+    const { start, end } = epiWeekToDateRange(selectedWeek.week, selectedWeek.year);
+    return dailies.filter((d) => d.work_date >= start && d.work_date <= end);
+  }, [dailies, selectedWeek]);
+
 
   const sum = (arr: Daily[], k: keyof Daily) =>
     arr.reduce((a, r) => a + (Number(r[k] as any) || 0), 0);
@@ -186,7 +249,7 @@ export function AgentReportsSimple() {
     });
 
   const handleDailyPdf = async (idOverride?: string) => {
-    const targetId = idOverride ?? todayRecord?.id;
+    const targetId = idOverride ?? selectedDaily?.id;
     if (!targetId) {
       toast.info("Nenhum relatório diário encontrado.");
       return;
@@ -203,7 +266,10 @@ export function AgentReportsSimple() {
   const handleWeeklyPdf = async () => {
     if (!authId) return;
     toast.info("Gerando Boletim Semanal…");
-    const res = await generateWeeklyReportPDF(authId, new Date());
+    // Data de referência dentro da SE selecionada (meio-dia local evita deslocamento de fuso)
+    const { start } = epiWeekToDateRange(selectedWeek.week, selectedWeek.year);
+    const reference = new Date(`${start}T12:00:00`);
+    const res = await generateWeeklyReportPDF(authId, reference);
     if (res) {
       res.pdf.save(res.fileName);
       toast.success(`SE ${res.epiWeek}/${res.epiYear} gerado`);
@@ -211,8 +277,8 @@ export function AgentReportsSimple() {
   };
 
   const handleCsv = () => {
-    if (weekRecords.length === 0) {
-      toast.info("Sem dados na semana atual.");
+    if (selectedWeekRecords.length === 0) {
+      toast.info("Sem dados na semana selecionada.");
       return;
     }
     const headers = [
@@ -226,10 +292,10 @@ export function AgentReportsSimple() {
       "Tubitos",
       "Larvicida(g)",
     ];
-    const lines = weekRecords.map((d) =>
+    const lines = selectedWeekRecords.map((d) =>
       [
         d.work_date,
-        `${d.epi_week}/${d.epi_year}`,
+        `${selectedWeek.week}/${selectedWeek.year}`,
         d.properties_worked ?? 0,
         d.properties_closed ?? 0,
         d.deposits_inspected ?? 0,
@@ -244,10 +310,11 @@ export function AgentReportsSimple() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `meus-relatorios-SE${epi.week}-${epi.year}.csv`;
+    a.download = `meus-relatorios-SE${selectedWeek.week}-${selectedWeek.year}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   if (loading) {
     return (
@@ -296,16 +363,39 @@ export function AgentReportsSimple() {
           />
         </div>
 
+        <div className="mt-4">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            Escolher diária
+          </p>
+          <Select
+            value={selectedDaily?.id ?? undefined}
+            onValueChange={setSelectedDailyId}
+            disabled={dailies.length === 0}
+          >
+            <SelectTrigger className="rounded-xl h-11 border-slate-200 text-xs font-bold">
+              <SelectValue placeholder="Nenhuma diária disponível" />
+            </SelectTrigger>
+            <SelectContent>
+              {dailies.map((d) => (
+                <SelectItem key={d.id} value={d.id} className="text-xs font-bold">
+                  {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")} —{" "}
+                  {d.properties_worked ?? 0} imóveis
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             asChild
-            disabled={!todayRecord}
+            disabled={!selectedDaily}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-5 font-bold text-xs uppercase tracking-wide"
           >
-            {todayRecord ? (
+            {selectedDaily ? (
               <Link
                 to="/daily-bulletin/$id"
-                params={{ id: todayRecord.id }}
+                params={{ id: selectedDaily.id }}
               >
                 <Eye className="h-4 w-4 mr-2" /> Ver Boletim Diário
               </Link>
@@ -316,6 +406,7 @@ export function AgentReportsSimple() {
             )}
           </Button>
         </div>
+
       </Card>
 
       {/* Resumo da Semana */}
@@ -359,7 +450,36 @@ export function AgentReportsSimple() {
           </div>
         )}
 
+        <div className="mt-4">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            Escolher semana epidemiológica
+          </p>
+          <Select
+            value={selectedWeekKey ?? undefined}
+            onValueChange={setSelectedWeekKey}
+            disabled={weekOptions.length === 0}
+          >
+            <SelectTrigger className="rounded-xl h-11 border-slate-200 text-xs font-bold">
+              <SelectValue placeholder="Nenhuma semana disponível" />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map((w) => {
+                const r = epiWeekToDateRange(w.week, w.year);
+                const f = (iso: string) =>
+                  format(new Date(`${iso}T12:00:00`), "dd/MM");
+                return (
+                  <SelectItem key={w.key} value={w.key} className="text-xs font-bold">
+                    SE {String(w.week).padStart(2, "0")}/{w.year} ({f(r.start)}–
+                    {f(r.end)}) — {w.count} diária(s)
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
+
           <Button
             onClick={handleWeeklyPdf}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-5 font-bold text-xs uppercase tracking-wide"
