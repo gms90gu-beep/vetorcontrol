@@ -16,6 +16,9 @@ export const PCFAD_DASH = "—";
 
 export type PcfadRow = {
   work_date: string;
+  /** Nº de imóveis TRABALHADOS por tipo (independente de tratamento). */
+  propertiesByType: PropertyTypeComposition;
+  propertiesByTypeTotal: number;
   a1: number; a2: number; b: number; c: number; d1: number; d2: number; e: number;
   depTotal: number;
   samples: number;
@@ -33,6 +36,7 @@ export type PcfadRow = {
   recovered: number;
   positive: number;
 };
+
 
 export type PcfadWeekData = {
   rows: PcfadRow[];
