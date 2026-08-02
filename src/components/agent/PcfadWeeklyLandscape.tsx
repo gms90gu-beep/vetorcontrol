@@ -86,6 +86,7 @@ export function PcfadWeeklyLandscape({
             <thead>
               <tr>
                 <th className={th} rowSpan={2}>Data</th>
+                <th className={th} colSpan={6}>Nº Imóveis trabalhados por tipo</th>
                 <th className={th} colSpan={7}>Depósitos inspecionados por tipo</th>
                 <th className={th} rowSpan={2}>Total dep.</th>
                 <th className={th} rowSpan={2}>Amostras</th>
