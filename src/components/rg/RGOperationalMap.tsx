@@ -466,6 +466,9 @@ export function RGOperationalMap({
           legend="none"
           onReady={setMapInst}
         >
+          {agentName && routePoints.length >= 3 && (
+            <AgentTerritoryOverlay agentName={agentName} points={routePoints} />
+          )}
           {routePoints.length > 1 && (
             <SharedRouteLayer
               points={routePoints}
