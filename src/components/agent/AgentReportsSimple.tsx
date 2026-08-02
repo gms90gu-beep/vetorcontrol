@@ -32,6 +32,7 @@ import {
   generateDailyReportPDF,
 } from "@/components/reports/DailyReportGenerator";
 import { generateWeeklyReportPDF } from "@/components/reports/WeeklyReportGenerator";
+import { generatePcfadWeeklyPDF } from "@/components/reports/PcfadWeeklyPdfGenerator";
 import { computePropertyTypeComposition } from "@/lib/property-composition";
 import { PcfadWeeklyLandscape } from "@/components/agent/PcfadWeeklyLandscape";
 
