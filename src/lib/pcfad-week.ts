@@ -62,6 +62,7 @@ export function pcfadIip(positive: number, inspected: number) {
 function emptyTotal(): PcfadRow {
   return {
     work_date: "TOTAL",
+    propertiesByType: { ...EMPTY_TREATED }, propertiesByTypeTotal: 0,
     a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0, depTotal: 0,
     samples: 0, blocks: 0, treated: { ...EMPTY_TREATED }, treatedTotal: 0,
     depInspected: 0, depTreated: 0, depEliminated: 0,
