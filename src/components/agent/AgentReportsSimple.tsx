@@ -130,6 +130,55 @@ export function AgentReportsSimple() {
   );
   const isTodayRecord = todayRecord?.work_date === today;
 
+  // Diária escolhida pelo agente (default: a diária de hoje / mais recente)
+  const [selectedDailyId, setSelectedDailyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedDailyId && todayRecord) setSelectedDailyId(todayRecord.id);
+  }, [todayRecord, selectedDailyId]);
+  const selectedDaily = useMemo(
+    () => dailies.find((d) => d.id === selectedDailyId) || todayRecord,
+    [dailies, selectedDailyId, todayRecord]
+  );
+
+  // Semanas epidemiológicas (SINAN) derivadas de work_date — nunca das colunas
+  // epi_week/epi_year (ISO no banco, divergentes do padrão SINAN).
+  const weekOptions = useMemo(() => {
+    const map = new Map<
+      string,
+      { key: string; week: number; year: number; count: number }
+    >();
+    for (const d of dailies) {
+      const [y, m, dd] = d.work_date.split("-").map(Number);
+      const w = getEpiWeek(new Date(y, m - 1, dd));
+      const key = `${w.year}-${w.week}`;
+      const prev = map.get(key);
+      if (prev) prev.count += 1;
+      else map.set(key, { key, week: w.week, year: w.year, count: 1 });
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => b.year - a.year || b.week - a.week
+    );
+  }, [dailies]);
+
+  const [selectedWeekKey, setSelectedWeekKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedWeekKey) return;
+    const current = `${epi.year}-${epi.week}`;
+    if (weekOptions.some((w) => w.key === current)) setSelectedWeekKey(current);
+    else if (weekOptions[0]) setSelectedWeekKey(weekOptions[0].key);
+  }, [weekOptions, selectedWeekKey, epi]);
+
+  const selectedWeek = useMemo(
+    () =>
+      weekOptions.find((w) => w.key === selectedWeekKey) || {
+        key: `${epi.year}-${epi.week}`,
+        week: epi.week,
+        year: epi.year,
+        count: 0,
+      },
+    [weekOptions, selectedWeekKey, epi]
+  );
+
   const weekRecords = useMemo(
     () =>
       dailies.filter(
@@ -137,6 +186,13 @@ export function AgentReportsSimple() {
       ),
     [dailies, epi]
   );
+
+  // Diárias da semana SELECIONADA (usadas no CSV) — SINAN sobre work_date
+  const selectedWeekRecords = useMemo(() => {
+    const { start, end } = epiWeekToDateRange(selectedWeek.week, selectedWeek.year);
+    return dailies.filter((d) => d.work_date >= start && d.work_date <= end);
+  }, [dailies, selectedWeek]);
+
 
   const sum = (arr: Daily[], k: keyof Daily) =>
     arr.reduce((a, r) => a + (Number(r[k] as any) || 0), 0);
