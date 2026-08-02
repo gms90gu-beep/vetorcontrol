@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { comparePropertyOrder } from "@/lib/property-order";
 import {
   Home, AlertTriangle, Flame, CheckCircle2,
-  Landmark, Trees, X, LocateFixed,
+  Landmark, Trees, X, LocateFixed, Layers,
 } from "lucide-react";
 
 // ─── Território do agente (aditivo, local a este arquivo) ────────────────────
@@ -258,6 +258,19 @@ export function RGOperationalMap({
   // Instância do mapa (para centralizar na posição do agente sob demanda).
   const [mapInst, setMapInst] = useState<L.Map | null>(null);
 
+  // Camada de satélite (opt-in, local a esta tela — não altera o SharedMap).
+  // Esri World Imagery é sobreposta ao tile base padrão e removida ao desligar.
+  const [satOn, setSatOn] = useState(false);
+  useEffect(() => {
+    if (!mapInst || !satOn) return;
+    const layer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles &copy; Esri", maxZoom: 19, maxNativeZoom: 17, zIndex: 250 },
+    ).addTo(mapInst);
+    return () => { try { mapInst.removeLayer(layer); } catch { /* noop */ } };
+  }, [mapInst, satOn]);
+
+
   // Auto-enquadra o mapa nos imóveis do quarteirão assim que ele carrega ou
   // quando a lista de pontos georreferenciados muda — sem isso o mapa abria
   // centralizado num ponto genérico e era preciso descobrir manualmente o
@@ -383,6 +396,24 @@ export function RGOperationalMap({
           </button>
         </div>
 
+        <div className="mt-1.5">
+          <button
+            type="button"
+            onClick={() => setSatOn((v) => !v)}
+            className={cn(
+              "w-full flex items-center justify-center gap-1.5 h-8 rounded-md text-[11px] font-bold uppercase tracking-wide border transition",
+              satOn
+                ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+            )}
+            title="Alterna entre o mapa padrão e a imagem de satélite"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            {satOn ? "Ocultar satélite" : "Satélite"}
+          </button>
+        </div>
+
+
         {gpsError && (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] text-red-700">
             {gpsError}
@@ -478,11 +509,15 @@ export function RGOperationalMap({
               dashArray="4 7"
             />
           )}
+          {/* Sem agrupamento: cada imóvel é desenhado individualmente, para que
+              a sequência numérica nunca seja escondida numa bolha de cluster. */}
           <SharedNumberedMarkerLayer
             points={points}
             selectedId={selectedId}
+            cluster={false}
             onClick={handleSelectFromMap}
           />
+
           {gpsOn && userPos && (
             <SharedUserLocationLayer
               lat={userPos.lat}
