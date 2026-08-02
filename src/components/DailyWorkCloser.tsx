@@ -869,11 +869,16 @@ export function DailyWorkCloser({
         console.log("[DAY_CLOSE_CROSS_DAY_SESSION]", {
           module: "DailyWorkCloser.handlePreClose",
           session_id: active?.id ?? null,
-          session_started_at: active?.session_date ?? null,
-          operational_date: workDate,
-          note: "quarteirão iniciado em data anterior — produção contabilizada em operational_date",
+          session_opened_at: active?.session_date ?? null,
+          latest_visit_date: toOperationalDate(closeContext.visits[0]?.visit_date) ?? null,
+          consolidated_work_date: workDate,
+          source: closeContext.target.source,
+          note: closeContext.target.source === "session_open"
+            ? "produção consolidada no dia de ABERTURA do quarteirão"
+            : "produção contabilizada na data da visita mais recente",
         });
       }
+
 
       // ═══ DIAGNÓSTICO OBRIGATÓRIO ANTES DE QUALQUER BLOQUEIO ═══
       await runDayCloseDiagnostic(user.id, workDate, activeCycle?.id ?? null);
