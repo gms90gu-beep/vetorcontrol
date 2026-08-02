@@ -1335,7 +1335,7 @@ export function DailyWorkCloser({
       // CONSOLIDAÇÃO OFICIAL: soma TODAS as jornadas do agente na mesma
       // Data da Produção. Nunca escopar por currentSession.id — o encerramento
       // do expediente deve refletir a produção do dia inteiro.
-      const dayAllSessions = await loadDayCloseSessions(user.id, operationalWorkDate);
+      const dayAllSessions = await loadDayCloseSessions(user.id, operationalWorkDate, activeSessionForClose?.id ?? null);
       const dayAllSessionIds = dayAllSessions.map((s: any) => s.id);
       console.log("[DAY_CLOSE_SESSIONS]", {
         op_date: operationalWorkDate,
