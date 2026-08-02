@@ -11,8 +11,9 @@ import { ptBR } from "date-fns/locale";
 import { DEP_ORDER, normalizeDepJson } from "@/lib/daily-integrity";
 import { computePropertyTypeComposition, type PropertyTypeComposition } from "@/lib/property-composition";
 import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generatePcfadDailyPDF } from "@/components/reports/PcfadDailyPdfGenerator";
+import { PcfadDailyLandscape } from "@/components/agent/PcfadDailyLandscape";
+
 
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "routes/daily-bulletin", file: "src/routes/_authenticated.daily-bulletin.$id.tsx", source: "daily_work_records", note: "boletim diário por id — usar getDateMetrics após refator" });
