@@ -363,16 +363,39 @@ export function AgentReportsSimple() {
           />
         </div>
 
+        <div className="mt-4">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">
+            Escolher diária
+          </p>
+          <Select
+            value={selectedDaily?.id ?? undefined}
+            onValueChange={setSelectedDailyId}
+            disabled={dailies.length === 0}
+          >
+            <SelectTrigger className="rounded-xl h-11 border-slate-200 text-xs font-bold">
+              <SelectValue placeholder="Nenhuma diária disponível" />
+            </SelectTrigger>
+            <SelectContent>
+              {dailies.map((d) => (
+                <SelectItem key={d.id} value={d.id} className="text-xs font-bold">
+                  {format(new Date(`${d.work_date}T12:00:00`), "dd/MM/yyyy")} —{" "}
+                  {d.properties_worked ?? 0} imóveis
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             asChild
-            disabled={!todayRecord}
+            disabled={!selectedDaily}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-5 font-bold text-xs uppercase tracking-wide"
           >
-            {todayRecord ? (
+            {selectedDaily ? (
               <Link
                 to="/daily-bulletin/$id"
-                params={{ id: todayRecord.id }}
+                params={{ id: selectedDaily.id }}
               >
                 <Eye className="h-4 w-4 mr-2" /> Ver Boletim Diário
               </Link>
@@ -383,6 +406,7 @@ export function AgentReportsSimple() {
             )}
           </Button>
         </div>
+
       </Card>
 
       {/* Resumo da Semana */}
