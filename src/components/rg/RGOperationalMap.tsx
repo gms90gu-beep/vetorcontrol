@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { comparePropertyOrder } from "@/lib/property-order";
 import {
   Home, AlertTriangle, Flame, CheckCircle2,
-  Landmark, Trees, X, LocateFixed, Layers,
+  Landmark, Trees, X, LocateFixed,
 } from "lucide-react";
 
 // ─── Território do agente (aditivo, local a este arquivo) ────────────────────
