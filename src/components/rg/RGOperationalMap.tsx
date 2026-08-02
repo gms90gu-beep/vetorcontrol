@@ -221,7 +221,7 @@ export function RGOperationalMap({
           </div>
           <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
-            <span style="color:#64748b">Sequência</span><b>#${label}</b>
+            ${p.sequence != null ? `<span style="color:#64748b">Sequência</span><b>${p.sequence}</b>` : ""}
             <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
             <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
             <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
