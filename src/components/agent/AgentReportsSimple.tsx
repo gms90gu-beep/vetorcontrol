@@ -28,10 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getOperationalDate } from "@/lib/operational-date";
-import {
-  generateDailyReportPDF,
-} from "@/components/reports/DailyReportGenerator";
 import { generatePcfadDailyPDF } from "@/components/reports/PcfadDailyPdfGenerator";
+
 // Gerador retrato antigo (seções 1–8) permanece em WeeklyReportGenerator.tsx, sem uso aqui.
 import { generatePcfadWeeklyPDF } from "@/components/reports/PcfadWeeklyPdfGenerator";
 import { computePropertyTypeComposition } from "@/lib/property-composition";
