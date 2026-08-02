@@ -136,7 +136,7 @@ export function PcfadWeeklyLandscape({
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td className={td} colSpan={31}>
+                  <td className={td} colSpan={37}>
                     Sem diárias registradas nesta semana epidemiológica.
                   </td>
                 </tr>
@@ -144,6 +144,12 @@ export function PcfadWeeklyLandscape({
               {rows.map((r) => (
                 <tr key={r.work_date}>
                   <td className={`${td} font-bold`}>{rf(r.work_date)}</td>
+                  <td className={td}>{r.propertiesByType.residence}</td>
+                  <td className={td}>{r.propertiesByType.commerce}</td>
+                  <td className={td}>{r.propertiesByType.vacant_lot}</td>
+                  <td className={td}>{r.propertiesByType.strategic_point}</td>
+                  <td className={td}>{r.propertiesByType.others}</td>
+                  <td className={`${td} font-bold`}>{r.propertiesByTypeTotal}</td>
                   <td className={td}>{r.a1}</td>
                   <td className={td}>{r.a2}</td>
                   <td className={td}>{r.b}</td>
