@@ -2074,10 +2074,16 @@ export function DailyWorkCloser({
       console.log("[SESSION_END]", { session_id: closedSessionId, block_id: closedBlockId });
 
       // 5) Limpeza completa do estado operacional local
+      // NAO zera jornadaDate/resolvedCloseDate aqui: a tela de Resumo
+      // Diario (showSummary) que abre logo em seguida ainda usa esses
+      // valores para exibir a data certa e para o botao "Gerar PDF
+      // Diario" (defaultGeneratePDF le jornadaDate). Zerar antes causava
+      // sempre o erro "Data da jornada indisponivel. Nao e possivel
+      // gerar o PDF." ao tentar gerar o PDF logo apos encerrar o
+      // expediente. Esses estados sao naturalmente sobrescritos na
+      // proxima vez que fetchDailyContext rodar com uma sessao ativa.
       setActiveSessionId(null);
       setOpenBlock(null);
-      setJornadaDate(null);
-      setResolvedCloseDate(null);
       setSessionRetro({ retro: false, reason: null, createdAt: null });
       try {
         // Limpa quaisquer chaves temporárias de jornada (se existirem)
