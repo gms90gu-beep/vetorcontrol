@@ -5,7 +5,9 @@
 import {
   createOffline,
   updateOffline,
-  deleteWhereOffline,
+  removeOffline,
+  upsertOffline,
+  listLocal,
 } from "./index";
 import {
   applyLocalVisitDelta,
@@ -71,14 +73,33 @@ export async function saveVisitOffline(
       console.log("[SAVE_VISIT_QUEUE_OK]", { id: visitId, table: "visits", op: "update" });
     }
 
-    // Substitui depósitos existentes da visita
-    await deleteWhereOffline("visit_deposits", { visit_id: visitId });
+    // Sincroniza depósitos da visita (BUG CORRIGIDO — ver auditoria):
+    // antes isso era "apaga todos + insere todos de novo" em duas operações
+    // SEPARADAS na fila offline. Se a sincronização processava essas duas
+    // mutações fora de ordem (ou o delete se perdia numa falha de rede
+    // pontual), a exclusão nunca acontecia mas a inserção sim — sobrava o
+    // depósito antigo (ex.: "não positivo") ao lado do novo ("positivo"),
+    // duplicando type_code para a mesma visita. Isso já aconteceu de verdade
+    // em produção (21 visitas, 31 linhas duplicadas encontradas e limpas).
+    //
+    // Agora: só remove os depósitos cujo type_code deixou de existir na
+    // seleção atual (delta, não "apaga tudo"), e faz UPSERT por
+    // (visit_id, type_code) — idempotente mesmo se a mutação for reprocessada
+    // ou reordenada pela fila de sincronização. Requer a constraint unique
+    // visit_deposits_visit_type_unique (visit_id, type_code) no banco.
+    const currentDeposits = await listLocal<any>("visit_deposits", (r) => r.visit_id === visitId);
+    const newTypeCodes = new Set(deposits.map((d) => d.type_code));
+    const obsolete = currentDeposits.filter((r: any) => !newTypeCodes.has(r.type_code));
+    for (const r of obsolete) {
+      console.log("[SAVE_VISIT_DEPOSIT_REMOVE]", { visitId, type_code: r.type_code, id: r.id });
+      await removeOffline("visit_deposits", r.id);
+    }
     for (const d of deposits) {
       const dp = { ...d, visit_id: visitId, updated_at: new Date().toISOString() };
-      console.log("[SAVE_VISIT_CREATE_OFFLINE]", { table: "visit_deposits", op: "insert", payload: dp });
-      const c = await createOffline("visit_deposits", dp);
+      console.log("[SAVE_VISIT_CREATE_OFFLINE]", { table: "visit_deposits", op: "upsert", payload: dp });
+      const c = await upsertOffline("visit_deposits", dp, { onConflict: "visit_id,type_code" });
       console.log("[SAVE_VISIT_DEXIE_OK]", { id: c.id, table: "visit_deposits", updatedAt: dp.updated_at });
-      console.log("[SAVE_VISIT_QUEUE_OK]", { id: c.id, table: "visit_deposits", op: "insert" });
+      console.log("[SAVE_VISIT_QUEUE_OK]", { id: c.id, table: "visit_deposits", op: "upsert" });
     }
 
     // BLOCK_PROGRESS — camada única (independente da Produção Diária).
