@@ -30,6 +30,7 @@ export interface OperationalBlockStats {
   abandonedProperties: number;
   recoveredProperties: number;
   pendingProperties: number;
+  focusProperties: number;
   completionPercentage: number;
   status: OperationalBlockStatus;
 }
@@ -39,6 +40,8 @@ export interface VisitLike {
   status?: string | null;
   visit_date?: string | null;
   is_recovery?: boolean | null;
+  has_focus?: boolean | null;
+  positive_focus?: boolean | null;
 }
 
 export interface BlockStatusInput {
@@ -73,12 +76,13 @@ export function getOperationalBlockStatus(input: BlockStatusInput): OperationalB
   // entrava em "done" aqui, entao um quarteirao com qualquer imovel
   // abandonado nunca batia 100%/CONCLUIDO nesta funcao (fonte unica usada
   // por Trabalho, Dashboard, Encerramento, Minhas Jornadas, Relatorios e PDFs).
-  let visited = 0, closed = 0, refused = 0, abandoned = 0, recovered = 0;
+  let visited = 0, closed = 0, refused = 0, abandoned = 0, recovered = 0, focus = 0;
   const scope = propertyIds.length ? propertyIds : Array.from(lastByProp.keys());
   for (const pid of scope) {
     const v = lastByProp.get(pid);
     if (!v) continue;
     if (v.is_recovery) recovered++;
+    if (v.has_focus || v.positive_focus) focus++;
     if (v.status === "visited") visited++;
     else if (v.status === "closed") closed++;
     else if (v.status === "refused") refused++;
@@ -99,6 +103,7 @@ export function getOperationalBlockStatus(input: BlockStatusInput): OperationalB
     abandonedProperties: abandoned,
     recoveredProperties: recovered,
     pendingProperties: pending,
+    focusProperties: focus,
     completionPercentage: pct,
     status,
   };
