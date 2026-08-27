@@ -198,21 +198,43 @@ export function resolveOperationalCloseTarget(
   visits: OperationalVisitLike[],
   todayOperational: string = getOperationalDate(),
 ): { workDate: string; sessionId: string | null; source: "visit" | "session_open" | "retroactive_session" | "today_session" | "system_today" } {
-  const sessionIds = new Set(sessions.map((session) => session.id).filter((id): id is string => !!id));
+  // Quando existe jornada retroativa aberta, ela é a intenção explícita do
+  // usuário: só as visitas dessa jornada podem definir o alvo do fechamento.
+  const retroactiveIds = new Set(
+    sessions.filter((s) => s.is_retroactive && s.id).map((s) => String(s.id)),
+  );
+  const candidateIds = retroactiveIds.size > 0
+    ? retroactiveIds
+    : new Set(sessions.map((session) => session.id).filter((id): id is string => !!id).map(String));
   const latestVisit = [...visits]
-    .filter((visit) => !!visit.field_work_session_id && sessionIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
+    .filter((visit) => !!visit.field_work_session_id && candidateIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
     .sort((a, b) => String(b.visit_date ?? "").localeCompare(String(a.visit_date ?? "")))[0];
+
   const visitDate = toOperationalDate(latestVisit?.visit_date);
   if (latestVisit && visitDate) {
     const visitSessionId = latestVisit.field_work_session_id ? String(latestVisit.field_work_session_id) : null;
     const owner = sessions.find((session) => session.id && String(session.id) === visitSessionId);
     const openedAt = owner?.session_date ?? null;
+    // Sessão retroativa ("Alterar Data"): a data do formulário é soberana.
+    // As visitas são digitadas hoje, mas a produção pertence ao dia informado.
+    if (owner?.is_retroactive && openedAt) {
+      if (openedAt !== visitDate) {
+        console.log("[PRODUCTION_DATE_SOURCE]", {
+          module: "resolveOperationalCloseTarget",
+          source: "retroactive_session_date",
+          session_date: openedAt,
+          latest_visit_date: visitDate,
+        });
+      }
+      return { workDate: openedAt, sessionId: visitSessionId, source: "retroactive_session" };
+    }
     if (owner && openedAt && openedAt < visitDate) {
       const gap = daysBetween(openedAt, visitDate);
       const isOpen = !owner.status || owner.status === "in_progress";
       if (isOpen && gap <= CROSS_DAY_CONSOLIDATION_MAX_DAYS) {
         return { workDate: openedAt, sessionId: visitSessionId, source: "session_open" };
       }
+
       console.warn("[DAY_CLOSE_STALE_SESSION]", {
         session_id: visitSessionId,
         session_date: openedAt,
