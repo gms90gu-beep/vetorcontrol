@@ -862,7 +862,26 @@ function BoletimView() {
                   </thead>
                   <tbody>
                     {folha.length === 0 ? (
-                      <tr><td colSpan={8} className="text-center text-slate-400 py-6">Nenhum imóvel.</td></tr>
+                      <tr>
+                        <td colSpan={8} className="text-center text-slate-400 py-6">
+                          <div className="flex flex-col items-center gap-2">
+                            <span>Nenhum imóvel.</span>
+                            <Button
+                              size="sm"
+                              className="brg-no-print bg-emerald-600 hover:bg-emerald-700"
+                              onClick={() =>
+                                navigate({
+                                  to: "/rg/editar/$id",
+                                  params: { id },
+                                  search: { novo: true },
+                                })
+                              }
+                            >
+                              Adicionar Imóveis
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
                     ) : folha.map((p) => {
                       const hasCoords = p.latitude != null && p.longitude != null;
                       return (

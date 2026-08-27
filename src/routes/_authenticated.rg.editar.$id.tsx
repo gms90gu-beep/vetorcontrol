@@ -21,6 +21,10 @@ import { StreetAutocomplete } from "@/components/rg/StreetAutocomplete";
 import { comparePropertyOrder } from "@/lib/property-order";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
+  // `novo=true` vem do fluxo "criar boletim": abre direto a seção/modal de imóveis.
+  validateSearch: (search: Record<string, unknown>): { novo?: boolean } => ({
+    novo: search.novo === true || search.novo === "true" ? true : undefined,
+  }),
   component: EditarBoletim,
 });
 
@@ -94,12 +98,23 @@ function EditarBoletim() {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchQty, setBatchQty] = useState<number>(10);
   const [batchSaving, setBatchSaving] = useState(false);
+  const { novo } = Route.useSearch();
+  const autoOpenedRef = useRef(false);
 
   useEffect(() => {
     toast.dismiss();
     load();
     /* eslint-disable-next-line */
   }, [id]);
+
+  // Boletim recém-criado: abre automaticamente o cadastro de imóveis assim que
+  // os dados terminam de carregar (uma única vez por boletim).
+  useEffect(() => {
+    if (!novo || loading || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    setShowBatchModal(true);
+    requestAnimationFrame(() => addBtnRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, [novo, loading]);
 
   async function load(showSpinner = true) {
     if (showSpinner) setLoading(true);
