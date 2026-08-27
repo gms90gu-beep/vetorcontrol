@@ -21,6 +21,10 @@ import { StreetAutocomplete } from "@/components/rg/StreetAutocomplete";
 import { comparePropertyOrder } from "@/lib/property-order";
 
 export const Route = createFileRoute("/_authenticated/rg/editar/$id")({
+  // `novo=true` vem do fluxo "criar boletim": abre direto a seção/modal de imóveis.
+  validateSearch: (search: Record<string, unknown>): { novo?: boolean } => ({
+    novo: search.novo === true || search.novo === "true" ? true : undefined,
+  }),
   component: EditarBoletim,
 });
 
