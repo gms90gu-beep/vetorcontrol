@@ -1641,12 +1641,48 @@ export function DailyWorkCloser({
         snapshot_worked_today: snap.workedCount,
         note: "definições distintas — não é divergência",
       });
+
+      // ATENÇÃO: NÃO comparar visited/closed usando `snap.visitedCount`/
+      // `snap.closedCount` diretamente. Esses contam TODAS as visitas do dia
+      // (inclusive revisitas de recuperação — uma propriedade visitada e depois
+      // recuperada gera 2 visitas, ambas contadas no snapshot). Já
+      // `metrics.visitedProperties`/`closedProperties` vêm de
+      // `getOperationalBlockStatus`, que considera apenas a ÚLTIMA visita por
+      // imóvel (dedup). Revisitas legítimas produziam divergências como "-65"
+      // e bloqueavam o encerramento sem motivo. Aqui dedupamos o lado snapshot
+      // pela mesma regra (última visita por imóvel prevalece), mantendo a rede
+      // de segurança para divergências reais (visita presente no snapshot mas
+      // ausente do metrics por bug de filtro).
+      const __snapDedupByProp = new Map<string, any>();
+      const __sortedForDedup = [...visitsByAllSessions].sort((a: any, b: any) =>
+        String(a.visit_date || "").localeCompare(String(b.visit_date || "")),
+      );
+      for (const v of __sortedForDedup) {
+        if (v.property_id) __snapDedupByProp.set(v.property_id, v);
+      }
+      let __snapDedupVisited = 0;
+      let __snapDedupClosed = 0;
+      for (const v of __snapDedupByProp.values()) {
+        const st = String(v.status ?? "").toLowerCase();
+        if (st === "visited") __snapDedupVisited++;
+        else if (st === "closed") __snapDedupClosed++;
+      }
+      console.log("[DAY_CLOSE_VISITED_SEMANTICS]", {
+        snapshot_raw_visited: snap.visitedCount,
+        snapshot_raw_closed: snap.closedCount,
+        snapshot_dedup_visited: __snapDedupVisited,
+        snapshot_dedup_closed: __snapDedupClosed,
+        metrics_visited: __dwrProperties.visited,
+        metrics_closed: __dwrProperties.closed,
+        revisits_collapsed: snap.visitedCount - __snapDedupVisited,
+        note: "snapshot dedupado pela última visita por imóvel (mesma regra do operational-block-status)",
+      });
       __check("Snapshot vs Metrics", {
         visited: __dwrProperties.visited,
         closed: __dwrProperties.closed,
       }, {
-        visited: snap.visitedCount,
-        closed: snap.closedCount,
+        visited: __snapDedupVisited,
+        closed: __snapDedupClosed,
       });
 
       // Cache: comparar Dexie × Supabase (total de visitas do dia)
