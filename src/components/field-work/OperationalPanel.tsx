@@ -454,7 +454,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
         {/* Ações rápidas */}
         <div className="grid grid-cols-3 gap-2 mt-3">
-          <QuickAction icon={Calendar} label="Alterar Data" onClick={() => navigate({ to: "/field-work-list" })} />
+          <QuickAction icon={Calendar} label="Alterar Data" onClick={() => navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } })} />
           <QuickAction icon={ClipboardList} label="Calendário" onClick={() => navigate({ to: "/calendario-producao" })} />
           <QuickAction icon={FileText} label="Minhas Jornadas" onClick={() => navigate({ to: "/minhas-jornadas" })} />
         </div>
@@ -598,7 +598,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
           <BottomAction Icon={ChevronDown} label="Próximo" onClick={() => {
             const p = pendingList[0]; if (p) goToProperty(p.id);
           }} />
-          <BottomAction Icon={CheckCircle2} label="Finalizar" primary onClick={() => (onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list" }))} />
+          <BottomAction Icon={CheckCircle2} label="Finalizar" primary onClick={() => (onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } }))} />
         </div>
       </div>
 
