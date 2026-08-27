@@ -88,7 +88,18 @@ export function buildNavItems(userRole: string | null): NavItem[] {
       { key: "mgr-settings", label: "Configurações", icon: Settings, to: "/settings", group: "administracao" },
     ];
 
+    if (userRole === "coordenador" || userRole === "admin_master") {
+      items.push({
+        key: "mgr-coordenacao",
+        label: "Coordenação",
+        icon: ShieldCheck,
+        to: "/coordenacao",
+        group: "administracao",
+      });
+    }
+
     if (userRole === "admin_master") {
+
       items.push(
         { key: "adm-exec", label: "Dashboard Admin", icon: BarChart3, to: "/admin/dashboard", group: "administracao" },
         { key: "adm-master", label: "Central de Comando", icon: ShieldCheck, to: "/admin-master", group: "administracao" },
