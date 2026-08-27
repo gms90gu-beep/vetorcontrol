@@ -198,10 +198,18 @@ export function resolveOperationalCloseTarget(
   visits: OperationalVisitLike[],
   todayOperational: string = getOperationalDate(),
 ): { workDate: string; sessionId: string | null; source: "visit" | "session_open" | "retroactive_session" | "today_session" | "system_today" } {
-  const sessionIds = new Set(sessions.map((session) => session.id).filter((id): id is string => !!id));
+  // Quando existe jornada retroativa aberta, ela é a intenção explícita do
+  // usuário: só as visitas dessa jornada podem definir o alvo do fechamento.
+  const retroactiveIds = new Set(
+    sessions.filter((s) => s.is_retroactive && s.id).map((s) => String(s.id)),
+  );
+  const candidateIds = retroactiveIds.size > 0
+    ? retroactiveIds
+    : new Set(sessions.map((session) => session.id).filter((id): id is string => !!id).map(String));
   const latestVisit = [...visits]
-    .filter((visit) => !!visit.field_work_session_id && sessionIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
+    .filter((visit) => !!visit.field_work_session_id && candidateIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
     .sort((a, b) => String(b.visit_date ?? "").localeCompare(String(a.visit_date ?? "")))[0];
+
   const visitDate = toOperationalDate(latestVisit?.visit_date);
   if (latestVisit && visitDate) {
     const visitSessionId = latestVisit.field_work_session_id ? String(latestVisit.field_work_session_id) : null;
