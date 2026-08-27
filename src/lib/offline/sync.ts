@@ -302,6 +302,10 @@ export function bootSyncEngine() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") tryFlush();
   });
+  // Última chance antes de o app ir para background/fechar (mobile mata a aba
+  // sem disparar "beforeunload" de forma confiável — "pagehide" cobre os dois).
+  window.addEventListener("pagehide", tryFlush);
+
   // Boot inicial
   setTimeout(tryFlush, 1500);
   // Gatilho 3: limpeza no boot (24h + guardas)
