@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 export type LegendEntry = { color: string; label: string };
 
 export const DEFAULT_LEGEND: LegendEntry[] = [
-  { color: MARKER_COLORS.clean, label: "Sem foco" },
   { color: MARKER_COLORS.focus, label: "Foco positivo" },
+  { color: MARKER_COLORS.refused, label: "Fechada/Recusada" },
   { color: MARKER_COLORS.pendency, label: "Pendência" },
+  { color: MARKER_COLORS.clean, label: "Sem foco" },
   { color: MARKER_COLORS.strategic, label: "Ponto estratégico" },
-  { color: MARKER_COLORS.case, label: "Caso confirmado" },
 ];
 
 export function SharedLegend({

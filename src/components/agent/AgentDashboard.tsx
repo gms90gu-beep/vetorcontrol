@@ -554,11 +554,11 @@ function HistoryList({ visits }: { visits: Visit[] }) {
           <div key={v.id} className="bg-white rounded-lg p-3 border border-slate-100 flex items-center gap-3">
             <span
               className="h-2 w-2 rounded-full shrink-0"
-              style={{ background: v.has_focus ? "#dc2626" : v.status === "closed" ? "#94a3b8" : "#10b981" }}
+              style={{ background: v.has_focus ? "#dc2626" : (v.status === "closed" || v.status === "refused") ? "#f97316" : "#10b981" }}
             />
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-bold text-slate-900 truncate">
-                {v.status === "closed" ? "Imóvel fechado" : v.status === "refused" ? "Recusa" : v.has_focus ? "Foco encontrado" : "Visita realizada"}
+                {v.has_focus ? "Foco encontrado" : v.status === "closed" ? "Imóvel fechado" : v.status === "refused" ? "Recusa" : "Visita realizada"}
               </p>
               <p className="text-[10px] text-slate-400">{dateStr} às {timeStr}</p>
             </div>
