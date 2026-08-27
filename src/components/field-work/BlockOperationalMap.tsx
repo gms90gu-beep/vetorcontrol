@@ -25,21 +25,24 @@ type Visit = {
 
 type FilterKey =
   | "all" | "visited" | "pending" | "focus"
-  | "strategic" | "vacant" | "nogeo";
+  | "strategic" | "vacant" | "nogeo" | "refused" | "closed";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Todos" },
+  { key: "focus", label: "Focos" },
+  { key: "refused", label: "Recusadas" },
+  { key: "closed", label: "Fechadas" },
   { key: "visited", label: "Visitados" },
   { key: "pending", label: "Pendentes" },
-  { key: "focus", label: "Focos" },
   { key: "strategic", label: "Pontos Estratégicos" },
   { key: "vacant", label: "Terrenos Baldios" },
   { key: "nogeo", label: "Sem GPS" },
 ];
 
 const LEGEND = [
-  { color: MARKER_COLORS.clean, label: "Visitado" },
   { color: MARKER_COLORS.focus, label: "Foco positivo" },
+  { color: MARKER_COLORS.refused, label: "Fechada/Recusada" },
+  { color: MARKER_COLORS.clean, label: "Visitado" },
   { color: MARKER_COLORS.pendency, label: "Pendente" },
   { color: MARKER_COLORS.strategic, label: "Ponto Estratégico" },
   { color: MARKER_COLORS.unknown, label: "Não iniciado" },
@@ -58,8 +61,9 @@ function classify(p: Property, v?: Visit): { status: MarkerStatus; label: string
   if (v?.has_focus) return { status: "focus", label: "Foco positivo" };
   if ((p.type || "").toUpperCase() === "PE" || (p.type || "").toLowerCase() === "strategic_point")
     return { status: "strategic", label: "Ponto Estratégico" };
-  if (v && (v.status === "visited" || v.status === "closed" || v.status === "refused"))
-    return { status: "clean", label: "Visitado" };
+  if (v?.status === "refused") return { status: "refused", label: "Recusada" };
+  if (v?.status === "closed") return { status: "closed", label: "Fechada" };
+  if (v?.status === "visited") return { status: "clean", label: "Visitado" };
   if (v) return { status: "pendency", label: "Pendente" };
   return { status: "unknown", label: "Não iniciado" };
 }
@@ -82,9 +86,11 @@ export function BlockOperationalMap({
       const hasGeo = p.latitude != null && p.longitude != null;
       const t = (p.type || "").toUpperCase();
       switch (filter) {
-        case "visited": return !!v && (v.status === "visited" || v.status === "closed" || v.status === "refused");
-        case "pending": return !v;
         case "focus": return !!v?.has_focus;
+        case "refused": return !!v && v.status === "refused";
+        case "closed": return !!v && v.status === "closed";
+        case "visited": return !!v && v.status === "visited";
+        case "pending": return !v;
         case "strategic": return t === "PE" || (p.type || "").toLowerCase() === "strategic_point";
         case "vacant": return t === "TB";
         case "nogeo": return !hasGeo;

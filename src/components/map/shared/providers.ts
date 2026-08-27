@@ -42,11 +42,13 @@ export function getProvider(id: string): TileProvider {
 
 // Shared semantic colors for property markers across the app.
 export const MARKER_COLORS = {
-  focus: "#ef4444",      // foco positivo
-  pendency: "#f97316",   // pendência
-  strategic: "#3b82f6",  // ponto estratégico
-  clean: "#10b981",      // sem foco
-  case: "#a855f7",       // caso confirmado
+  focus: "#dc2626",      // foco positivo (vermelho vibrante)
+  pendency: "#f97316",   // pendência (laranja)
+  closed: "#f97316",     // fechada/recusada (laranja - mesmo de pendência)
+  refused: "#f97316",    // recusa de acesso (laranja - mesmo de pendência)
+  strategic: "#3b82f6",  // ponto estratégico (azul)
+  clean: "#10b981",      // sem foco / visitado (verde)
+  case: "#a855f7",       // caso confirmado (roxo)
   // Auditoria de georreferenciamento
   valid: "#16a34a",
   missing: "#eab308",
