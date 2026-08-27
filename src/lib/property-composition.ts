@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { safeFetch } from "@/lib/offline/safe-fetch";
+import { listLocal } from "@/lib/offline/repos";
 import { getOperationalDate } from "@/lib/operational-date";
 
 export interface PropertyTypeComposition {
@@ -71,8 +73,27 @@ export async function computePropertyTypeComposition(params: {
   if (params.cycleId) vq = vq.eq("cycle_id", params.cycleId);
   if (params.onlyTreated) vq = vq.eq("treatment_applied", true);
 
-  const { data, error } = await vq;
-  if (error) console.warn("[PROPERTY_COMPOSITION_VISITS_QUERY_ERROR]", error);
+  // Offline: reconstrói o join visits→properties a partir do cache Dexie.
+  const data = await safeFetch<any[]>(
+    async () => {
+      const { data: rows, error } = await vq;
+      if (error) throw error;
+      return (rows as any[]) || [];
+    },
+    async () => {
+      const props = await listLocal<any>("properties");
+      const propById = new Map(props.map((p: any) => [p.id, p]));
+      const visits = await listLocal<any>("visits", (v: any) => {
+        if (v.agent_id !== params.agentAuthId) return false;
+        if (params.cycleId && v.cycle_id !== params.cycleId) return false;
+        if (params.onlyTreated && !v.treatment_applied) return false;
+        const d = String(v.visit_date || "");
+        return d >= startIso && d <= endIso;
+      });
+      return visits.map((v: any) => ({ ...v, properties: propById.get(v.property_id) ?? null }));
+    },
+    { label: "visits" },
+  );
 
 
   const workDateSet = new Set(workDates);

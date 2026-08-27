@@ -57,12 +57,16 @@ export function ReportsDashboard() {
   // Carrega o ciclo ativo e força como filtro padrão (evita misturar ciclos)
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const cycle = await getActiveCycleForUser(session?.user?.id);
-      if (cycle?.id) {
-        setActiveCycleId(cycle.id);
-        setFilters(prev => prev.cycle === "all" ? { ...prev, cycle: cycle.id } : prev);
-        console.log(`[CICLO] ReportsDashboard usando ciclo ${cycle.name || cycle.id}`);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const cycle = await getActiveCycleForUser(session?.user?.id);
+        if (cycle?.id) {
+          setActiveCycleId(cycle.id);
+          setFilters(prev => prev.cycle === "all" ? { ...prev, cycle: cycle.id } : prev);
+          console.log(`[CICLO] ReportsDashboard usando ciclo ${cycle.name || cycle.id}`);
+        }
+      } catch (e) {
+        console.warn("[CICLO] falha ao resolver ciclo ativo (seguindo sem filtro)", e);
       }
     })();
   }, []);
@@ -186,7 +190,11 @@ export function ReportsDashboard() {
       let production: any[] = [];
       if (byAgent.size > 0) {
         const agentIds = Array.from(byAgent.keys());
-        const { data: agentRows } = await supabase.from("agents").select("id, name").in("id", agentIds);
+        const agentRows = await listRemoteOrCache<any>({
+          name: "agents",
+          remote: () => supabase.from("agents").select("id, name").in("id", agentIds) as any,
+          filter: (a: any) => agentIds.includes(a.id),
+        });
         const nameMap = new Map((agentRows || []).map((a: any) => [a.id, a.name]));
         production = agentIds
           .map((aid) => {
