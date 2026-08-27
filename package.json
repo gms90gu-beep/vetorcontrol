@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
+    "test:retroactive": "vitest run tests/unit/retroactive-date-priority.test.ts",
     "test:integration": "vitest run tests/integration",
     "test:offline": "vitest run tests/offline",
     "test:coverage": "vitest run --coverage",
