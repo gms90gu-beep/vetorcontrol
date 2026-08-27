@@ -6,7 +6,7 @@ export const Route = createFileRoute("/_authenticated/campo")({
     if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/login" });
-    throw redirect({ to: "/field-work-list", replace: true });
+    throw redirect({ to: "/field-work-list", replace: true, search: { restore: undefined, ts: undefined } });
   },
   component: () => null,
 });

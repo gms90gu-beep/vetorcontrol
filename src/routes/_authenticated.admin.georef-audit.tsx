@@ -480,7 +480,7 @@ function GeorefAuditPage() {
                     <div className="flex flex-col gap-1 shrink-0">
                       {a.property_id && (
                         <Button asChild size="sm" variant="outline">
-                          <Link to="/properties/$id" params={{ id: a.property_id }}>
+                          <Link to="/property/$propertyId" params={{ propertyId: a.property_id }}>
                             <ExternalLink className="h-3 w-3 mr-1" /> Imóvel
                           </Link>
                         </Button>
@@ -605,7 +605,7 @@ function GeorefAuditPage() {
                         <TableCell className="text-xs">{h.geocoded_at ? new Date(h.geocoded_at).toLocaleString("pt-BR") : "—"}</TableCell>
                         <TableCell>{h.geocoded_by_name || h.geocoded_by || "—"}</TableCell>
                         <TableCell className="font-mono text-xs">
-                          <Link to="/properties/$id" params={{ id: h.property_id }} className="underline">
+                          <Link to="/property/$propertyId" params={{ propertyId: h.property_id }} className="underline">
                             {h.property_id.slice(0, 8)}
                           </Link>
                         </TableCell>

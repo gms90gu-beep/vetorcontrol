@@ -729,7 +729,7 @@ function PropertyVisitPage() {
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
         toast.success(`✅ ${offlineHint}`, { description: "Último imóvel do quarteirão." });
-        navigate({ to: "/field-work-list" });
+        navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
       }
     } catch (error: any) {
       toast.error("Erro ao salvar visita: " + error.message);
@@ -835,7 +835,7 @@ function PropertyVisitPage() {
           <p className="text-sm text-slate-500 font-medium">Não foi possível carregar as informações.</p>
         </div>
         <div className="flex gap-3 w-full max-w-xs">
-          <Button variant="outline" onClick={() => navigate({ to: "/field-work-list" })} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
+          <Button variant="outline" onClick={() => navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } })} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
             Voltar
           </Button>
           <Button onClick={fetchData} className="flex-1 h-12 rounded-2xl font-bold uppercase tracking-widest text-[10px]">
@@ -945,7 +945,7 @@ function PropertyVisitPage() {
       <div className="flex flex-col gap-4 bg-white p-6 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/field-work-list" }); }} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
+            <Button variant="ghost" size="icon" onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } }); }} className="rounded-2xl bg-slate-50 active:scale-95 transition-all">
               <ChevronLeft className="h-6 w-6 text-slate-600" />
             </Button>
             {prevProperty && (

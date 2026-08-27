@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1214,6 +1214,36 @@ export type Database = {
           },
         ]
       }
+      supabase_keep_alive: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          ping_source: string | null
+          ping_timestamp: string | null
+          response_time_ms: number | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          ping_source?: string | null
+          ping_timestamp?: string | null
+          response_time_ms?: number | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          ping_source?: string | null
+          ping_timestamp?: string | null
+          response_time_ms?: number | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           id: string
@@ -1696,18 +1726,76 @@ export type Database = {
         }
         Relationships: []
       }
+      keep_alive_status: {
+        Row: {
+          failed_pings: number | null
+          last_ping: string | null
+          minutes_since_last_ping: number | null
+          sources_count: number | null
+          success_rate: number | null
+          successful_pings: number | null
+          total_pings: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       agent_integrity_check: { Args: { _fix?: boolean }; Returns: Json }
       auto_data_audit_snapshot: { Args: never; Returns: Json }
       autoheal_agent: { Args: { _user_id: string }; Returns: string }
+      calculate_daily_metrics_v2: {
+        Args: { p_agent_id: string; p_cycle_id: string; p_work_date: string }
+        Returns: {
+          accuracy: number
+          closed_count: number
+          pending_count: number
+          total_properties: number
+          visited_count: number
+        }[]
+      }
       can_supervise_user: { Args: { target_user_id: string }; Returns: boolean }
+      check_and_alert_hibernation: {
+        Args: never
+        Returns: {
+          action_required: string
+          alert_level: string
+          is_critical: boolean
+          message: string
+        }[]
+      }
       check_block_completion: {
         Args: { p_block_id: string; p_cycle_id: string }
         Returns: undefined
       }
+      check_hibernation_status: {
+        Args: never
+        Returns: {
+          is_hibernated: boolean
+          last_activity: string
+          minutes_since_activity: number
+          recommendation: string
+        }[]
+      }
       cleanup_demo_data: { Args: never; Returns: Json }
+      cleanup_old_pings: {
+        Args: never
+        Returns: {
+          deleted_count: number
+          message: string
+        }[]
+      }
       close_week: { Args: { _week_id: string }; Returns: Json }
+      daily_activity_report: {
+        Args: never
+        Returns: {
+          app_pings: number
+          data: string
+          github_pings: number
+          manual_pings: number
+          success_rate: number
+          total_pings: number
+        }[]
+      }
       data_audit_report: { Args: never; Returns: Json }
       ensure_annual_cycles: {
         Args: { target_year: number }
@@ -1716,6 +1804,15 @@ export type Database = {
       finalize_shift_pendencies: {
         Args: { p_agent_id: string; p_cycle_id: string; p_date: string }
         Returns: Json
+      }
+      get_correct_metrics: {
+        Args: { p_agent_id: string; p_cycle_id: string; p_work_date: string }
+        Returns: {
+          closed_count: number
+          pending_count: number
+          total_properties: number
+          visited_count: number
+        }[]
       }
       get_current_cycle: {
         Args: never
@@ -1796,6 +1893,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      health_check: {
+        Args: never
+        Returns: {
+          database_active: boolean
+          keep_alive_recorded: boolean
+          status: string
+        }[]
+      }
+      log_activity: {
+        Args: { source_type: string }
+        Returns: {
+          logged: boolean
+          message: string
+        }[]
+      }
       operational_date: { Args: { ts: string }; Returns: string }
       rebuild_daily_work_records: {
         Args: { _agent?: string; _from?: string; _to?: string }
@@ -1859,6 +1971,15 @@ export type Database = {
         Returns: string
       }
       sync_cycle_statuses: { Args: never; Returns: Json }
+      validate_end_session: {
+        Args: { p_agent_id: string; p_cycle_id: string; p_work_date: string }
+        Returns: {
+          can_end_session: boolean
+          last_record_date: string
+          message: string
+          total_days_worked: number
+        }[]
+      }
     }
     Enums: {
       activity_type: "routine" | "infestation_survey" | "pending"
