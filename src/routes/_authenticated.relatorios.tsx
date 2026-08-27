@@ -14,11 +14,13 @@ import {
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "routes/relatorios", file: "src/routes/_authenticated.relatorios.tsx", source: "daily_work_records", note: "tela relatórios — usar getDashboardMetrics após refator" });
 import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { AgentReportsSimple } from "@/components/agent/AgentReportsSimple";
+import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 import { useServerFn } from "@tanstack/react-start";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 import { getOperationalDate } from "@/lib/operational-date";
@@ -39,9 +41,15 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 
 function RelatoriosPage() {
   const { userRole } = useOperationalDate();
+  const { online } = useSyncStatus();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const rebuildFn = useServerFn(rebuildDailyRecords);
+
+  // ⛔ Bloquear acesso offline: Relatórios requerem conexão
+  if (!online) {
+    return <OfflineNotAvailable feature="Relatórios" />;
+  }
 
   if (!userRole)
     return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;

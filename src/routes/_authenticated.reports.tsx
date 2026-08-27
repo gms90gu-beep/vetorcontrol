@@ -1,6 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { ReportsDashboard } from "@/components/reports/ReportsDashboard";
 import { useOrientation } from "@/hooks/useOrientation";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
@@ -20,6 +22,12 @@ export const Route = createFileRoute("/_authenticated/reports")({
 
 function ReportsPage() {
   const isLandscape = useOrientation();
+  const { online } = useSyncStatus();
+
+  // ⛔ Bloquear acesso offline: Relatórios requerem conexão
+  if (!online) {
+    return <OfflineNotAvailable feature="Relatórios" />;
+  }
 
   return (
     <div className={cn(

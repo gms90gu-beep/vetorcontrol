@@ -1,5 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { safeGetUser } from "@/lib/offline/safe-auth";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 import { SupervisionDashboard } from "@/components/supervision/SupervisionDashboard";
 import { OperationalDashboard } from "@/components/supervision/OperationalDashboard";
 import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
@@ -23,6 +25,12 @@ export const Route = createFileRoute("/_authenticated/supervision")({
 });
 
 function SupervisionPage() {
+  const { online } = useSyncStatus();
+
+  // ⛔ Bloquear acesso offline: Supervision requer conexão
+  if (!online) {
+    return <OfflineNotAvailable feature="Dashboard de Supervisão" />;
+  }
   return (
     <div className="w-full h-full pb-20">
       <Tabs defaultValue="equipe" className="w-full">

@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { getExecutiveDashboard } from "@/lib/wave-c.functions";
 import { getOperationalDate } from "@/lib/operational-date";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 import {
   generateInstitutionalPDF,
   downloadCSV,
@@ -37,6 +39,13 @@ function isoOffset(days: number) {
 }
 
 function ExecutiveDashboardPage() {
+  const { online } = useSyncStatus();
+
+  // ⛔ Bloquear acesso offline: Dashboard administrativo requer conexão
+  if (!online) {
+    return <OfflineNotAvailable feature="Dashboard Administrativo" />;
+  }
+
   const [from, setFrom] = useState(isoOffset(-30));
   const [to, setTo] = useState(isoOffset(0));
   const [cycleId, setCycleId] = useState<string>("all");
