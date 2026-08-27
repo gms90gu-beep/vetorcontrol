@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
@@ -43,7 +44,7 @@ function DesignSystemPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
       setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));

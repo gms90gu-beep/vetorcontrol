@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { 
   User, 
   MapPin, 
@@ -58,7 +59,7 @@ function SettingsPage() {
   }, []);
 
   async function fetchAgentProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await safeGetUser();
     if (!user) return;
 
     const { data } = await supabase
@@ -73,7 +74,7 @@ function SettingsPage() {
   const handleUpdateAgent = async () => {
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) return;
 
       const { error } = await supabase

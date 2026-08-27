@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
+import { listLocal, getLocal } from "@/lib/offline/repos";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,40 +78,66 @@ export function AgentReportsSimple() {
   }, [today]);
 
   const fetchDailies = useCallback(async (aId: string) => {
-    const { data, error } = await supabase
-      .from("daily_work_records")
-      .select(
-        "id, work_date, epi_week, epi_year, cycle_id, status, properties_worked, properties_closed, deposits_inspected, deposits_treated, positive_foci, tubitos_collected, larvicide_amount, pending_visits, blocks_worked"
-      )
-      .eq("agent_id", aId)
-      .order("work_date", { ascending: false })
-      .limit(60);
-    if (error) console.error("[RELATÓRIOS AGENTE]", error);
+    const data = await safeFetch<any[]>(
+      async () => {
+        const { data: rows, error } = await supabase
+          .from("daily_work_records")
+          .select(
+            "id, work_date, epi_week, epi_year, cycle_id, status, properties_worked, properties_closed, deposits_inspected, deposits_treated, positive_foci, tubitos_collected, larvicide_amount, pending_visits, blocks_worked, agent_id"
+          )
+          .eq("agent_id", aId)
+          .order("work_date", { ascending: false })
+          .limit(60);
+        if (error) throw error;
+        return (rows as any[]) || [];
+      },
+      async () =>
+        ((await listLocal<any>("daily_work_records", (r: any) => r.agent_id === aId)) || [])
+          .sort((a: any, b: any) => String(b.work_date).localeCompare(String(a.work_date)))
+          .slice(0, 60),
+      { label: "daily_work_records" },
+    );
     setDailies((data || []) as Daily[]);
   }, []);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
+      try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) {
-        setLoading(false);
         return;
       }
       setAuthId(session.user.id);
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, registration_number, city")
-        .eq("id", session.user.id)
-        .maybeSingle();
+      const profile = await safeFetch<any>(
+        async () => {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("full_name, registration_number, city")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (error) throw error;
+          return data;
+        },
+        async () => await getLocal<any>("profiles", session.user.id),
+        { label: "profiles" },
+      );
       // DWR usa profile_id como agent_id; agents só fornece metadados de cadastro
-      const { data: agent } = await supabase
-        .from("agents")
-        .select("name, registration_id, municipality")
-        .eq("profile_id", session.user.id)
-        .maybeSingle();
+      const agent = await safeFetch<any>(
+        async () => {
+          const { data, error } = await supabase
+            .from("agents")
+            .select("name, registration_id, municipality, profile_id")
+            .eq("profile_id", session.user.id)
+            .maybeSingle();
+          if (error) throw error;
+          return data;
+        },
+        async () => ((await listLocal<any>("agents", (a: any) => a.profile_id === session.user.id)) || [])[0] ?? null,
+        { label: "agents" },
+      );
       setAgentId(session.user.id);
       setAgentMeta({
         name: agent?.name || profile?.full_name || "Agente",
@@ -118,7 +146,12 @@ export function AgentReportsSimple() {
         municipality: agent?.municipality || profile?.city || "—",
       });
       await fetchDailies(session.user.id);
-      setLoading(false);
+      } catch (e) {
+        // Nunca deixar a tela presa em "Carregando…" por falha de rede.
+        console.warn("[RELATÓRIOS AGENTE] falha ao carregar (offline?)", e);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [fetchDailies]);
 

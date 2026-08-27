@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { runSystemHealth, type SystemHealthResult, type HealthStatus } from "@/lib/system-health.functions";
@@ -40,7 +41,7 @@ function SystemHealthPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
       setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));

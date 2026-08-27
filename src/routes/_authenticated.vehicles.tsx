@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, Component, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +63,7 @@ function VehicleRegistrationPage() {
 
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
 
       const { error } = await supabase

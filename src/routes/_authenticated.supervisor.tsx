@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 
@@ -6,7 +7,7 @@ export const Route = createFileRoute("/_authenticated/supervisor")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
 
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await safeGetUser();
     if (error || !data.user) throw redirect({ to: "/login" });
 
     const role = await getCachedUserRole(data.user.id);
