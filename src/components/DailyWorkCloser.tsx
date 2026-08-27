@@ -340,6 +340,7 @@ async function buildDailySnapshot(
       abandonedProperties: 0,
       recoveredProperties: 0,
       pendingProperties: snap.pendingLocal,
+      focusProperties: snap.focusCount,
       completionPercentage: 0,
       status: "EM_ANDAMENTO",
     }, {
