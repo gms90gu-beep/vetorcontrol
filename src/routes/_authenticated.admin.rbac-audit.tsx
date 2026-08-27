@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { runRbacAudit, type RBACAuditResult } from "@/lib/rbac-audit.functions";
@@ -34,7 +35,7 @@ function RbacAuditPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
       setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));

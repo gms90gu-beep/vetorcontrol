@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { SupervisionDashboard } from "@/components/supervision/SupervisionDashboard";
 import { OperationalDashboard } from "@/components/supervision/OperationalDashboard";
 import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/supervision")({
     if (typeof window === "undefined") return;
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await safeGetUser();
     if (!userData.user) throw redirect({ to: "/login" });
     const role = await getCachedUserRole(userData.user.id);
     if (!role || !["supervisor", "coordenador", "admin_master"].includes(role)) {

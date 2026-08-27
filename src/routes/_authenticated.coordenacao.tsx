@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 import { MunicipalIntelligence } from "@/components/coordination/MunicipalIntelligence";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
@@ -10,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/coordenacao")({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw redirect({ to: "/login" });
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await safeGetUser();
     if (!userData.user) throw redirect({ to: "/login" });
 
     const role = await getCachedUserRole(userData.user.id);
