@@ -491,8 +491,10 @@ function RGPage() {
       if (error) throw error;
       console.log("[RG_RECONCILE_DONE]", data.id);
       setShowNew(false);
-      toast.success("Boletim criado");
-      navigate({ to: "/rg/boletim/$id", params: { id: data.id } });
+      toast.success("Boletim criado — cadastre os imóveis");
+      // Boletim novo nasce sem imóveis: manda direto para a edição com o
+      // cadastro de imóveis já aberto, em vez da visualização vazia.
+      navigate({ to: "/rg/editar/$id", params: { id: data.id }, search: { novo: true } });
     } catch (e: any) {
       console.error("[RG] new boletim", e);
       toast.error("Erro: " + e.message);
