@@ -2902,6 +2902,7 @@ export function DailyWorkCloser({
                               <p className="text-[10px] font-mono opacity-70">{i.code}</p>
                             </div>
                             {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
+                              <>
                               <Button
                                 type="button"
                                 size="sm"
