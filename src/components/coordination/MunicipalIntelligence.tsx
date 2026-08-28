@@ -49,19 +49,29 @@ export function MunicipalIntelligence() {
         
         // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
         let sups = (profs || []).filter((p: any) => p.role === "supervisor");
+        
         if (role === "coordenador" && user?.id) {
-          // Coordenador vê apenas supervisores vinculados a ele (coordinator_id = seu ID)
-          sups = sups.filter((p: any) => p.coordinator_id === user.id);
-          console.log("[COORDINATOR_FILTER]", { role, coordId: user.id, supervisorsFound: sups.length });
+          // Verificar se há supervisores vinculados a este coordenador
+          const linkedSups = sups.filter((p: any) => p.coordinator_id === user.id);
+          
+          if (linkedSups.length > 0) {
+            // ✅ Se tem supervisores vinculados: usar filtro rigoroso
+            sups = linkedSups;
+            console.log("[COORDINATOR_FILTER] Rigoroso", { coordId: user.id, supervisorsFound: sups.length });
+          } else {
+            // ⚠️ Se NÃO tem supervisores vinculados: mostrar todos (compatibilidade)
+            // Isso permite coordenador ver dados até que supervisores sejam vinculados corretamente
+            console.log("[COORDINATOR_FILTER] Compatibilidade (sem vinculações)", { coordId: user.id, totalSupervisors: sups.length });
+          }
         }
         
         // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
         const supIds = new Set(sups.map((s: any) => s.id));
         let ags = (profs || []).filter((p: any) => p.role === "agente");
-        if (role === "coordenador") {
-          // Coordenador vê apenas agentes de seus supervisores
+        if (role === "coordenador" && supIds.size > 0) {
+          // ✅ Coordenador vê apenas agentes de seus supervisores
           ags = ags.filter((p: any) => supIds.has(p.supervisor_id));
-          console.log("[COORDINATOR_FILTER]", { role, agentsFound: ags.length });
+          console.log("[COORDINATOR_FILTER] Agentes", { role, agentsFound: ags.length });
         }
         
         setSupervisors(sups);

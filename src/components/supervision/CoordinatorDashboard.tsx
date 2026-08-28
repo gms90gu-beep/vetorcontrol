@@ -54,9 +54,17 @@ export function CoordinatorDashboard() {
       // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
       let supList = (profiles || []).filter((p: any) => p.role === "supervisor");
       if (role === "coordenador" && user?.id) {
-        // Coordenador vê apenas supervisores vinculados a ele (coordinator_id = seu ID)
-        supList = supList.filter((p: any) => p.coordinator_id === user.id);
-        console.log("[COORDINATOR_DASHBOARD_FILTER]", { role, coordId: user.id, supervisorsFound: supList.length });
+        // Verificar se há supervisores vinculados a este coordenador
+        const linkedSups = supList.filter((p: any) => p.coordinator_id === user.id);
+        
+        if (linkedSups.length > 0) {
+          // ✅ Se tem supervisores vinculados: usar filtro rigoroso
+          supList = linkedSups;
+          console.log("[COORDINATOR_DASHBOARD_FILTER] Rigoroso", { coordId: user.id, supervisorsFound: supList.length });
+        } else {
+          // ⚠️ Se NÃO tem supervisores vinculados: mostrar todos (compatibilidade)
+          console.log("[COORDINATOR_DASHBOARD_FILTER] Compatibilidade (sem vinculações)", { coordId: user.id, totalSupervisors: supList.length });
+        }
       }
       
       // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
@@ -64,10 +72,10 @@ export function CoordinatorDashboard() {
       let agList = (profiles || []).filter(
         (p: any) => (p.role === "agente" || p.role === "agent"),
       );
-      if (role === "coordenador") {
-        // Coordenador vê apenas agentes de seus supervisores
+      if (role === "coordenador" && supIds.size > 0) {
+        // ✅ Coordenador vê apenas agentes de seus supervisores
         agList = agList.filter((p: any) => supIds.has(p.supervisor_id));
-        console.log("[COORDINATOR_DASHBOARD_FILTER]", { role, agentsFound: agList.length });
+        console.log("[COORDINATOR_DASHBOARD_FILTER] Agentes", { role, agentsFound: agList.length });
       }
 
       const today = getOperationalDate();
