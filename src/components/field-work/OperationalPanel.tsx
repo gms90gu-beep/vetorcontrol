@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BlockOperationalMap } from "./BlockOperationalMap";
 import { supabase } from "@/integrations/supabase/client";
@@ -109,6 +111,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
+  const [showEndBlockConfirm, setShowEndBlockConfirm] = useState(false); // 🆕 Confirmação de encerramento
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollKey = `op_panel_scroll_${session?.id ?? "none"}`;
@@ -598,7 +601,21 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
           <BottomAction Icon={ChevronDown} label="Próximo" onClick={() => {
             const p = pendingList[0]; if (p) goToProperty(p.id);
           }} />
-          <BottomAction Icon={CheckCircle2} label="Finalizar" primary onClick={() => (onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } }))} />
+          <BottomAction 
+            Icon={CheckCircle2} 
+            label="Finalizar" 
+            primary 
+            onClick={() => {
+              // 🆕 Se há propriedades pendentes, é última?
+              if (pendingList.length === 0) {
+                // Última propriedade! Mostrar confirmação
+                setShowEndBlockConfirm(true);
+              } else {
+                // Ainda há propriedades, fechar normalmente
+                onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+              }
+            }} 
+          />
         </div>
       </div>
 
@@ -609,6 +626,58 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         properties={properties}
         visits={visits}
       />
+
+      {/* 🆕 Dialog: Confirmação de Encerramento do Quarteirão */}
+      <Dialog open={showEndBlockConfirm} onOpenChange={setShowEndBlockConfirm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Encerrar Quarteirão?
+            </DialogTitle>
+            <DialogDescription>
+              Você visitou todas as propriedades deste quarteirão. Deseja encerrar a jornada agora?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3">
+            {/* Info */}
+            <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-600">Quarteirão:</span>
+                <span className="font-semibold">{session?.block_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Propriedades visitadas:</span>
+                <span className="font-semibold">{properties.filter((p) => {
+                  const visit = visits.find((v) => v.property_id === p.id);
+                  return visit?.status === "visited";
+                }).length}</span>
+              </div>
+            </div>
+
+            {/* Botões */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowEndBlockConfirm(false)}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEndBlockConfirm(false);
+                  onCloseSessionRoute ? onCloseSessionRoute() : navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+                }}
+                className="flex-1 bg-amber-600 hover:bg-amber-700"
+              >
+                ✓ Encerrar Quarteirão
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
