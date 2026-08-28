@@ -883,10 +883,11 @@ export function DailyWorkCloser({
         return;
       }
       
+      const closeContext = await loadOpenDayCloseContext(user.id);
+
       // 🆕 NOVO: Sincronizar propriedades do servidor antes de validar
       console.log("[PRE_CLOSE_SYNC] Sincronizando propriedades...");
       try {
-        const closeContext = await loadOpenDayCloseContext(user.id);
         const activeSessions = await listLocal<any>(
           "field_work_sessions",
           (s) => s.user_id === user.id && toOperationalDate(s.session_date) === closeContext.target.workDate
