@@ -2931,6 +2931,7 @@ export function DailyWorkCloser({
                               >
                                 ✕ Descartar
                               </Button>
+                              </>
                             )}
                           </div>
                           {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
