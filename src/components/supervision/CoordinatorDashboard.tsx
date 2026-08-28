@@ -51,10 +51,24 @@ export function CoordinatorDashboard() {
         remote: async () => await supabase.from("profiles").select("*"),
       });
 
-      const supList = (profiles || []).filter((p: any) => p.role === "supervisor");
-      const agList = (profiles || []).filter(
-        (p: any) => p.role === "agente" || p.role === "agent",
+      // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
+      let supList = (profiles || []).filter((p: any) => p.role === "supervisor");
+      if (role === "coordenador" && user?.id) {
+        // Coordenador vê apenas supervisores vinculados a ele (coordinator_id = seu ID)
+        supList = supList.filter((p: any) => p.coordinator_id === user.id);
+        console.log("[COORDINATOR_DASHBOARD_FILTER]", { role, coordId: user.id, supervisorsFound: supList.length });
+      }
+      
+      // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
+      const supIds = new Set(supList.map((s: any) => s.id));
+      let agList = (profiles || []).filter(
+        (p: any) => (p.role === "agente" || p.role === "agent"),
       );
+      if (role === "coordenador") {
+        // Coordenador vê apenas agentes de seus supervisores
+        agList = agList.filter((p: any) => supIds.has(p.supervisor_id));
+        console.log("[COORDINATOR_DASHBOARD_FILTER]", { role, agentsFound: agList.length });
+      }
 
       const today = getOperationalDate();
       const [visits, openSessions] = await Promise.all([

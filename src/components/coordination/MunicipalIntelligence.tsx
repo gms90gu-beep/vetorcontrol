@@ -46,8 +46,24 @@ export function MunicipalIntelligence() {
           listRemoteOrCache<any>({ name: "properties", remote: async () => await supabase.from("properties").select("id, neighborhood, block_id") }),
           listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }) }),
         ]);
-        const sups = (profs || []).filter((p: any) => p.role === "supervisor");
-        const ags = (profs || []).filter((p: any) => p.role === "agente");
+        
+        // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
+        let sups = (profs || []).filter((p: any) => p.role === "supervisor");
+        if (role === "coordenador" && user?.id) {
+          // Coordenador vê apenas supervisores vinculados a ele (coordinator_id = seu ID)
+          sups = sups.filter((p: any) => p.coordinator_id === user.id);
+          console.log("[COORDINATOR_FILTER]", { role, coordId: user.id, supervisorsFound: sups.length });
+        }
+        
+        // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
+        const supIds = new Set(sups.map((s: any) => s.id));
+        let ags = (profs || []).filter((p: any) => p.role === "agente");
+        if (role === "coordenador") {
+          // Coordenador vê apenas agentes de seus supervisores
+          ags = ags.filter((p: any) => supIds.has(p.supervisor_id));
+          console.log("[COORDINATOR_FILTER]", { role, agentsFound: ags.length });
+        }
+        
         setSupervisors(sups);
         setAgents(ags);
         setVisits(vs || []);
@@ -61,7 +77,7 @@ export function MunicipalIntelligence() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [user?.id, role]);
 
   // Indicadores Gerais
   const totals = useMemo(() => {
