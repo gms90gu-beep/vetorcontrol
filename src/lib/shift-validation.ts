@@ -16,6 +16,7 @@ export interface ShiftIssue {
   message: string;
   count?: number;
   detail?: any;
+  allowForceClose?: boolean; // Se true, agente pode ignorar este aviso e fechar mesmo assim
 }
 
 export interface ShiftValidationScope {
@@ -157,13 +158,15 @@ export async function runShiftValidation(
       count: pendingMutations,
     });
   }
-  // Fila com erro — bloqueante (falha real que exige ação).
+  // Fila com erro — AVISO + permitir force close
+  // (em vez de bloqueante, tenta retry e deixa fechar mesmo assim se quiser)
   if (failedMutations > 0) {
     issues.push({
       code: "FAILED_MUTATIONS",
-      severity: "error",
-      message: `${failedMutations} mutação(ões) com erro de sincronização.`,
+      severity: "warning", // Mudado de "error" para "warning"
+      message: `${failedMutations} mutação(ões) com erro de sincronização. Pressione "Retry" para tentar novamente ou "Fechar Mesmo Assim" para prosseguir.`,
       count: failedMutations,
+      allowForceClose: true, // Novo flag: permite fechar mesmo com aviso
     });
   }
 

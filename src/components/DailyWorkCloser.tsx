@@ -50,7 +50,7 @@ import {
   runShiftValidation,
   type ShiftValidationReport,
 } from "@/lib/shift-validation";
-import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, type FailedMutationInfo } from "@/lib/offline/sync";
+import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, forceRetryFailedMutations, type FailedMutationInfo } from "@/lib/offline/sync";
 import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import {
   AlertDialog,
@@ -934,17 +934,23 @@ export function DailyWorkCloser({
     const before = failedMutations.length;
     console.log("[MUTATION_RETRY]", { count: before, ts: new Date().toISOString() });
     try {
-      await retryFailedMutations();
-      const { ok, failed } = await flushMutations();
-      if (failed === 0) {
-        console.log("[MUTATION_RETRY_SUCCESS]", { ok, previously_failed: before });
-        toast.success(`✔ ${ok} mutações sincronizadas com sucesso.`);
+      // 🔧 Force retry: reseta TODAS as mutações com erro e tenta novamente
+      const { retried, synced } = await forceRetryFailedMutations();
+      console.log("[FORCE_RETRY_RESULT]", { retried, synced });
+      
+      if (synced === retried) {
+        console.log("[MUTATION_RETRY_SUCCESS]", { synced, previously_failed: before });
+        toast.success(`✔ ${synced} mutações sincronizadas com sucesso!`);
       } else {
-        console.warn("[MUTATION_RETRY_FAILED]", { ok, failed });
-        toast.warning(`Sincronização: ${ok} ok, ${failed} erro(s)`);
+        const stillFailing = retried - synced;
+        console.warn("[MUTATION_RETRY_PARTIAL]", { synced, still_failing: stillFailing });
+        toast.warning(`Sincronização: ${synced} ok, ${stillFailing} ainda com erro. Pode fechar mesmo assim.`);
       }
-      console.log("[MUTATION_VALIDATION]", { trigger: "retry" });
+      console.log("[MUTATION_VALIDATION]", { trigger: "force_retry" });
       await handlePreClose();
+    } catch (e) {
+      console.error("[MUTATION_RETRY_ERROR]", e);
+      toast.error("Erro ao fazer retry. Tente novamente.");
     } finally {
       setRetrying(false);
       setValidating(false);

@@ -240,6 +240,36 @@ export async function pendingMutationCount(): Promise<number> {
   return db.mutations.count();
 }
 
+/**
+ * 🔧 FORCE RETRY: Tenta enviar mutações com erro novamente
+ * Usado quando: agente precisa fechar expediente e há erros de sync
+ */
+export async function forceRetryFailedMutations(): Promise<{ retried: number; synced: number }> {
+  console.log("[FORCE_RETRY_START] Reenviando mutações com erro...");
+  
+  const failed = await db.mutations
+    .where("status").equals("error")
+    .toArray();
+
+  console.log(`[FORCE_RETRY] Encontradas ${failed.length} mutações com erro`);
+
+  // Reseta TODAS para pending (independente de tries)
+  for (const m of failed) {
+    await db.mutations.update(m.id!, {
+      status: "pending",
+      tries: 0, // Reseta contador
+      lastError: null,
+      nextRetryAt: null,
+    });
+  }
+
+  // Tenta sync
+  const result = await flushMutations();
+  
+  console.log(`[FORCE_RETRY_DONE] ${result.ok} ok, ${result.failed} ainda falhando`);
+  return { retried: failed.length, synced: result.ok };
+}
+
 export async function pendingByTable(): Promise<Record<string, number>> {
   const all = await db.mutations.toArray();
   const out: Record<string, number> = {};
