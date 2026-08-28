@@ -646,7 +646,16 @@ function BoletimView() {
         .brg-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: .04em; }
         .brg-value { font-size: 11px; font-weight: 600; min-height: 14px; }
         .brg-table { width: 100%; border-collapse: collapse; }
-        .brg-table th, .brg-table td { border: 1px solid #000; padding: 3px 4px; font-size: 10px; }
+        .brg-table th, .brg-table td { 
+          border: 1px solid #000; 
+          padding: 3px 4px; 
+          font-size: 10px;
+          height: 18px;
+          vertical-align: middle;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          word-wrap: break-word;
+        }
         .brg-table th {
           background: #eee;
           font-weight: 700;
@@ -654,7 +663,10 @@ function BoletimView() {
           position: sticky;
           top: 0;
           z-index: 1;
+          height: 20px;
         }
+        .brg-table tr { height: 18px; }
+        .brg-table tbody tr { height: 18px; }
 
         /* Wrapper de scroll horizontal aplicado SOMENTE à tabela */
         .brg-table-scroll {
