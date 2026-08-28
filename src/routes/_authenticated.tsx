@@ -150,11 +150,11 @@ function AppSidebar({ userRole, onLogout }: { userRole: string | null; onLogout:
 
   return (
     <Sidebar variant="inset" collapsible={isMobile ? "offcanvas" : "icon"}>
-      <SidebarHeader className="h-16 flex items-center px-4 border-b">
-        <div className="flex items-center gap-2 font-bold text-primary">
+      <SidebarHeader className="h-16 flex items-center px-4 border-b border-white/10">
+        <div className="flex items-center gap-2 font-bold text-white">
           <div
             aria-hidden
-            className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/30"
+            className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center text-white font-black shadow-lg"
           >
             V
           </div>
@@ -165,7 +165,7 @@ function AppSidebar({ userRole, onLogout }: { userRole: string | null; onLogout:
         <SidebarMenu className="px-2 py-4 gap-4">
           {groups.map(({ group, items }) => (
             <div key={group} className="space-y-1">
-              <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground group-data-[collapsible=icon]:hidden">
+              <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/60 group-data-[collapsible=icon]:hidden">
                 {NAV_GROUP_LABEL[group]}
               </div>
               {items.map((item) => (
@@ -183,16 +183,16 @@ function AppSidebar({ userRole, onLogout }: { userRole: string | null; onLogout:
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t border-white/10 p-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={onLogout}
               aria-label="Sair da conta"
-              className="flex items-center gap-3 px-3 py-2 rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 w-full"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 active:scale-95 w-full font-semibold transition-colors"
             >
               <LogOut className="h-5 w-5" aria-hidden />
-              <span className="font-medium group-data-[collapsible=icon]:hidden">Sair</span>
+              <span className="group-data-[collapsible=icon]:hidden">Sair</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

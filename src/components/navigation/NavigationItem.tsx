@@ -95,12 +95,12 @@ export function NavigationItem({
         "flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 active:scale-95",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         isActive
-          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
-          : "hover:bg-accent text-foreground",
+          ? "bg-white/15 text-white hover:bg-white/20 shadow-lg shadow-white/10"
+          : "text-white/85 hover:text-white hover:bg-white/10",
       )}
     >
       <Icon className="h-5 w-5 shrink-0" aria-hidden />
-      <span className="font-medium truncate group-data-[collapsible=icon]:hidden flex-1">
+      <span className="font-semibold truncate group-data-[collapsible=icon]:hidden flex-1">
         {item.label}
       </span>
       {badge > 0 && (
