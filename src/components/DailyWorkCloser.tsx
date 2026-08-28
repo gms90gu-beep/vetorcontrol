@@ -912,7 +912,9 @@ export function DailyWorkCloser({
             if (freshProps && freshProps.length > 0) {
               // Update local cache with fresh data
               const { db: __offlineDb2 } = await import("@/lib/offline/db");
-              await __offlineDb2.properties.bulkPut(freshProps);
+              await __offlineDb2.properties.bulkPut(
+                freshProps.map((p: any) => ({ id: p.id, data: p, updatedAt: Date.now() })) as any,
+              );
               console.log(`[PRE_CLOSE_SYNC_COMPLETE] ${freshProps.length} propriedades sincronizadas`);
             }
           }
