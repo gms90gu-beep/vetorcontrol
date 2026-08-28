@@ -2914,6 +2914,22 @@ export function DailyWorkCloser({
                               >
                                 {showFailedDetails ? "Ocultar" : "▼ Ver detalhes"}
                               </Button>
+                              {/* 🆕 Botão para descartar/limpar erros de sincronização */}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[10px] text-slate-500 hover:bg-slate-100"
+                                title="Descartar mensagem de erro e limpar lista"
+                                onClick={() => {
+                                  setFailedMutations([]);
+                                  setShowFailedDetails(false);
+                                  console.log("[DISCARD_SYNC_ERRORS] Erros descartados pelo usuário");
+                                  toast.success("Mensagem de erro removida");
+                                }}
+                              >
+                                ✕ Descartar
+                              </Button>
                             )}
                           </div>
                           {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
