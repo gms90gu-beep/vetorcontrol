@@ -911,7 +911,8 @@ export function DailyWorkCloser({
             
             if (freshProps && freshProps.length > 0) {
               // Update local cache with fresh data
-              await db.properties.bulkPut(freshProps);
+              const { db: __offlineDb2 } = await import("@/lib/offline/db");
+              await __offlineDb2.properties.bulkPut(freshProps);
               console.log(`[PRE_CLOSE_SYNC_COMPLETE] ${freshProps.length} propriedades sincronizadas`);
             }
           }
@@ -928,7 +929,6 @@ export function DailyWorkCloser({
         console.log(`[PRE_CLOSE_CLEANUP_COMPLETE] ${cleanedCount} visitas órfãs removidas`);
       }
       
-      const closeContext = await loadOpenDayCloseContext(user.id);
       const active = closeContext.activeSession;
       // Data da Produção: hoje (America/Sao_Paulo) por padrão — a jornada de
       // um quarteirão pode atravessar vários dias e cada dia fecha com sua
