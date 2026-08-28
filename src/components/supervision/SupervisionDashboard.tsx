@@ -86,15 +86,34 @@ export function SupervisionDashboard() {
         setProfile(prof);
       }
 
-      // RLS já filtra por supervisor_id
+      // RLS já filtra por supervisor_id (para supervisores)
+      // Mas para coordenadores, precisa filtro manual
       const profiles = await listRemoteOrCache<any>({
         name: "profiles",
         remote: () => supabase.from("profiles").select("*") as any,
       });
 
-      const team = (profiles || []).filter(
+      // 🆕 FILTRO MANUAL: Para coordenadores, filtrar agentes de seus supervisores
+      let team = (profiles || []).filter(
         (p: any) => p.role === "agente" || p.role === "agent",
       );
+
+      // Se é coordenador: filtrar apenas agentes de seus supervisores
+      if (role === "coordenador" && user?.id) {
+        // 1. Encontrar supervisores do coordenador
+        const supervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
+        const linkedSups = supervisors.filter((p: any) => p.coordinator_id === user.id);
+        const supIds = new Set(linkedSups.length > 0 ? linkedSups.map((s: any) => s.id) : supervisors.map((s: any) => s.id));
+        
+        // 2. Filtrar agentes apenas de seus supervisores
+        if (supIds.size > 0) {
+          team = team.filter((a: any) => supIds.has(a.supervisor_id));
+          console.log("[SUPERVISION_DASHBOARD_FILTER] Coordenador", { coordId: user.id, agentsFound: team.length });
+        } else {
+          // Se nenhum supervisor vinculado: mostrar todos (compatibilidade)
+          console.log("[SUPERVISION_DASHBOARD_FILTER] Coordenador Compatibilidade (sem supervisores)", { coordId: user.id, totalAgents: team.length });
+        }
+      }
 
       const todayISO = getOperationalDate();
 
