@@ -862,7 +862,8 @@ export function DailyWorkCloser({
 
       if (orphans.length > 0) {
         console.log("[CLEANUP_ORPHANS]", { count: orphans.length, ids: orphans.map((v) => v.id.substring(0, 8)) });
-        await db.visits.bulkDelete(orphans.map((v) => v.id));
+        const { db: __offlineDb } = await import("@/lib/offline/db");
+        await __offlineDb.visits.bulkDelete(orphans.map((v) => v.id));
         return orphans.length;
       }
       return 0;
@@ -882,10 +883,11 @@ export function DailyWorkCloser({
         return;
       }
       
+      const closeContext = await loadOpenDayCloseContext(user.id);
+
       // 🆕 NOVO: Sincronizar propriedades do servidor antes de validar
       console.log("[PRE_CLOSE_SYNC] Sincronizando propriedades...");
       try {
-        const closeContext = await loadOpenDayCloseContext(user.id);
         const activeSessions = await listLocal<any>(
           "field_work_sessions",
           (s) => s.user_id === user.id && toOperationalDate(s.session_date) === closeContext.target.workDate
@@ -909,7 +911,10 @@ export function DailyWorkCloser({
             
             if (freshProps && freshProps.length > 0) {
               // Update local cache with fresh data
-              await db.properties.bulkPut(freshProps);
+              const { db: __offlineDb2 } = await import("@/lib/offline/db");
+              await __offlineDb2.properties.bulkPut(
+                freshProps.map((p: any) => ({ id: p.id, data: p, updatedAt: Date.now() })) as any,
+              );
               console.log(`[PRE_CLOSE_SYNC_COMPLETE] ${freshProps.length} propriedades sincronizadas`);
             }
           }
@@ -926,7 +931,6 @@ export function DailyWorkCloser({
         console.log(`[PRE_CLOSE_CLEANUP_COMPLETE] ${cleanedCount} visitas órfãs removidas`);
       }
       
-      const closeContext = await loadOpenDayCloseContext(user.id);
       const active = closeContext.activeSession;
       // Data da Produção: hoje (America/Sao_Paulo) por padrão — a jornada de
       // um quarteirão pode atravessar vários dias e cada dia fecha com sua
@@ -2902,6 +2906,7 @@ export function DailyWorkCloser({
                               <p className="text-[10px] font-mono opacity-70">{i.code}</p>
                             </div>
                             {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (
+                              <>
                               <Button
                                 type="button"
                                 size="sm"
@@ -2930,6 +2935,7 @@ export function DailyWorkCloser({
                               >
                                 ✕ Descartar
                               </Button>
+                              </>
                             )}
                           </div>
                           {i.code === "FAILED_MUTATIONS" && failedMutations.length > 0 && (

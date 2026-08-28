@@ -41,7 +41,7 @@ async function resolveScopedAgents(supabase: any, userId: string) {
     throw new Error("Forbidden: requer supervisor ou admin_master");
   }
 
-  let profileQuery = supabase.from("profiles").select("id, full_name, registration_id, supervisor_id");
+  let profileQuery = supabase.from("profiles").select("id, full_name, registration_number, supervisor_id");
   if (role === "supervisor") profileQuery = profileQuery.eq("supervisor_id", userId);
   const { data: profiles, error: profErr } = await profileQuery;
   if (profErr) throw new Error(profErr.message);
@@ -113,7 +113,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
         agent_id: p.id,
         profile_id: p.id,
         full_name: p.full_name || "Sem nome",
-        registration: p.registration_id ?? null,
+        registration: p.registration_number ?? null,
         ...emptyTotals(),
       });
     }
