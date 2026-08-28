@@ -18,6 +18,7 @@ import {
   Pencil,
   Trash2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   FileText,
 } from "lucide-react";
@@ -428,6 +429,20 @@ function RGPage() {
 
   async function handleNewBoletim(payload: { block_number: string; locality: string }) {
     try {
+      // 🆕 Validar online ANTES de tudo
+      if (!navigator.onLine) {
+        toast.error(
+          "⚠️ Você precisa estar ONLINE para criar um RG.\n\n" +
+          "📝 Recomendação: Crie o RG antes de sair do escritório!\n\n" +
+          "💡 Depois que criado, você consegue preencher dados mesmo offline.",
+          {
+            duration: 5000,
+            description: "Verifique sua conexão e tente novamente"
+          }
+        );
+        return;
+      }
+
       const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
 
@@ -1032,6 +1047,7 @@ function NewBoletimForm({ onSubmit, onCancel }: {
   const [locality, setLocality] = useState("");
   const [side, setSide] = useState("");
   const [saving, setSaving] = useState(false);
+  const isOnline = navigator.onLine;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1047,6 +1063,22 @@ function NewBoletimForm({ onSubmit, onCancel }: {
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {/* 🆕 Aviso se offline */}
+      {!isOnline && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm">
+          <div className="flex gap-2">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Sem conexão - Não é possível criar RG</p>
+              <p className="text-[12px] mt-1 opacity-80">
+                Crie o RG quando estiver online (no escritório).
+                Depois que criado, você consegue preencher dados mesmo offline.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div>
         <Label className="text-[10px] uppercase tracking-widest font-bold" style={{ color: C.text2 }}>Localidade</Label>
         <Input value={locality} onChange={(e) => setLocality(e.target.value)} placeholder="Ex: Centro" className="h-10 mt-1" autoFocus />
@@ -1067,7 +1099,12 @@ function NewBoletimForm({ onSubmit, onCancel }: {
       </div>
       <div className="grid grid-cols-2 gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
-        <Button type="submit" disabled={saving} style={{ background: C.hdrBg, color: "#fff" }}>
+        <Button 
+          type="submit" 
+          disabled={saving || !isOnline} 
+          style={{ background: C.hdrBg, color: "#fff" }}
+          title={!isOnline ? "Você precisa estar online para criar RG" : ""}
+        >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Criar</>}
         </Button>
       </div>
