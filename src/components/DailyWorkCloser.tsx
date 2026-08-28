@@ -862,7 +862,8 @@ export function DailyWorkCloser({
 
       if (orphans.length > 0) {
         console.log("[CLEANUP_ORPHANS]", { count: orphans.length, ids: orphans.map((v) => v.id.substring(0, 8)) });
-        await db.visits.bulkDelete(orphans.map((v) => v.id));
+        const { db: __offlineDb } = await import("@/lib/offline/db");
+        await __offlineDb.visits.bulkDelete(orphans.map((v) => v.id));
         return orphans.length;
       }
       return 0;
