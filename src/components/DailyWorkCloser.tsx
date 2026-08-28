@@ -847,6 +847,31 @@ export function DailyWorkCloser({
    */
   const resolveActiveSessionForDayClose = resolveActiveSessionCandidate;
 
+  // 🆕 Função auxiliar: Cleanup de visitas órfãs
+  const cleanupOrphanVisits = async (userId: string, workDate: string): Promise<number> => {
+    try {
+      const allProps = await listLocal<any>("properties");
+      const validPropIds = new Set(allProps.map((p) => p.id));
+
+      const dayVisits = await listLocal<any>(
+        "visits",
+        (v) => v.agent_id === userId && toOperationalDate(v.visit_date) === workDate
+      );
+
+      const orphans = dayVisits.filter((v) => v.property_id && !validPropIds.has(v.property_id));
+
+      if (orphans.length > 0) {
+        console.log("[CLEANUP_ORPHANS]", { count: orphans.length, ids: orphans.map((v) => v.id.substring(0, 8)) });
+        await db.visits.bulkDelete(orphans.map((v) => v.id));
+        return orphans.length;
+      }
+      return 0;
+    } catch (e) {
+      console.warn("[CLEANUP_ORPHANS_ERROR]", e);
+      return 0; // Não bloqueia se falhar
+    }
+  };
+
   const handlePreClose = async () => {
     console.log("[SHIFT_CLOSE_INTELLIGENT_START]");
     setValidating(true);
@@ -856,6 +881,51 @@ export function DailyWorkCloser({
         toast.error("Usuário não autenticado.");
         return;
       }
+      
+      // 🆕 NOVO: Sincronizar propriedades do servidor antes de validar
+      console.log("[PRE_CLOSE_SYNC] Sincronizando propriedades...");
+      try {
+        const closeContext = await loadOpenDayCloseContext(user.id);
+        const activeSessions = await listLocal<any>(
+          "field_work_sessions",
+          (s) => s.user_id === user.id && toOperationalDate(s.session_date) === closeContext.target.workDate
+        );
+        
+        if (activeSessions.length > 0) {
+          const blockIds = Array.from(
+            new Set(
+              activeSessions
+                .filter((s) => s.block_id)
+                .map((s) => String(s.block_id))
+            )
+          );
+          
+          if (blockIds.length > 0 && isOnline()) {
+            // Fetch fresh properties from server
+            const { data: freshProps } = await supabase
+              .from("properties")
+              .select("*")
+              .in("block_id", blockIds);
+            
+            if (freshProps && freshProps.length > 0) {
+              // Update local cache with fresh data
+              await db.properties.bulkPut(freshProps);
+              console.log(`[PRE_CLOSE_SYNC_COMPLETE] ${freshProps.length} propriedades sincronizadas`);
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn("[PRE_CLOSE_SYNC_ERROR]", syncErr);
+        // Continue même se sync falhar - não bloqueia
+      }
+      
+      // 🆕 NOVO: Cleanup de visitas órfãs
+      console.log("[PRE_CLOSE_CLEANUP] Limpando visitas órfãs...");
+      const cleanedCount = await cleanupOrphanVisits(user.id, closeContext.target.workDate);
+      if (cleanedCount > 0) {
+        console.log(`[PRE_CLOSE_CLEANUP_COMPLETE] ${cleanedCount} visitas órfãs removidas`);
+      }
+      
       const closeContext = await loadOpenDayCloseContext(user.id);
       const active = closeContext.activeSession;
       // Data da Produção: hoje (America/Sao_Paulo) por padrão — a jornada de
