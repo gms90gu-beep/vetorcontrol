@@ -87,11 +87,29 @@ export function SupervisionDashboard() {
       }
 
       // RLS já filtra por supervisor_id (para supervisores)
-      // Mas para coordenadores, precisa filtro manual
-      const profiles = await listRemoteOrCache<any>({
-        name: "profiles",
-        remote: () => supabase.from("profiles").select("*") as any,
-      });
+      // Mas para coordenadores, precisa RPC
+      let profiles;
+      if (role === "coordenador" && user?.id) {
+        try {
+          const { data, error } = await supabase.rpc('get_coordinator_data', { p_user_id: user.id });
+          if (!error && data && data.length > 0) {
+            profiles = data;
+            console.log("[SUPERVISION_RPC] ✅ Sucesso - dados via RPC", { count: data.length });
+          } else {
+            throw new Error("RPC vazio ou erro");
+          }
+        } catch (rpcError) {
+          console.log("[SUPERVISION_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: rpcError.message });
+          profiles = null; // Vai carregar abaixo
+        }
+      }
+      
+      if (!profiles) {
+        profiles = await listRemoteOrCache<any>({
+          name: "profiles",
+          remote: () => supabase.from("profiles").select("*") as any,
+        });
+      }
 
       // 🆕 FILTRO INTELIGENTE: Para coordenadores, filtrar agentes de seus supervisores
       let team = (profiles || []).filter(

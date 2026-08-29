@@ -45,11 +45,29 @@ export function CoordinatorDashboard() {
   async function fetchAll() {
     setLoading(true);
     try {
-      // RLS filtra automaticamente: coordenador vê seus supervisores e os agentes deles
-      const profiles = await listRemoteOrCache<any>({
-        name: "profiles",
-        remote: async () => await supabase.from("profiles").select("*"),
-      });
+      // 🆕 Para coordenador: tentar usar RPC primeiro (ignora RLS)
+      let profiles;
+      if (role === "coordenador" && user?.id) {
+        try {
+          const { data, error } = await supabase.rpc('get_coordinator_data', { p_user_id: user.id });
+          if (!error && data && data.length > 0) {
+            profiles = data;
+            console.log("[COORDINATOR_RPC] ✅ Sucesso - dados via RPC", { count: data.length });
+          } else {
+            throw new Error("RPC vazio ou erro");
+          }
+        } catch (rpcError) {
+          console.log("[COORDINATOR_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: rpcError.message });
+          profiles = null; // Vai carregar abaixo
+        }
+      }
+      
+      if (!profiles) {
+        profiles = await listRemoteOrCache<any>({
+          name: "profiles",
+          remote: async () => await supabase.from("profiles").select("*"),
+        });
+      }
 
       // 🆕 FILTRO INTELIGENTE: Coordenador vê seus supervisores OU todos (compatibilidade)
       let supList = (profiles || []).filter((p: any) => p.role === "supervisor");

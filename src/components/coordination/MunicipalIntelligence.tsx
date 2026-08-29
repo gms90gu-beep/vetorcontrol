@@ -37,8 +37,25 @@ export function MunicipalIntelligence() {
     (async () => {
       setLoading(true);
       try {
+        // 🆕 Para coordenador: tentar usar RPC primeiro (ignora RLS)
+        let profiles;
+        if (role === "coordenador" && user?.id) {
+          try {
+            const { data, error } = await supabase.rpc('get_coordinator_data', { p_user_id: user.id });
+            if (!error && data && data.length > 0) {
+              profiles = data;
+              console.log("[COORDINATOR_RPC] ✅ Sucesso - dados via RPC", { count: data.length });
+            } else {
+              throw new Error("RPC vazio ou erro");
+            }
+          } catch (rpcError) {
+            console.log("[COORDINATOR_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: rpcError.message });
+            profiles = null; // Vai carregar abaixo
+          }
+        }
+        
         const [profs, vs, props, cs] = await Promise.all([
-          listRemoteOrCache<any>({ name: "profiles", remote: async () => await supabase.from("profiles").select("id, full_name, email, city, role, supervisor_id, coordinator_id, is_active") }),
+          profiles ? Promise.resolve(profiles) : listRemoteOrCache<any>({ name: "profiles", remote: async () => await supabase.from("profiles").select("id, full_name, email, city, role, supervisor_id, coordinator_id, is_active") }),
           // Sem filtro de período: dado cresce sem limite ao longo dos anos.
           // Aplica um teto de segurança + ordena mais recentes primeiro, pra
           // não travar o dashboard nem estourar o tamanho de resposta.
