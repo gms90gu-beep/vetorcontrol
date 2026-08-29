@@ -258,8 +258,8 @@ export async function forceRetryFailedMutations(): Promise<{ retried: number; sy
     await db.mutations.update(m.id!, {
       status: "pending",
       tries: 0, // Reseta contador
-      lastError: null,
-      nextRetryAt: null,
+      lastError: undefined,
+      nextRetryAt: undefined,
     });
   }
 
