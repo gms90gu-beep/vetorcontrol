@@ -51,31 +51,32 @@ export function CoordinatorDashboard() {
         remote: async () => await supabase.from("profiles").select("*"),
       });
 
-      // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
+      // 🆕 FILTRO INTELIGENTE: Coordenador vê seus supervisores OU todos (compatibilidade)
       let supList = (profiles || []).filter((p: any) => p.role === "supervisor");
       if (role === "coordenador" && user?.id) {
         // Verificar se há supervisores vinculados a este coordenador
         const linkedSups = supList.filter((p: any) => p.coordinator_id === user.id);
         
         if (linkedSups.length > 0) {
-          // ✅ Se tem supervisores vinculados: usar filtro rigoroso
+          // ✅ Modo 1: Filtro Rigoroso (supervisores vinculados)
           supList = linkedSups;
-          console.log("[COORDINATOR_DASHBOARD_FILTER] Rigoroso", { coordId: user.id, supervisorsFound: supList.length });
+          console.log("[COORDINATOR_DASHBOARD_FILTER] RIGOROSO - Supervisores vinculados", { coordId: user.id, supervisorsFound: supList.length });
         } else {
-          // ⚠️ Se NÃO tem supervisores vinculados: mostrar todos (compatibilidade)
-          console.log("[COORDINATOR_DASHBOARD_FILTER] Compatibilidade (sem vinculações)", { coordId: user.id, totalSupervisors: supList.length });
+          // ⚠️ Modo 2: Permissivo (compatibilidade - coordenador novo)
+          // Mostrar TODOS os supervisores até que coordinator_id seja preenchido
+          console.log("[COORDINATOR_DASHBOARD_FILTER] PERMISSIVO - Coordenador novo (sem vinculações)", { coordId: user.id, totalSupervisors: supList.length, note: "Mostrar TODOS até vincular no banco" });
         }
       }
       
-      // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
+      // 🆕 Agentes: filtrar pelos supervisores que temos (rigoroso ou todos)
       const supIds = new Set(supList.map((s: any) => s.id));
       let agList = (profiles || []).filter(
         (p: any) => (p.role === "agente" || p.role === "agent"),
       );
       if (role === "coordenador" && supIds.size > 0) {
-        // ✅ Coordenador vê apenas agentes de seus supervisores
+        // ✅ Coordenador vê agentes de seus supervisores (ou TODOS se em modo permissivo)
         agList = agList.filter((p: any) => supIds.has(p.supervisor_id));
-        console.log("[COORDINATOR_DASHBOARD_FILTER] Agentes", { role, agentsFound: agList.length });
+        console.log("[COORDINATOR_DASHBOARD_FILTER] Agentes filtrados", { role, agentsFound: agList.length, supervisorsCount: supIds.size });
       }
 
       const today = getOperationalDate();

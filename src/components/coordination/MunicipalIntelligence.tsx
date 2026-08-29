@@ -47,7 +47,7 @@ export function MunicipalIntelligence() {
           listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, name, year, number, status").order("year", { ascending: false }) }),
         ]);
         
-        // 🆕 FILTRO DE SEGURANÇA: Coordenador só vê seus supervisores
+        // 🆕 FILTRO INTELIGENTE: Coordenador vê seus supervisores OU todos (compatibilidade)
         let sups = (profs || []).filter((p: any) => p.role === "supervisor");
         
         if (role === "coordenador" && user?.id) {
@@ -55,23 +55,23 @@ export function MunicipalIntelligence() {
           const linkedSups = sups.filter((p: any) => p.coordinator_id === user.id);
           
           if (linkedSups.length > 0) {
-            // ✅ Se tem supervisores vinculados: usar filtro rigoroso
+            // ✅ Modo 1: Filtro Rigoroso (supervisores vinculados)
             sups = linkedSups;
-            console.log("[COORDINATOR_FILTER] Rigoroso", { coordId: user.id, supervisorsFound: sups.length });
+            console.log("[COORDINATOR_FILTER] RIGOROSO - Supervisores vinculados", { coordId: user.id, supervisorsFound: sups.length });
           } else {
-            // ⚠️ Se NÃO tem supervisores vinculados: mostrar todos (compatibilidade)
-            // Isso permite coordenador ver dados até que supervisores sejam vinculados corretamente
-            console.log("[COORDINATOR_FILTER] Compatibilidade (sem vinculações)", { coordId: user.id, totalSupervisors: sups.length });
+            // ⚠️ Modo 2: Permissivo (compatibilidade - coordenador novo)
+            // Mostrar TODOS os supervisores até que coordinator_id seja preenchido
+            console.log("[COORDINATOR_FILTER] PERMISSIVO - Coordenador novo (sem vinculações)", { coordId: user.id, totalSupervisors: sups.length, note: "Mostrar TODOS até vincular no banco" });
           }
         }
         
-        // 🆕 Agentes: filtrar apenas os de supervisores do coordenador
+        // 🆕 Agentes: filtrar pelos supervisores que temos (rigoroso ou todos)
         const supIds = new Set(sups.map((s: any) => s.id));
         let ags = (profs || []).filter((p: any) => p.role === "agente");
         if (role === "coordenador" && supIds.size > 0) {
-          // ✅ Coordenador vê apenas agentes de seus supervisores
+          // ✅ Coordenador vê agentes de seus supervisores (ou TODOS se em modo permissivo)
           ags = ags.filter((p: any) => supIds.has(p.supervisor_id));
-          console.log("[COORDINATOR_FILTER] Agentes", { role, agentsFound: ags.length });
+          console.log("[COORDINATOR_FILTER] Agentes filtrados", { role, agentsFound: ags.length, supervisorsCount: supIds.size });
         }
         
         setSupervisors(sups);

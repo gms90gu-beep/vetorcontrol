@@ -93,25 +93,28 @@ export function SupervisionDashboard() {
         remote: () => supabase.from("profiles").select("*") as any,
       });
 
-      // 🆕 FILTRO MANUAL: Para coordenadores, filtrar agentes de seus supervisores
+      // 🆕 FILTRO INTELIGENTE: Para coordenadores, filtrar agentes de seus supervisores
       let team = (profiles || []).filter(
         (p: any) => p.role === "agente" || p.role === "agent",
       );
 
-      // Se é coordenador: filtrar apenas agentes de seus supervisores
+      // Se é coordenador: filtrar agentes de seus supervisores (ou mostrar TODOS se novo)
       if (role === "coordenador" && user?.id) {
         // 1. Encontrar supervisores do coordenador
         const supervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
         const linkedSups = supervisors.filter((p: any) => p.coordinator_id === user.id);
-        const supIds = new Set(linkedSups.length > 0 ? linkedSups.map((s: any) => s.id) : supervisors.map((s: any) => s.id));
         
-        // 2. Filtrar agentes apenas de seus supervisores
-        if (supIds.size > 0) {
+        if (linkedSups.length > 0) {
+          // ✅ Modo 1: Filtro Rigoroso (supervisores vinculados)
+          const supIds = new Set(linkedSups.map((s: any) => s.id));
           team = team.filter((a: any) => supIds.has(a.supervisor_id));
-          console.log("[SUPERVISION_DASHBOARD_FILTER] Coordenador", { coordId: user.id, agentsFound: team.length });
+          console.log("[SUPERVISION_DASHBOARD_FILTER] RIGOROSO - Coordenador com supervisores vinculados", { coordId: user.id, agentsFound: team.length });
         } else {
-          // Se nenhum supervisor vinculado: mostrar todos (compatibilidade)
-          console.log("[SUPERVISION_DASHBOARD_FILTER] Coordenador Compatibilidade (sem supervisores)", { coordId: user.id, totalAgents: team.length });
+          // ⚠️ Modo 2: Permissivo (compatibilidade - coordenador novo sem supervisores vinculados)
+          // Mostrar TODOS os agentes até que coordinator_id seja preenchido
+          const supIds = new Set(supervisors.map((s: any) => s.id));
+          team = team.filter((a: any) => supIds.has(a.supervisor_id));
+          console.log("[SUPERVISION_DASHBOARD_FILTER] PERMISSIVO - Coordenador novo (sem vinculações)", { coordId: user.id, totalAgents: team.length, note: "Mostrar agentes de TODOS supervisores até vincular" });
         }
       }
 
