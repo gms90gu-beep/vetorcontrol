@@ -240,6 +240,17 @@ async function buildDailySnapshot(
     const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
     snap.depExisting += q;
     snap.depInspected += q;
+    // 🔍 DEBUG: Log para validar contagem de depósitos
+    if (q > 20) {
+      console.warn('[DEPOSITS_DEBUG]', {
+        visit_id: v.id,
+        property_id: v.property_id,
+        visit_date: v.visit_date,
+        deposits_count: deps.length,
+        total_quantity: q,
+        deps_detail: deps.map((d: any) => ({ id: d.id, quantity: d.quantity, type_code: d.type_code }))
+      });
+    }
     // Depósitos tratados: visit_deposits.is_treated quando existir; senão a
     // coluna visits.treated_deposits (fonte real gravada pela tela do imóvel).
     // Sem esse fallback, daily_work_records.deposits_treated ficava sempre 0.
@@ -293,7 +304,11 @@ async function buildDailySnapshot(
     "field_work_sessions",
     (s) => s.user_id === userId && s.session_date === opDateStr,
   );
-  snap.blocksWorked = new Set(daySessions.map((s) => s.block_number)).size;
+  // 🔧 FIX: Contar apenas quarteirões FINALIZADOS (status === "completed")
+  // Antes: contava todos os quarteirões, inclusive os em progresso
+  snap.blocksWorked = new Set(
+    daySessions.filter((s) => s.status === "completed").map((s) => s.block_number)
+  ).size;
   snap.blocksCompleted = new Set(
     daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
   ).size;
