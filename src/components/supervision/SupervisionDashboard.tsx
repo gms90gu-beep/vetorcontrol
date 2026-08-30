@@ -40,7 +40,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { getBlockProgressBatch } from "@/lib/offline/repos/blockProgress";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 
-type FilterKey = "all" | "active" | "inactive" | "no_session";
+type FilterKey = "all" | "supervisors" | "agents" | "active" | "inactive" | "no_session";
 
 function initials(name?: string | null) {
   if (!name) return "??";
@@ -306,6 +306,8 @@ export function SupervisionDashboard() {
     }
   }
 
+  const canSeeSupervisors = role === "coordenador" || role === "admin_master";
+
   const totals = useMemo(() => {
     const active = agents.filter((a) => a.is_active).length;
     const inactive = agents.filter((a) => !a.is_active).length;
@@ -318,6 +320,8 @@ export function SupervisionDashboard() {
         a.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.registration_number?.toLowerCase().includes(searchTerm.toLowerCase());
       if (!m) return false;
+      if (filter === "supervisors") return a.role === "supervisor";
+      if (filter === "agents") return a.role === "agente" || a.role === "agent";
       if (filter === "active") return a.is_active;
       if (filter === "inactive") return !a.is_active;
       if (filter === "no_session") return !a.hasAnyToday;
@@ -540,6 +544,9 @@ export function SupervisionDashboard() {
             {(
               [
                 ["all", "Todos"],
+                ...(canSeeSupervisors
+                  ? ([["supervisors", "Supervisores"], ["agents", "Agentes"]] as [FilterKey, string][])
+                  : []),
                 ["active", "Ativos"],
                 ["inactive", "Inativos"],
                 ["no_session", "Sem sessão"],
@@ -584,6 +591,12 @@ export function SupervisionDashboard() {
                       <h3 className="font-black text-slate-900 text-sm truncate">
                         {agent.full_name}
                       </h3>
+                      <div className="flex items-center gap-1 shrink-0">
+                      {agent.role === "supervisor" && (
+                        <Badge className="rounded-md px-1.5 py-0 font-black text-[9px] uppercase tracking-wider border-none bg-sky-100 text-sky-700">
+                          SUPERVISOR
+                        </Badge>
+                      )}
                       <Badge
                         className={cn(
                           "rounded-md px-1.5 py-0 font-black text-[9px] uppercase tracking-wider border-none",
@@ -594,6 +607,7 @@ export function SupervisionDashboard() {
                       >
                         {agent.is_active ? "ATIVO" : "INATIVO"}
                       </Badge>
+                      </div>
                     </div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
                       {agent.registration_number || "—"} · {agent.city || "—"}
