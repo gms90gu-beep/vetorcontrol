@@ -1805,6 +1805,20 @@ export type Database = {
         Args: { p_agent_id: string; p_cycle_id: string; p_date: string }
         Returns: Json
       }
+      get_coordinator_data: {
+        Args: { p_user_id: string }
+        Returns: {
+          city: string
+          coordinator_id: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          registration_number: string
+          role: string
+          supervisor_id: string
+        }[]
+      }
       get_correct_metrics: {
         Args: { p_agent_id: string; p_cycle_id: string; p_work_date: string }
         Returns: {
