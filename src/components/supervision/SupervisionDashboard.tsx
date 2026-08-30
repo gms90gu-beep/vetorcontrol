@@ -111,30 +111,36 @@ export function SupervisionDashboard() {
         });
       }
 
-      // 🆕 FILTRO INTELIGENTE: Para coordenadores, filtrar agentes de seus supervisores
-      let team = (profiles || []).filter(
+      // 🆕 Coordenador e Admin Master gerenciam SUPERVISORES + AGENTES
+      const includeSupervisors = role === "coordenador" || role === "admin_master";
+
+      const allAgents = (profiles || []).filter(
         (p: any) => p.role === "agente" || p.role === "agent",
       );
+      const allSupervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
 
-      // Se é coordenador: filtrar agentes de seus supervisores (ou mostrar TODOS se novo)
+      let team: any[] = [...allAgents];
+      let visibleSupervisors: any[] = includeSupervisors ? [...allSupervisors] : [];
+
+      // Se é coordenador: filtrar supervisores vinculados + agentes desses supervisores
       if (role === "coordenador" && user?.id) {
-        // 1. Encontrar supervisores do coordenador
-        const supervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
-        const linkedSups = supervisors.filter((p: any) => p.coordinator_id === user.id);
-        
-        if (linkedSups.length > 0) {
-          // ✅ Modo 1: Filtro Rigoroso (supervisores vinculados)
-          const supIds = new Set(linkedSups.map((s: any) => s.id));
-          team = team.filter((a: any) => supIds.has(a.supervisor_id));
-          console.log("[SUPERVISION_DASHBOARD_FILTER] RIGOROSO - Coordenador com supervisores vinculados", { coordId: user.id, agentsFound: team.length });
-        } else {
-          // ⚠️ Modo 2: Permissivo (compatibilidade - coordenador novo sem supervisores vinculados)
-          // Mostrar TODOS os agentes até que coordinator_id seja preenchido
-          const supIds = new Set(supervisors.map((s: any) => s.id));
-          team = team.filter((a: any) => supIds.has(a.supervisor_id));
-          console.log("[SUPERVISION_DASHBOARD_FILTER] PERMISSIVO - Coordenador novo (sem vinculações)", { coordId: user.id, totalAgents: team.length, note: "Mostrar agentes de TODOS supervisores até vincular" });
-        }
+        const linkedSups = allSupervisors.filter((p: any) => p.coordinator_id === user.id);
+        const scopedSups = linkedSups.length > 0 ? linkedSups : allSupervisors;
+        const supIds = new Set(scopedSups.map((s: any) => s.id));
+        visibleSupervisors = scopedSups;
+        team = team.filter((a: any) => supIds.has(a.supervisor_id));
+        console.log("[SUPERVISION_DASHBOARD_FILTER]", {
+          mode: linkedSups.length > 0 ? "RIGOROSO" : "PERMISSIVO",
+          coordId: user.id,
+          supervisors: scopedSups.length,
+          agents: team.length,
+        });
       }
+
+      if (includeSupervisors) {
+        team = [...visibleSupervisors, ...team];
+      }
+
 
       const todayISO = getOperationalDate();
 
