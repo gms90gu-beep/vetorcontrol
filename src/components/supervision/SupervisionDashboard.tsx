@@ -88,18 +88,18 @@ export function SupervisionDashboard() {
 
       // RLS já filtra por supervisor_id (para supervisores)
       // Mas para coordenadores, precisa RPC
-      let profiles;
+      let profiles: any[] | null = null;
       if (role === "coordenador" && user?.id) {
         try {
-          const { data, error } = await supabase.rpc('get_coordinator_data', { p_user_id: user.id });
+          const { data, error } = await (supabase.rpc as any)("get_coordinator_data", { p_user_id: user.id });
           if (!error && data && data.length > 0) {
-            profiles = data;
+            profiles = data as any[];
             console.log("[SUPERVISION_RPC] ✅ Sucesso - dados via RPC", { count: data.length });
           } else {
             throw new Error("RPC vazio ou erro");
           }
         } catch (rpcError) {
-          console.log("[SUPERVISION_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: rpcError.message });
+          console.log("[SUPERVISION_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: (rpcError as any)?.message });
           profiles = null; // Vai carregar abaixo
         }
       }
