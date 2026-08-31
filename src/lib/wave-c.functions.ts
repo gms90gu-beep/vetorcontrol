@@ -472,9 +472,11 @@ export interface PropertyMapPoint {
   latitude: number;
   longitude: number;
   status: string | null;
+  last_visit_status: string | null;
   has_pendency: boolean;
   has_positive_focus: boolean;
   is_strategic: boolean;
+
   boletim_id: string | null;
   agent_name: string | null;
   last_visit_at: string | null;
@@ -615,7 +617,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
     const { data: visits } = await supabase
       .from("visits")
-      .select("id, property_id, agent_id, has_focus, visit_date")
+      .select("id, property_id, agent_id, has_focus, status, visit_date")
       .in("property_id", propIds)
       .gte("visit_date", data.from)
       .lte("visit_date", data.to)
@@ -624,6 +626,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const focusByProp = new Map<string, number>();
     const lastVisitByProp = new Map<string, string>();
     const lastAgentByProp = new Map<string, string>();
+    const lastStatusByProp = new Map<string, string>();
     const visitIds: string[] = [];
     for (const v of visits ?? []) {
       visitIds.push(v.id);
@@ -631,6 +634,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
+        if (v.status) lastStatusByProp.set(v.property_id, String(v.status));
       }
     }
 
@@ -683,6 +687,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         latitude: Number(p.latitude),
         longitude: Number(p.longitude),
         status: p.status ?? null,
+        last_visit_status: lastStatusByProp.get(p.id) ?? null,
         has_pendency: pend > 0,
         has_positive_focus: foci > 0,
         is_strategic: isPe,
