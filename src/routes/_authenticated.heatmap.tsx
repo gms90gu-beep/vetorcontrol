@@ -138,6 +138,15 @@ function HeatmapPage() {
     [geoPoints],
   );
 
+  const counts = useMemo(() => {
+    const c = { focus: 0, closed: 0, refused: 0, pendency: 0, strategic: 0, clean: 0 } as Record<string, number>;
+    for (const p of geoPoints) {
+      const st = classify(p).status;
+      c[st] = (c[st] ?? 0) + 1;
+    }
+    return c as { focus: number; closed: number; refused: number; pendency: number; strategic: number; clean: number };
+  }, [geoPoints]);
+
   const territoryPoints = useMemo(
     () => geoPoints.map((p) => ({ lat: p.latitude, lng: p.longitude, agentLabel: p.agent_name ?? null })),
     [geoPoints],
@@ -215,6 +224,8 @@ function HeatmapPage() {
             onRetryLoad={refetchAll}
             isEmpty={geoPoints.length === 0}
             emptyVariant={allPoints.length === 0 ? "no-data" : "no-geo"}
+            legendEntries={HEATMAP_LEGEND}
+            legendTrailing={`${geoPoints.length} imóveis · ${counts.focus} focos · ${counts.closed + counts.refused} fechadas/recusadas · ${counts.pendency} pendências`}
           >
             <SharedMarkerLayer
               points={markers}
