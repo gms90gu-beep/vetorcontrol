@@ -30,12 +30,36 @@ function isoOffset(days: number) {
 }
 
 function classify(p: PropertyMapPoint) {
+  // Prioridade operacional: foco > fechada/recusada > pendência > PE > sem foco
+  if (p.has_positive_focus) {
+    return { status: "focus" as const, color: MARKER_COLORS.focus, label: "Foco positivo" };
+  }
+  const st = (p.last_visit_status ?? "").toLowerCase();
+  if (st === "closed") {
+    return { status: "closed" as const, color: MARKER_COLORS.closed, label: "Fechada" };
+  }
+  if (st === "refused") {
+    return { status: "refused" as const, color: MARKER_COLORS.refused, label: "Recusada" };
+  }
+  if (p.has_pendency) {
+    return { status: "pendency" as const, color: MARKER_COLORS.pendency, label: "Pendência" };
+  }
   return classifyProperty({
-    had_previous_focus: p.has_positive_focus,
-    has_pendency: p.has_pendency,
+    had_previous_focus: false,
+    has_pendency: false,
     type: p.is_strategic ? "strategic_point" : null,
   });
 }
+
+const HEATMAP_LEGEND = [
+  { color: MARKER_COLORS.focus, label: "Foco positivo" },
+  { color: MARKER_COLORS.closed, label: "Fechada" },
+  { color: MARKER_COLORS.refused, label: "Recusada" },
+  { color: MARKER_COLORS.pendency, label: "Pendência" },
+  { color: MARKER_COLORS.strategic, label: "Ponto estratégico" },
+  { color: MARKER_COLORS.clean, label: "Sem foco" },
+];
+
 
 function isValidCoord(lat: unknown, lng: unknown) {
   return (
