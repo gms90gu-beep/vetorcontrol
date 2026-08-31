@@ -472,9 +472,11 @@ export interface PropertyMapPoint {
   latitude: number;
   longitude: number;
   status: string | null;
+  last_visit_status: string | null;
   has_pendency: boolean;
   has_positive_focus: boolean;
   is_strategic: boolean;
+
   boletim_id: string | null;
   agent_name: string | null;
   last_visit_at: string | null;
