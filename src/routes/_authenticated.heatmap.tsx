@@ -180,14 +180,21 @@ function HeatmapPage() {
             </Button>
           </div>
 
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+            <Stat label="Imóveis no mapa" value={geoPoints.length} />
+            <Stat label="Focos positivos" value={counts.focus} />
+            <Stat label="Fechadas/Recusadas" value={counts.closed + counts.refused} />
+            <Stat label="Pendências" value={counts.pendency} />
+          </div>
           {blocks.data && (
-            <div className="grid grid-cols-4 gap-2 text-sm">
-              <Stat label="Imóveis no mapa" value={geoPoints.length} />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
               <Stat label="Trabalhados (período)" value={blocks.data.totals.properties_worked} />
-              <Stat label="Focos+" value={blocks.data.totals.positive_foci} />
+              <Stat label="Focos+ (boletins)" value={blocks.data.totals.positive_foci} />
               <Stat label="Depósitos" value={blocks.data.totals.deposits_total} />
+              <Stat label="Pontos estratégicos" value={counts.strategic} />
             </div>
           )}
+
           {props.data?.truncated && (
             <p className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
