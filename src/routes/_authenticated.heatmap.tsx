@@ -14,6 +14,7 @@ import {
   SharedMarkerLayer,
   SharedAgentTerritoryLayer,
   classifyProperty,
+  MARKER_COLORS,
   type SharedMarkerPoint,
 } from "@/components/map/shared";
 
