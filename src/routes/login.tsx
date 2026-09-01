@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { saveSessionLocally } from "@/auth/auth";
 import { Button } from "@/components/ui/button";
@@ -88,11 +89,60 @@ function LoginPage() {
       mark("AUTH_START", { email });
       const loginEmail = email.includes("@") ? email : `${email}@vetor.com`;
 
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email: loginEmail, password }),
-        15000,
-        "signInWithPassword",
-      );
+      // Uma sessão antiga com refresh inacessível pode manter várias conexões
+      // pendentes e impedir uma nova autenticação. Interrompê-la e removê-la
+      // localmente não faz chamada de rede nem invalida sessões em outros aparelhos.
+      supabase.auth.stopAutoRefresh();
+      await supabase.auth.signOut({ scope: "local" }).catch((cleanupError) => {
+        console.warn("[AUTH_STALE_SESSION_CLEANUP]", cleanupError);
+      });
+
+      let data;
+      let error;
+      let usedFallback = false;
+      try {
+        const directResult = await withTimeout(
+          supabase.auth.signInWithPassword({ email: loginEmail, password }),
+          7000,
+          "signInWithPassword",
+        );
+        data = directResult.data;
+        error = directResult.error;
+        if (error) {
+          const directMessage = String(error.message || error);
+          const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(directMessage);
+          if (transportFailure) throw error;
+        }
+      } catch (directError: any) {
+        const message = String(directError?.message || directError || "");
+        const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(message);
+        if (!transportFailure) throw directError;
+
+        mark("AUTH_FALLBACK_START");
+        const response = await withTimeout(
+          fetch("/api/public/auth-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: loginEmail, password }),
+          }),
+          12000,
+          "fallback de autenticação",
+        );
+        const payload = await response.json() as { session?: any; error?: string };
+        if (!response.ok || !payload.session?.user) {
+          throw new Error(payload.error || "Erro ao fazer login");
+        }
+
+        const backendUrl = import.meta.env.VITE_SUPABASE_URL;
+        const projectRef = backendUrl ? new URL(backendUrl).hostname.split(".")[0] : null;
+        if (!projectRef) throw new Error("Configuração de autenticação indisponível.");
+        const storage = brokeredPreviewStorage();
+        await storage?.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(payload.session));
+        data = { session: payload.session, user: payload.session.user };
+        error = null;
+        usedFallback = true;
+        mark("AUTH_FALLBACK_SUCCESS");
+      }
 
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
@@ -130,8 +180,12 @@ function LoginPage() {
         : "/dashboard";
 
       mark("AUTH_REDIRECT", { target });
-      // Não aguardar navigate — evita prender o botão se algum loader travar
-      navigate({ to: target as any, replace: true });
+      if (usedFallback) {
+        window.location.replace(target);
+      } else {
+        // Não aguardar navigate — evita prender o botão se algum loader travar
+        navigate({ to: target as any, replace: true });
+      }
       mark("AUTH_FINISH");
     } catch (error: any) {
       console.error("[AUTH_ERROR]", error);
