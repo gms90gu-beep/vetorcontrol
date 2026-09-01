@@ -613,9 +613,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       idChunks.push(propIds.slice(index, index + 150));
     }
 
+    // Consulta consolidada de gestão: o papel foi validado e `propIds` já
+    // contém somente os imóveis do escopo permitido ao usuário. Usar o cliente
+    // administrativo aqui evita que políticas de linha das tabelas operacionais
+    // ocultem visitas e pendências de agentes subordinados.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = await Promise.all(
       idChunks.map((ids) =>
-        supabase
+        supabaseAdmin
           .from("property_pendencies")
           .select("property_id, resolved_at")
           .in("property_id", ids),
@@ -633,7 +638,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const periodEnd = `${data.to}T23:59:59.999-03:00`;
     const visitResults = await Promise.all(
       idChunks.map((ids) =>
-        supabase
+        supabaseAdmin
           .from("visits")
           .select("id, property_id, agent_id, has_focus, status, visit_date")
           .in("property_id", ids)
@@ -671,7 +676,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       }
       const depResults = await Promise.all(
         visitIdChunks.map((ids) =>
-          supabase.from("visit_deposits").select("visit_id").in("visit_id", ids),
+          supabaseAdmin.from("visit_deposits").select("visit_id").in("visit_id", ids),
         ),
       );
       const depError = depResults.find((result) => result.error)?.error;
