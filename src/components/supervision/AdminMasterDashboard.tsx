@@ -182,14 +182,33 @@ export function AdminMasterDashboard() {
           if (pErr) throw pErr;
         }
       } else {
+        const { full_name, email, password, role } = newUser;
         const { error } = await supabase.functions.invoke("manage-agents", {
-          body: { action: "create_manager", userData: newUser },
+          body: { action: "create_manager", userData: { full_name, email, password, role } },
         });
         if (error) throw error;
+
+        // Vincula o agente ao supervisor escolhido (create_manager não herda vínculos)
+        if (role === "agente" && newUser.supervisor_id) {
+          const { data: created } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("email", email)
+            .maybeSingle();
+          if (created?.id) {
+            const { error: linkErr } = await supabase.functions.invoke("manage-agents", {
+              body: {
+                action: "update_user",
+                userData: { userId: created.id, supervisor_id: newUser.supervisor_id },
+              },
+            });
+            if (linkErr) throw linkErr;
+          }
+        }
       }
       toast.success(`${ROLE_LABELS[newUser.role]} cadastrado com sucesso!`);
       setIsAddingUser(false);
-      setNewUser({ full_name: "", email: "", password: "", role: "supervisor" });
+      setNewUser({ full_name: "", email: "", password: "", role: "supervisor", supervisor_id: null });
       fetchUsers();
     } catch (error: any) {
       console.error("Error creating user:", error);
