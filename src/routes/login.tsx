@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { signInThroughApp } from "@/lib/login.functions";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { saveSessionLocally } from "@/auth/auth";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ async function getSessionAfterLogin() {
 
 function LoginPage() {
   const navigate = useNavigate();
+  const serverSignIn = useServerFn(signInThroughApp);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -88,11 +91,47 @@ function LoginPage() {
       mark("AUTH_START", { email });
       const loginEmail = email.includes("@") ? email : `${email}@vetor.com`;
 
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email: loginEmail, password }),
-        15000,
-        "signInWithPassword",
-      );
+      // Uma sessão antiga com refresh inacessível pode manter várias conexões
+      // pendentes e impedir uma nova autenticação. Interrompê-la e removê-la
+      // localmente não faz chamada de rede nem invalida sessões em outros aparelhos.
+      supabase.auth.stopAutoRefresh();
+      await supabase.auth.signOut({ scope: "local" }).catch((cleanupError) => {
+        console.warn("[AUTH_STALE_SESSION_CLEANUP]", cleanupError);
+      });
+
+      let data;
+      let error;
+      try {
+        const directResult = await withTimeout(
+          supabase.auth.signInWithPassword({ email: loginEmail, password }),
+          7000,
+          "signInWithPassword",
+        );
+        data = directResult.data;
+        error = directResult.error;
+      } catch (directError: any) {
+        const message = String(directError?.message || directError || "");
+        const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(message);
+        if (!transportFailure) throw directError;
+
+        mark("AUTH_FALLBACK_START");
+        const tokens = await withTimeout(
+          serverSignIn({ data: { email: loginEmail, password } }),
+          12000,
+          "fallback de autenticação",
+        );
+        const fallbackResult = await withTimeout(
+          supabase.auth.setSession({
+            access_token: tokens.accessToken,
+            refresh_token: tokens.refreshToken,
+          }),
+          7000,
+          "restauração da sessão",
+        );
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+        mark("AUTH_FALLBACK_SUCCESS");
+      }
 
       if (error) throw error;
       if (!data.user) throw new Error("Usuário não encontrado");
