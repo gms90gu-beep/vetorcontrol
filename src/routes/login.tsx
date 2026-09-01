@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { signInThroughApp } from "@/lib/login.functions";
+import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { saveSessionLocally } from "@/auth/auth";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ async function getSessionAfterLogin() {
 
 function LoginPage() {
   const navigate = useNavigate();
-  const serverSignIn = useServerFn(signInThroughApp);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -101,6 +99,7 @@ function LoginPage() {
 
       let data;
       let error;
+      let usedFallback = false;
       try {
         const directResult = await withTimeout(
           supabase.auth.signInWithPassword({ email: loginEmail, password }),
@@ -120,21 +119,28 @@ function LoginPage() {
         if (!transportFailure) throw directError;
 
         mark("AUTH_FALLBACK_START");
-        const tokens = await withTimeout(
-          serverSignIn({ data: { email: loginEmail, password } }),
+        const response = await withTimeout(
+          fetch("/api/public/auth-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: loginEmail, password }),
+          }),
           12000,
           "fallback de autenticação",
         );
-        const fallbackResult = await withTimeout(
-          supabase.auth.setSession({
-            access_token: tokens.accessToken,
-            refresh_token: tokens.refreshToken,
-          }),
-          7000,
-          "restauração da sessão",
-        );
-        data = fallbackResult.data;
-        error = fallbackResult.error;
+        const payload = await response.json() as { session?: any; error?: string };
+        if (!response.ok || !payload.session?.user) {
+          throw new Error(payload.error || "Erro ao fazer login");
+        }
+
+        const backendUrl = import.meta.env.VITE_SUPABASE_URL;
+        const projectRef = backendUrl ? new URL(backendUrl).hostname.split(".")[0] : null;
+        if (!projectRef) throw new Error("Configuração de autenticação indisponível.");
+        const storage = brokeredPreviewStorage();
+        await storage?.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(payload.session));
+        data = { session: payload.session, user: payload.session.user };
+        error = null;
+        usedFallback = true;
         mark("AUTH_FALLBACK_SUCCESS");
       }
 
@@ -174,8 +180,12 @@ function LoginPage() {
         : "/dashboard";
 
       mark("AUTH_REDIRECT", { target });
-      // Não aguardar navigate — evita prender o botão se algum loader travar
-      navigate({ to: target as any, replace: true });
+      if (usedFallback) {
+        window.location.replace(target);
+      } else {
+        // Não aguardar navigate — evita prender o botão se algum loader travar
+        navigate({ to: target as any, replace: true });
+      }
       mark("AUTH_FINISH");
     } catch (error: any) {
       console.error("[AUTH_ERROR]", error);
