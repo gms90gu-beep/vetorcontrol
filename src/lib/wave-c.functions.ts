@@ -613,12 +613,9 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       idChunks.push(propIds.slice(index, index + 150));
     }
 
-    // O papel já foi validado acima. As leituras administrativas continuam
-    // limitadas aos imóveis do escopo do coordenador/supervisor.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = await Promise.all(
       idChunks.map((ids) =>
-        supabaseAdmin
+        supabase
           .from("property_pendencies")
           .select("property_id, resolved_at")
           .in("property_id", ids),
@@ -636,7 +633,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const periodEnd = `${data.to}T23:59:59.999-03:00`;
     const visitResults = await Promise.all(
       idChunks.map((ids) =>
-        supabaseAdmin
+        supabase
           .from("visits")
           .select("id, property_id, agent_id, has_focus, status, visit_date")
           .in("property_id", ids)
@@ -674,7 +671,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       }
       const depResults = await Promise.all(
         visitIdChunks.map((ids) =>
-          supabaseAdmin.from("visit_deposits").select("visit_id").in("visit_id", ids),
+          supabase.from("visit_deposits").select("visit_id").in("visit_id", ids),
         ),
       );
       const depError = depResults.find((result) => result.error)?.error;
