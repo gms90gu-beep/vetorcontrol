@@ -39,6 +39,7 @@ import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedCalendarioProducaoRouteImport } from './routes/_authenticated.calendario-producao'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
+import { Route as ApiPublicAuthLoginRouteImport } from './routes/api/public/auth-login'
 import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
 import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
 import { Route as AuthenticatedAdminSystemHealthRouteImport } from './routes/_authenticated.admin.system-health'
@@ -213,6 +214,11 @@ const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
   path: '/agente',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicAuthLoginRoute = ApiPublicAuthLoginRouteImport.update({
+  id: '/api/public/auth-login',
+  path: '/api/public/auth-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedPropertyPropertyIdRoute =
   AuthenticatedPropertyPropertyIdRouteImport.update({
     id: '/property/$propertyId',
@@ -360,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/api/public/auth-login': typeof ApiPublicAuthLoginRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
@@ -408,6 +415,7 @@ export interface FileRoutesByTo {
   '/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/api/public/auth-login': typeof ApiPublicAuthLoginRoute
   '/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
@@ -458,6 +466,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/system-health': typeof AuthenticatedAdminSystemHealthRoute
   '/_authenticated/daily-bulletin/$id': typeof AuthenticatedDailyBulletinIdRoute
   '/_authenticated/property/$propertyId': typeof AuthenticatedPropertyPropertyIdRoute
+  '/api/public/auth-login': typeof ApiPublicAuthLoginRoute
   '/_authenticated/rg/boletim/$id': typeof AuthenticatedRgBoletimIdRoute
   '/_authenticated/rg/editar/$id': typeof AuthenticatedRgEditarIdRoute
 }
@@ -508,6 +517,7 @@ export interface FileRouteTypes {
     | '/admin/system-health'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
+    | '/api/public/auth-login'
     | '/rg/boletim/$id'
     | '/rg/editar/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -556,6 +566,7 @@ export interface FileRouteTypes {
     | '/admin/system-health'
     | '/daily-bulletin/$id'
     | '/property/$propertyId'
+    | '/api/public/auth-login'
     | '/rg/boletim/$id'
     | '/rg/editar/$id'
   id:
@@ -605,6 +616,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/system-health'
     | '/_authenticated/daily-bulletin/$id'
     | '/_authenticated/property/$propertyId'
+    | '/api/public/auth-login'
     | '/_authenticated/rg/boletim/$id'
     | '/_authenticated/rg/editar/$id'
   fileRoutesById: FileRoutesById
@@ -617,6 +629,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   SignupRoute: typeof SignupRoute
+  ApiPublicAuthLoginRoute: typeof ApiPublicAuthLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -830,6 +843,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/agente'
       preLoaderRoute: typeof AuthenticatedAgenteRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/public/auth-login': {
+      id: '/api/public/auth-login'
+      path: '/api/public/auth-login'
+      fullPath: '/api/public/auth-login'
+      preLoaderRoute: typeof ApiPublicAuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/property/$propertyId': {
       id: '/_authenticated/property/$propertyId'
@@ -1061,6 +1081,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   SignupRoute: SignupRoute,
+  ApiPublicAuthLoginRoute: ApiPublicAuthLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
