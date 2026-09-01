@@ -9,7 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 
+type SupervisionTab = "equipe" | "operacional" | "producao";
+
 export const Route = createFileRoute("/_authenticated/supervision")({
+  validateSearch: (search: Record<string, unknown>): { tab?: SupervisionTab } => {
+    const tab = String(search?.tab ?? "");
+    return tab === "operacional" || tab === "producao" || tab === "equipe"
+      ? { tab: tab as SupervisionTab }
+      : {};
+  },
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const { data: { session } } = await supabase.auth.getSession();
@@ -26,6 +34,9 @@ export const Route = createFileRoute("/_authenticated/supervision")({
 
 function SupervisionPage() {
   const { online } = useSyncStatus();
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const activeTab: SupervisionTab = tab ?? "equipe";
 
   // ⛔ Bloquear acesso offline: Supervision requer conexão
   if (!online) {
@@ -33,7 +44,11 @@ function SupervisionPage() {
   }
   return (
     <div className="w-full h-full pb-20">
-      <Tabs defaultValue="equipe" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => navigate({ search: { tab: v as SupervisionTab }, replace: true })}
+        className="w-full"
+      >
         <div className="px-4 pt-4 bg-[#0b1520]">
           <TabsList className="grid grid-cols-3 w-full bg-white/5 border border-white/10">
             <TabsTrigger value="equipe" className="text-xs data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white/70">

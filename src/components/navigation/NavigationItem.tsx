@@ -25,6 +25,7 @@ export function NavigationItem({
     return (
       <Link
         to={item.to as any}
+        search={item.search as any}
         aria-label={aria}
         aria-current={isActive ? "page" : undefined}
         onClick={onNavigate}
@@ -60,6 +61,7 @@ export function NavigationItem({
     return (
       <Link
         to={item.to as any}
+        search={item.search as any}
         onClick={onNavigate}
         aria-label={aria}
         aria-current={isActive ? "page" : undefined}
@@ -89,6 +91,7 @@ export function NavigationItem({
   return (
     <Link
       to={item.to as any}
+        search={item.search as any}
       aria-label={aria}
       aria-current={isActive ? "page" : undefined}
       className={cn(
