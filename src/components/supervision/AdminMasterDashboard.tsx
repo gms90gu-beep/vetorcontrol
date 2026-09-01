@@ -149,7 +149,7 @@ export function AdminMasterDashboard() {
   }
 
   const handleOpenCreate = (role: NewUserRole) => {
-    setNewUser({ full_name: "", email: "", password: "", role });
+    setNewUser({ full_name: "", email: "", password: "", role, supervisor_id: null });
     setIsAddingUser(true);
   };
 
