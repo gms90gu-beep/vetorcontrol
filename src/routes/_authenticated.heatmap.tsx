@@ -20,6 +20,22 @@ import {
 
 export const Route = createFileRoute("/_authenticated/heatmap")({
   component: HeatmapPage,
+  head: () => ({
+    meta: [
+      { title: "Mapa Epidemiológico | VetorControl" },
+      {
+        name: "description",
+        content: "Mapa operacional de focos, pendências e imóveis inspecionados.",
+      },
+      { property: "og:title", content: "Mapa Epidemiológico | VetorControl" },
+      {
+        property: "og:description",
+        content: "Mapa operacional de focos, pendências e imóveis inspecionados.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
 function isoOffset(days: number) {

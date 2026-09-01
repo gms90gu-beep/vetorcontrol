@@ -605,30 +605,60 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     }
 
     const propIds = propList.map((p) => p.id);
+    // Uma única cláusula `in` com centenas/milhares de UUIDs pode ultrapassar
+    // o limite de tamanho da URL do gateway. O erro era ignorado e o mapa
+    // classificava silenciosamente todos os imóveis como "Sem foco".
+    const idChunks: string[][] = [];
+    for (let index = 0; index < propIds.length; index += 150) {
+      idChunks.push(propIds.slice(index, index + 150));
+    }
 
-    const { data: pends } = await supabase
-      .from("property_pendencies")
-      .select("property_id, resolved_at")
-      .in("property_id", propIds);
+    // Consulta consolidada de gestão: o papel foi validado e `propIds` já
+    // contém somente os imóveis do escopo permitido ao usuário. Usar o cliente
+    // administrativo aqui evita que políticas de linha das tabelas operacionais
+    // ocultem visitas e pendências de agentes subordinados.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const pendResults = await Promise.all(
+      idChunks.map((ids) =>
+        supabaseAdmin
+          .from("property_pendencies")
+          .select("property_id, resolved_at")
+          .in("property_id", ids),
+      ),
+    );
+    const pendError = pendResults.find((result) => result.error)?.error;
+    if (pendError) throw new Error(`Falha ao carregar pendências do mapa: ${pendError.message}`);
+    const pends = pendResults.flatMap((result) => result.data ?? []);
     const pendingByProp = new Map<string, number>();
-    for (const p of pends ?? []) {
+    for (const p of pends) {
       if (!p.resolved_at) pendingByProp.set(p.property_id, (pendingByProp.get(p.property_id) ?? 0) + 1);
     }
 
-    const { data: visits } = await supabase
-      .from("visits")
-      .select("id, property_id, agent_id, has_focus, status, visit_date")
-      .in("property_id", propIds)
-      .gte("visit_date", data.from)
-      .lte("visit_date", data.to)
-      .order("visit_date", { ascending: false });
+    const periodStart = `${data.from}T00:00:00-03:00`;
+    const periodEnd = `${data.to}T23:59:59.999-03:00`;
+    const visitResults = await Promise.all(
+      idChunks.map((ids) =>
+        supabaseAdmin
+          .from("visits")
+          .select("id, property_id, agent_id, has_focus, status, visit_date")
+          .in("property_id", ids)
+          .gte("visit_date", periodStart)
+          .lte("visit_date", periodEnd)
+          .order("visit_date", { ascending: false }),
+      ),
+    );
+    const visitError = visitResults.find((result) => result.error)?.error;
+    if (visitError) throw new Error(`Falha ao carregar visitas do mapa: ${visitError.message}`);
+    const visits = visitResults
+      .flatMap((result) => result.data ?? [])
+      .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
 
     const focusByProp = new Map<string, number>();
     const lastVisitByProp = new Map<string, string>();
     const lastAgentByProp = new Map<string, string>();
     const lastStatusByProp = new Map<string, string>();
     const visitIds: string[] = [];
-    for (const v of visits ?? []) {
+    for (const v of visits) {
       visitIds.push(v.id);
       if (v.has_focus) focusByProp.set(v.property_id, (focusByProp.get(v.property_id) ?? 0) + 1);
       if (!lastVisitByProp.has(v.property_id)) {
@@ -640,13 +670,21 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
     const depByProp = new Map<string, number>();
     if (visitIds.length > 0) {
-      const { data: deps } = await supabase
-        .from("visit_deposits")
-        .select("visit_id")
-        .in("visit_id", visitIds);
+      const visitIdChunks: string[][] = [];
+      for (let index = 0; index < visitIds.length; index += 150) {
+        visitIdChunks.push(visitIds.slice(index, index + 150));
+      }
+      const depResults = await Promise.all(
+        visitIdChunks.map((ids) =>
+          supabaseAdmin.from("visit_deposits").select("visit_id").in("visit_id", ids),
+        ),
+      );
+      const depError = depResults.find((result) => result.error)?.error;
+      if (depError) throw new Error(`Falha ao carregar depósitos do mapa: ${depError.message}`);
+      const deps = depResults.flatMap((result) => result.data ?? []);
       const visitToProp = new Map<string, string>();
-      for (const v of visits ?? []) visitToProp.set(v.id, v.property_id);
-      for (const d of deps ?? []) {
+      for (const v of visits) visitToProp.set(v.id, v.property_id);
+      for (const d of deps) {
         const pid = visitToProp.get(d.visit_id);
         if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
       }
