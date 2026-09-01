@@ -117,6 +117,7 @@ export function AdminMasterDashboard() {
     email: "",
     password: "",
     role: "supervisor" as NewUserRole,
+    supervisor_id: null as string | null,
   });
 
   // Detail/edit drawer state
