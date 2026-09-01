@@ -109,6 +109,11 @@ function LoginPage() {
         );
         data = directResult.data;
         error = directResult.error;
+        if (error) {
+          const directMessage = String(error.message || error);
+          const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(directMessage);
+          if (transportFailure) throw error;
+        }
       } catch (directError: any) {
         const message = String(directError?.message || directError || "");
         const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(message);
