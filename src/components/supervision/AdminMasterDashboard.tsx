@@ -591,6 +591,28 @@ export function AdminMasterDashboard() {
                 minLength={6}
               />
             </div>
+            {newUser.role === "agente" && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Supervisor responsável
+                </label>
+                <select
+                  value={newUser.supervisor_id ?? ""}
+                  onChange={(e) => setNewUser({ ...newUser, supervisor_id: e.target.value || null })}
+                  className="w-full bg-slate-800 border-none rounded-xl h-11 px-3 text-sm font-bold text-white outline-none"
+                >
+                  <option value="">— Sem supervisor —</option>
+                  {supervisorOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name ?? s.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  O agente aparecerá na equipe do supervisor selecionado.
+                </p>
+              </div>
+            )}
             <Button type="submit" className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black uppercase tracking-widest text-xs">
               Confirmar Cadastro
             </Button>
