@@ -112,18 +112,26 @@ function BoletimView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Auto-scale do documento somente em telas estreitas
+  // Auto-scale do documento (A4 = 210mm ≈ 794px) para caber na largura da tela.
+  // Usa `zoom` no CSS (reflui o layout) em vez de transform, que deixava faixa
+  // branca e scroll horizontal no celular.
   useEffect(() => {
+    const A4_PX = 794;
     const computeScale = () => {
       const w = window.innerWidth;
-      if (w < 480) setScale(0.7);
-      else if (w < 768) setScale(0.82);
-      else setScale(1);
+      if (w >= 900) return setScale(1);
+      const available = Math.max(280, w - 12);
+      setScale(Math.max(0.42, Math.min(1, available / A4_PX)));
     };
     computeScale();
     window.addEventListener("resize", computeScale);
-    return () => window.removeEventListener("resize", computeScale);
+    window.addEventListener("orientationchange", computeScale);
+    return () => {
+      window.removeEventListener("resize", computeScale);
+      window.removeEventListener("orientationchange", computeScale);
+    };
   }, []);
+
 
   async function load() {
     setLoading(true);
@@ -631,7 +639,7 @@ function BoletimView() {
   if (imoveis.length === 0) console.log("[RG_VIEWER_EMPTY_FILTER_RENDER]", viewerFilters);
 
   return (
-    <div className="min-h-screen bg-muted/40 brg-screen">
+    <div className="min-h-screen overflow-x-hidden bg-muted/40 brg-screen">
       <style>{`
         /* Documento e tabela */
         .brg-page {
@@ -645,7 +653,7 @@ function BoletimView() {
         .brg-cell { border: 1px solid #000; padding: 2px 4px; font-size: 10px; }
         .brg-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: .04em; }
         .brg-value { font-size: 11px; font-weight: 600; min-height: 14px; }
-        .brg-table { width: 100%; border-collapse: collapse; }
+        .brg-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .brg-table th, .brg-table td { 
           border: 1px solid #000; 
           padding: 3px 4px; 
@@ -674,22 +682,38 @@ function BoletimView() {
           -webkit-overflow-scrolling: touch;
         }
 
-        /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo. */
+        /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo.
+           zoom reflui o layout (sem faixa branca / scroll lateral do transform). */
         .brg-scale-wrap {
-          transform: scale(var(--brg-scale, 1));
-          transform-origin: top center;
+          zoom: var(--brg-scale, 1);
           width: 100%;
+        }
+
+        /* Mobile: menos margem interna para aproveitar a largura útil */
+        @media (max-width: 640px) {
+          .brg-page {
+            padding: 6mm;
+            margin: 8px auto;
+            min-height: auto;
+          }
         }
 
         @media print {
           body { background: white !important; }
           .brg-no-print { display: none !important; }
-          .brg-page { box-shadow: none !important; margin: 0 !important; page-break-after: always; }
+          .brg-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 12mm !important;
+            min-height: 297mm !important;
+            page-break-after: always;
+          }
           .brg-page:last-child { page-break-after: auto; }
-          .brg-scale-wrap { transform: none !important; }
+          .brg-scale-wrap { zoom: 1 !important; transform: none !important; }
           aside, nav, header[data-app-header], .sidebar, [data-bottom-nav] { display: none !important; }
           .brg-table th { position: static !important; }
         }
+
       `}</style>
 
       {/* Cabeçalho mobile-first */}
@@ -759,7 +783,7 @@ function BoletimView() {
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex rounded-lg border border-border bg-background p-0.5 text-xs">
+          <div className="-mx-1 flex max-w-full gap-0.5 overflow-x-auto rounded-lg border border-border bg-background p-0.5 text-xs sm:mx-0 sm:inline-flex sm:overflow-visible">
             {(
               [
                 { key: "all", label: `Todos (${gpsStats.total})` },
@@ -772,7 +796,7 @@ function BoletimView() {
                 type="button"
                 onClick={() => setGeoFilter(opt.key)}
                 className={
-                  "rounded-md px-2.5 py-1 font-semibold transition " +
+                  "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 font-semibold transition " +
                   (geoFilter === opt.key
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted")
@@ -782,6 +806,7 @@ function BoletimView() {
               </button>
             ))}
           </div>
+
           <Button
             variant="ghost"
             size="sm"
