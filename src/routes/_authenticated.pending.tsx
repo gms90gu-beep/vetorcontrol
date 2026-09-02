@@ -143,12 +143,20 @@ function PendingPage() {
     if (!user) return [];
     setLoading(true);
     try {
+      // Buscar ciclo ativo
+      const { data: activeCycle } = await supabase
+        .from("cycles")
+        .select("id")
+        .eq("is_active", true)
+        .single();
+
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",
         remote: () =>
           (supabase as any)
             .from("property_pendencies")
             .select("*")
+            .eq("cycle_id", activeCycle?.id || "")  // ← Filtrar por ciclo ativo
             .order("last_attempt_at", { ascending: false }),
       });
 
