@@ -129,9 +129,11 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
               {/* Os relatórios são indexados por perfil (daily_work_records.agent_id = profiles.id),
                   então o valor do filtro precisa ser o profile_id do agente. */}
               {agents
-                .filter((agent) => agent.profile_id)
+                .filter((agent) => agent.profile_id || agent.id)
                 .map(agent => (
-                  <SelectItem key={agent.id} value={agent.profile_id}>{agent.name}</SelectItem>
+                  <SelectItem key={agent.id} value={String(agent.profile_id || agent.id)}>
+                    {agent.name || "Agente"}
+                  </SelectItem>
                 ))}
             </SelectContent>
           </Select>
