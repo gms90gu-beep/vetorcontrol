@@ -81,7 +81,9 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
+      // "Todos os Ciclos" deve significar TODOS: não reaplicar o ciclo ativo aqui,
+      // senão o ciclo recém-iniciado (sem produção) zera todos os indicadores.
+      const cycleFilter = filters.cycle !== "all" ? filters.cycle : null;
       logDirectSource({
         module: "ReportsDashboard",
         file: "src/components/reports/ReportsDashboard.tsx",
