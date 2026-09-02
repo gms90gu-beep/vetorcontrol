@@ -560,6 +560,29 @@ function PropertyVisitPage() {
     }
   };
 
+  // Confirmação no último imóvel: encerra o quarteirão e volta para a lista.
+  const handleConfirmEndBlock = async () => {
+    setEndingBlock(true);
+    try {
+      console.log("[BLOCK_END_CONFIRMED]", {
+        property_id: propertyId,
+        block_id: property?.block_id ?? null,
+        block_number: property?.block_number ?? null,
+      });
+      await handleEndBlock();
+    } finally {
+      setEndingBlock(false);
+      setAskEndBlock(false);
+    }
+  };
+
+  const handleKeepBlockOpen = () => {
+    console.log("[BLOCK_END_DECLINED]", { property_id: propertyId });
+    setAskEndBlock(false);
+    navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+  };
+
+
   const handleStatusChange = async (newStatus: string) => {
 
     if (!activeSession || isUpdatingStatus || !propertyId) {
