@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
@@ -138,6 +139,10 @@ function PropertyVisitPage() {
   const [nextProperty, setNextProperty] = useState<any>(null);
   const [prevProperty, setPrevProperty] = useState<any>(null);
   const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
+  // Último imóvel do quarteirão: em vez de sair direto (o que abria o
+  // fechamento/boletim), perguntar se o agente deseja encerrar o quarteirão.
+  const [askEndBlock, setAskEndBlock] = useState(false);
+  const [endingBlock, setEndingBlock] = useState(false);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -556,6 +561,29 @@ function PropertyVisitPage() {
     }
   };
 
+  // Confirmação no último imóvel: encerra o quarteirão e volta para a lista.
+  const handleConfirmEndBlock = async () => {
+    setEndingBlock(true);
+    try {
+      console.log("[BLOCK_END_CONFIRMED]", {
+        property_id: propertyId,
+        block_id: property?.block_id ?? null,
+        block_number: property?.block_number ?? null,
+      });
+      await handleEndBlock();
+    } finally {
+      setEndingBlock(false);
+      setAskEndBlock(false);
+    }
+  };
+
+  const handleKeepBlockOpen = () => {
+    console.log("[BLOCK_END_DECLINED]", { property_id: propertyId });
+    setAskEndBlock(false);
+    navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+  };
+
+
   const handleStatusChange = async (newStatus: string) => {
 
     if (!activeSession || isUpdatingStatus || !propertyId) {
@@ -729,7 +757,7 @@ function PropertyVisitPage() {
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
         toast.success(`✅ ${offlineHint}`, { description: "Último imóvel do quarteirão." });
-        navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+        setAskEndBlock(true);
       }
     } catch (error: any) {
       toast.error("Erro ao salvar visita: " + error.message);
@@ -1517,6 +1545,61 @@ function PropertyVisitPage() {
           </div>
         </div>
       </div>
+
+      <EndBlockDialog
+        open={askEndBlock}
+        working={endingBlock}
+        blockNumber={property?.block_number ?? null}
+        total={propertyIndex?.total ?? null}
+        onConfirm={handleConfirmEndBlock}
+        onDecline={handleKeepBlockOpen}
+      />
     </div>
+  );
+}
+
+function EndBlockDialog({
+  open, working, blockNumber, total, onConfirm, onDecline,
+}: {
+  open: boolean;
+  working: boolean;
+  blockNumber: string | null;
+  total: number | null;
+  onConfirm: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !working) onDecline(); }}>
+      <DialogContent className="sm:max-w-md rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            Encerrar o quarteirão?
+          </DialogTitle>
+          <DialogDescription>
+            Você concluiu a visita do último imóvel
+            {blockNumber ? ` do quarteirão ${blockNumber}` : ""}
+            {total ? ` (${total} imóveis)` : ""}. Deseja encerrar o quarteirão agora?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+          <Button
+            onClick={onConfirm}
+            disabled={working}
+            className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black"
+          >
+            {working ? "ENCERRANDO..." : "SIM, ENCERRAR QUARTEIRÃO"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onDecline}
+            disabled={working}
+            className="w-full h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest"
+          >
+            Não, continuar depois
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
