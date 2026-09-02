@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
@@ -144,11 +145,7 @@ function PendingPage() {
     setLoading(true);
     try {
       // Buscar ciclo ativo
-      const { data: activeCycle } = await supabase
-        .from("cycles")
-        .select("id")
-        .eq("is_active", true)
-        .single();
+      const activeCycle = await getActiveCycleForUser(user.id);
 
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",

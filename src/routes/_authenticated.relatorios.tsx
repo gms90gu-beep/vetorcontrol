@@ -156,9 +156,9 @@ function SupervisorReports() {
         />
         <NavCard
           icon={<Calendar className="h-6 w-6" />}
-          title="Boletins Semanais"
-          description="Consolidados oficiais por semana epidemiológica."
-          to="/reports"
+          title="Relatório Semanal da Equipe"
+          description="Produção da semana por agente e por bairro."
+          to="/relatorio-semanal-equipe"
         />
         <NavCard
           icon={<ClipboardList className="h-6 w-6" />}
@@ -192,9 +192,9 @@ function CoordinatorReports() {
         />
         <NavCard
           icon={<FileText className="h-6 w-6" />}
-          title="Boletins Oficiais"
-          description="Boletins semanais e consolidados oficiais."
-          to="/reports"
+          title="Relatório Semanal da Equipe"
+          description="Produção da semana por agente e por bairro."
+          to="/relatorio-semanal-equipe"
         />
         <NavCard
           icon={<FileSpreadsheet className="h-6 w-6" />}

@@ -278,3 +278,182 @@ export const getWeeklyComparison = createServerFn({ method: "POST" })
       agents_scope: agentIds.length,
     };
   });
+
+/* ─────────── Relatório Semanal da Equipe (por agente e por bairro) ─────────── */
+
+export interface TeamWeeklyAgentRow {
+  agent_id: string;
+  full_name: string;
+  registration: string | null;
+  records: number;
+  properties_worked: number;
+  properties_closed: number;
+  blocks_worked: number;
+  positive_foci: number;
+  deposits_treated: number;
+  deposits_eliminated: number;
+}
+
+export interface TeamWeeklyNeighborhoodRow {
+  neighborhood: string;
+  visits: number;
+  properties: number;
+  visited: number;
+  closed: number;
+  refused: number;
+  foci: number;
+  treated: number;
+}
+
+export interface TeamWeeklyResult {
+  epi_week: number;
+  epi_year: number;
+  from: string;
+  to: string;
+  agents: TeamWeeklyAgentRow[];
+  neighborhoods: TeamWeeklyNeighborhoodRow[];
+  totals: {
+    records: number;
+    properties_worked: number;
+    properties_closed: number;
+    blocks_worked: number;
+    positive_foci: number;
+    deposits_treated: number;
+    deposits_eliminated: number;
+  };
+}
+
+export const getTeamWeeklyProduction = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { epiWeek: number; epiYear: number }) => input)
+  .handler(async ({ data, context }): Promise<TeamWeeklyResult> => {
+    const { supabase, userId } = context;
+    const { profiles } = await resolveScopedAgents(supabase, userId);
+    const profileIds = (profiles as any[]).map((p) => p.id);
+    const { start, end } = epiWeekToDateRange(data.epiWeek, data.epiYear);
+
+    const empty: TeamWeeklyResult = {
+      epi_week: data.epiWeek,
+      epi_year: data.epiYear,
+      from: start,
+      to: end,
+      agents: [],
+      neighborhoods: [],
+      totals: {
+        records: 0,
+        properties_worked: 0,
+        properties_closed: 0,
+        blocks_worked: 0,
+        positive_foci: 0,
+        deposits_treated: 0,
+        deposits_eliminated: 0,
+      },
+    };
+    if (profileIds.length === 0) return empty;
+
+    // ── Produção por agente (fonte: daily_work_records) ──
+    const { data: dwr, error: dwrErr } = await supabase
+      .from("daily_work_records")
+      .select("agent_id, properties_worked, properties_closed, blocks_worked, positive_foci, deposits_treated, deposits_eliminated")
+      .in("agent_id", profileIds)
+      .gte("work_date", start)
+      .lte("work_date", end);
+    if (dwrErr) throw new Error(dwrErr.message);
+
+    const byAgent = new Map<string, TeamWeeklyAgentRow>();
+    const profileById = new Map<string, any>((profiles as any[]).map((p) => [p.id, p]));
+    for (const r of (dwr ?? []) as any[]) {
+      const id = r.agent_id as string;
+      let row = byAgent.get(id);
+      if (!row) {
+        const p = profileById.get(id);
+        row = {
+          agent_id: id,
+          full_name: p?.full_name || "Agente",
+          registration: p?.registration_number ?? null,
+          records: 0,
+          properties_worked: 0,
+          properties_closed: 0,
+          blocks_worked: 0,
+          positive_foci: 0,
+          deposits_treated: 0,
+          deposits_eliminated: 0,
+        };
+        byAgent.set(id, row);
+      }
+      row.records += 1;
+      row.properties_worked += Number(r.properties_worked) || 0;
+      row.properties_closed += Number(r.properties_closed) || 0;
+      row.blocks_worked += Number(r.blocks_worked) || 0;
+      row.positive_foci += Number(r.positive_foci) || 0;
+      row.deposits_treated += Number(r.deposits_treated) || 0;
+      row.deposits_eliminated += Number(r.deposits_eliminated) || 0;
+    }
+    const agents = [...byAgent.values()].sort((a, b) => b.properties_worked - a.properties_worked);
+    const totals = { ...empty.totals };
+    for (const a of agents) {
+      totals.records += a.records;
+      totals.properties_worked += a.properties_worked;
+      totals.properties_closed += a.properties_closed;
+      totals.blocks_worked += a.blocks_worked;
+      totals.positive_foci += a.positive_foci;
+      totals.deposits_treated += a.deposits_treated;
+      totals.deposits_eliminated += a.deposits_eliminated;
+    }
+
+    // ── Produção por bairro (fonte: visits + properties.neighborhood) ──
+    // visits.agent_id pode referenciar profiles.id ou agents.id (legado):
+    // resolvemos os dois conjuntos de identificadores.
+    const agentIds = new Set<string>(profileIds);
+    const { data: agentRows } = await supabase
+      .from("agents")
+      .select("id, profile_id")
+      .in("profile_id", profileIds);
+    for (const a of (agentRows ?? []) as any[]) if (a?.id) agentIds.add(a.id as string);
+
+    const ids = [...agentIds];
+    const visitRows: any[] = [];
+    for (let i = 0; i < ids.length; i += 150) {
+      const chunk = ids.slice(i, i + 150);
+      const { data: vs, error: vErr } = await supabase
+        .from("visits")
+        .select("property_id, status, has_focus, treatment_applied, properties!inner(neighborhood)")
+        .in("agent_id", chunk)
+        .gte("visit_date", start)
+        .lte("visit_date", end);
+      if (vErr) throw new Error(vErr.message);
+      visitRows.push(...((vs ?? []) as any[]));
+    }
+
+    const byHood = new Map<string, TeamWeeklyNeighborhoodRow & { _props: Set<string> }>();
+    for (const v of visitRows) {
+      const hood = (v.properties?.neighborhood as string | null)?.trim() || "Sem bairro";
+      let row = byHood.get(hood);
+      if (!row) {
+        row = {
+          neighborhood: hood,
+          visits: 0,
+          properties: 0,
+          visited: 0,
+          closed: 0,
+          refused: 0,
+          foci: 0,
+          treated: 0,
+          _props: new Set<string>(),
+        };
+        byHood.set(hood, row);
+      }
+      row.visits += 1;
+      if (v.property_id) row._props.add(v.property_id as string);
+      if (v.status === "visited") row.visited += 1;
+      else if (v.status === "closed") row.closed += 1;
+      else if (v.status === "refused") row.refused += 1;
+      if (v.has_focus) row.foci += 1;
+      if (v.treatment_applied) row.treated += 1;
+    }
+    const neighborhoods = [...byHood.values()]
+      .map(({ _props, ...r }) => ({ ...r, properties: _props.size }))
+      .sort((a, b) => b.properties - a.properties);
+
+    return { ...empty, agents, neighborhoods, totals };
+  });
