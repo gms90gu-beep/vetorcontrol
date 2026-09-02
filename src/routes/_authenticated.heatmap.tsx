@@ -127,17 +127,30 @@ function HeatmapPage() {
     [geoPoints],
   );
 
+  // Prioridade de desenho: "sem foco" primeiro, ocorrências relevantes por cima.
+  // Sem isso, imóveis verdes desenhados depois cobriam os focos vermelhos.
+  const DRAW_ORDER: Record<string, number> = {
+    clean: 0,
+    strategic: 1,
+    pendency: 2,
+    refused: 3,
+    closed: 4,
+    focus: 5,
+  };
+
   const markers: SharedMarkerPoint[] = useMemo(
     () =>
-      geoPoints.map((p) => {
-        const c = classify(p);
-        return {
-          id: p.id,
-          lat: p.latitude,
-          lng: p.longitude,
-          status: c.status,
-          tooltip: `${p.street ?? "Imóvel"} ${p.number ?? ""}`,
-          popupHtml: `
+      geoPoints
+        .map((p) => {
+          const c = classify(p);
+          return {
+            id: p.id,
+            lat: p.latitude,
+            lng: p.longitude,
+            status: c.status,
+            radius: c.status === "focus" ? 12 : c.status === "clean" ? 7 : 10,
+            tooltip: `${p.street ?? "Imóvel"} ${p.number ?? ""}`,
+            popupHtml: `
             <div style="font-family:system-ui;font-size:12px;min-width:180px">
               <div style="font-weight:600">${p.street ?? "Imóvel"} ${p.number ?? ""}</div>
               <div>Quarteirão: <b>${p.block_number ?? "—"}</b></div>
@@ -148,11 +161,13 @@ function HeatmapPage() {
               </div>
             </div>
           `,
-          data: p,
-        };
-      }),
+            data: p,
+          };
+        })
+        .sort((a, b) => (DRAW_ORDER[a.status!] ?? 0) - (DRAW_ORDER[b.status!] ?? 0)),
     [geoPoints],
   );
+
 
   const counts = useMemo(() => {
     const c = { focus: 0, closed: 0, refused: 0, pendency: 0, strategic: 0, clean: 0 } as Record<string, number>;
