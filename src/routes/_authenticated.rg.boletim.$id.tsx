@@ -683,7 +683,7 @@ function BoletimView() {
         }
 
         /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo.
-           `zoom` reflui o layout (sem faixa branca / scroll lateral do transform). */
+           zoom reflui o layout (sem faixa branca / scroll lateral do transform). */
         .brg-scale-wrap {
           zoom: var(--brg-scale, 1);
           width: 100%;
