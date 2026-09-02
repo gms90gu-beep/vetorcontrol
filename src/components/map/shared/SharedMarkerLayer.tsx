@@ -15,6 +15,8 @@ export type SharedMarkerPoint = {
   had_previous_focus?: boolean | null;
   has_pendency?: boolean | null;
   type?: string | null;
+  // Raio individual (sobrepõe o raio padrão da camada)
+  radius?: number;
   // Conteúdo HTML do popup/tooltip
   popupHtml?: string;
   tooltip?: string;
