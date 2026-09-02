@@ -144,11 +144,7 @@ function PendingPage() {
     setLoading(true);
     try {
       // Buscar ciclo ativo
-      const { data: activeCycle } = await supabase
-        .from("cycles")
-        .select("id")
-        .eq("is_active", true)
-        .single();
+      const activeCycle = await getActiveCycleForUser(user.id);
 
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",
