@@ -733,7 +733,7 @@ function PropertyVisitPage() {
         navigate({ to: `/property/${nextProperty.id}` });
       } else {
         toast.success(`✅ ${offlineHint}`, { description: "Último imóvel do quarteirão." });
-        navigate({ to: "/field-work-list", search: { restore: undefined, ts: undefined } });
+        setAskEndBlock(true);
       }
     } catch (error: any) {
       toast.error("Erro ao salvar visita: " + error.message);
