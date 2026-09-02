@@ -138,6 +138,10 @@ function PropertyVisitPage() {
   const [nextProperty, setNextProperty] = useState<any>(null);
   const [prevProperty, setPrevProperty] = useState<any>(null);
   const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
+  // Último imóvel do quarteirão: em vez de sair direto (o que abria o
+  // fechamento/boletim), perguntar se o agente deseja encerrar o quarteirão.
+  const [askEndBlock, setAskEndBlock] = useState(false);
+  const [endingBlock, setEndingBlock] = useState(false);
   const isLandscape = useOrientation();
   const [agent, setAgent] = useState<any>(null);
   const [isDirty, setIsDirty] = useState(false);
