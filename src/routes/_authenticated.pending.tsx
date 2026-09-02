@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
