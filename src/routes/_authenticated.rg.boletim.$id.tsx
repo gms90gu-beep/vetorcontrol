@@ -112,18 +112,26 @@ function BoletimView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Auto-scale do documento somente em telas estreitas
+  // Auto-scale do documento (A4 = 210mm ≈ 794px) para caber na largura da tela.
+  // Usa `zoom` no CSS (reflui o layout) em vez de transform, que deixava faixa
+  // branca e scroll horizontal no celular.
   useEffect(() => {
+    const A4_PX = 794;
     const computeScale = () => {
       const w = window.innerWidth;
-      if (w < 480) setScale(0.7);
-      else if (w < 768) setScale(0.82);
-      else setScale(1);
+      if (w >= 900) return setScale(1);
+      const available = Math.max(280, w - 12);
+      setScale(Math.max(0.42, Math.min(1, available / A4_PX)));
     };
     computeScale();
     window.addEventListener("resize", computeScale);
-    return () => window.removeEventListener("resize", computeScale);
+    window.addEventListener("orientationchange", computeScale);
+    return () => {
+      window.removeEventListener("resize", computeScale);
+      window.removeEventListener("orientationchange", computeScale);
+    };
   }, []);
+
 
   async function load() {
     setLoading(true);
