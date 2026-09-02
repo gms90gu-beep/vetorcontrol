@@ -192,9 +192,9 @@ function CoordinatorReports() {
         />
         <NavCard
           icon={<FileText className="h-6 w-6" />}
-          title="Boletins Oficiais"
-          description="Boletins semanais e consolidados oficiais."
-          to="/reports"
+          title="Relatório Semanal da Equipe"
+          description="Produção da semana por agente e por bairro."
+          to="/relatorio-semanal-equipe"
         />
         <NavCard
           icon={<FileSpreadsheet className="h-6 w-6" />}
