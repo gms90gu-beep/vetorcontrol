@@ -41,7 +41,16 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
   async function fetchFiltersData() {
     try {
       const [agentsData, cyclesData, weeksData] = await Promise.all([
-        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name, profile_id") }),
+        // Busca direta primeiro: caches antigos podem ter linhas de agents sem profile_id,
+        // o que fazia a lista do filtro ficar vazia/insensível ao clique.
+        (async () => {
+          const { data, error } = await supabase.from("agents").select("id, name, profile_id");
+          if (!error && data?.length) return data as any[];
+          return await listRemoteOrCache<any>({
+            name: "agents",
+            remote: async () => await supabase.from("agents").select("id, name, profile_id"),
+          });
+        })(),
         listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
         listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
@@ -120,9 +129,11 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
               {/* Os relatórios são indexados por perfil (daily_work_records.agent_id = profiles.id),
                   então o valor do filtro precisa ser o profile_id do agente. */}
               {agents
-                .filter((agent) => agent.profile_id)
+                .filter((agent) => agent.profile_id || agent.id)
                 .map(agent => (
-                  <SelectItem key={agent.id} value={agent.profile_id}>{agent.name}</SelectItem>
+                  <SelectItem key={agent.id} value={String(agent.profile_id || agent.id)}>
+                    {agent.name || "Agente"}
+                  </SelectItem>
                 ))}
             </SelectContent>
           </Select>
