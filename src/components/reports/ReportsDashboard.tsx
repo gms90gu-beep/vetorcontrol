@@ -192,12 +192,13 @@ export function ReportsDashboard() {
       let production: any[] = [];
       if (byAgent.size > 0) {
         const agentIds = Array.from(byAgent.keys());
+        // agent_id nos DWRs é o profiles.id — o nome vem de agents.profile_id
         const agentRows = await listRemoteOrCache<any>({
           name: "agents",
-          remote: () => supabase.from("agents").select("id, name").in("id", agentIds) as any,
-          filter: (a: any) => agentIds.includes(a.id),
+          remote: () => supabase.from("agents").select("id, name, profile_id").in("profile_id", agentIds) as any,
+          filter: (a: any) => agentIds.includes(a.profile_id),
         });
-        const nameMap = new Map((agentRows || []).map((a: any) => [a.id, a.name]));
+        const nameMap = new Map((agentRows || []).map((a: any) => [a.profile_id, a.name]));
         production = agentIds
           .map((aid) => {
             const { worked, pending } = byAgent.get(aid)!;

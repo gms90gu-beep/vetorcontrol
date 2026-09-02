@@ -41,7 +41,7 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
   async function fetchFiltersData() {
     try {
       const [agentsData, cyclesData, weeksData] = await Promise.all([
-        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name") }),
+        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name, profile_id") }),
         listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
         listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
@@ -117,9 +117,13 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-slate-100">
               <SelectItem value="all">Todos os Agentes</SelectItem>
-              {agents.map(agent => (
-                <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
-              ))}
+              {/* Os relatórios são indexados por perfil (daily_work_records.agent_id = profiles.id),
+                  então o valor do filtro precisa ser o profile_id do agente. */}
+              {agents
+                .filter((agent) => agent.profile_id)
+                .map(agent => (
+                  <SelectItem key={agent.id} value={agent.profile_id}>{agent.name}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
