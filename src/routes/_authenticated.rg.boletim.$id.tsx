@@ -639,7 +639,7 @@ function BoletimView() {
   if (imoveis.length === 0) console.log("[RG_VIEWER_EMPTY_FILTER_RENDER]", viewerFilters);
 
   return (
-    <div className="min-h-screen bg-muted/40 brg-screen">
+    <div className="min-h-screen overflow-x-hidden bg-muted/40 brg-screen">
       <style>{`
         /* Documento e tabela */
         .brg-page {
@@ -653,7 +653,7 @@ function BoletimView() {
         .brg-cell { border: 1px solid #000; padding: 2px 4px; font-size: 10px; }
         .brg-label { font-size: 7px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: .04em; }
         .brg-value { font-size: 11px; font-weight: 600; min-height: 14px; }
-        .brg-table { width: 100%; border-collapse: collapse; }
+        .brg-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .brg-table th, .brg-table td { 
           border: 1px solid #000; 
           padding: 3px 4px; 
@@ -682,22 +682,38 @@ function BoletimView() {
           -webkit-overflow-scrolling: touch;
         }
 
-        /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo. */
+        /* Zoom auto do documento (somente em tela). Impressão é resetada abaixo.
+           `zoom` reflui o layout (sem faixa branca / scroll lateral do transform). */
         .brg-scale-wrap {
-          transform: scale(var(--brg-scale, 1));
-          transform-origin: top center;
+          zoom: var(--brg-scale, 1);
           width: 100%;
+        }
+
+        /* Mobile: menos margem interna para aproveitar a largura útil */
+        @media (max-width: 640px) {
+          .brg-page {
+            padding: 6mm;
+            margin: 8px auto;
+            min-height: auto;
+          }
         }
 
         @media print {
           body { background: white !important; }
           .brg-no-print { display: none !important; }
-          .brg-page { box-shadow: none !important; margin: 0 !important; page-break-after: always; }
+          .brg-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 12mm !important;
+            min-height: 297mm !important;
+            page-break-after: always;
+          }
           .brg-page:last-child { page-break-after: auto; }
-          .brg-scale-wrap { transform: none !important; }
+          .brg-scale-wrap { zoom: 1 !important; transform: none !important; }
           aside, nav, header[data-app-header], .sidebar, [data-bottom-nav] { display: none !important; }
           .brg-table th { position: static !important; }
         }
+
       `}</style>
 
       {/* Cabeçalho mobile-first */}
