@@ -26,6 +26,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
+import { Route as AuthenticatedRelatorioSemanalEquipeRouteImport } from './routes/_authenticated.relatorio-semanal-equipe'
 import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
 import { Route as AuthenticatedMinhasJornadasRouteImport } from './routes/_authenticated.minhas-jornadas'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
@@ -144,6 +145,12 @@ const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedRelatorioSemanalEquipeRoute =
+  AuthenticatedRelatorioSemanalEquipeRouteImport.update({
+    id: '/relatorio-semanal-equipe',
+    path: '/relatorio-semanal-equipe',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
   id: '/pending',
   path: '/pending',
@@ -342,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof AuthenticatedMapRoute
   '/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/pending': typeof AuthenticatedPendingRoute
+  '/relatorio-semanal-equipe': typeof AuthenticatedRelatorioSemanalEquipeRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRouteWithChildren
@@ -390,6 +398,7 @@ export interface FileRoutesByTo {
   '/map': typeof AuthenticatedMapRoute
   '/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/pending': typeof AuthenticatedPendingRoute
+  '/relatorio-semanal-equipe': typeof AuthenticatedRelatorioSemanalEquipeRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/rg': typeof AuthenticatedRgRouteWithChildren
@@ -441,6 +450,7 @@ export interface FileRoutesById {
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/minhas-jornadas': typeof AuthenticatedMinhasJornadasRoute
   '/_authenticated/pending': typeof AuthenticatedPendingRoute
+  '/_authenticated/relatorio-semanal-equipe': typeof AuthenticatedRelatorioSemanalEquipeRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/rg': typeof AuthenticatedRgRouteWithChildren
@@ -493,6 +503,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/minhas-jornadas'
     | '/pending'
+    | '/relatorio-semanal-equipe'
     | '/relatorios'
     | '/reports'
     | '/rg'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/minhas-jornadas'
     | '/pending'
+    | '/relatorio-semanal-equipe'
     | '/relatorios'
     | '/reports'
     | '/rg'
@@ -591,6 +603,7 @@ export interface FileRouteTypes {
     | '/_authenticated/map'
     | '/_authenticated/minhas-jornadas'
     | '/_authenticated/pending'
+    | '/_authenticated/relatorio-semanal-equipe'
     | '/_authenticated/relatorios'
     | '/_authenticated/reports'
     | '/_authenticated/rg'
@@ -751,6 +764,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/relatorio-semanal-equipe': {
+      id: '/_authenticated/relatorio-semanal-equipe'
+      path: '/relatorio-semanal-equipe'
+      fullPath: '/relatorio-semanal-equipe'
+      preLoaderRoute: typeof AuthenticatedRelatorioSemanalEquipeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/pending': {
@@ -1001,6 +1021,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedMinhasJornadasRoute: typeof AuthenticatedMinhasJornadasRoute
   AuthenticatedPendingRoute: typeof AuthenticatedPendingRoute
+  AuthenticatedRelatorioSemanalEquipeRoute: typeof AuthenticatedRelatorioSemanalEquipeRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedRgRoute: typeof AuthenticatedRgRouteWithChildren
@@ -1042,6 +1063,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedMinhasJornadasRoute: AuthenticatedMinhasJornadasRoute,
   AuthenticatedPendingRoute: AuthenticatedPendingRoute,
+  AuthenticatedRelatorioSemanalEquipeRoute:
+    AuthenticatedRelatorioSemanalEquipeRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedRgRoute: AuthenticatedRgRouteWithChildren,
