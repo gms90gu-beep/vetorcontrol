@@ -783,7 +783,7 @@ function BoletimView() {
           />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="inline-flex rounded-lg border border-border bg-background p-0.5 text-xs">
+          <div className="-mx-1 flex max-w-full gap-0.5 overflow-x-auto rounded-lg border border-border bg-background p-0.5 text-xs sm:mx-0 sm:inline-flex sm:overflow-visible">
             {(
               [
                 { key: "all", label: `Todos (${gpsStats.total})` },
@@ -796,7 +796,7 @@ function BoletimView() {
                 type="button"
                 onClick={() => setGeoFilter(opt.key)}
                 className={
-                  "rounded-md px-2.5 py-1 font-semibold transition " +
+                  "shrink-0 whitespace-nowrap rounded-md px-2.5 py-1.5 font-semibold transition " +
                   (geoFilter === opt.key
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted")
@@ -806,6 +806,7 @@ function BoletimView() {
               </button>
             ))}
           </div>
+
           <Button
             variant="ghost"
             size="sm"
