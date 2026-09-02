@@ -41,7 +41,7 @@ export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProp
   async function fetchFiltersData() {
     try {
       const [agentsData, cyclesData, weeksData] = await Promise.all([
-        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name") }),
+        listRemoteOrCache<any>({ name: "agents", remote: async () => await supabase.from("agents").select("id, name, profile_id") }),
         listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
         listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
