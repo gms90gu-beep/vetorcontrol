@@ -1544,6 +1544,61 @@ function PropertyVisitPage() {
           </div>
         </div>
       </div>
+
+      <EndBlockDialog
+        open={askEndBlock}
+        working={endingBlock}
+        blockNumber={property?.block_number ?? null}
+        total={propertyIndex?.total ?? null}
+        onConfirm={handleConfirmEndBlock}
+        onDecline={handleKeepBlockOpen}
+      />
     </div>
+  );
+}
+
+function EndBlockDialog({
+  open, working, blockNumber, total, onConfirm, onDecline,
+}: {
+  open: boolean;
+  working: boolean;
+  blockNumber: string | null;
+  total: number | null;
+  onConfirm: () => void;
+  onDecline: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o && !working) onDecline(); }}>
+      <DialogContent className="sm:max-w-md rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            Encerrar o quarteirão?
+          </DialogTitle>
+          <DialogDescription>
+            Você concluiu a visita do último imóvel
+            {blockNumber ? ` do quarteirão ${blockNumber}` : ""}
+            {total ? ` (${total} imóveis)` : ""}. Deseja encerrar o quarteirão agora?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+          <Button
+            onClick={onConfirm}
+            disabled={working}
+            className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black"
+          >
+            {working ? "ENCERRANDO..." : "SIM, ENCERRAR QUARTEIRÃO"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onDecline}
+            disabled={working}
+            className="w-full h-11 rounded-2xl font-black text-[11px] uppercase tracking-widest"
+          >
+            Não, continuar depois
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
