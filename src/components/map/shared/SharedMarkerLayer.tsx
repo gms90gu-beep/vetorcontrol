@@ -15,6 +15,8 @@ export type SharedMarkerPoint = {
   had_previous_focus?: boolean | null;
   has_pendency?: boolean | null;
   type?: string | null;
+  // Raio individual (sobrepõe o raio padrão da camada)
+  radius?: number;
   // Conteúdo HTML do popup/tooltip
   popupHtml?: string;
   tooltip?: string;
@@ -53,12 +55,13 @@ export function SharedMarkerLayer({
               type: p.type,
             });
         const m = L.circleMarker([p.lat, p.lng], {
-          radius,
+          radius: p.radius ?? radius,
           fillColor: cls.color,
           fillOpacity: 1,
           color: "#fff",
           weight: 2,
         });
+
         if (p.popupHtml) m.bindPopup(p.popupHtml);
         if (p.tooltip) m.bindTooltip(p.tooltip, { direction: "top", offset: [0, -8] });
         if (onClick) m.on("click", () => onClick(p));

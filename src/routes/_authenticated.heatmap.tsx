@@ -14,11 +14,28 @@ import {
   SharedMarkerLayer,
   SharedAgentTerritoryLayer,
   classifyProperty,
+  MARKER_COLORS,
   type SharedMarkerPoint,
 } from "@/components/map/shared";
 
 export const Route = createFileRoute("/_authenticated/heatmap")({
   component: HeatmapPage,
+  head: () => ({
+    meta: [
+      { title: "Mapa Epidemiológico | VetorControl" },
+      {
+        name: "description",
+        content: "Mapa operacional de focos, pendências e imóveis inspecionados.",
+      },
+      { property: "og:title", content: "Mapa Epidemiológico | VetorControl" },
+      {
+        property: "og:description",
+        content: "Mapa operacional de focos, pendências e imóveis inspecionados.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
 });
 
 function isoOffset(days: number) {
@@ -30,12 +47,36 @@ function isoOffset(days: number) {
 }
 
 function classify(p: PropertyMapPoint) {
+  // Prioridade operacional: foco > fechada/recusada > pendência > PE > sem foco
+  if (p.has_positive_focus) {
+    return { status: "focus" as const, color: MARKER_COLORS.focus, label: "Foco positivo" };
+  }
+  const st = (p.last_visit_status ?? "").toLowerCase();
+  if (st === "closed") {
+    return { status: "closed" as const, color: MARKER_COLORS.closed, label: "Fechada" };
+  }
+  if (st === "refused") {
+    return { status: "refused" as const, color: MARKER_COLORS.refused, label: "Recusada" };
+  }
+  if (p.has_pendency) {
+    return { status: "pendency" as const, color: MARKER_COLORS.pendency, label: "Pendência" };
+  }
   return classifyProperty({
-    had_previous_focus: p.has_positive_focus,
-    has_pendency: p.has_pendency,
+    had_previous_focus: false,
+    has_pendency: false,
     type: p.is_strategic ? "strategic_point" : null,
   });
 }
+
+const HEATMAP_LEGEND = [
+  { color: MARKER_COLORS.focus, label: "Foco positivo" },
+  { color: MARKER_COLORS.closed, label: "Fechada" },
+  { color: MARKER_COLORS.refused, label: "Recusada" },
+  { color: MARKER_COLORS.pendency, label: "Pendência" },
+  { color: MARKER_COLORS.strategic, label: "Ponto estratégico" },
+  { color: MARKER_COLORS.clean, label: "Sem foco" },
+];
+
 
 function isValidCoord(lat: unknown, lng: unknown) {
   return (
@@ -86,17 +127,30 @@ function HeatmapPage() {
     [geoPoints],
   );
 
+  // Prioridade de desenho: "sem foco" primeiro, ocorrências relevantes por cima.
+  // Sem isso, imóveis verdes desenhados depois cobriam os focos vermelhos.
+  const DRAW_ORDER: Record<string, number> = {
+    clean: 0,
+    strategic: 1,
+    pendency: 2,
+    refused: 3,
+    closed: 4,
+    focus: 5,
+  };
+
   const markers: SharedMarkerPoint[] = useMemo(
     () =>
-      geoPoints.map((p) => {
-        const c = classify(p);
-        return {
-          id: p.id,
-          lat: p.latitude,
-          lng: p.longitude,
-          status: c.status,
-          tooltip: `${p.street ?? "Imóvel"} ${p.number ?? ""}`,
-          popupHtml: `
+      geoPoints
+        .map((p) => {
+          const c = classify(p);
+          return {
+            id: p.id,
+            lat: p.latitude,
+            lng: p.longitude,
+            status: c.status,
+            radius: c.status === "focus" ? 12 : c.status === "clean" ? 7 : 10,
+            tooltip: `${p.street ?? "Imóvel"} ${p.number ?? ""}`,
+            popupHtml: `
             <div style="font-family:system-ui;font-size:12px;min-width:180px">
               <div style="font-weight:600">${p.street ?? "Imóvel"} ${p.number ?? ""}</div>
               <div>Quarteirão: <b>${p.block_number ?? "—"}</b></div>
@@ -107,11 +161,22 @@ function HeatmapPage() {
               </div>
             </div>
           `,
-          data: p,
-        };
-      }),
+            data: p,
+          };
+        })
+        .sort((a, b) => (DRAW_ORDER[a.status!] ?? 0) - (DRAW_ORDER[b.status!] ?? 0)),
     [geoPoints],
   );
+
+
+  const counts = useMemo(() => {
+    const c = { focus: 0, closed: 0, refused: 0, pendency: 0, strategic: 0, clean: 0 } as Record<string, number>;
+    for (const p of geoPoints) {
+      const st = classify(p).status;
+      c[st] = (c[st] ?? 0) + 1;
+    }
+    return c as { focus: number; closed: number; refused: number; pendency: number; strategic: number; clean: number };
+  }, [geoPoints]);
 
   const territoryPoints = useMemo(
     () => geoPoints.map((p) => ({ lat: p.latitude, lng: p.longitude, agentLabel: p.agent_name ?? null })),
@@ -155,14 +220,21 @@ function HeatmapPage() {
             </Button>
           </div>
 
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+            <Stat label="Imóveis no mapa" value={geoPoints.length} />
+            <Stat label="Focos positivos" value={counts.focus} />
+            <Stat label="Fechadas/Recusadas" value={counts.closed + counts.refused} />
+            <Stat label="Pendências" value={counts.pendency} />
+          </div>
           {blocks.data && (
-            <div className="grid grid-cols-4 gap-2 text-sm">
-              <Stat label="Imóveis no mapa" value={geoPoints.length} />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
               <Stat label="Trabalhados (período)" value={blocks.data.totals.properties_worked} />
-              <Stat label="Focos+" value={blocks.data.totals.positive_foci} />
+              <Stat label="Focos+ (boletins)" value={blocks.data.totals.positive_foci} />
               <Stat label="Depósitos" value={blocks.data.totals.deposits_total} />
+              <Stat label="Pontos estratégicos" value={counts.strategic} />
             </div>
           )}
+
           {props.data?.truncated && (
             <p className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
@@ -183,6 +255,8 @@ function HeatmapPage() {
             onRetryLoad={refetchAll}
             isEmpty={geoPoints.length === 0}
             emptyVariant={allPoints.length === 0 ? "no-data" : "no-geo"}
+            legendEntries={HEATMAP_LEGEND}
+            legendTrailing={`${geoPoints.length} imóveis · ${counts.focus} focos · ${counts.closed + counts.refused} fechadas/recusadas · ${counts.pendency} pendências`}
           >
             <SharedMarkerLayer
               points={markers}

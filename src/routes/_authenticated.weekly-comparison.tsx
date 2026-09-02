@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowDown, ArrowUp, Loader2, Minus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_authenticated/weekly-comparison")({
   component: WeeklyComparisonPage,
@@ -34,6 +35,11 @@ function WeeklyComparisonPage() {
   const now = getEpiWeek();
   const [epiWeek, setEpiWeek] = useState<number>(now.week);
   const [epiYear, setEpiYear] = useState<number>(now.year);
+  const { role } = useAuth();
+  // Gestores (coordenador, supervisor, admin master) não fazem produção diária,
+  // então a opção "Eu" não faz sentido pra eles.
+  const isManager =
+    role === "coordenador" || role === "supervisor" || role === "admin_master" || role === "admin";
   const [scope, setScope] = useState<"team" | "self">("team");
   const fetchCompare = useServerFn(getWeeklyComparison);
 
@@ -58,12 +64,16 @@ function WeeklyComparisonPage() {
               <div className="text-muted-foreground mb-1">Ano</div>
               <Input type="number" value={epiYear} onChange={(e) => setEpiYear(Number(e.target.value))} />
             </label>
-            <Tabs value={scope} onValueChange={(v) => setScope(v as any)}>
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="self" className="text-xs">Eu</TabsTrigger>
-                <TabsTrigger value="team" className="text-xs">Equipe</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {isManager ? (
+              <div className="text-xs text-muted-foreground pb-2">Escopo: <strong>Equipe</strong></div>
+            ) : (
+              <Tabs value={scope} onValueChange={(v) => setScope(v as any)}>
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="self" className="text-xs">Eu</TabsTrigger>
+                  <TabsTrigger value="team" className="text-xs">Equipe</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
               {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
             </Button>

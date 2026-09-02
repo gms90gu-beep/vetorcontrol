@@ -29,6 +29,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   to: string;
+  /** Optional search params forwarded to the Link. */
+  search?: Record<string, string>;
   group: NavGroup;
   /** Accessible name; defaults to label. */
   ariaLabel?: string;
@@ -73,8 +75,8 @@ export function buildNavItems(userRole: string | null): NavItem[] {
   if (manager) {
     const items: NavItem[] = [
       // ── Operação ────────────────────────────────────────────────
-      { key: "mgr-panel", label: "Painel", icon: Home, to: "/supervision", group: "operacao", primary: true },
-      { key: "mgr-team", label: "Equipe", icon: Users, to: "/supervision", group: "operacao", primary: true },
+      { key: "mgr-panel", label: "Painel", icon: Home, to: "/supervision", search: { tab: "operacional" }, group: "operacao", primary: true },
+      { key: "mgr-team", label: "Equipe", icon: Users, to: "/supervision", search: { tab: "equipe" }, group: "operacao", primary: true },
       { key: "mgr-weekly", label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison", group: "operacao", badge: "weekly" },
       { key: "mgr-intel", label: "Intelligence", icon: BarChart3, to: "/reports", group: "operacao" },
       { key: "mgr-map", label: "Mapa", icon: MapIcon, to: "/map", group: "operacao", primary: true },

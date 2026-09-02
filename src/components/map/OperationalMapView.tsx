@@ -129,8 +129,10 @@ const BASE_LAYERS: Record<BaseLayerId, { name: string; url: string; attribution:
 export default function OperationalMapView() {
   console.log("[MAP_COMPONENT_MOUNT]");
 
-  const [preset, setPreset] = useState<Preset>("current");
-  const initial = currentEpiRange();
+  // A SE atual costuma ter pouca ou nenhuma produção lançada (o mapa abria
+  // com focos/fechadas em 0 para gestores). Abrir nas últimas 4 semanas.
+  const [preset, setPreset] = useState<Preset>("last4");
+  const initial = lastNWeeksRange(4);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [filter, setFilter] = useState<"all" | Category>("all");

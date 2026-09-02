@@ -117,6 +117,7 @@ export function AdminMasterDashboard() {
     email: "",
     password: "",
     role: "supervisor" as NewUserRole,
+    supervisor_id: null as string | null,
   });
 
   // Detail/edit drawer state
@@ -148,7 +149,7 @@ export function AdminMasterDashboard() {
   }
 
   const handleOpenCreate = (role: NewUserRole) => {
-    setNewUser({ full_name: "", email: "", password: "", role });
+    setNewUser({ full_name: "", email: "", password: "", role, supervisor_id: null });
     setIsAddingUser(true);
   };
 
@@ -181,14 +182,33 @@ export function AdminMasterDashboard() {
           if (pErr) throw pErr;
         }
       } else {
+        const { full_name, email, password, role } = newUser;
         const { error } = await supabase.functions.invoke("manage-agents", {
-          body: { action: "create_manager", userData: newUser },
+          body: { action: "create_manager", userData: { full_name, email, password, role } },
         });
         if (error) throw error;
+
+        // Vincula o agente ao supervisor escolhido (create_manager não herda vínculos)
+        if (role === "agente" && newUser.supervisor_id) {
+          const { data: created } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("email", email)
+            .maybeSingle();
+          if (created?.id) {
+            const { error: linkErr } = await supabase.functions.invoke("manage-agents", {
+              body: {
+                action: "update_user",
+                userData: { userId: created.id, supervisor_id: newUser.supervisor_id },
+              },
+            });
+            if (linkErr) throw linkErr;
+          }
+        }
       }
       toast.success(`${ROLE_LABELS[newUser.role]} cadastrado com sucesso!`);
       setIsAddingUser(false);
-      setNewUser({ full_name: "", email: "", password: "", role: "supervisor" });
+      setNewUser({ full_name: "", email: "", password: "", role: "supervisor", supervisor_id: null });
       fetchUsers();
     } catch (error: any) {
       console.error("Error creating user:", error);
@@ -571,6 +591,28 @@ export function AdminMasterDashboard() {
                 minLength={6}
               />
             </div>
+            {newUser.role === "agente" && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Supervisor responsável
+                </label>
+                <select
+                  value={newUser.supervisor_id ?? ""}
+                  onChange={(e) => setNewUser({ ...newUser, supervisor_id: e.target.value || null })}
+                  className="w-full bg-slate-800 border-none rounded-xl h-11 px-3 text-sm font-bold text-white outline-none"
+                >
+                  <option value="">— Sem supervisor —</option>
+                  {supervisorOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name ?? s.email}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  O agente aparecerá na equipe do supervisor selecionado.
+                </p>
+              </div>
+            )}
             <Button type="submit" className="w-full h-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black uppercase tracking-widest text-xs">
               Confirmar Cadastro
             </Button>

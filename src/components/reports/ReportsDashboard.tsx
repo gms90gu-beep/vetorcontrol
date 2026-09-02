@@ -81,7 +81,9 @@ export function ReportsDashboard() {
   async function fetchDashboardData() {
     setIsLoading(true);
     try {
-      const cycleFilter = filters.cycle !== "all" ? filters.cycle : activeCycleId;
+      // "Todos os Ciclos" deve significar TODOS: não reaplicar o ciclo ativo aqui,
+      // senão o ciclo recém-iniciado (sem produção) zera todos os indicadores.
+      const cycleFilter = filters.cycle !== "all" ? filters.cycle : null;
       logDirectSource({
         module: "ReportsDashboard",
         file: "src/components/reports/ReportsDashboard.tsx",
@@ -190,12 +192,17 @@ export function ReportsDashboard() {
       let production: any[] = [];
       if (byAgent.size > 0) {
         const agentIds = Array.from(byAgent.keys());
+        // agent_id nos DWRs é o profiles.id — o nome vem de agents.profile_id
         const agentRows = await listRemoteOrCache<any>({
           name: "agents",
-          remote: () => supabase.from("agents").select("id, name").in("id", agentIds) as any,
-          filter: (a: any) => agentIds.includes(a.id),
+          remote: () => supabase.from("agents").select("id, name, profile_id") as any,
         });
-        const nameMap = new Map((agentRows || []).map((a: any) => [a.id, a.name]));
+        // Indexa por profile_id e por id: o filtro pode enviar qualquer um dos dois.
+        const nameMap = new Map<string, string>();
+        for (const a of (agentRows || []) as any[]) {
+          if (a?.profile_id) nameMap.set(a.profile_id, a.name);
+          if (a?.id) nameMap.set(a.id, a.name);
+        }
         production = agentIds
           .map((aid) => {
             const { worked, pending } = byAgent.get(aid)!;
