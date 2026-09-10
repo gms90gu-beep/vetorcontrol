@@ -406,7 +406,38 @@ function FieldWorkPage() {
               previous_status: "paused",
               new_status: "prompt",
             });
-            const decision = await assessSessionForResume(paused);
+
+            // Jornada retroativa pausada: a Data da Produção dela é, por
+            // definição, anterior a hoje. Antes, assessSessionForResume era
+            // chamada sem referenceDate (usando "hoje"), então a decisão saía
+            // sempre "blocked_by_date", o modal nunca aparecia e a jornada
+            // ficava presa em `paused` — nenhuma tela reconhecia jornada ativa
+            // e o agente recebia "Inicie uma jornada de trabalho primeiro".
+            // Agora usamos a própria Data da Produção da sessão como
+            // referência quando ela está dentro da janela retroativa, e
+            // alinhamos o seletor de data da tela a ela.
+            const pausedDate = String((paused as any).session_date || "");
+            const todayStr = getOperationalDate();
+            let referenceDate = todayStr;
+            if (pausedDate && pausedDate !== todayStr) {
+              const [py, pm, pd] = pausedDate.split("-").map(Number);
+              const pausedAsDate = py && pm && pd ? new Date(py, pm - 1, pd) : null;
+              const diffDays = pausedAsDate
+                ? Math.round((operationalTodayDate().getTime() - pausedAsDate.getTime()) / 86400000)
+                : Number.NaN;
+              if (pausedAsDate && diffDays > 0 && diffDays <= MAX_RETROACTIVE_DAYS) {
+                referenceDate = pausedDate;
+                setDate(pausedAsDate);
+                console.log("[JOURNEY_RESUME_RETROACTIVE_DATE]", {
+                  session_id: (paused as any).id,
+                  session_date: pausedDate,
+                  operational_today: todayStr,
+                  diff_days: diffDays,
+                });
+              }
+            }
+
+            const decision = await assessSessionForResume(paused, referenceDate);
             if (decision.show) {
               setOpenSession(paused as any);
               setOpenSessionModal(true);
@@ -984,25 +1015,27 @@ function FieldWorkPage() {
         weekLabel={openSession && autoWeek?.id === openSession.week_id ? `Semana ${autoWeek.number}/8` : undefined}
         onContinue={async (s) => {
           setOpenSessionModal(false);
-          // Se a jornada estava PAUSED, reativa para in_progress na data atual
+          // Se a jornada estava PAUSED, reativa para in_progress PRESERVANDO a
+          // Data da Produção original. Antes, o session_date era reescrito para
+          // hoje — o que destruía a Data da Produção de uma jornada retroativa
+          // (visitas do dia lançado passavam a contar em outra data).
           const wasPaused = (s as any).status === "paused";
           let resumed = s;
           if (wasPaused) {
-            const todayStr = getOperationalDate();
+            const keptDate = s.session_date || getOperationalDate();
             try {
               await updateOffline("field_work_sessions", s.id, {
                 status: "in_progress",
-                session_date: todayStr,
                 updated_at: new Date().toISOString(),
               });
-              resumed = { ...s, status: "in_progress", session_date: todayStr } as any;
+              resumed = { ...s, status: "in_progress", session_date: keptDate } as any;
               console.log("[JOURNEY_RESUMED]", {
                 user_id: userId,
                 session_id: s.id,
                 block_id: (s as any).block_id ?? null,
                 block_number: s.block_number ?? null,
                 cycle_id: s.cycle_id ?? null,
-                session_date: todayStr,
+                session_date: keptDate,
                 previous_status: "paused",
                 new_status: "in_progress",
               });
