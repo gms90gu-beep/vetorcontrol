@@ -406,7 +406,38 @@ function FieldWorkPage() {
               previous_status: "paused",
               new_status: "prompt",
             });
-            const decision = await assessSessionForResume(paused);
+
+            // Jornada retroativa pausada: a Data da Produção dela é, por
+            // definição, anterior a hoje. Antes, assessSessionForResume era
+            // chamada sem referenceDate (usando "hoje"), então a decisão saía
+            // sempre "blocked_by_date", o modal nunca aparecia e a jornada
+            // ficava presa em `paused` — nenhuma tela reconhecia jornada ativa
+            // e o agente recebia "Inicie uma jornada de trabalho primeiro".
+            // Agora usamos a própria Data da Produção da sessão como
+            // referência quando ela está dentro da janela retroativa, e
+            // alinhamos o seletor de data da tela a ela.
+            const pausedDate = String((paused as any).session_date || "");
+            const todayStr = getOperationalDate();
+            let referenceDate = todayStr;
+            if (pausedDate && pausedDate !== todayStr) {
+              const [py, pm, pd] = pausedDate.split("-").map(Number);
+              const pausedAsDate = py && pm && pd ? new Date(py, pm - 1, pd) : null;
+              const diffDays = pausedAsDate
+                ? Math.round((operationalTodayDate().getTime() - pausedAsDate.getTime()) / 86400000)
+                : Number.NaN;
+              if (pausedAsDate && diffDays > 0 && diffDays <= MAX_RETROACTIVE_DAYS) {
+                referenceDate = pausedDate;
+                setDate(pausedAsDate);
+                console.log("[JOURNEY_RESUME_RETROACTIVE_DATE]", {
+                  session_id: (paused as any).id,
+                  session_date: pausedDate,
+                  operational_today: todayStr,
+                  diff_days: diffDays,
+                });
+              }
+            }
+
+            const decision = await assessSessionForResume(paused, referenceDate);
             if (decision.show) {
               setOpenSession(paused as any);
               setOpenSessionModal(true);
