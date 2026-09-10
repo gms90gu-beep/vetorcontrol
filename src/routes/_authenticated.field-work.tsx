@@ -1015,25 +1015,27 @@ function FieldWorkPage() {
         weekLabel={openSession && autoWeek?.id === openSession.week_id ? `Semana ${autoWeek.number}/8` : undefined}
         onContinue={async (s) => {
           setOpenSessionModal(false);
-          // Se a jornada estava PAUSED, reativa para in_progress na data atual
+          // Se a jornada estava PAUSED, reativa para in_progress PRESERVANDO a
+          // Data da Produção original. Antes, o session_date era reescrito para
+          // hoje — o que destruía a Data da Produção de uma jornada retroativa
+          // (visitas do dia lançado passavam a contar em outra data).
           const wasPaused = (s as any).status === "paused";
           let resumed = s;
           if (wasPaused) {
-            const todayStr = getOperationalDate();
+            const keptDate = s.session_date || getOperationalDate();
             try {
               await updateOffline("field_work_sessions", s.id, {
                 status: "in_progress",
-                session_date: todayStr,
                 updated_at: new Date().toISOString(),
               });
-              resumed = { ...s, status: "in_progress", session_date: todayStr } as any;
+              resumed = { ...s, status: "in_progress", session_date: keptDate } as any;
               console.log("[JOURNEY_RESUMED]", {
                 user_id: userId,
                 session_id: s.id,
                 block_id: (s as any).block_id ?? null,
                 block_number: s.block_number ?? null,
                 cycle_id: s.cycle_id ?? null,
-                session_date: todayStr,
+                session_date: keptDate,
                 previous_status: "paused",
                 new_status: "in_progress",
               });
