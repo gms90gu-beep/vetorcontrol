@@ -121,15 +121,15 @@ export async function closeExpiredInProgressSessions(
 ): Promise<number> {
   if (!userId || !todayOperational) return 0;
   try {
-    // Inclui "paused": uma jornada pausada em um dia anterior é tão fantasma
-    // quanto uma "in_progress" esquecida — ela nunca expirava, reaparecia no
-    // modal "Jornada pausada" e travava a criação de uma jornada nova (inclusive
-    // retroativa) para o mesmo quarteirão/dia.
+    // Uma jornada `in_progress` esquecida pode ser encerrada ao virar o dia.
+    // Já `paused` é uma pausa intencional: ela precisa permanecer disponível
+    // para retomada dentro da janela retroativa (até 5 dias). Fechá-la aqui
+    // fazia a jornada desaparecer antes que o agente pudesse continuar.
     const { data, error } = await supabase
       .from("field_work_sessions")
       .update({ status: "closed", updated_at: new Date().toISOString() })
       .eq("user_id", userId)
-      .in("status", ["in_progress", "paused"])
+      .eq("status", "in_progress")
       .eq("is_retroactive", false)
       .lt("session_date", todayOperational)
       .select("id, session_date, block_number, block_id, status");
