@@ -364,19 +364,24 @@ function PropertyVisitPage() {
       if (!user) return;
 
       // Estatística offline-first: o mesmo conjunto de visitas vem do cache
-      // quando a rede não está disponível.
+      // quando a rede não está disponível, mas a consulta online continua
+      // limitada ao dia para não carregar todo o histórico do agente.
+      const today = getOperationalDate();
+      const { startIso, endIso } = operationalDateBoundsUtcIso(today);
       const rows = await listRemoteOrCache<any>({
         name: "visits",
         remote: () =>
           supabase
             .from("visits")
-            .select("status, treatment_amount, treated_deposits, tubitos_coletados, visit_date")
+            .select("agent_id, status, treatment_amount, treated_deposits, tubitos_coletados, visit_date")
             .eq("agent_id", user.id)
-            .in("status", ["visited", "closed", "refused", "abandoned"]) as any,
+            .in("status", ["visited", "closed", "refused", "abandoned"])
+            .gte("visit_date", startIso)
+            .lt("visit_date", endIso) as any,
         filter: (v) =>
           v.agent_id === user.id &&
           ["visited", "closed", "refused", "abandoned"].includes(v.status) &&
-          operationalDateBR(v.visit_date) === operationalDateBR(new Date()),
+          operationalDateBR(v.visit_date) === today,
       });
 
       const stats = rows.reduce((acc, v) => ({
