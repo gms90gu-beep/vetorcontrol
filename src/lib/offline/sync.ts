@@ -148,7 +148,7 @@ async function purgeInvalidTmpMutations(): Promise<number> {
   return removed;
 }
 
-export async function flushMutations(): Promise<{ ok: number; failed: number }> {
+export async function flushMutations(options?: { retryErroredImmediately?: boolean }): Promise<{ ok: number; failed: number }> {
   if (running) return { ok: 0, failed: 0 };
   if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: 0, failed: 0 };
   running = true;
@@ -171,8 +171,11 @@ export async function flushMutations(): Promise<{ ok: number; failed: number }> 
     const now = Date.now();
     await db.mutations
       .where("status").equals("error")
-      .and((m) => (m.tries || 0) < MAX_RETRIES && (!m.nextRetryAt || m.nextRetryAt <= now))
-      .modify({ status: "pending" });
+      .and((m) =>
+        (m.tries || 0) < MAX_RETRIES &&
+        (options?.retryErroredImmediately || !m.nextRetryAt || m.nextRetryAt <= now),
+      )
+      .modify({ status: "pending", ...(options?.retryErroredImmediately ? { nextRetryAt: undefined } : {}) });
 
     // FIFO — apenas pending agora
     const pending = await db.mutations
@@ -321,14 +324,41 @@ export async function discardFailedMutation(id: number): Promise<void> {
 
 
 let booted = false;
+
+/**
+ * Um reload recria o módulo JS, mas a fila Dexie permanece. Mutação que ficou
+ * em "syncing" durante o reload ou em "error" aguardando backoff precisa ser
+ * rearmada para que o próximo boot tente novamente imediatamente.
+ */
+async function prepareMutationsAfterReload() {
+  await db.mutations
+    .where("status")
+    .equals("syncing")
+    .modify({ status: "pending" });
+  await db.mutations
+    .where("status")
+    .equals("error")
+    .and((m) => (m.tries || 0) < MAX_RETRIES)
+    .modify({ status: "pending", nextRetryAt: undefined });
+  console.log("[SYNC_RELOAD_RECOVERY]", { pending: await db.mutations.count() });
+}
 export function bootSyncEngine() {
   if (booted || typeof window === "undefined") return;
   booted = true;
 
   const tryFlush = () => { void flushMutations(); };
+  const flushAfterReload = async () => {
+    try {
+      await prepareMutationsAfterReload();
+      await flushMutations({ retryErroredImmediately: true });
+    } catch (e) {
+      console.warn("[SYNC_RELOAD_RECOVERY_FAIL]", e);
+    }
+  };
 
   window.addEventListener("online", tryFlush);
   window.addEventListener("focus", tryFlush);
+  window.addEventListener("pageshow", tryFlush);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") tryFlush();
   });
@@ -336,7 +366,9 @@ export function bootSyncEngine() {
   // sem disparar "beforeunload" de forma confiável — "pagehide" cobre os dois).
   window.addEventListener("pagehide", tryFlush);
 
-  // Boot inicial
+  // Boot inicial: reabre mutações interrompidas por refresh e envia
+  // imediatamente quando a rede já estiver disponível.
+  void flushAfterReload();
   setTimeout(tryFlush, 1500);
   // Gatilho 3: limpeza no boot (24h + guardas)
   setTimeout(() => {
