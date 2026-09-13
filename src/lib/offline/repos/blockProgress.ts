@@ -19,6 +19,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { db, enqueueMutation, type CachedRow } from "../db";
 import { safeFetch } from "../safe-fetch";
+import { getOperationalBlockStatus } from "@/lib/operational-block-status";
 
 export type BlockProgressStatus =
   | "NOT_STARTED"
@@ -213,6 +214,77 @@ export async function getBlockProgressBatch(input: {
  * Aplica delta local imediatamente após uma visita — não espera sync.
  * Mantém pending = max(0, total - visited - closed).
  */
+async function rebuildLocalProgress(
+  base: BlockProgress,
+  input: {
+    cycle_id: string;
+    block_number: string;
+    agent_id: string;
+    property_id: string;
+    visit_date?: string;
+  },
+): Promise<BlockProgress | null> {
+  try {
+    const currentProperty = (await db.properties.get(input.property_id))?.data as any;
+    const allProperties = (await db.properties.toArray()).map((r) => r.data as any).filter(Boolean);
+    const scopedProperties = allProperties.filter((p) =>
+      currentProperty?.block_id
+        ? p.block_id === currentProperty.block_id
+        : String(p.block_number) === String(input.block_number),
+    );
+    const propertyIds = scopedProperties.map((p) => p.id).filter(Boolean);
+    if (!propertyIds.includes(input.property_id)) propertyIds.push(input.property_id);
+    if (!propertyIds.length) return null;
+
+    const visits = (await db.visits.toArray())
+      .map((r) => r.data as any)
+      .filter((v) =>
+        v?.agent_id === input.agent_id &&
+        v?.cycle_id === input.cycle_id &&
+        propertyIds.includes(v.property_id),
+      );
+
+    const canonical = getOperationalBlockStatus({
+      propertyIds,
+      visits,
+      fallbackTotal: base.total_properties || 0,
+    });
+    const now = new Date().toISOString();
+    const operationalClosed =
+      canonical.closedProperties +
+      canonical.refusedProperties +
+      canonical.abandonedProperties;
+    const patch: BlockProgress = {
+      ...base,
+      total_properties: canonical.totalProperties || base.total_properties || 0,
+      visited_properties: canonical.visitedProperties,
+      closed_properties: operationalClosed,
+      pending_properties: canonical.pendingProperties,
+      recovered_properties: canonical.recoveredProperties,
+      completion_percentage: canonical.completionPercentage,
+      status: canonical.pendingProperties === 0 && canonical.totalProperties > 0
+        ? "COMPLETED"
+        : "IN_PROGRESS",
+      completed_at:
+        canonical.pendingProperties === 0 && canonical.totalProperties > 0
+          ? base.completed_at ?? now
+          : null,
+      last_visit_at: input.visit_date ?? now,
+      started_at: base.started_at ?? now,
+      updated_at: now,
+    };
+    return patch;
+  } catch (e) {
+    console.warn("[BLOCK_PROGRESS_LOCAL_REBUILD_FAIL]", e);
+    return null;
+  }
+}
+
+/**
+ * Aplica progresso local a partir da fotografia atual das visitas.
+ * Recalcular a última visita de cada imóvel evita dupla contagem quando o
+ * agente edita/reabre um imóvel antes da sincronização.
+ */
 export async function applyLocalVisitDelta(input: {
   cycle_id: string;
   block_number: string;
@@ -251,37 +323,32 @@ export async function applyLocalVisitDelta(input: {
     updated_at: now,
   };
 
-  // Incremento otimista — o servidor recalcula o valor exato via trigger.
-  const patch: BlockProgress = { ...base };
-  if (status === "visited") patch.visited_properties = (base.visited_properties || 0) + 1;
-  else if (status === "closed") patch.closed_properties = (base.closed_properties || 0) + 1;
-  if (is_recovery) patch.recovered_properties = (base.recovered_properties || 0) + 1;
+  const rebuilt = await rebuildLocalProgress(base, input);
+  const patch: BlockProgress = rebuilt ?? { ...base };
 
-  const doneNow = (patch.visited_properties || 0) + (patch.closed_properties || 0);
-  if (patch.total_properties > 0) {
-    patch.pending_properties = Math.max(0, patch.total_properties - doneNow);
-    // Bug: "refused" e "abandoned" não têm coluna própria neste schema
-    // (mesmo tratamento que o recompute_block_progress do servidor já dava
-    // a "refused") e não entravam em `doneNow` acima — o otimista local
-    // ignorava esses dois desfechos por completo, então marcar uma recusa
-    // ou um abandono não atualizava "Pendentes" na tela até o próximo
-    // recompute do servidor sobrescrever. Reduz pending manualmente aqui.
-    if (status === "refused" || status === "abandoned") {
-      patch.pending_properties = Math.max(0, patch.pending_properties - 1);
+  // Fallback para instalações em que o imóvel ainda não foi cacheado.
+  // Continua refletindo a visita atual, mas sem deixar recusas/abandonos
+  // fora do total concluído.
+  if (!rebuilt) {
+    if (status === "visited") patch.visited_properties = (base.visited_properties || 0) + 1;
+    else if (status === "closed" || status === "refused" || status === "abandoned") {
+      patch.closed_properties = (base.closed_properties || 0) + 1;
     }
-    const doneEstimate = patch.total_properties - patch.pending_properties;
-    patch.completion_percentage = Math.round((doneEstimate / patch.total_properties) * 100 * 100) / 100;
+    if (is_recovery) patch.recovered_properties = (base.recovered_properties || 0) + 1;
+    const doneNow = (patch.visited_properties || 0) + (patch.closed_properties || 0);
+    if (patch.total_properties > 0) {
+      patch.pending_properties = Math.max(0, patch.total_properties - doneNow);
+      patch.completion_percentage = Math.round(
+        ((patch.total_properties - patch.pending_properties) / patch.total_properties) * 100 * 100,
+      ) / 100;
+    }
+    patch.last_visit_at = visit_date ?? now;
+    patch.status = patch.pending_properties === 0 && patch.total_properties > 0
+      ? "COMPLETED"
+      : "IN_PROGRESS";
+    patch.completed_at = patch.status === "COMPLETED" ? base.completed_at ?? now : null;
+    patch.updated_at = now;
   }
-  patch.last_visit_at = visit_date ?? now;
-  patch.started_at = base.started_at ?? now;
-  patch.status = patch.pending_properties === 0 && patch.total_properties > 0
-    ? "COMPLETED"
-    : "IN_PROGRESS";
-  if (patch.status === "COMPLETED") {
-    patch.completed_at = base.completed_at ?? now;
-    log("BLOCK_PROGRESS_COMPLETED", { cycle_id, block_number, agent_id });
-  }
-  patch.updated_at = now;
 
   await db.block_progress.put({ id: patch.id, data: patch, updatedAt: now });
   log("BLOCK_PROGRESS_UPDATE", {
@@ -294,7 +361,11 @@ export async function applyLocalVisitDelta(input: {
     pendentes: patch.pending_properties,
     percentual: patch.completion_percentage,
     status: patch.status,
+    source: rebuilt ? "local-visits-rebuild" : "incremental-fallback",
   });
+  if (patch.status === "COMPLETED") {
+    log("BLOCK_PROGRESS_COMPLETED", { cycle_id, block_number, agent_id });
+  }
   checkIntegrity(patch, "applyLocalVisitDelta");
   return patch;
 }
@@ -373,17 +444,19 @@ export async function pauseBlockProgress(input: {
     const patch = { ...existing, status: "PAUSED" as const, updated_at: now };
     await db.block_progress.put({ id: patch.id, data: patch, updatedAt: now });
   }
-  try {
-    await supabase
-      .from(TABLE)
-      .update({ status: "PAUSED" })
-      .eq("cycle_id", input.cycle_id)
-      .eq("block_number", String(input.block_number))
-      .eq("agent_id", input.agent_id);
-  } catch (e) {
-    console.warn("[BLOCK_PROGRESS_PAUSED_REMOTE_FAIL]", e);
-  }
-  log("BLOCK_PROGRESS_PAUSED", input);
+  // A pausa é sempre registrada na fila. Assim, se o agente encerrar
+  // o expediente sem internet, a alteração não fica apenas no cache local.
+  await enqueueMutation({
+    table: TABLE,
+    op: "update_where",
+    match: {
+      cycle_id: input.cycle_id,
+      block_number: String(input.block_number),
+      agent_id: input.agent_id,
+    },
+    payload: { status: "PAUSED", updated_at: new Date().toISOString() },
+  });
+  log("BLOCK_PROGRESS_PAUSED", { ...input, queued: true });
 }
 
 /** Log padronizado ao retomar uma jornada consultando block_progress. */
