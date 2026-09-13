@@ -139,6 +139,7 @@ function PropertyVisitPage() {
   const [nextProperty, setNextProperty] = useState<any>(null);
   const [prevProperty, setPrevProperty] = useState<any>(null);
   const [propertyIndex, setPropertyIndex] = useState<{current: number, total: number} | null>(null);
+  const [navigationReady, setNavigationReady] = useState(false);
   // Último imóvel do quarteirão: em vez de sair direto (o que abria o
   // fechamento/boletim), perguntar se o agente deseja encerrar o quarteirão.
   const [askEndBlock, setAskEndBlock] = useState(false);
@@ -242,51 +243,84 @@ function PropertyVisitPage() {
   const fetchAdjacentProperties = async () => {
     if (!property) return;
 
+    setNavigationReady(false);
+    setPrevProperty(null);
+    setNextProperty(null);
+    setPropertyIndex(null);
+
     try {
-      // Buscar TODOS os imóveis do quarteirão (somente colunas necessárias)
-      let query = supabase
-        .from("properties")
-        .select("id, number, complement, sequence, status, street_name");
-
-      if (property.block_id) {
-        query = query.eq("block_id", property.block_id);
-      } else if (property.block_number) {
-        query = query.eq("block_number", property.block_number);
-      } else {
+      // Offline-first: a navegação do quarteirão nunca depende apenas do Supabase.
+      // O primeiro carregamento online hidrata o cache; depois, a mesma lista
+      // é usada mesmo sem sinal para calcular anterior/próximo.
+      const blockId = property.block_id ?? null;
+      const blockNumber = property.block_number ?? null;
+      if (!blockId && blockNumber == null) {
+        console.warn("[NAVEGACAO_OFFLINE_SEM_ESCOP0]", { property_id: property.id });
         return;
       }
 
-      const { data: allPropsRaw, error } = await query;
-      if (error) {
-        console.error("[Navegação] Erro ao buscar imóveis:", error);
-        return;
-      }
+      const cachedOrRemote = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () => {
+          let query = supabase
+            .from("properties")
+            .select("id, number, complement, sequence, status, street_name, block_id, block_number");
+          query = blockId
+            ? query.eq("block_id", blockId)
+            : query.eq("block_number", blockNumber);
+          return query as any;
+        },
+        filter: (p) =>
+          blockId
+            ? p.block_id === blockId
+            : String(p.block_number) === String(blockNumber),
+      });
 
-      const all = allPropsRaw || [];
+      // fetchData já pode ter carregado a lista completa do quarteirão.
+      // Usa-a como segunda camada caso uma leitura concorrente ainda não tenha
+      // terminado de hidratar a tabela properties.
+      const fallbackRows = (blockProperties || []).filter((p: any) =>
+        blockId ? p.block_id === blockId : String(p.block_number) === String(blockNumber),
+      );
+      const rows = cachedOrRemote.length ? cachedOrRemote : fallbackRows;
+      const all = [...rows];
+      if (!all.some((p: any) => p.id === property.id)) all.push(property);
 
-      // Ordenação operacional canônica — nunca considera tipo do imóvel.
       const sorted = sortPropertiesOperational(all);
-
       const currentIndex = sorted.findIndex((p) => p.id === propertyId);
+      if (currentIndex < 0) {
+        console.warn("[NAVEGACAO_OFFLINE_IMOVEL_FORA_DO_CACHE]", {
+          property_id: propertyId,
+          block_id: blockId,
+          block_number: blockNumber,
+          source: (cachedOrRemote as any).source,
+          count: sorted.length,
+        });
+        return;
+      }
+
       const prev = currentIndex > 0 ? sorted[currentIndex - 1] : null;
-      const next = currentIndex >= 0 && currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
+      const next = currentIndex < sorted.length - 1 ? sorted[currentIndex + 1] : null;
 
       console.log("[PROPERTY_NAVIGATION]", {
+        source: (cachedOrRemote as any).source || (fallbackRows.length ? "state" : "empty"),
         block_number: property.block_number,
         total: sorted.length,
-        current: { id: property.id, number: property.number, sequence: property.sequence, complement: property.complement, index: currentIndex + 1 },
+        current: {
+          id: property.id,
+          number: property.number,
+          sequence: property.sequence,
+          complement: property.complement,
+          index: currentIndex + 1,
+        },
         prev: prev && { id: prev.id, number: prev.number, sequence: prev.sequence, complement: prev.complement },
         next: next && { id: next.id, number: next.number, sequence: next.sequence, complement: next.complement },
       });
 
-      if (currentIndex !== -1) {
-        setPropertyIndex({
-          current: currentIndex + 1,
-          total: sorted.length,
-        });
-        setPrevProperty(prev);
-        setNextProperty(next);
-      }
+      setPropertyIndex({ current: currentIndex + 1, total: sorted.length });
+      setPrevProperty(prev);
+      setNextProperty(next);
+      setNavigationReady(true);
     } catch (e) {
       console.error("[Navegação] Erro inesperado:", e);
     }
@@ -317,27 +351,32 @@ function PropertyVisitPage() {
       const { data: { user } } = await safeGetUser();
       if (!user) return;
 
-      // Fronteira do dia calculada com fuso fixo America/Sao_Paulo (-03:00),
-      // em vez de depender do relógio/fuso local do aparelho.
-      const { startIso: todayStartIso } = operationalDateBoundsUtcIso(getOperationalDate());
+      // Estatística offline-first: o mesmo conjunto de visitas vem do cache
+      // quando a rede não está disponível.
+      const rows = await listRemoteOrCache<any>({
+        name: "visits",
+        remote: () =>
+          supabase
+            .from("visits")
+            .select("status, treatment_amount, treated_deposits, tubitos_coletados, visit_date")
+            .eq("agent_id", user.id)
+            .in("status", ["visited", "closed", "refused", "abandoned"]) as any,
+        filter: (v) =>
+          v.agent_id === user.id &&
+          ["visited", "closed", "refused", "abandoned"].includes(v.status) &&
+          operationalDateBR(v.visit_date) === operationalDateBR(new Date()),
+      });
 
-      const { data: visits } = await supabase
-        .from("visits")
-        .select("status, treatment_amount, treated_deposits, tubitos_coletados")
-        .eq("agent_id", user.id)
-        .in("status", ["visited", "closed", "refused", "abandoned"])
-        .gte("visit_date", todayStartIso);
-
-      if (visits) {
-        const stats = visits.reduce((acc, v) => ({
-          worked: acc.worked + 1,
-          treated: acc.treated + (v.treated_deposits || 0),
-          larvicide: acc.larvicide + (Number(v.treatment_amount) || 0),
-          tubitos: acc.tubitos + (Number(v.tubitos_coletados) || 0)
-        }), { worked: 0, treated: 0, larvicide: 0, tubitos: 0 });
-        setDailyStats(stats);
-      }
-    } catch (e) { console.error(e); }
+      const stats = rows.reduce((acc, v) => ({
+        worked: acc.worked + 1,
+        treated: acc.treated + (v.treated_deposits || 0),
+        larvicide: acc.larvicide + (Number(v.treatment_amount) || 0),
+        tubitos: acc.tubitos + (Number(v.tubitos_coletados) || 0),
+      }), { worked: 0, treated: 0, larvicide: 0, tubitos: 0 });
+      setDailyStats(stats);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function fetchData() {
@@ -755,6 +794,13 @@ function PropertyVisitPage() {
       if (nextProperty) {
         toast.success(`✅ ${offlineHint}`, { description: "Carregando próximo imóvel..." });
         navigate({ to: `/property/${nextProperty.id}` });
+      } else if (!navigationReady) {
+        // Sem a lista do quarteirão, não é seguro declarar que este é o último
+        // imóvel. A visita fica salva localmente, mas o fechamento não é aberto
+        // por engano.
+        toast.success(`✅ ${offlineHint}`, {
+          description: "Visita salva. A lista do quarteirão ainda não está disponível offline.",
+        });
       } else {
         toast.success(`✅ ${offlineHint}`, { description: "Último imóvel do quarteirão." });
         setAskEndBlock(true);
