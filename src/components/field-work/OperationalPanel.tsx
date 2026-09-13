@@ -138,17 +138,33 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     if (!session?.user_id) return;
     audit("OP_PANEL_LOAD", { session: session.id });
 
-    const [{ data: ag }, { data: cy }, { data: wk }] = await Promise.all([
-      supabase.from("agents").select("name, registration_id, municipality")
-        .eq("profile_id", session.user_id).maybeSingle(),
+    // Metadados também são offline-first. Sem isso o painel abre, mas
+    // apresenta agente/ciclo/semana vazios depois que a conexão cai.
+    const [agents, cycles, weeks] = await Promise.all([
+      listRemoteOrCache<any>({
+        name: "agents",
+        remote: () => supabase.from("agents").select("name, registration_id, municipality, profile_id")
+          .eq("profile_id", session.user_id) as any,
+        filter: (a) => a.profile_id === session.user_id,
+      }),
       session.cycle_id
-        ? supabase.from("cycles").select("id, number, year, name").eq("id", session.cycle_id).maybeSingle()
-        : Promise.resolve({ data: null } as any),
+        ? listRemoteOrCache<any>({
+            name: "cycles",
+            remote: () => supabase.from("cycles").select("id, number, year, name").eq("id", session.cycle_id) as any,
+            filter: (c) => c.id === session.cycle_id,
+          })
+        : Promise.resolve([] as any[]),
       session.week_id
-        ? supabase.from("weeks").select("id, number, start_date, end_date").eq("id", session.week_id).maybeSingle()
-        : Promise.resolve({ data: null } as any),
+        ? listRemoteOrCache<any>({
+            name: "weeks",
+            remote: () => supabase.from("weeks").select("id, number, start_date, end_date").eq("id", session.week_id) as any,
+            filter: (w) => w.id === session.week_id,
+          })
+        : Promise.resolve([] as any[]),
     ]);
-    setAgent(ag); setCycle(cy); setWeek(wk);
+    setAgent(agents[0] ?? null);
+    setCycle(cycles[0] ?? null);
+    setWeek(weeks[0] ?? null);
 
     if (session.block_id) {
       const props = await listRemoteOrCache<any>({
@@ -163,9 +179,13 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
 
       const propIds = sorted.map((p) => p.id);
       if (propIds.length) {
-        const { data: pend } = await supabase.from("property_pendencies")
-          .select("property_id, current_status, resolved_at")
-          .in("property_id", propIds);
+        const pend = await listRemoteOrCache<any>({
+          name: "property_pendencies",
+          remote: () => supabase.from("property_pendencies")
+            .select("id, property_id, current_status, resolved_at")
+            .in("property_id", propIds) as any,
+          filter: (p) => propIds.includes(p.property_id),
+        });
         setPendencies(pend || []);
       }
     }
@@ -188,9 +208,14 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     audit("OP_PANEL_VISITS", { count: vs.length, source: (vs as any).source, session_date: session.session_date });
 
     if (vs.length) {
-      const { data: deps } = await supabase.from("visit_deposits")
-        .select("id, visit_id, type_code, quantity, is_positive")
-        .in("visit_id", vs.map((v: any) => v.id));
+      const visitIds = vs.map((v: any) => v.id);
+      const deps = await listRemoteOrCache<any>({
+        name: "visit_deposits",
+        remote: () => supabase.from("visit_deposits")
+          .select("id, visit_id, type_code, quantity, is_positive")
+          .in("visit_id", visitIds) as any,
+        filter: (d) => visitIds.includes(d.visit_id),
+      });
       setDeposits(deps || []);
     } else {
       setDeposits([]);
