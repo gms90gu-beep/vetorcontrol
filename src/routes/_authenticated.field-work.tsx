@@ -52,6 +52,19 @@ function toDateOnly(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const operationalDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function operationalDateBR(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return value;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : operationalDateFormatter.format(d);
+}
+
 /**
  * "Hoje" (meia-noite local) alinhado à Data Operacional (America/Sao_Paulo),
  * em vez de `new Date()` cru (hora do aparelho). Evita divergir da mesma
@@ -546,6 +559,23 @@ function FieldWorkPage() {
           blocksData = bl ?? [];
         }
       }
+      // Pré-carrega os imóveis enquanto há conexão. Isso garante que o
+      // próximo turno possa abrir a sessão e navegar usando apenas o cache.
+      const cachedProperties = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () =>
+          supabase
+            .from("properties")
+            .select("*")
+            .in("boletim_id", boletimIds) as any,
+        filter: (p) => boletimIds.includes(p.boletim_id),
+      });
+      console.log("[FIELD_WORK_OFFLINE_PREFETCH]", {
+        source: (cachedProperties as any).source,
+        properties: cachedProperties.length,
+        boletins: boletimIds.length,
+      });
+
       const seen = new Set<string>();
       const uniq = (blocksData || []).filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
       uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
@@ -560,15 +590,23 @@ function FieldWorkPage() {
   // (baseado nas visitas reais do agente, não no status estático do bloco).
   const [blockStats, setBlockStats] = useState<Map<string, { total: number; visited: number; closed: number; refused: number; pending: number; status: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDO" }>>(new Map());
 
+  // Estatísticas por quarteirão para a Data da Produção selecionada.
+  // Tanto propriedades quanto visitas usam Dexie quando o aparelho está offline.
   useEffect(() => {
     (async () => {
       if (!userId || !date || blocks.length === 0) { setBlockStats(new Map()); return; }
       const iso = toDateOnly(date);
       try {
-        const { data: props } = await supabase
-          .from("properties")
-          .select("id, block_id")
-          .in("block_id", blocks.map((b) => b.id));
+        const blockIds = blocks.map((b) => b.id);
+        const props = await listRemoteOrCache<any>({
+          name: "properties",
+          remote: () =>
+            supabase
+              .from("properties")
+              .select("id, block_id")
+              .in("block_id", blockIds) as any,
+          filter: (p) => blockIds.includes(p.block_id),
+        });
         const propsByBlock = new Map<string, string[]>();
         (props || []).forEach((p: any) => {
           if (!p.block_id) return;
@@ -577,12 +615,19 @@ function FieldWorkPage() {
           propsByBlock.set(p.block_id, list);
         });
 
-        const { data: vs } = await supabase.rpc("get_session_visits" as any, {
-          _agent_id: userId,
-          _session_date: iso,
+        const visits = await listRemoteOrCache<any>({
+          name: "visits",
+          remote: () =>
+            supabase.rpc("get_session_visits" as any, {
+              _agent_id: userId,
+              _session_date: iso,
+            }) as any,
+          filter: (v) =>
+            v.agent_id === userId &&
+            operationalDateBR(v.visit_date) === iso,
         });
         const visitByProp = new Map<string, any>();
-        (vs || []).forEach((v: any) => { if (v.property_id) visitByProp.set(v.property_id, v); });
+        (visits || []).forEach((v: any) => { if (v.property_id) visitByProp.set(v.property_id, v); });
 
         const m = new Map<string, any>();
         blocks.forEach((b) => {
@@ -735,6 +780,25 @@ function FieldWorkPage() {
         return;
       }
 
+
+      // Se estiver offline, a sessão só é iniciada quando o quarteirão
+      // estiver no cache. Sem os imóveis locais, o agente poderia abrir uma
+      // jornada sem conseguir navegar nem registrar o contexto correto.
+      const preparedProperties = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () =>
+          supabase
+            .from("properties")
+            .select("*")
+            .eq("block_id", selectedBlock.id) as any,
+        filter: (p) => p.block_id === selectedBlock.id,
+      });
+      if (!isOnline() && preparedProperties.length === 0) {
+        toast.error("Este quarteirão ainda não foi preparado para uso offline.", {
+          description: "Abra-o uma vez enquanto estiver online e tente novamente.",
+        });
+        return;
+      }
 
       // Cria nova jornada automaticamente
       const nowIso = new Date().toISOString();
