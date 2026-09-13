@@ -118,6 +118,18 @@ const DEFAULT_ROUTINE = {
 const DEFAULT_SURVEY = { hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 };
 const DEFAULT_PENDING = { isRecovered: false, notes: "" };
 
+const operationalDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+function operationalDateBR(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : operationalDateFormatter.format(d);
+}
+
 function PropertyVisitPage() {
   const { propertyId } = useParams({ from: "/_authenticated/property/$propertyId" });
   const navigate = useNavigate();
