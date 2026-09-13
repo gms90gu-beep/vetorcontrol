@@ -168,9 +168,20 @@ export async function registerPwa(): Promise<void> {
         // Buscar uma vez aqui garante que a rota inicial já esteja no cache
         // assim que o SW terminar de instalar.
         if (navigator.onLine) {
-          fetch("/dashboard", { cache: "reload" })
-            .then(() => console.log("[PWA_START_URL_WARMED]", { url: "/dashboard" }))
-            .catch((e) => console.warn("[PWA_START_URL_WARM_FAILED]", { message: String(e?.message || e) }));
+          // A rota de trabalho também precisa estar no cache para o app abrir
+          // após um reload sem rede. O conteúdo operacional continua vindo do
+          // IndexedDB; aqui aquecemos apenas o shell/HTML das rotas críticas.
+          const criticalRoutes = ["/dashboard", "/field-work", "/sync-status"];
+          void Promise.all(
+            criticalRoutes.map((url) =>
+              fetch(url, { cache: "reload" })
+                .then(() => console.log("[PWA_ROUTE_WARMED]", { url }))
+                .catch((e) => console.warn("[PWA_ROUTE_WARM_FAILED]", {
+                  url,
+                  message: String(e?.message || e),
+                })),
+            ),
+          );
         }
       },
       onRegisterError(err) {
