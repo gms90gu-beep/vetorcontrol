@@ -63,6 +63,16 @@ function operationalTodayDate(): Date {
   return new Date(y, m - 1, d);
 }
 
+function isWithinResumeWindow(sessionDate?: string | null): boolean {
+  if (!sessionDate) return false;
+  const [y, m, d] = sessionDate.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const target = new Date(y, m - 1, d);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((operationalTodayDate().getTime() - target.getTime()) / 86400000);
+  return diffDays >= 0 && diffDays <= MAX_RETROACTIVE_DAYS;
+}
+
 async function autoRecoverSession(sessionId: string) {
   if (!isOnline()) return;
   try {
@@ -392,7 +402,10 @@ function FieldWorkPage() {
                 .order("updated_at", { ascending: false }) as any,
             filter: (r) => r.user_id === user.id && r.status === "paused",
           });
+          // Ignora jornadas pausadas fora da janela permitida para que uma
+          // jornada antiga não esconda uma jornada válida mais recente.
           const paused = (pausedRows ?? [])
+            .filter((row: any) => isWithinResumeWindow(row?.session_date))
             .slice()
             .sort((a: any, b: any) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))[0] ?? null;
           if (paused) {
