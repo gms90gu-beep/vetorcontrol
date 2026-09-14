@@ -99,8 +99,8 @@ function LoginPage() {
         });
       }
 
-      let data;
-      let error;
+      let data: { session?: any; user?: any } | null = null;
+      let error: any;
       let usedFallback = false;
 
       const authenticateThroughServer = async () => {
@@ -159,7 +159,7 @@ function LoginPage() {
       }
 
       if (error) throw error;
-      if (!data.user) throw new Error("Usuário não encontrado");
+      if (!data?.user) throw new Error("Usuário não encontrado");
       mark("AUTH_SUCCESS", { userId: data.user.id });
 
       if (data.session) {
