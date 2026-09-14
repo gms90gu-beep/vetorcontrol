@@ -4,15 +4,15 @@ import { useOrientation } from "@/hooks/useOrientation";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 
 export const Route = createFileRoute("/_authenticated/reports")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
-    const role = await getCachedUserRole(session.user.id);
+    const { data: userData } = await safeGetUser();
+    if (!userData.user) throw redirect({ to: "/login" });
+    const role = await getCachedUserRole(userData.user.id);
     if (!role || !["supervisor", "coordenador", "admin_master"].includes(role)) {
       throw redirect({ to: "/dashboard" });
     }
