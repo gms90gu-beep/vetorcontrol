@@ -49,7 +49,7 @@ export function OperationalDashboard() {
     (async () => {
       setLoading(true);
       try {
-        const [profs, vs, cs, ws, pends] = await Promise.all([
+        const [profs, vs, agentLinks, cs, ws, pends] = await Promise.all([
           listRemoteOrCache<any>({
             name: "profiles",
             remote: () => supabase.from("profiles").select("id, full_name, role").eq("role", "agente") as any,
@@ -58,6 +58,10 @@ export function OperationalDashboard() {
           listRemoteOrCache<any>({
             name: "visits",
             remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id") as any,
+          }),
+          listRemoteOrCache<any>({
+            name: "agents",
+            remote: () => supabase.from("agents").select("id, profile_id") as any,
           }),
           listRemoteOrCache<any>({
             name: "cycles",
@@ -73,8 +77,19 @@ export function OperationalDashboard() {
             filter: (r: any) => !r.resolved_at,
           }),
         ]);
+        const legacyAgentToProfile = new Map(
+          (agentLinks || [])
+            .filter((link: any) => link?.id && link?.profile_id)
+            .map((link: any) => [link.id, link.profile_id]),
+        );
+        const normalizedVisits = (vs || []).map((visit: any) => ({
+          ...visit,
+          // Registros antigos usavam agents.id; o relatório trabalha com
+          // profiles.id, que é a identidade atual do agente.
+          agent_id: legacyAgentToProfile.get(visit.agent_id) ?? visit.agent_id,
+        }));
         setAgents(profs || []);
-        setVisits(vs || []);
+        setVisits(normalizedVisits);
         setCycles(cs || []);
         setWeeks(ws || []);
         setPendencies(((pends || []) as PendencyRow[]).filter((p) => !p.resolved_at));
