@@ -92,10 +92,12 @@ function LoginPage() {
       // Uma sessão antiga com refresh inacessível pode manter várias conexões
       // pendentes e impedir uma nova autenticação. Interrompê-la e removê-la
       // localmente não faz chamada de rede nem invalida sessões em outros aparelhos.
-      supabase.auth.stopAutoRefresh();
-      await supabase.auth.signOut({ scope: "local" }).catch((cleanupError) => {
-        console.warn("[AUTH_STALE_SESSION_CLEANUP]", cleanupError);
-      });
+      if (isSupabaseConfigured()) {
+        supabase.auth.stopAutoRefresh();
+        await supabase.auth.signOut({ scope: "local" }).catch((cleanupError) => {
+          console.warn("[AUTH_STALE_SESSION_CLEANUP]", cleanupError);
+        });
+      }
 
       let data;
       let error;
