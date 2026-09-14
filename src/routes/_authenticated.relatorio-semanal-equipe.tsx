@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, MapPin, Users } from "lucide-react";
+import { FileDown, Loader2, MapPin, Users } from "lucide-react";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { OfflineNotAvailable } from "@/components/OfflineNotAvailable";
 
@@ -34,11 +34,27 @@ export const Route = createFileRoute("/_authenticated/relatorio-semanal-equipe")
   component: TeamWeeklyReportPage,
 });
 
+function csvCell(value: unknown): string {
+  return '"' + String(value ?? "").replace(/"/g, '""') + '"';
+}
+
+function downloadCsv(filename: string, rows: unknown[][]) {
+  const csv = rows.map((row) => row.map(csvCell).join(";")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function TeamWeeklyReportPage() {
   const now = getEpiWeek();
   const { online } = useSyncStatus();
   const [epiWeek, setEpiWeek] = useState(now.week);
   const [epiYear, setEpiYear] = useState(now.year);
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
   const fetchWeekly = useServerFn(getTeamWeeklyProduction);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
@@ -48,6 +64,44 @@ function TeamWeeklyReportPage() {
   });
 
   if (!online) return <OfflineNotAvailable feature="Relatório Semanal da Equipe" />;
+
+  const visibleNeighborhoods = (data?.neighborhoods ?? []).filter((row) =>
+    row.neighborhood.toLocaleLowerCase("pt-BR").includes(neighborhoodFilter.trim().toLocaleLowerCase("pt-BR")),
+  );
+
+  const exportAgents = () => {
+    if (!data) return;
+    downloadCsv("relatorio-geral-agentes-SE" + data.epi_week + "-" + data.epi_year + ".csv", [
+      ["Agente", "Matrícula", "Diárias", "Imóveis trabalhados", "Imóveis fechados", "Quarteirões", "Focos", "Depósitos tratados"],
+      ...data.agents.map((a) => [
+        a.full_name,
+        a.registration ?? "",
+        a.records,
+        a.properties_worked,
+        a.properties_closed,
+        a.blocks_worked,
+        a.positive_foci,
+        a.deposits_treated,
+      ]),
+    ]);
+  };
+
+  const exportNeighborhoods = () => {
+    if (!data) return;
+    downloadCsv("relatorio-bairros-SE" + data.epi_week + "-" + data.epi_year + ".csv", [
+      ["Bairro", "Imóveis", "Visitas", "Inspecionados", "Fechados", "Recusados", "Focos", "Tratados"],
+      ...visibleNeighborhoods.map((n) => [
+        n.neighborhood,
+        n.properties,
+        n.visits,
+        n.visited,
+        n.closed,
+        n.refused,
+        n.foci,
+        n.treated,
+      ]),
+    ]);
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 pb-24">
@@ -116,7 +170,7 @@ function TeamWeeklyReportPage() {
           <Tabs defaultValue="agentes">
             <TabsList className="grid grid-cols-2 w-full max-w-md">
               <TabsTrigger value="agentes" className="text-xs">
-                <Users className="h-3.5 w-3.5 mr-1" /> Por agente
+                <Users className="h-3.5 w-3.5 mr-1" /> Geral / agente
               </TabsTrigger>
               <TabsTrigger value="bairros" className="text-xs">
                 <MapPin className="h-3.5 w-3.5 mr-1" /> Por bairro
@@ -124,6 +178,14 @@ function TeamWeeklyReportPage() {
             </TabsList>
 
             <TabsContent value="agentes" className="mt-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Visão geral consolidada a partir dos registros diários encerrados.
+                </p>
+                <Button size="sm" variant="outline" onClick={exportAgents} disabled={!data.agents.length}>
+                  <FileDown className="h-3.5 w-3.5 mr-1" /> CSV geral
+                </Button>
+              </div>
               <Card className="rounded-3xl">
                 <CardContent className="p-0 overflow-x-auto">
                   <table className="w-full text-sm">
@@ -172,6 +234,26 @@ function TeamWeeklyReportPage() {
             </TabsContent>
 
             <TabsContent value="bairros" className="mt-3">
+              <div className="mb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={neighborhoodFilter}
+                    onChange={(event) => setNeighborhoodFilter(event.target.value)}
+                    placeholder="Filtrar bairro ou área"
+                    className="h-9 w-full sm:w-64 text-xs"
+                    aria-label="Filtrar bairro ou área"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {visibleNeighborhoods.length} área(s)
+                  </span>
+                </div>
+                <Button size="sm" variant="outline" onClick={exportNeighborhoods} disabled={!visibleNeighborhoods.length}>
+                  <FileDown className="h-3.5 w-3.5 mr-1" /> CSV por bairro
+                </Button>
+              </div>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Agrupamento pelo bairro cadastrado no imóvel; registros sem bairro aparecem como “Sem bairro”.
+              </p>
               <Card className="rounded-3xl">
                 <CardContent className="p-0 overflow-x-auto">
                   <table className="w-full text-sm">
@@ -188,14 +270,14 @@ function TeamWeeklyReportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.neighborhoods.length === 0 ? (
+                      {visibleNeighborhoods.length === 0 ? (
                         <tr>
                           <td colSpan={8} className="p-6 text-center text-muted-foreground text-xs">
                             Nenhuma visita registrada nesta semana.
                           </td>
                         </tr>
                       ) : (
-                        data.neighborhoods.map((n) => (
+                        visibleNeighborhoods.map((n) => (
                           <tr key={n.neighborhood} className="border-t">
                             <td className="p-2 font-medium">{n.neighborhood}</td>
                             <td className="p-2 text-right tabular-nums font-semibold">
