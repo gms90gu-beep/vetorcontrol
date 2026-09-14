@@ -90,6 +90,21 @@ export const Route = createFileRoute("/api/public/auth-login")({
           return new Response(JSON.stringify({ error: message }), { status: 400, headers });
         }
       },
+      DELETE: async ({ request }) => {
+        const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+        const cookie = [
+          "vetorcontrol_access=",
+          "Path=/",
+          "HttpOnly",
+          "SameSite=Lax",
+          "Max-Age=0",
+          secure,
+        ].filter(Boolean).join("; ");
+        return new Response(null, {
+          status: 204,
+          headers: { "Cache-Control": "no-store", "Set-Cookie": cookie },
+        });
+      },
     },
   },
 });
