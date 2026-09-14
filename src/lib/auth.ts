@@ -9,6 +9,7 @@
 
 import { db, type LocalSession } from '../db/database';
 import { supabase } from '@/integrations/supabase/client';
+import type { Session } from '@supabase/supabase-js';
 
 // ─── Leitura de sessão (offline-safe) ────────────────────────────────────────
 
@@ -40,16 +41,37 @@ export async function hasValidLocalSession(): Promise<boolean> {
  * Lê de forma síncrona o token persistido pelo Supabase no localStorage.
  * Não toca rede. Retorna true se houver token não expirado.
  */
+function supabaseAuthStorageKeys(): string[] {
+  if (typeof window === "undefined") return [];
+  const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID as string | undefined;
+  if (projectId) return [`sb-${projectId}-auth-token`];
+
+  try {
+    // O project ID pode não estar exposto no preview, mas a sessão ainda pode
+    // existir no localStorage. Limitar o padrão ao formato oficial do Supabase.
+    return Object.keys(window.localStorage).filter((key) => /^sb-.+-auth-token$/.test(key));
+  } catch {
+    return [];
+  }
+}
+
+export function getPersistedSupabaseSession(): Session | null {
+  for (const key of supabaseAuthStorageKeys()) {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(key) || "null");
+      const session = parsed?.currentSession ?? parsed;
+      if (session?.access_token && session?.user?.id) return session as Session;
+    } catch {}
+  }
+  return null;
+}
+
 export function hasSupabaseLocalStorageSession(): boolean {
   try {
-    if (typeof window === "undefined") return false;
-    const projectId = (import.meta as any).env?.VITE_SUPABASE_PROJECT_ID as string | undefined;
-    if (!projectId) return false;
-    const raw = window.localStorage.getItem(`sb-${projectId}-auth-token`);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    const expiresAt = (parsed?.expires_at ?? parsed?.currentSession?.expires_at) as number | undefined;
-    if (!expiresAt) return Boolean(parsed?.access_token || parsed?.currentSession?.access_token);
+    const session = getPersistedSupabaseSession();
+    if (!session) return false;
+    const expiresAt = session.expires_at;
+    if (!expiresAt) return true;
     return expiresAt * 1000 > Date.now() - 60_000;
   } catch {
     return false;

@@ -4,6 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { clearLocalSession, getLocalSession, getPersistedSupabaseSession } from "@/lib/auth";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { safeFetch } from "@/lib/offline/safe-fetch";
 
@@ -28,6 +29,41 @@ function isNetErr(e: any) {
   return /Failed to fetch|NetworkError|fetch failed|AuthRetryableFetchError/i.test(msg) || e?.name === "AuthRetryableFetchError";
 }
 
+async function getLocalAuthState() {
+  const persisted = getPersistedSupabaseSession();
+  if (persisted?.user) {
+    return { session: persisted, user: persisted.user };
+  }
+
+  const local = await getLocalSession();
+  if (!local || local.expiresAt <= Date.now() - 60_000) {
+    return { session: null, user: null };
+  }
+
+  // Mantém o boot offline mesmo quando o ambiente ainda não tem Supabase
+  // configurado. O token local só será usado para sincronizar quando a rede
+  // e as variáveis de ambiente estiverem disponíveis.
+  const user = {
+    id: local.userId,
+    email: local.email,
+    aud: "authenticated",
+    role: "authenticated",
+    app_metadata: {},
+    user_metadata: {},
+    created_at: new Date(local.createdAt).toISOString(),
+  } as User;
+  const session = {
+    access_token: local.accessToken,
+    refresh_token: local.refreshToken,
+    expires_at: Math.floor(local.expiresAt / 1000),
+    expires_in: Math.max(0, Math.floor((local.expiresAt - Date.now()) / 1000)),
+    token_type: "bearer",
+    user,
+  } as Session;
+
+  return { session, user };
+}
+
 async function getVerifiedAuthState() {
   console.debug("[Auth] Restaurando sessão persistida...");
   let sessionData: any = null;
@@ -37,9 +73,19 @@ async function getVerifiedAuthState() {
     sessionData = data;
   } catch (e) {
     console.warn("[Auth] getSession falhou:", e);
+    const fallback = await getLocalAuthState();
+    if (fallback.user) {
+      console.log("[OFFLINE] useAuth — sessão local mantida após falha do Supabase");
+      return fallback;
+    }
   }
 
   if (!sessionData?.session) {
+    const fallback = await getLocalAuthState();
+    if (fallback.user) {
+      console.log("[OFFLINE] useAuth — sessão local restaurada");
+      return fallback;
+    }
     console.debug("[Auth] Nenhuma sessão persistida encontrada.");
     return { session: null, user: null };
   }
@@ -121,7 +167,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     console.debug("[Auth] Encerrando sessão...");
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn("[Auth] logout remoto indisponível:", (e as any)?.message || e);
+    }
+    await clearLocalSession().catch(() => {});
     setSession(null);
     setUser(null);
     setRole(null);
@@ -146,9 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+    let subscription: { unsubscribe: () => void } | null = null;
+    try {
+      const {
+        data: { subscription: nextSubscription },
+      } = supabase.auth.onAuthStateChange((event, nextSession) => {
       console.debug("[Auth] Evento de autenticação:", event, nextSession?.user?.email ?? "sem usuário");
       if (!isMounted) return;
 
@@ -192,11 +245,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ).catch((e) => console.warn("[AUTOHEAL_AGENT] falhou:", (e as any)?.message));
       }
 
-    });
+      });
+      subscription = nextSubscription;
+    } catch (e) {
+      // Sem configuração, o app continua em modo offline com a sessão local.
+      console.warn("[Auth] Listener Supabase indisponível:", (e as any)?.message || e);
+    }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [queryClient, router]);
 

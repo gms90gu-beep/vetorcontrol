@@ -54,6 +54,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const e = error as any;
   const msg = String(e?.message || error || "");
   const name = String(e?.name || "");
+  const isConfiguration = /Supabase não configurado|Missing Supabase environment variable/i.test(msg);
   const isNetwork =
     /Failed to fetch|NetworkError|Network request failed|fetch failed|Load failed/i.test(msg) ||
     (name === "TypeError" && /fetch/i.test(msg)) ||
@@ -105,7 +106,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Esta página não carregou</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Algo deu errado. Tente novamente ou volte ao início.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {isConfiguration
+            ? "O ambiente de execução ainda não está conectado ao Supabase. Configure as variáveis do projeto e tente novamente."
+            : "Algo deu errado. Tente novamente ou volte ao início."}
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => { router.invalidate(); reset(); }}
