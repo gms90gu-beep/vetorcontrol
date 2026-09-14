@@ -172,6 +172,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn("[Auth] logout remoto indisponível:", (e as any)?.message || e);
     }
+    try {
+      await fetch("/api/public/auth-login", { method: "DELETE", credentials: "same-origin" });
+    } catch {}
     await clearLocalSession().catch(() => {});
     setSession(null);
     setUser(null);
