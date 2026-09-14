@@ -6,7 +6,6 @@ import { SupervisionDashboard } from "@/components/supervision/SupervisionDashbo
 import { OperationalDashboard } from "@/components/supervision/OperationalDashboard";
 import { AgentProductionRanking } from "@/components/supervision/AgentProductionRanking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 
 type SupervisionTab = "equipe" | "operacional" | "producao";
@@ -20,8 +19,6 @@ export const Route = createFileRoute("/_authenticated/supervision")({
   },
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
     const { data: userData } = await safeGetUser();
     if (!userData.user) throw redirect({ to: "/login" });
     const role = await getCachedUserRole(userData.user.id);
