@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseConfigurationError, isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { brokeredPreviewStorage } from "@/integrations/supabase/previewAuthStorage";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { saveSessionLocally } from "@/auth/auth";
@@ -100,24 +100,8 @@ function LoginPage() {
       let data;
       let error;
       let usedFallback = false;
-      try {
-        const directResult = await withTimeout(
-          supabase.auth.signInWithPassword({ email: loginEmail, password }),
-          7000,
-          "signInWithPassword",
-        );
-        data = directResult.data;
-        error = directResult.error;
-        if (error) {
-          const directMessage = String(error.message || error);
-          const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(directMessage);
-          if (transportFailure) throw error;
-        }
-      } catch (directError: any) {
-        const message = String(directError?.message || directError || "");
-        const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(message);
-        if (!transportFailure) throw directError;
 
+      const authenticateThroughServer = async () => {
         mark("AUTH_FALLBACK_START");
         const response = await withTimeout(
           fetch("/api/public/auth-login", {
@@ -128,20 +112,48 @@ function LoginPage() {
           12000,
           "fallback de autenticação",
         );
-        const payload = await response.json() as { session?: any; error?: string };
+        const payload = await response.json() as { session?: any; role?: string | null; error?: string };
         if (!response.ok || !payload.session?.user) {
           throw new Error(payload.error || "Erro ao fazer login");
         }
 
-        const backendUrl = import.meta.env.VITE_SUPABASE_URL;
-        const projectRef = backendUrl ? new URL(backendUrl).hostname.split(".")[0] : null;
-        if (!projectRef) throw new Error("Configuração de autenticação indisponível.");
-        const storage = brokeredPreviewStorage();
-        await storage?.setItem(`sb-${projectRef}-auth-token`, JSON.stringify(payload.session));
+        // A sessão local (Dexie) mantém o boot mesmo quando o build externo
+        // não expõe as variáveis VITE_* ao navegador. O endpoint também grava
+        // um cookie HttpOnly para as server functions autenticarem os relatórios.
         data = { session: payload.session, user: payload.session.user };
         error = null;
         usedFallback = true;
-        mark("AUTH_FALLBACK_SUCCESS");
+        if (payload.role) {
+          try { localStorage.setItem(`vc_role_${payload.session.user.id}`, payload.role); } catch {}
+        }
+        mark("AUTH_FALLBACK_SUCCESS", { role: payload.role ?? null });
+      };
+
+      if (!isSupabaseConfigured()) {
+        console.warn("[AUTH_CLIENT_UNCONFIGURED]", getSupabaseConfigurationError());
+        await authenticateThroughServer();
+      } else {
+        try {
+          const directResult = await withTimeout(
+            supabase.auth.signInWithPassword({ email: loginEmail, password }),
+            7000,
+            "signInWithPassword",
+          );
+          data = directResult.data;
+          error = directResult.error;
+          if (error) {
+            const directMessage = String(error.message || error);
+            const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(directMessage);
+            if (transportFailure) {
+              await authenticateThroughServer();
+            }
+          }
+        } catch (directError: any) {
+          const message = String(directError?.message || directError || "");
+          const transportFailure = /Failed to fetch|NetworkError|fetch failed|Timeout signInWithPassword|AuthRetryableFetchError/i.test(message);
+          if (!transportFailure) throw directError;
+          await authenticateThroughServer();
+        }
       }
 
       if (error) throw error;
