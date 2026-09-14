@@ -6,8 +6,16 @@ import { brokeredPreviewStorage } from './previewAuthStorage';
 export function getSupabaseConfigurationError(): string | null {
   // Use import.meta.env for client-side (Vite build-time replacement).
   // Fall back to process.env for SSR (server-side rendering).
-  const url = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const url =
+    import.meta.env.VITE_SUPABASE_URL ||
+    import.meta.env.VITE_SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL;
+  const key =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
 
   if (url && key) return null;
 
@@ -24,8 +32,16 @@ export function isSupabaseConfigured(): boolean {
 
 function createSupabaseClient() {
   const configurationError = getSupabaseConfigurationError();
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const SUPABASE_URL =
+    import.meta.env.VITE_SUPABASE_URL ||
+    import.meta.env.VITE_SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    process.env.SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY;
 
   if (configurationError) {
     console.error(`[Supabase] ${configurationError}`);
