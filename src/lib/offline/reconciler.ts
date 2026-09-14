@@ -7,6 +7,11 @@
  *   3. Remover órfãos (locais do mesmo userId que sumiram do servidor)
  *   4. Registrar conflitos (local mais novo que o servidor)
  *
+ * Proteção offline:
+ *   Registros que ainda possuem mutação pendente na fila nunca são removidos
+ *   apenas porque ainda não apareceram no servidor. Isso evita perda de dados
+ *   durante a janela entre a reconexão e o flush da fila.
+ *
  * Uso:
  *   await reconcile({
  *     module: 'rg',
@@ -18,7 +23,7 @@
  */
 
 import type { Table } from 'dexie';
-import { db as offlineDb, type CachedRow } from '@/lib/offline/db';
+import { db as offlineDb, type CachedRow, type Mutation } from '@/lib/offline/db';
 
 export type ReconcileModule = 'rg' | 'work' | 'pendencies' | 'properties';
 
@@ -39,6 +44,7 @@ export interface ReconcileReport {
   inserted: number;
   updated: number;
   deleted: number;
+  preservedPending: number;
   conflicts: ReconcileConflict[];
 }
 
@@ -51,9 +57,21 @@ export interface ReconcileInput {
   localStore: Table<CachedRow, string>;
   /** Campo em `data` que identifica o dono do registro (default: 'agent_id'). */
   ownerKey?: string;
+  /**
+   * Nome(s) usados pela fila de mutações para esta store. Opcional porque os
+   * módulos atuais usam nomes de tabela diferentes dos nomes das stores Dexie.
+   */
+  mutationTables?: string[];
 }
 
 const CONFLICTS_KEY = 'reconcile:conflicts';
+
+const MODULE_MUTATION_TABLES: Record<ReconcileModule, string[]> = {
+  rg: ['rg', 'boletins_rg'],
+  work: ['work', 'fieldWork', 'field_work_records', 'field_work_sessions'],
+  pendencies: ['pendencies', 'pendingItems', 'pending_records', 'property_pendencies'],
+  properties: ['properties', 'property'],
+};
 
 async function appendConflicts(conflicts: ReconcileConflict[]) {
   if (!conflicts.length) return;
@@ -80,12 +98,62 @@ export async function clearReconcileConflicts(): Promise<void> {
   await offlineDb.meta.delete(CONFLICTS_KEY);
 }
 
+function sameValue(actual: unknown, expected: unknown): boolean {
+  if (actual === expected) return true;
+  if (actual == null || expected == null) return false;
+  return String(actual) === String(expected);
+}
+
+function matchesWhere(row: CachedRow, match?: Record<string, any>): boolean {
+  if (!match || Object.keys(match).length === 0) return false;
+  const data = row.data ?? {};
+  return Object.entries(match).every(([key, expected]) => sameValue(data[key], expected));
+}
+
+function mutationTouchesRow(
+  mutation: Mutation,
+  row: CachedRow,
+  tableNames: Set<string>,
+): boolean {
+  if (!tableNames.has(String(mutation.table))) return false;
+
+  const rowId = String(row.id);
+  const payloadId = mutation.payload?.id != null ? String(mutation.payload.id) : null;
+  const primaryKey = mutation.pk != null ? String(mutation.pk) : null;
+
+  if ((mutation.op === 'insert' || mutation.op === 'upsert') && payloadId === rowId) return true;
+  if ((mutation.op === 'update' || mutation.op === 'delete') && (primaryKey === rowId || payloadId === rowId)) return true;
+  if (mutation.op === 'update_where' || mutation.op === 'delete_where') {
+    return matchesWhere(row, mutation.match);
+  }
+
+  return false;
+}
+
+async function getPendingProtectedIds(
+  module: ReconcileModule,
+  localRows: CachedRow[],
+  mutationTables?: string[],
+): Promise<Set<string>> {
+  const tableNames = new Set([
+    ...MODULE_MUTATION_TABLES[module],
+    ...(mutationTables ?? []),
+  ]);
+  const mutations = await offlineDb.mutations.toArray();
+  return new Set(
+    localRows
+      .filter((row) => mutations.some((mutation) => mutationTouchesRow(mutation, row, tableNames)))
+      .map((row) => String(row.id)),
+  );
+}
+
 export async function reconcile({
   module,
   userId,
   serverRows,
   localStore,
   ownerKey = 'agent_id',
+  mutationTables,
 }: ReconcileInput): Promise<ReconcileReport> {
   const serverById = new Map<string, any>();
   for (const r of serverRows) {
@@ -96,6 +164,7 @@ export async function reconcile({
   const localForUser = localAll.filter(
     (row) => row.data?.[ownerKey] && String(row.data[ownerKey]) === userId,
   );
+  const protectedPendingIds = await getPendingProtectedIds(module, localForUser, mutationTables);
 
   const inserted: CachedRow[] = [];
   const updated: CachedRow[] = [];
@@ -126,9 +195,12 @@ export async function reconcile({
     }
   }
 
-  // 3: órfãos — locais deste user que não existem mais no servidor
+  // 3: órfãos — locais deste user que não existem mais no servidor.
+  // Nunca apagar uma linha que ainda está representada na fila offline.
   for (const lRow of localForUser) {
-    if (!serverById.has(lRow.id)) deletedIds.push(lRow.id);
+    if (!serverById.has(lRow.id) && !protectedPendingIds.has(String(lRow.id))) {
+      deletedIds.push(lRow.id);
+    }
   }
 
   if (inserted.length) await localStore.bulkPut(inserted);
@@ -138,6 +210,16 @@ export async function reconcile({
   if (deletedIds.length) await localStore.bulkDelete(deletedIds);
   if (conflicts.length) await appendConflicts(conflicts);
 
+  const preservedPending = [...protectedPendingIds].filter((id) => !serverById.has(id)).length;
+  if (preservedPending > 0) {
+    console.log('[RECONCILE_PENDING_PRESERVED]', {
+      module,
+      userId,
+      count: preservedPending,
+      ids: [...protectedPendingIds].filter((id) => !serverById.has(id)),
+    });
+  }
+
   const report: ReconcileReport = {
     module,
     userId,
@@ -146,11 +228,12 @@ export async function reconcile({
     inserted: inserted.length,
     updated: updated.length,
     deleted: deletedIds.length,
+    preservedPending,
     conflicts,
   };
 
   console.log(
-    `[RECONCILE:${module}] userId=${userId} server=${report.server} local=${report.local} inserted=${report.inserted} updated=${report.updated} deleted=${report.deleted} conflicts=${report.conflicts.length}`,
+    `[RECONCILE:${module}] userId=${userId} server=${report.server} local=${report.local} inserted=${report.inserted} updated=${report.updated} deleted=${report.deleted} preservedPending=${report.preservedPending} conflicts=${report.conflicts.length}`,
   );
 
   return report;
