@@ -56,6 +56,16 @@ export const Route = createFileRoute("/api/public/auth-login")({
             // O acesso ao relatório ainda será protegido pelo middleware;
             // o cache local é apenas um acelerador de navegação.
           }
+          if (!role) {
+            try {
+              const { data: profile } = await authClient
+                .from("profiles")
+                .select("role")
+                .eq("id", data.session.user.id)
+                .maybeSingle();
+              role = profile?.role ?? null;
+            } catch {}
+          }
 
           const expiresAt = Number(data.session.expires_at || 0);
           const maxAge = expiresAt > 0
