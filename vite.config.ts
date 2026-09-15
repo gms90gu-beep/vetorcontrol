@@ -7,6 +7,26 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Conexão pública do backend (URL + chave publicável/anon). São valores
+// públicos por definição — a chave privada (service role) NUNCA aparece aqui.
+// Servem como fallback determinístico quando o ambiente de build (produção)
+// não injeta as variáveis VITE_*, o que deixava o app publicado sem backend
+// ("Supabase não configurado" no console e login falhando).
+const SUPABASE_PROJECT_ID = "ttjzgszxrnmcsygtzfcu";
+const SUPABASE_URL_FALLBACK = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
+const SUPABASE_PUBLISHABLE_FALLBACK =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0anpnc3p4cm5tY3N5Z3R6ZmN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTkyMDMsImV4cCI6MjA5NDQzNTIwM30.cP_-LNb9jIfeXFjUSZSh7Lf7JWQm2o9D7oYRrDweBsw";
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || SUPABASE_URL_FALLBACK;
+const supabaseKey =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  SUPABASE_PUBLISHABLE_FALLBACK;
+const supabaseProjectId =
+  process.env.VITE_SUPABASE_PROJECT_ID || process.env.SUPABASE_PROJECT_ID || SUPABASE_PROJECT_ID;
+
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
 export default defineConfig({
@@ -14,6 +34,12 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    define: {
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
+      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseKey),
+      "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(supabaseProjectId),
+    },
     plugins: [
       VitePWA({
         registerType: "autoUpdate",
