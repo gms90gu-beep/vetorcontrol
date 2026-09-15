@@ -124,7 +124,6 @@ export function AgentDashboard() {
       // deslocando o corte de "hoje" em ~3 horas e contando visitas da
       // noite anterior como se fossem de hoje (ou o contrário).
       const { startIso: todayStartUtcIso } = operationalDateBoundsUtcIso(todayIso);
-      const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
       // Ciclo ativo: prioriza a sessão do agente, senão usa cycles.in_progress.
