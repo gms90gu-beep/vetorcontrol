@@ -8,9 +8,7 @@ export const Route = createFileRoute("/_authenticated/coordenacao")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw redirect({ to: "/login" });
-
+    // Aceita sessão local restaurada (offline / Supabase momentaneamente fora).
     const { data: userData } = await safeGetUser();
     if (!userData.user) throw redirect({ to: "/login" });
 

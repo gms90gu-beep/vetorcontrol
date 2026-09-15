@@ -14,9 +14,28 @@ export async function getCachedUserRole(userId: string): Promise<string | null> 
 
   const remote = () => safeFetch<string | null>(
     async () => {
-      const { data, error } = await supabase.rpc("get_user_role", { u_id: userId });
-      if (error) throw error;
-      const role = (data as string | null) ?? null;
+      let role: string | null = null;
+
+      // Fonte preferencial: RPC get_user_role.
+      try {
+        const { data, error } = await supabase.rpc("get_user_role", { u_id: userId });
+        if (error) throw error;
+        role = (data as string | null) ?? null;
+      } catch (e) {
+        console.warn("[role-cache] RPC get_user_role falhou; tentando profiles.role", e);
+      }
+
+      // Fallback: profiles.role pelo id do usuário.
+      if (!role) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        if (error) throw error;
+        role = ((data as any)?.role as string | null) ?? null;
+      }
+
       try { if (role) localStorage.setItem(KEY(userId), role); } catch {}
       return role;
     },

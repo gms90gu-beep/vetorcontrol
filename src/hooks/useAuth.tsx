@@ -184,22 +184,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    // Versionamento de eventos: cada SIGNED_IN/SIGNED_OUT/USER_UPDATED incrementa.
+    // A restauração inicial (getSession) só aplica seu resultado se nenhum evento
+    // de identidade ocorreu depois dela — evita que o boot sobrescreva um login
+    // recém-realizado (causa do "entra e volta para o login").
+    let authEventVersion = 0;
 
-    getVerifiedAuthState().then((nextAuthState) => {
-      if (!isMounted) return;
-      setSession(nextAuthState.session);
-      setUser(nextAuthState.user);
-      lastAuthUserIdRef.current = nextAuthState.user?.id ?? null;
-      setIsReady(true);
-      console.log("[BOOT_SESSION]", { hasUser: !!nextAuthState.user });
-      // Espelha sessão Supabase → Dexie para boot offline futuro
-      if (nextAuthState.session) {
-        import("@/lib/auth").then((m) => m.saveSessionLocally(nextAuthState.session as any)).catch(() => {});
-      }
-    });
-
-
-
+    // 1) Listener instalado ANTES da restauração inicial.
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const {
@@ -211,6 +202,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextUser = nextSession?.user ?? null;
       const previousUserId = lastAuthUserIdRef.current;
       const nextUserId = nextUser?.id ?? null;
+
+      // INITIAL_SESSION não deve liberar os guards antes da restauração local
+      // terminar (offline pode ter sessão no Dexie sem sessão no Supabase).
+      if (event === "INITIAL_SESSION") {
+        if (nextSession) {
+          setSession(nextSession);
+          setUser(nextUser);
+          lastAuthUserIdRef.current = nextUserId;
+          import("@/lib/auth").then((m) => m.saveSessionLocally(nextSession as any)).catch(() => {});
+        }
+        return;
+      }
+
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        authEventVersion += 1;
+      }
 
       setSession(nextSession);
       setUser(nextUser);
@@ -226,13 +233,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsRoleLoading(false);
       }
 
-      if (event !== "INITIAL_SESSION" && previousUserId !== nextUserId) {
+      if (previousUserId !== nextUserId) {
         router.invalidate();
         queryClient.invalidateQueries();
       }
 
       // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent (no-op offline)
-      if (nextUser && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+      if (nextUser && event === "SIGNED_IN") {
         safeFetch(
           async () => {
             const { data, error } = await supabase.rpc("autoheal_agent", { _user_id: nextUser.id });
@@ -254,6 +261,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Sem configuração, o app continua em modo offline com a sessão local.
       console.warn("[Auth] Listener Supabase indisponível:", (e as any)?.message || e);
     }
+
+    // 2) Restauração inicial (rede + Dexie). Só aplica se nenhum evento de
+    //    identidade (SIGNED_IN/SIGNED_OUT) ocorreu enquanto ela estava em voo.
+    const versionAtStart = authEventVersion;
+    getVerifiedAuthState()
+      .then((nextAuthState) => {
+        if (!isMounted) return;
+        if (authEventVersion !== versionAtStart) {
+          console.debug("[Auth] Restauração inicial ignorada — evento de auth mais recente");
+          setIsReady(true);
+          return;
+        }
+        setSession(nextAuthState.session);
+        setUser(nextAuthState.user);
+        lastAuthUserIdRef.current = nextAuthState.user?.id ?? null;
+        setIsReady(true);
+        console.log("[BOOT_SESSION]", { hasUser: !!nextAuthState.user });
+        // Espelha sessão Supabase → Dexie para boot offline futuro
+        if (nextAuthState.session) {
+          import("@/lib/auth").then((m) => m.saveSessionLocally(nextAuthState.session as any)).catch(() => {});
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsReady(true);
+      });
 
     return () => {
       isMounted = false;
