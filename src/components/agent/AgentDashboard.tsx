@@ -495,6 +495,14 @@ export function AgentDashboard() {
             <MetricBox icon={Droplets} label="Larvicida mL (ciclo)" value={Math.round(cycleVisits.reduce((s, v) => s + Number(v.treatment_amount || 0), 0))} color="#854f0b" />
             <MetricBox icon={MapPin} label="Quart. concl. (ciclo)" value={blockStats.concluidos} color="#0d7a5f" />
           </div>
+          {historyStats.total > 0 && (
+            <p className="mt-2 text-[10px] font-semibold text-slate-500">
+              Histórico total (todos os ciclos): <span className="text-slate-800 font-black">{historyStats.total}</span> imóveis
+              {historyStats.lastDate
+                ? ` · última produção em ${new Date(historyStats.lastDate).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                : ""}
+            </p>
+          )}
         </section>
 
         {/* Produção da Semana */}
