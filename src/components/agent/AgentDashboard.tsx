@@ -383,6 +383,15 @@ export function AgentDashboard() {
       </header>
 
       <div className="px-4 py-5 space-y-5 pb-24">
+        {loadError && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-[11px] leading-snug text-amber-900">
+              <span className="font-bold">Não foi possível carregar todos os números.</span>{" "}
+              {loadError} Os valores abaixo podem estar incompletos.
+            </div>
+          </div>
+        )}
         <div className="flex justify-end"><RunningAsAppBadge /></div>
         <InstallPromoCard />
 
