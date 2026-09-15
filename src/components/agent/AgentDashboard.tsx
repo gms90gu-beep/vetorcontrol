@@ -308,14 +308,22 @@ export function AgentDashboard() {
         });
       }
       } catch (e: any) {
+        const message = String(e?.message || e);
         console.log("[POST_BOOT_SUPABASE]", {
           where: "AgentDashboard",
           name: e?.name,
-          message: String(e?.message || e),
+          message,
           online: navigator.onLine,
           sinceBoot: Math.round(performance.now() - t0),
         });
-        // silencioso — não bloqueia a UI, dados ficam vazios até reconectar
+        // Nunca mostrar zero silenciosamente: sinaliza a falha na tela.
+        if (!cancelled) {
+          setLoadError(
+            navigator.onLine
+              ? `Falha ao carregar ${message}`
+              : "Sem conexão — mostrando apenas os dados salvos no aparelho.",
+          );
+        }
       }
     })();
     return () => {
