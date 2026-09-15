@@ -233,13 +233,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsRoleLoading(false);
       }
 
-      if (event !== "INITIAL_SESSION" && previousUserId !== nextUserId) {
+      if (previousUserId !== nextUserId) {
         router.invalidate();
         queryClient.invalidateQueries();
       }
 
       // [AUTOHEAL_AGENT] garante que todo usuário logado tem agent (no-op offline)
-      if (nextUser && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+      if (nextUser && event === "SIGNED_IN") {
         safeFetch(
           async () => {
             const { data, error } = await supabase.rpc("autoheal_agent", { _user_id: nextUser.id });
