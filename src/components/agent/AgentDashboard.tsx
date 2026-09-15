@@ -135,51 +135,91 @@ export function AgentDashboard() {
         setCycleInfo({ number: activeCycle.number as number, year: activeCycle.year as number });
       }
 
+      // Semana operacional (domingo→sábado) calculada a partir da data
+      // operacional em São Paulo, não do relógio local do dispositivo.
+      const todayNoon = new Date(`${todayIso}T12:00:00-03:00`);
+      const weekStartDate = new Date(todayNoon);
+      weekStartDate.setDate(weekStartDate.getDate() - todayNoon.getDay());
+      const weekStartIso = weekStartDate.toISOString().slice(0, 10);
+      const weekStart = operationalDateBoundsUtcIso(weekStartIso).startIso;
+
+      const visitColumns = "id, status, has_focus, visit_date, treated_deposits, treatment_amount";
+
       let qToday = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount, property_id")
+        .select(`${visitColumns}, property_id`)
         .eq("agent_id", user.id)
         .gte("visit_date", todayStartUtcIso)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qToday = qToday.eq("cycle_id", activeCycleId);
-      const { data: vToday } = await qToday;
+      const { data: vToday, error: eToday } = await qToday;
+      if (eToday) throw new Error(`produção de hoje: ${eToday.message}`);
 
       let qWeek = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+        .select(visitColumns)
         .eq("agent_id", user.id)
         .gte("visit_date", weekStart)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qWeek = qWeek.eq("cycle_id", activeCycleId);
-      const { data: vWeek } = await qWeek;
+      const { data: vWeek, error: eWeek } = await qWeek;
+      if (eWeek) throw new Error(`produção da semana: ${eWeek.message}`);
 
       let qMonth = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+        .select(visitColumns)
         .eq("agent_id", user.id)
         .gte("visit_date", monthStart)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qMonth = qMonth.eq("cycle_id", activeCycleId);
-      const { data: vMonth } = await qMonth;
+      const { data: vMonth, error: eMonth } = await qMonth;
+      if (eMonth) throw new Error(`produção do mês: ${eMonth.message}`);
 
       // Produção acumulada do CICLO inteiro (todas as jornadas do agente neste ciclo)
       let vCycle: any[] | null = null;
       if (activeCycleId) {
-        const { data } = await supabase
+        const { data, error: eCycle } = await supabase
           .from("visits")
-          .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+          .select(visitColumns)
           .eq("agent_id", user.id)
           .eq("cycle_id", activeCycleId)
           .order("visit_date", { ascending: false });
+        if (eCycle) throw new Error(`produção do ciclo: ${eCycle.message}`);
         vCycle = data ?? [];
         console.log(`[CICLO] Consulta visits (ciclo) retornou ${vCycle.length} registros`);
       }
+
+      // Histórico total do agente (todos os ciclos) — evita a leitura de
+      // "zero" quando a produção existe, mas está fora do ciclo/semana atual.
+      const { count: histCount, error: eHist } = await supabase
+        .from("visits")
+        .select("id", { count: "exact", head: true })
+        .eq("agent_id", user.id);
+      if (eHist) throw new Error(`histórico total: ${eHist.message}`);
+      const { data: lastVisit } = await supabase
+        .from("visits")
+        .select("visit_date")
+        .eq("agent_id", user.id)
+        .order("visit_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (cancelled) return;
       setTodayVisits((vToday as any) || []);
       setWeekVisits((vWeek as any) || []);
       setMonthVisits((vMonth as any) || []);
       setCycleVisits((vCycle as any) || []);
+      setHistoryStats({ total: histCount || 0, lastDate: lastVisit?.visit_date ?? null });
+      console.log("[AGENT_DASHBOARD_AUDIT]", {
+        agent_id: user.id,
+        cycle_id: activeCycleId,
+        hoje: (vToday || []).length,
+        semana: (vWeek || []).length,
+        ciclo: (vCycle || []).length,
+        historico: histCount || 0,
+        weekStart,
+        todayStartUtcIso,
+      });
 
       // Depósitos de hoje
       const todayIds = (vToday || []).map((v) => v.id);
