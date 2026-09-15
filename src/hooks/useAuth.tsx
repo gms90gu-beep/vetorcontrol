@@ -262,6 +262,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn("[Auth] Listener Supabase indisponível:", (e as any)?.message || e);
     }
 
+    // 2) Restauração inicial (rede + Dexie). Só aplica se nenhum evento de
+    //    identidade (SIGNED_IN/SIGNED_OUT) ocorreu enquanto ela estava em voo.
+    const versionAtStart = authEventVersion;
+    getVerifiedAuthState()
+      .then((nextAuthState) => {
+        if (!isMounted) return;
+        if (authEventVersion !== versionAtStart) {
+          console.debug("[Auth] Restauração inicial ignorada — evento de auth mais recente");
+          setIsReady(true);
+          return;
+        }
+        setSession(nextAuthState.session);
+        setUser(nextAuthState.user);
+        lastAuthUserIdRef.current = nextAuthState.user?.id ?? null;
+        setIsReady(true);
+        console.log("[BOOT_SESSION]", { hasUser: !!nextAuthState.user });
+        // Espelha sessão Supabase → Dexie para boot offline futuro
+        if (nextAuthState.session) {
+          import("@/lib/auth").then((m) => m.saveSessionLocally(nextAuthState.session as any)).catch(() => {});
+        }
+      })
+      .catch(() => {
+        if (isMounted) setIsReady(true);
+      });
+
     return () => {
       isMounted = false;
       subscription?.unsubscribe();
