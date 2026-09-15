@@ -16,24 +16,12 @@ export const Route = createFileRoute("/admin-master")({
     }
 
     console.debug("[Admin-Master Guard] Iniciando verificação de acesso...");
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      console.error("[Admin-Master Guard] Erro ao restaurar sessão:", sessionError);
-    }
-
-    if (!session) {
-      console.warn("[Admin-Master Guard] Sem sessão persistida, redirecionando para login");
-      throw redirect({ to: "/login" });
-    }
-
-    const { data: verifiedUser, error: userError } = await supabase.auth.getUser();
+    // safeGetUser aceita a sessão local restaurada — não expulsa o usuário
+    // offline nem quando o Supabase está temporariamente indisponível.
+    const { data: verifiedUser, error: userError } = await safeGetUser();
 
     if (userError || !verifiedUser.user) {
-      console.warn("[Admin-Master Guard] Sessão existe, mas usuário não foi validado:", userError);
+      console.warn("[Admin-Master Guard] Nenhuma sessão válida encontrada:", userError);
       throw redirect({ to: "/login" });
     }
 
