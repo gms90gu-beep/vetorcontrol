@@ -2,6 +2,7 @@ import { redirect, isRedirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { hasValidLocalSession, getLocalSession } from "@/auth/auth";
 import { getCachedUserRole, readCachedUserRole } from "@/lib/offline/role-cache";
+import { safeGetUser } from "@/lib/offline/safe-auth";
 
 export const MANAGER_ROLES = ["supervisor", "coordenador", "admin_master"] as const;
 export type ManagerRole = (typeof MANAGER_ROLES)[number];
@@ -122,14 +123,7 @@ export async function requireAdminMasterGuard() {
 export async function requireManagerGuard() {
   if (typeof window === "undefined") return;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    throw redirect({ to: "/login", replace: true });
-  }
-
-  const { data: verifiedUser } = await supabase.auth.getUser();
+  const { data: verifiedUser } = await safeGetUser();
   const user = verifiedUser?.user;
   if (!user) {
     throw redirect({ to: "/login", replace: true });
