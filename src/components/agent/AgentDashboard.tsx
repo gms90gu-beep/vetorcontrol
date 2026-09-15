@@ -91,13 +91,31 @@ export function AgentDashboard() {
     console.log("[DASHBOARD_RENDER]", { sinceBoot: Math.round(performance.now() - t0) });
     (async () => {
       try {
-      const { data: p } = await supabase
+      setLoadError(null);
+      const { data: p, error: pErr } = await supabase
         .from("profiles")
         .select("full_name, registration_number, city")
         .eq("id", user.id)
         .maybeSingle();
+      if (pErr) throw new Error(`perfil: ${pErr.message}`);
       if (cancelled) return;
-      setProfile(p ?? null);
+
+      // FONTE PRINCIPAL: profiles.registration_number / profiles.city.
+      // O cadastro de agentes (agents) é apenas reserva quando o perfil
+      // ainda não tem matrícula/município preenchidos.
+      let registration = p?.registration_number ?? null;
+      let city = p?.city ?? null;
+      if (!registration || !city) {
+        const { data: ag } = await supabase
+          .from("agents")
+          .select("registration_id, municipality")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        registration = registration || ag?.registration_id || null;
+        city = city || ag?.municipality || null;
+      }
+      if (cancelled) return;
+      setProfile({ full_name: p?.full_name ?? null, registration_number: registration, city });
 
       const todayIso = getOperationalDate();
       // Início do dia operacional em UTC com offset explícito (-03:00),
