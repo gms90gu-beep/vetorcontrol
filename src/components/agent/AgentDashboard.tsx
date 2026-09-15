@@ -71,6 +71,8 @@ export function AgentDashboard() {
   const [weekVisits, setWeekVisits] = useState<Visit[]>([]);
   const [monthVisits, setMonthVisits] = useState<Visit[]>([]);
   const [cycleVisits, setCycleVisits] = useState<Visit[]>([]);
+  const [historyStats, setHistoryStats] = useState<{ total: number; lastDate: string | null }>({ total: 0, lastDate: null });
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cycleInfo, setCycleInfo] = useState<{ number: number; year: number } | null>(null);
   const [todayDeposits, setTodayDeposits] = useState({ tratados: 0, focos: 0 });
   const [weekFocos, setWeekFocos] = useState(0);
@@ -89,13 +91,31 @@ export function AgentDashboard() {
     console.log("[DASHBOARD_RENDER]", { sinceBoot: Math.round(performance.now() - t0) });
     (async () => {
       try {
-      const { data: p } = await supabase
+      setLoadError(null);
+      const { data: p, error: pErr } = await supabase
         .from("profiles")
         .select("full_name, registration_number, city")
         .eq("id", user.id)
         .maybeSingle();
+      if (pErr) throw new Error(`perfil: ${pErr.message}`);
       if (cancelled) return;
-      setProfile(p ?? null);
+
+      // FONTE PRINCIPAL: profiles.registration_number / profiles.city.
+      // O cadastro de agentes (agents) é apenas reserva quando o perfil
+      // ainda não tem matrícula/município preenchidos.
+      let registration = p?.registration_number ?? null;
+      let city = p?.city ?? null;
+      if (!registration || !city) {
+        const { data: ag } = await supabase
+          .from("agents")
+          .select("registration_id, municipality")
+          .eq("profile_id", user.id)
+          .maybeSingle();
+        registration = registration || ag?.registration_id || null;
+        city = city || ag?.municipality || null;
+      }
+      if (cancelled) return;
+      setProfile({ full_name: p?.full_name ?? null, registration_number: registration, city });
 
       const todayIso = getOperationalDate();
       // Início do dia operacional em UTC com offset explícito (-03:00),
@@ -104,7 +124,6 @@ export function AgentDashboard() {
       // deslocando o corte de "hoje" em ~3 horas e contando visitas da
       // noite anterior como se fossem de hoje (ou o contrário).
       const { startIso: todayStartUtcIso } = operationalDateBoundsUtcIso(todayIso);
-      const weekStart = startOfWeek().toISOString();
       const monthStart = startOfMonth().toISOString();
 
       // Ciclo ativo: prioriza a sessão do agente, senão usa cycles.in_progress.
@@ -115,51 +134,91 @@ export function AgentDashboard() {
         setCycleInfo({ number: activeCycle.number as number, year: activeCycle.year as number });
       }
 
+      // Semana operacional (domingo→sábado) calculada a partir da data
+      // operacional em São Paulo, não do relógio local do dispositivo.
+      const todayNoon = new Date(`${todayIso}T12:00:00-03:00`);
+      const weekStartDate = new Date(todayNoon);
+      weekStartDate.setDate(weekStartDate.getDate() - todayNoon.getDay());
+      const weekStartIso = weekStartDate.toISOString().slice(0, 10);
+      const weekStart = operationalDateBoundsUtcIso(weekStartIso).startIso;
+
+      const visitColumns = "id, status, has_focus, visit_date, treated_deposits, treatment_amount";
+
       let qToday = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount, property_id")
+        .select(`${visitColumns}, property_id`)
         .eq("agent_id", user.id)
         .gte("visit_date", todayStartUtcIso)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qToday = qToday.eq("cycle_id", activeCycleId);
-      const { data: vToday } = await qToday;
+      const { data: vToday, error: eToday } = await qToday;
+      if (eToday) throw new Error(`produção de hoje: ${eToday.message}`);
 
       let qWeek = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+        .select(visitColumns)
         .eq("agent_id", user.id)
         .gte("visit_date", weekStart)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qWeek = qWeek.eq("cycle_id", activeCycleId);
-      const { data: vWeek } = await qWeek;
+      const { data: vWeek, error: eWeek } = await qWeek;
+      if (eWeek) throw new Error(`produção da semana: ${eWeek.message}`);
 
       let qMonth = supabase
         .from("visits")
-        .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+        .select(visitColumns)
         .eq("agent_id", user.id)
         .gte("visit_date", monthStart)
         .order("visit_date", { ascending: false });
       if (activeCycleId) qMonth = qMonth.eq("cycle_id", activeCycleId);
-      const { data: vMonth } = await qMonth;
+      const { data: vMonth, error: eMonth } = await qMonth;
+      if (eMonth) throw new Error(`produção do mês: ${eMonth.message}`);
 
       // Produção acumulada do CICLO inteiro (todas as jornadas do agente neste ciclo)
       let vCycle: any[] | null = null;
       if (activeCycleId) {
-        const { data } = await supabase
+        const { data, error: eCycle } = await supabase
           .from("visits")
-          .select("id, status, has_focus, visit_date, treated_deposits, treatment_amount")
+          .select(visitColumns)
           .eq("agent_id", user.id)
           .eq("cycle_id", activeCycleId)
           .order("visit_date", { ascending: false });
+        if (eCycle) throw new Error(`produção do ciclo: ${eCycle.message}`);
         vCycle = data ?? [];
         console.log(`[CICLO] Consulta visits (ciclo) retornou ${vCycle.length} registros`);
       }
+
+      // Histórico total do agente (todos os ciclos) — evita a leitura de
+      // "zero" quando a produção existe, mas está fora do ciclo/semana atual.
+      const { count: histCount, error: eHist } = await supabase
+        .from("visits")
+        .select("id", { count: "exact", head: true })
+        .eq("agent_id", user.id);
+      if (eHist) throw new Error(`histórico total: ${eHist.message}`);
+      const { data: lastVisit } = await supabase
+        .from("visits")
+        .select("visit_date")
+        .eq("agent_id", user.id)
+        .order("visit_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (cancelled) return;
       setTodayVisits((vToday as any) || []);
       setWeekVisits((vWeek as any) || []);
       setMonthVisits((vMonth as any) || []);
       setCycleVisits((vCycle as any) || []);
+      setHistoryStats({ total: histCount || 0, lastDate: lastVisit?.visit_date ?? null });
+      console.log("[AGENT_DASHBOARD_AUDIT]", {
+        agent_id: user.id,
+        cycle_id: activeCycleId,
+        hoje: (vToday || []).length,
+        semana: (vWeek || []).length,
+        ciclo: (vCycle || []).length,
+        historico: histCount || 0,
+        weekStart,
+        todayStartUtcIso,
+      });
 
       // Depósitos de hoje
       const todayIds = (vToday || []).map((v) => v.id);
@@ -249,14 +308,22 @@ export function AgentDashboard() {
         });
       }
       } catch (e: any) {
+        const message = String(e?.message || e);
         console.log("[POST_BOOT_SUPABASE]", {
           where: "AgentDashboard",
           name: e?.name,
-          message: String(e?.message || e),
+          message,
           online: navigator.onLine,
           sinceBoot: Math.round(performance.now() - t0),
         });
-        // silencioso — não bloqueia a UI, dados ficam vazios até reconectar
+        // Nunca mostrar zero silenciosamente: sinaliza a falha na tela.
+        if (!cancelled) {
+          setLoadError(
+            navigator.onLine
+              ? `Falha ao carregar ${message}`
+              : "Sem conexão — mostrando apenas os dados salvos no aparelho.",
+          );
+        }
       }
     })();
     return () => {
@@ -316,6 +383,15 @@ export function AgentDashboard() {
       </header>
 
       <div className="px-4 py-5 space-y-5 pb-24">
+        {loadError && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="text-[11px] leading-snug text-amber-900">
+              <span className="font-bold">Não foi possível carregar todos os números.</span>{" "}
+              {loadError} Os valores abaixo podem estar incompletos.
+            </div>
+          </div>
+        )}
         <div className="flex justify-end"><RunningAsAppBadge /></div>
         <InstallPromoCard />
 
@@ -419,6 +495,14 @@ export function AgentDashboard() {
             <MetricBox icon={Droplets} label="Larvicida mL (ciclo)" value={Math.round(cycleVisits.reduce((s, v) => s + Number(v.treatment_amount || 0), 0))} color="#854f0b" />
             <MetricBox icon={MapPin} label="Quart. concl. (ciclo)" value={blockStats.concluidos} color="#0d7a5f" />
           </div>
+          {historyStats.total > 0 && (
+            <p className="mt-2 text-[10px] font-semibold text-slate-500">
+              Histórico total (todos os ciclos): <span className="text-slate-800 font-black">{historyStats.total}</span> imóveis
+              {historyStats.lastDate
+                ? ` · última produção em ${new Date(historyStats.lastDate).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                : ""}
+            </p>
+          )}
         </section>
 
         {/* Produção da Semana */}
