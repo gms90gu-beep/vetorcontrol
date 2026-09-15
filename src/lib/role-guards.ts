@@ -93,14 +93,7 @@ export async function blockManagersGuard() {
 export async function requireAdminMasterGuard() {
   if (typeof window === "undefined") return;
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
-    throw redirect({ to: "/login", replace: true });
-  }
-
-  const { data: verifiedUser } = await supabase.auth.getUser();
+  const { data: verifiedUser } = await safeGetUser();
   const user = verifiedUser?.user;
   if (!user) {
     throw redirect({ to: "/login", replace: true });
