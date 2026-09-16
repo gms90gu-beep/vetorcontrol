@@ -86,8 +86,9 @@ function LoginPage() {
       ]);
 
     try {
-      mark("AUTH_START", { email });
-      const loginEmail = email.includes("@") ? email : `${email}@vetor.com`;
+      const rawIdentifier = email.trim();
+      const directEmail = rawIdentifier.includes("@") ? rawIdentifier : null;
+      mark("AUTH_START", { identifier: rawIdentifier });
 
       // Uma sessão antiga com refresh inacessível pode manter várias conexões
       // pendentes e impedir uma nova autenticação. Interrompê-la e removê-la
@@ -109,7 +110,7 @@ function LoginPage() {
           fetch("/api/public/auth-login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email: loginEmail, password }),
+            body: JSON.stringify({ identifier: rawIdentifier, password }),
           }),
           12000,
           "fallback de autenticação",
@@ -134,10 +135,15 @@ function LoginPage() {
       if (!isSupabaseConfigured()) {
         console.warn("[AUTH_CLIENT_UNCONFIGURED]", getSupabaseConfigurationError());
         await authenticateThroughServer();
+      } else if (!directEmail) {
+        // Matrícula não deve ser convertida cegamente para matricula@vetor.com.
+        // O servidor resolve profiles.registration_number -> profiles.email sem
+        // expor dados de perfis no cliente e mantém fallback para contas antigas.
+        await authenticateThroughServer();
       } else {
         try {
           const directResult = await withTimeout(
-            supabase.auth.signInWithPassword({ email: loginEmail, password }),
+            supabase.auth.signInWithPassword({ email: directEmail, password }),
             7000,
             "signInWithPassword",
           );
