@@ -542,7 +542,7 @@ function PropertyVisitPage() {
             remote: () =>
               supabase
                 .from("visits")
-                .select("id, property_id, agent_id, cycle_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
+                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
                 .eq("property_id", propertyId as string)
                 .eq("agent_id", user.id)
                 .eq("cycle_id", session.cycle_id as string)
@@ -552,7 +552,17 @@ function PropertyVisitPage() {
               v.agent_id === user.id &&
               v.cycle_id === session.cycle_id,
           });
-          const existingVisit = (visitRows ?? [])
+          // Para uma jornada retroativa, a visita correta é a vinculada à
+          // sessão selecionada ou à mesma Data da Produção. Não reutilizar
+          // automaticamente a visita mais recente de outro dia do ciclo.
+          const sessionVisits = (visitRows ?? []).filter(
+            (v: any) => String(v.field_work_session_id ?? "") === String(session.id),
+          );
+          const dateVisits = (visitRows ?? []).filter(
+            (v: any) => operationalDateBR(v.visit_date) === String(session.session_date ?? ""),
+          );
+          const visitCandidates = sessionVisits.length > 0 ? sessionVisits : dateVisits;
+          const existingVisit = visitCandidates
             .slice()
             .sort((a: any, b: any) => String(b.visit_date || "").localeCompare(String(a.visit_date || "")))[0] ?? null;
           
