@@ -451,6 +451,9 @@ function PropertyVisitPage() {
       }
 
 
+      // Get current active session
+      const { data: { user } } = await safeGetUser();
+      if (user) {
       // Resolve a jornada pelo quarteirão do imóvel e pela janela operacional.
       // Antes, esta consulta pegava apenas a jornada in_progress mais recente de
       // qualquer quarteirão. Em lançamentos retroativos, a jornada podia estar
@@ -647,6 +650,7 @@ function PropertyVisitPage() {
             }
           }
         }
+      }
       }
     } catch (error: any) {
       console.error("Error fetching data:", error);
