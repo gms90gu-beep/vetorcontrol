@@ -451,32 +451,88 @@ function PropertyVisitPage() {
       }
 
 
-      // Get current active session
-      const { data: { user } } = await safeGetUser();
-      if (user) {
-        // Bug: estas duas consultas eram chamadas diretas ao Supabase, sem
-        // fallback de cache offline (diferente de praticamente todo o resto
-        // deste arquivo). Se o agente abrisse este imóvel para revisitar
-        // estando sem sinal, a busca da "visita existente" falhava/voltava
-        // vazia, currentVisitId ficava null, e o salvamento seguinte criava
-        // uma visita NOVA em vez de atualizar a anterior — duas linhas de
-        // visits para o mesmo imóvel/agente/ciclo com status diferentes, o
-        // que infla a contagem em recompute_block_progress (ver auditoria).
-        const sessionRows = await listRemoteOrCache<any>({
-          name: "field_work_sessions",
-          remote: () =>
-            supabase
-              .from("field_work_sessions")
-              .select("*")
-              .eq("user_id", user.id)
-              .eq("status", "in_progress")
-              .order("created_at", { ascending: false }) as any,
-          filter: (r) => r.user_id === user.id && r.status === "in_progress",
-        });
-        const session = (sessionRows ?? [])
-          .slice()
-          .sort((a: any, b: any) => String(b.created_at || "").localeCompare(String(a.created_at || "")))[0] ?? null;
-        
+      // Resolve a jornada pelo quarteirão do imóvel e pela janela operacional.
+      // Antes, esta consulta pegava apenas a jornada in_progress mais recente de
+      // qualquer quarteirão. Em lançamentos retroativos, a jornada podia estar
+      // pausada ou pertencer a outro quarteirão/data; ao salvar, activeSession
+      // ficava nula e o app exibia "Inicie uma jornada de trabalho primeiro".
+      const targetBlockId = prop?.block_id ? String(prop.block_id) : null;
+      const targetBlockNumber = prop?.block_number != null ? String(prop.block_number) : null;
+      const maxResumeDays = 5;
+
+      const isWithinSessionWindow = (sessionDate: unknown) => {
+        const value = String(sessionDate ?? "");
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+        const [y, m, d] = value.split("-").map(Number);
+        const [ty, tm, td] = getOperationalDate().split("-").map(Number);
+        const target = new Date(y, m - 1, d);
+        const today = new Date(ty, tm - 1, td);
+        target.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+        return diffDays >= 0 && diffDays <= maxResumeDays;
+      };
+
+      const sessionRows = await listRemoteOrCache<any>({
+        name: "field_work_sessions",
+        remote: () =>
+          supabase
+            .from("field_work_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .in("status", ["in_progress", "paused"])
+            .order("updated_at", { ascending: false }) as any,
+        filter: (r) => {
+          const blockMatches = targetBlockId
+            ? String(r.block_id ?? "") === targetBlockId
+            : targetBlockNumber
+              ? String(r.block_number ?? "") === targetBlockNumber
+              : true;
+          return (
+            r.user_id === user.id &&
+            ["in_progress", "paused"].includes(String(r.status)) &&
+            blockMatches &&
+            isWithinSessionWindow(r.session_date)
+          );
+        },
+      });
+
+      const statusRank = (s: any) => String(s?.status) === "in_progress" ? 0 : 1;
+      let session = (sessionRows ?? [])
+        .slice()
+        .sort((a: any, b: any) => {
+          const rankDiff = statusRank(a) - statusRank(b);
+          if (rankDiff !== 0) return rankDiff;
+          return String(b.updated_at || b.created_at || "").localeCompare(
+            String(a.updated_at || a.created_at || ""),
+          );
+        })[0] ?? null;
+
+      // Se o agente abriu diretamente um imóvel de uma jornada pausada
+      // retroativa, retoma a mesma jornada preservando session_date, ciclo,
+      // semana e quarteirão. O fluxo normal do botão "Continuar Jornada"
+      // continua funcionando sem alteração.
+      if (session?.status === "paused") {
+        try {
+          const resumed = await updateOffline("field_work_sessions", session.id, {
+            status: "in_progress",
+            updated_at: new Date().toISOString(),
+          });
+          session = { ...session, ...(resumed ?? {}), status: "in_progress" };
+          console.log("[JOURNEY_AUTO_RESUMED_PROPERTY]", {
+            session_id: session.id,
+            session_date: session.session_date,
+            block_id: session.block_id ?? null,
+            block_number: session.block_number ?? null,
+          });
+        } catch (e: any) {
+          console.warn("[JOURNEY_AUTO_RESUME_PROPERTY_ERR]", {
+            session_id: session.id,
+            error: e?.message,
+          });
+        }
+      }
+      
         if (session) {
           setActiveSession(session);
           
