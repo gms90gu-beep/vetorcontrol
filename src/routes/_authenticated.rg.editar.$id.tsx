@@ -367,22 +367,14 @@ function EditarBoletim() {
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
         } else {
-          const subarea = await safeSupabaseRead<any>(
-            () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
-            null,
-            "subareas",
-          );
-          if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
-          const insertBlockPayload = { ...blockPayload, subarea_id: subarea.id };
-          console.log("[RG Editar] INSERT blocks payload:", insertBlockPayload);
-          const { data: createdBlock, error: blockError } = await supabase
-            .from("blocks")
-            .insert(insertBlockPayload)
-            .select("id, number, total_properties")
-            .single();
-          console.log("[RG Editar] INSERT blocks resultado:", { data: createdBlock, error: blockError });
+          // Criação via RPC segura (valida perfil ativo no servidor).
+          const { data: ensuredId, error: blockError } = await (supabase as any).rpc("ensure_block", {
+            _number: blockPayload.number,
+            _locality: null,
+          });
+          console.log("[RG Editar] ensure_block resultado:", { data: ensuredId, error: blockError });
           if (blockError) throw blockError;
-          effectiveBlockId = createdBlock.id;
+          effectiveBlockId = ensuredId as string;
         }
         setBlockId(effectiveBlockId);
       }
@@ -410,17 +402,15 @@ function EditarBoletim() {
         .eq("id", boletimId);
 
       const blockUpdatePromise = effectiveBlockId
-        ? supabase
-            .from("blocks")
-            .update({
-              address: blockLoc.address || null,
-              neighborhood: blockLoc.neighborhood || null,
-              city: blockLoc.city || form.municipality || null,
-              latitude: blockLoc.latitude,
-              longitude: blockLoc.longitude,
-              location_source: blockLoc.location_source,
-            })
-            .eq("id", effectiveBlockId)
+        ? (supabase as any).rpc("set_block_location", {
+            _block_id: effectiveBlockId,
+            _address: blockLoc.address || null,
+            _neighborhood: blockLoc.neighborhood || null,
+            _city: blockLoc.city || form.municipality || null,
+            _latitude: blockLoc.latitude,
+            _longitude: blockLoc.longitude,
+            _location_source: blockLoc.location_source,
+          })
         : Promise.resolve({ error: null } as any);
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
@@ -619,19 +609,12 @@ function EditarBoletim() {
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
         } else {
-          const subarea = await safeSupabaseRead<any>(
-            () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
-            null,
-            "subareas",
-          );
-          if (!subarea?.id) throw new Error("Nenhuma subárea cadastrada para vincular o quarteirão.");
-          const { data: createdBlock, error: blockError } = await supabase
-            .from("blocks")
-            .insert({ number: form.block_number.trim(), total_properties: 0, subarea_id: subarea.id })
-            .select("id, number, total_properties")
-            .single();
+          const { data: ensuredId, error: blockError } = await (supabase as any).rpc("ensure_block", {
+            _number: form.block_number.trim(),
+            _locality: null,
+          });
           if (blockError) throw blockError;
-          effectiveBlockId = createdBlock.id;
+          effectiveBlockId = ensuredId as string;
         }
         setBlockId(effectiveBlockId);
       }

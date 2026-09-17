@@ -673,11 +673,13 @@ function PropertyVisitPage() {
         .eq("id", propertyId);
       
       // Update block status
-      await supabase
-        .from("blocks")
-        .update({ status: 'completed' })
-        .eq("id", property.block_id);
-        
+      // blocks só é alterável por gestores; encerramento do agente vai pela RPC segura.
+      const { error: blockStatusError } = await (supabase as any).rpc("set_block_status", {
+        _block_id: property.block_id,
+        _status: "completed",
+      });
+      if (blockStatusError) throw blockStatusError;
+
       toast.success("Quarteirão encerrado com sucesso!");
       navigate({ to: "/rg" });
     } catch (e) {

@@ -1801,6 +1801,10 @@ export type Database = {
         Args: { target_year: number }
         Returns: undefined
       }
+      ensure_block: {
+        Args: { _locality?: string; _number: string }
+        Returns: string
+      }
       finalize_shift_pendencies: {
         Args: { p_agent_id: string; p_cycle_id: string; p_date: string }
         Returns: Json
@@ -1900,6 +1904,7 @@ export type Database = {
         }
       }
       get_user_role: { Args: { u_id: string }; Returns: string }
+      has_active_profile: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1915,6 +1920,7 @@ export type Database = {
           status: string
         }[]
       }
+      is_territory_manager: { Args: { _user_id: string }; Returns: boolean }
       log_activity: {
         Args: { source_type: string }
         Returns: {
@@ -1983,6 +1989,26 @@ export type Database = {
           _score: number
         }
         Returns: string
+      }
+      set_block_current_street: {
+        Args: { _block_id: string; _street: string }
+        Returns: undefined
+      }
+      set_block_location: {
+        Args: {
+          _address: string
+          _block_id: string
+          _city: string
+          _latitude: number
+          _location_source: string
+          _longitude: number
+          _neighborhood: string
+        }
+        Returns: undefined
+      }
+      set_block_status: {
+        Args: { _block_id: string; _status: string }
+        Returns: undefined
       }
       sync_cycle_statuses: { Args: never; Returns: Json }
       validate_end_session: {

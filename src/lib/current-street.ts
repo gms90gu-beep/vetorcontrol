@@ -173,14 +173,12 @@ export async function confirmBlockStreet(params: {
 }): Promise<void> {
   const street = params.street.trim();
   if (!street) return;
-  const { error } = await supabase
-    .from("blocks")
-    .update({
-      current_street: street,
-      current_street_confirmed_at: new Date().toISOString(),
-      current_street_confirmed_by: params.actorId,
-    })
-    .eq("id", params.blockId);
+  // Alterações em blocks são restritas a gestores; o agente confirma a rua
+  // pela função segura no servidor (valida perfil ativo e registra o autor).
+  const { error } = await (supabase as any).rpc("set_block_current_street", {
+    _block_id: params.blockId,
+    _street: street,
+  });
   if (error) throw error;
   console.log("[CURRENT_STREET_CONFIRMED]", street);
 }
