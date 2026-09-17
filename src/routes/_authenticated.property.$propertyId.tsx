@@ -651,7 +651,6 @@ function PropertyVisitPage() {
           }
         }
       }
-      }
     } catch (error: any) {
       console.error("Error fetching data:", error);
       setError("Falha ao carregar dados do imóvel.");
