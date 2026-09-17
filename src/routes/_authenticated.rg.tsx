@@ -460,26 +460,15 @@ function RGPage() {
           (b: any) => (b.locality ?? "").trim().toLowerCase() === normLocality,
         )?.id ?? null;
 
-      // 2) Criar bloco se não existir
+      // 2) Criar bloco se não existir — via RPC segura (valida perfil no servidor;
+      //    INSERT direto em blocks é restrito a supervisor/coordenador/admin).
       if (!blockId) {
-        const anySubarea = await safeSupabaseRead<any>(
-          () => supabase.from("subareas").select("id").limit(1).maybeSingle() as any,
-          null,
-          "subareas",
-        );
-        const { data: newBlock, error: blockErr } = await supabase
-          .from("blocks")
-          .insert({
-            number: payload.block_number,
-            locality,
-            status: "not_started",
-            total_properties: 0,
-            subarea_id: anySubarea?.id as any,
-          })
-          .select("id")
-          .single();
+        const { data: ensuredId, error: blockErr } = await (supabase as any).rpc("ensure_block", {
+          _number: payload.block_number,
+          _locality: locality,
+        });
         if (blockErr) throw blockErr;
-        blockId = newBlock.id;
+        blockId = ensuredId as string;
       }
       console.log("[RG_RECONCILE_BLOCK]", { blockId, blockNumber: payload.block_number, locality });
 
