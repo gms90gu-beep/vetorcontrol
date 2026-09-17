@@ -1,0 +1,1 @@
+GRANT UPDATE ON public.blocks TO authenticated;
