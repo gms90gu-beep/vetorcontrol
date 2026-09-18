@@ -1,6 +1,7 @@
 // SyncEngine — drena a fila de mutações para o Supabase quando online.
 import { supabase } from "@/integrations/supabase/client";
 import { db, type Mutation } from "./db";
+import { isJourneyPermissionError, journeyPermissionMessage } from "@/lib/journey-permission-error";
 
 let running = false;
 const MAX_RETRIES = 5;
