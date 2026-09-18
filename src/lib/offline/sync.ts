@@ -206,10 +206,17 @@ export async function flushMutations(options?: { retryErroredImmediately?: boole
       } catch (e: any) {
         failed++;
         const tries = (m.tries || 0) + 1;
+        // Bloqueio por vínculo de equipe/área (RLS) vira mensagem explicativa,
+        // em vez do texto cru do banco.
+        const isJourneyTable =
+          m.table === "field_work_sessions" || m.table === "daily_work_records";
+        const lastError = isJourneyTable && isJourneyPermissionError(e)
+          ? journeyPermissionMessage()
+          : e?.message || String(e);
         await db.mutations.update(m.id!, {
           status: "error",
           tries,
-          lastError: e?.message || String(e),
+          lastError,
           nextRetryAt: Date.now() + RETRY_DELAYS[Math.min(tries - 1, RETRY_DELAYS.length - 1)],
         });
         console.warn(`[SYNC] Falha em ${m.op} ${m.table}:`, e?.message || e);
