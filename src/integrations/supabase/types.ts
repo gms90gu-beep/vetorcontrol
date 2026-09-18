@@ -1797,6 +1797,10 @@ export type Database = {
         }[]
       }
       data_audit_report: { Args: never; Returns: Json }
+      dwr_write_allowed: {
+        Args: { _agent_id: string; _legacy_agent_id: string }
+        Returns: boolean
+      }
       ensure_annual_cycles: {
         Args: { target_year: number }
         Returns: undefined
