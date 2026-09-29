@@ -37,7 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
-import { getOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
@@ -77,13 +77,7 @@ function operationalTodayDate(): Date {
 }
 
 function isWithinResumeWindow(sessionDate?: string | null): boolean {
-  if (!sessionDate) return false;
-  const [y, m, d] = sessionDate.split("-").map(Number);
-  if (!y || !m || !d) return false;
-  const target = new Date(y, m - 1, d);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((operationalTodayDate().getTime() - target.getTime()) / 86400000);
-  return diffDays >= 0 && diffDays <= MAX_RETROACTIVE_DAYS;
+  return isOperationalDateInWindow(sessionDate, getOperationalDate(), MAX_RETROACTIVE_DAYS, MAX_FUTURE_PRODUCTION_DAYS);
 }
 
 async function autoRecoverSession(sessionId: string) {
@@ -433,32 +427,28 @@ function FieldWorkPage() {
               new_status: "prompt",
             });
 
-            // Jornada retroativa pausada: a Data da Produção dela é, por
-            // definição, anterior a hoje. Antes, assessSessionForResume era
+            // Uma jornada pausada fora de hoje mantém sua própria Data da
+            // Produção selecionada, seja retroativa ou de amanhã. Antes, assessSessionForResume era
             // chamada sem referenceDate (usando "hoje"), então a decisão saía
             // sempre "blocked_by_date", o modal nunca aparecia e a jornada
             // ficava presa em `paused` — nenhuma tela reconhecia jornada ativa
             // e o agente recebia "Inicie uma jornada de trabalho primeiro".
             // Agora usamos a própria Data da Produção da sessão como
-            // referência quando ela está dentro da janela retroativa, e
+            // referência quando ela está dentro da janela permitida, e
             // alinhamos o seletor de data da tela a ela.
             const pausedDate = String((paused as any).session_date || "");
             const todayStr = getOperationalDate();
             let referenceDate = todayStr;
-            if (pausedDate && pausedDate !== todayStr) {
+            if (pausedDate && pausedDate !== todayStr && isWithinResumeWindow(pausedDate)) {
               const [py, pm, pd] = pausedDate.split("-").map(Number);
               const pausedAsDate = py && pm && pd ? new Date(py, pm - 1, pd) : null;
-              const diffDays = pausedAsDate
-                ? Math.round((operationalTodayDate().getTime() - pausedAsDate.getTime()) / 86400000)
-                : Number.NaN;
-              if (pausedAsDate && diffDays > 0 && diffDays <= MAX_RETROACTIVE_DAYS) {
+              if (pausedAsDate) {
                 referenceDate = pausedDate;
                 setDate(pausedAsDate);
-                console.log("[JOURNEY_RESUME_RETROACTIVE_DATE]", {
+                console.log("[JOURNEY_RESUME_PRODUCTION_DATE]", {
                   session_id: (paused as any).id,
                   session_date: pausedDate,
                   operational_today: todayStr,
-                  diff_days: diffDays,
                 });
               }
             }
@@ -684,11 +674,11 @@ function FieldWorkPage() {
 
     const sessionDateStr = toDateOnly(date);
 
-    // Regra de janela retroativa (hoje = Data Operacional, America/Sao_Paulo)
+    // Janela da Data da Produção: até cinco dias atrás ou um dia à frente.
     const today = operationalTodayDate();
     const chosen = new Date(date); chosen.setHours(0, 0, 0, 0);
     const diffDays = Math.round((today.getTime() - chosen.getTime()) / 86400000);
-    if (diffDays < 0) { toast.error("Datas futuras não são permitidas."); return; }
+    if (diffDays < -MAX_FUTURE_PRODUCTION_DAYS) { toast.error(`Só é permitido lançar produção com até ${MAX_FUTURE_PRODUCTION_DAYS} dia de antecedência.`); return; }
     if (diffDays > MAX_RETROACTIVE_DAYS) {
       toast.error(`Só é permitido lançar produção referente aos últimos ${MAX_RETROACTIVE_DAYS} dias.`);
       return;
@@ -910,8 +900,9 @@ function FieldWorkPage() {
                   disabled={(d) => {
                     const today = operationalTodayDate();
                     const min = new Date(today); min.setDate(min.getDate() - MAX_RETROACTIVE_DAYS);
+                    const max = new Date(today); max.setDate(max.getDate() + MAX_FUTURE_PRODUCTION_DAYS);
                     const t = new Date(d); t.setHours(0, 0, 0, 0);
-                    return t > today || t < min;
+                    return t > max || t < min;
                   }}
                   initialFocus
                   className="pointer-events-auto"

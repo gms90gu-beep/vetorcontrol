@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getOperationalDate, epiWeekFromDate, getOperationalVisitDate, assertProductionDate, resolveOperationalCloseTarget } from "@/lib/operational-date";
+import { getOperationalDate, epiWeekFromDate, getOperationalVisitDate, assertProductionDate, resolveOperationalCloseTarget, isOperationalDateInWindow } from "@/lib/operational-date";
 
 describe("getOperationalDate (America/Sao_Paulo)", () => {
   it("22:30 BRT stays on same calendar day", () => {
@@ -21,6 +21,25 @@ describe("getOperationalDate (America/Sao_Paulo)", () => {
 });
 
 describe("resolveOperationalCloseTarget", () => {
+  it("keeps a tomorrow session as the production date when it has no visits yet", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "tomorrow", session_date: "2026-08-02", status: "in_progress", is_retroactive: false }],
+      [],
+      "2026-08-01",
+    );
+    expect(result).toEqual({ workDate: "2026-08-02", sessionId: "tomorrow", source: "future_session" });
+  });
+
+  it("uses visits from a tomorrow session as tomorrow production", () => {
+    const result = resolveOperationalCloseTarget(
+      [{ id: "tomorrow", session_date: "2026-08-02", status: "in_progress", is_retroactive: false }],
+      [{ field_work_session_id: "tomorrow", visit_date: "2026-08-02T13:00:00-03:00" }],
+      "2026-08-01",
+    );
+    expect(result.workDate).toBe("2026-08-02");
+    expect(result.sessionId).toBe("tomorrow");
+  });
+
   it("prefers the date of real production over an empty session created today", () => {
     const result = resolveOperationalCloseTarget(
       [
@@ -71,6 +90,20 @@ describe("resolveOperationalCloseTarget", () => {
     );
     expect(result.workDate).toBe("2026-08-01");
     expect(result.source).toBe("today_session");
+  });
+});
+
+describe("isOperationalDateInWindow", () => {
+  it("allows one future day and up to five past days", () => {
+    expect(isOperationalDateInWindow("2026-08-02", "2026-08-01", 5, 1)).toBe(true);
+    expect(isOperationalDateInWindow("2026-07-27", "2026-08-01", 5, 1)).toBe(true);
+    expect(isOperationalDateInWindow("2026-08-03", "2026-08-01", 5, 1)).toBe(false);
+    expect(isOperationalDateInWindow("2026-07-26", "2026-08-01", 5, 1)).toBe(false);
+  });
+
+  it("rejects invalid date values", () => {
+    expect(isOperationalDateInWindow("not-a-date", "2026-08-01", 5, 1)).toBe(false);
+    expect(isOperationalDateInWindow("2026-02-30", "2026-08-01", 5, 1)).toBe(false);
   });
 });
 

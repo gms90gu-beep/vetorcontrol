@@ -40,7 +40,7 @@ import { LandscapeBulletinLayout } from "@/components/LandscapeBulletinLayout";
 import { DigitalBulletinTable } from "@/components/DigitalBulletinTable";
 import { DailyWorkCloser } from "@/components/DailyWorkCloser";
 import { translate } from "@/lib/translations";
-import { getOperationalVisitDate, assertProductionDate, getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
+import { getOperationalVisitDate, assertProductionDate, getOperationalDate, operationalDateBoundsUtcIso, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { GeolocationCaptureDialog } from "@/components/property/GeolocationCaptureDialog";
 import { FirstVisitStreetPrompt } from "@/components/property/FirstVisitStreetPrompt";
 import { getBlockCurrentStreet, detectFromGPS, isSameStreet } from "@/lib/current-street";
@@ -461,19 +461,10 @@ function PropertyVisitPage() {
       // ficava nula e o app exibia "Inicie uma jornada de trabalho primeiro".
       const targetBlockId = prop?.block_id ? String(prop.block_id) : null;
       const targetBlockNumber = prop?.block_number != null ? String(prop.block_number) : null;
-      const maxResumeDays = 5;
-
       const isWithinSessionWindow = (sessionDate: unknown) => {
         const value = String(sessionDate ?? "");
         if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-        const [y, m, d] = value.split("-").map(Number);
-        const [ty, tm, td] = getOperationalDate().split("-").map(Number);
-        const target = new Date(y, m - 1, d);
-        const today = new Date(ty, tm - 1, td);
-        target.setHours(0, 0, 0, 0);
-        today.setHours(0, 0, 0, 0);
-        const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
-        return diffDays >= 0 && diffDays <= maxResumeDays;
+        return isOperationalDateInWindow(value, getOperationalDate(), 5, MAX_FUTURE_PRODUCTION_DAYS);
       };
 
       const sessionRows = await listRemoteOrCache<any>({
@@ -954,6 +945,7 @@ function PropertyVisitPage() {
     return (
       <LandscapeBulletinLayout
         isLandscape={true}
+        productionDate={activeSession?.session_date || getOperationalDate()}
         title={`Quarteirão ${activeSession?.block_number || "--"}`}
         subtitle={activeSession?.street_name || "--"}
         agentInfo={{

@@ -12,6 +12,8 @@
  *   [PRODUCTION_DATE_ERROR]       — session_date inválida/ausente
  */
 
+export const MAX_FUTURE_PRODUCTION_DAYS = 1;
+
 export function getOperationalVisitDate(
   sessionDate?: string | null,
   moduleName: string = "unknown",
@@ -86,6 +88,32 @@ export function operationalDateBoundsUtcIso(dateOnly: string): { startIso: strin
     startIso: `${dateOnly}T00:00:00-03:00`,
     endIso: `${dateOnly}T23:59:59.999-03:00`,
   };
+}
+
+/** Confere se uma Data da Produção está dentro da janela permitida. */
+export function isOperationalDateInWindow(
+  dateOnly: string | null | undefined,
+  referenceDate: string,
+  maxPastDays: number,
+  maxFutureDays = 0,
+): boolean {
+  const parse = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return Number.NaN;
+    const [year, month, day] = value.split("-").map(Number);
+    const timestamp = Date.UTC(year, month - 1, day);
+    const parsed = new Date(timestamp);
+    return parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+      ? timestamp
+      : Number.NaN;
+  };
+  if (!dateOnly) return false;
+  const target = parse(dateOnly);
+  const reference = parse(referenceDate);
+  if (!Number.isFinite(target) || !Number.isFinite(reference)) return false;
+  const daysFromReference = Math.round((target - reference) / 86400000);
+  return daysFromReference >= -maxPastDays && daysFromReference <= maxFutureDays;
 }
 
 export function getOperationalDayRange(sessionDate?: string | null): { start: string; end: string; dateOnly: string } {
@@ -185,7 +213,7 @@ function daysBetween(fromDateOnly: string, toDateOnly: string): number {
  * A data de uma visita é mais forte que a data do relógio: isso permite
  * encerrar uma produção anterior que ficou aberta sem confundi-la com uma
  * sessão vazia criada hoje. Sem visitas, preserva a intenção de uma jornada
- * retroativa e, por último, usa hoje em America/Sao_Paulo.
+ * retroativa ou futura e, por último, usa hoje em America/Sao_Paulo.
  *
  * Consolidação de virada de dia: quando a sessão dona da visita mais recente
  * foi ABERTA em um dia anterior (quarteirão começou num dia e está sendo
@@ -197,15 +225,24 @@ export function resolveOperationalCloseTarget(
   sessions: OperationalSessionLike[],
   visits: OperationalVisitLike[],
   todayOperational: string = getOperationalDate(),
-): { workDate: string; sessionId: string | null; source: "visit" | "session_open" | "retroactive_session" | "today_session" | "system_today" } {
+): { workDate: string; sessionId: string | null; source: "visit" | "session_open" | "retroactive_session" | "future_session" | "today_session" | "system_today" } {
   // Quando existe jornada retroativa aberta, ela é a intenção explícita do
   // usuário: só as visitas dessa jornada podem definir o alvo do fechamento.
+  const futureSessions = sessions.filter((session) =>
+    !session.is_retroactive &&
+    session.session_date &&
+    session.session_date !== todayOperational &&
+    isOperationalDateInWindow(session.session_date, todayOperational, 0, MAX_FUTURE_PRODUCTION_DAYS)
+  );
+  const futureIds = new Set(futureSessions.filter((session) => session.id).map((session) => String(session.id)));
   const retroactiveIds = new Set(
     sessions.filter((s) => s.is_retroactive && s.id).map((s) => String(s.id)),
   );
-  const candidateIds = retroactiveIds.size > 0
-    ? retroactiveIds
-    : new Set(sessions.map((session) => session.id).filter((id): id is string => !!id).map(String));
+  const candidateIds = futureIds.size > 0
+    ? futureIds
+    : retroactiveIds.size > 0
+      ? retroactiveIds
+      : new Set(sessions.map((session) => session.id).filter((id): id is string => !!id).map(String));
   const latestVisit = [...visits]
     .filter((visit) => !!visit.field_work_session_id && candidateIds.has(String(visit.field_work_session_id)) && !!toOperationalDate(visit.visit_date))
     .sort((a, b) => String(b.visit_date ?? "").localeCompare(String(a.visit_date ?? "")))[0];
@@ -254,6 +291,15 @@ export function resolveOperationalCloseTarget(
 
   const byUpdatedDesc = (a: OperationalSessionLike, b: OperationalSessionLike) =>
     String(b.updated_at ?? b.created_at ?? "").localeCompare(String(a.updated_at ?? a.created_at ?? ""));
+  const futureSession = futureSessions.sort(byUpdatedDesc)[0];
+  if (futureSession?.session_date) {
+    return {
+      workDate: futureSession.session_date,
+      sessionId: futureSession.id ? String(futureSession.id) : null,
+      source: "future_session",
+    };
+  }
+
   const retroactive = sessions
     .filter((session) => session.is_retroactive && session.session_date)
     .sort(byUpdatedDesc)[0];

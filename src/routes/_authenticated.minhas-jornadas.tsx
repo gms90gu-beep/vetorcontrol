@@ -11,7 +11,7 @@ import { isOnline } from "@/lib/offline/safe-fetch";
 import { listRemoteOrCache, removeOffline, updateOffline } from "@/lib/offline/repos";
 import { toast } from "sonner";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
-import { getOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -66,12 +66,6 @@ function todayISO() {
   // virada do dia (mesma classe de bug já corrigida no painel do agente).
   return getOperationalDate();
 }
-function daysAgoISO(n: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return getOperationalDate(d);
-}
-
 // Sem estatísticas carregadas (ex.: offline — os contadores só são calculados
 // online) não há como confirmar se a jornada tem visitas registradas. Assume que
 // pode ter, para não liberar a exclusão de uma jornada com dados de campo reais
@@ -225,11 +219,10 @@ function MySessionsPage() {
 
   const filtered = useMemo(() => {
     const today = todayISO();
-    const cutoff = daysAgoISO(5);
     return rows.filter((r) => {
       switch (filter) {
         case "hoje": return r.session_date === today;
-        case "5dias": return r.session_date >= cutoff;
+        case "5dias": return isOperationalDateInWindow(r.session_date, today, 5, MAX_FUTURE_PRODUCTION_DAYS);
         case "in_progress": return r.status === "in_progress";
         case "closed": return r.status === "closed";
         default: return true;
@@ -311,7 +304,7 @@ function MySessionsPage() {
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="hoje">Hoje</SelectItem>
-              <SelectItem value="5dias">Últimos 5 dias</SelectItem>
+              <SelectItem value="5dias">Últimos 5 dias e amanhã</SelectItem>
               <SelectItem value="in_progress">Em andamento</SelectItem>
               <SelectItem value="closed">Finalizadas</SelectItem>
             </SelectContent>

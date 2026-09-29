@@ -10,7 +10,7 @@ import {
   safeSupabaseRead,
 } from "@/lib/offline/repos";
 import { isOnline } from "@/lib/offline/safe-fetch";
-import { getOperationalDate, toOperationalDate, operationalDateBoundsUtcIso, resolveOperationalCloseTarget } from "@/lib/operational-date";
+import { getOperationalDate, toOperationalDate, operationalDateBoundsUtcIso, resolveOperationalCloseTarget, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { getOperationalBlockStatus, logBlockStatusShared, assertOperationalStatusMatches } from "@/lib/operational-block-status";
 import { pauseBlockProgress, enqueueRecomputeBlockProgress } from "@/lib/offline/repos/blockProgress";
 import { jsPDF } from "jspdf";
@@ -587,6 +587,12 @@ async function loadDayCloseSessions(userId: string, workDate: string, targetSess
 function resolveActiveSessionCandidate(sessions: any[], todayOperational: string): any | null {
   if (!sessions.length) return null;
   const byCreatedDesc = (a: any, b: any) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+  const future = sessions.filter((session) =>
+    !session.is_retroactive &&
+    session.session_date !== todayOperational &&
+    isOperationalDateInWindow(session.session_date, todayOperational, 0, MAX_FUTURE_PRODUCTION_DAYS)
+  );
+  if (future.length) return [...future].sort(byCreatedDesc)[0];
   const today = sessions.filter((session) => session.session_date === todayOperational && !session.is_retroactive);
   if (today.length) return [...today].sort(byCreatedDesc)[0];
   const retroactive = sessions.filter((session) => session.is_retroactive);
@@ -1070,14 +1076,36 @@ export function DailyWorkCloser({
       
       if (agentData) setAgent(agentData);
 
-      const { data: cycle } = await supabase
-        .from("cycles")
-        .select("*")
+      const { data: activeSessionRows } = await supabase
+        .from("field_work_sessions")
+        .select("id, session_date, cycle_id, block_number, is_retroactive, retroactive_reason, created_at, updated_at")
+        .eq("user_id", user.id)
         .eq("status", "in_progress")
-        .eq("year", new Date().getFullYear())
-        .limit(1)
-        .maybeSingle();
-      
+        .order("created_at", { ascending: false });
+      const activeSession = resolveActiveSessionForDayClose(activeSessionRows || [], getOperationalDate());
+
+      // Usa o ciclo vinculado à jornada selecionada. Isso mantém o fechamento
+      // alinhado à Data da Produção quando a sessão é de amanhã ou cruza um ciclo.
+      let cycle: any = null;
+      if (activeSession?.cycle_id) {
+        const { data } = await supabase
+          .from("cycles")
+          .select("*")
+          .eq("id", activeSession.cycle_id)
+          .maybeSingle();
+        cycle = data;
+      }
+      if (!cycle) {
+        const { data } = await supabase
+          .from("cycles")
+          .select("*")
+          .eq("status", "in_progress")
+          .eq("year", new Date().getFullYear())
+          .limit(1)
+          .maybeSingle();
+        cycle = data;
+      }
+
       if (cycle) {
         setActiveCycle(cycle);
 
@@ -1085,14 +1113,6 @@ export function DailyWorkCloser({
         // operacional. Busca TODAS as sessões in_progress (não só a mais
         // recente por created_at) e usa resolveActiveSessionForDayClose —
         // ver comentário na definição da função para o motivo.
-        const { data: activeSessionRows } = await supabase
-          .from("field_work_sessions")
-          .select("id, session_date, block_number, is_retroactive, retroactive_reason, created_at, updated_at")
-          .eq("user_id", user.id)
-          .eq("status", "in_progress")
-          .order("created_at", { ascending: false });
-        const activeSession = resolveActiveSessionForDayClose(activeSessionRows || [], getOperationalDate());
-
         setActiveSessionId(activeSession?.id ?? null);
         setOpenBlock(activeSession?.block_number ?? null);
         setSessionRetro({

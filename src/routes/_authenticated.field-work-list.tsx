@@ -54,7 +54,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
-import { getOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
@@ -159,7 +159,8 @@ function FieldWorkListPage() {
       // a jornada ainda in_progress no banco. Agora busca todas as sessões
       // in_progress do usuário (mesmo padrão já usado em
       // property.$propertyId.tsx) e só depois decide qual é a "ativa":
-      // prioriza a de hoje; na ausência dela, aceita uma retroativa aberta.
+      // prioriza a jornada de amanhã; depois a de hoje; na ausência delas,
+      // aceita uma retroativa aberta.
       const sessions = await listRemoteOrCache<any>({
         name: "field_work_sessions",
         remote: () =>
@@ -175,9 +176,14 @@ function FieldWorkListPage() {
       const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
       );
+      const sessionsFuture = sorted.filter((s: any) =>
+        s.session_date !== todayOperational &&
+        !s.is_retroactive &&
+        isOperationalDateInWindow(s.session_date, todayOperational, 0, MAX_FUTURE_PRODUCTION_DAYS)
+      );
       const sessionsToday = sorted.filter((s: any) => s.session_date === todayOperational);
       const sessionsRetro = sorted.filter((s: any) => s.session_date !== todayOperational && s.is_retroactive);
-      const candidates = [...sessionsToday, ...sessionsRetro];
+      const candidates = [...sessionsFuture, ...sessionsToday, ...sessionsRetro];
       const session =
         (preferSessionId && candidates.find((s: any) => s.id === preferSessionId)) ||
         candidates[0] ||
@@ -873,6 +879,8 @@ function FieldWorkListPage() {
 
   const generatePDF = () => {
     const doc = new jsPDF();
+    const productionDate = activeSession?.session_date || getOperationalDate();
+    const productionDateLabel = new Date(`${productionDate}T12:00:00`).toLocaleDateString("pt-BR");
     
     // Add Summary Section
     doc.setFontSize(22);
@@ -882,7 +890,7 @@ function FieldWorkListPage() {
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139); // slate-500
     doc.text(`Agente: ${agent?.name || "Agente"}`, 14, 30);
-    doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 14, 35);
+    doc.text(`Data: ${productionDateLabel}`, 14, 35);
     doc.text(`Quarteirão: ${activeSession?.block_number} | Ciclo: ${activeCycle?.number}`, 14, 40);
 
     // Summary Box
@@ -941,7 +949,7 @@ function FieldWorkListPage() {
       }
     });
 
-    doc.save(`boletim-diario-${activeSession?.block_number}-${getOperationalDate()}.pdf`);
+    doc.save(`boletim-diario-${activeSession?.block_number}-${productionDate}.pdf`);
     toast.success("Boletim e Resumo Operacional gerados com sucesso!");
   };
 
@@ -958,6 +966,7 @@ function FieldWorkListPage() {
   return (
     <LandscapeBulletinLayout
       isLandscape={isLandscape}
+      productionDate={activeSession?.session_date || getOperationalDate()}
       title="Boletim Digital"
       subtitle={`Quarteirão ${activeSession?.block_number || "--"}`}
       agentInfo={{

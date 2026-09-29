@@ -47,6 +47,7 @@ interface LandscapeBulletinLayoutProps {
   sidebarHeader?: React.ReactNode;
   sidebarFooter?: React.ReactNode;
   isLandscape: boolean;
+  productionDate?: string;
 }
 
 export function LandscapeBulletinLayout({
@@ -57,7 +58,8 @@ export function LandscapeBulletinLayout({
   agentInfo,
   sidebarHeader,
   sidebarFooter,
-  isLandscape
+  isLandscape,
+  productionDate = getOperationalDate(),
 }: LandscapeBulletinLayoutProps) {
   if (!isLandscape) {
     return <div className="space-y-6">{children}</div>;
@@ -100,7 +102,7 @@ export function LandscapeBulletinLayout({
               </div>
               <div>
                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Data</p>
-                <p className="text-[10px] font-bold">{new Date(`${getOperationalDate()}T12:00:00`).toLocaleDateString('pt-BR')}</p>
+                <p className="text-[10px] font-bold">{new Date(`${productionDate}T12:00:00`).toLocaleDateString('pt-BR')}</p>
               </div>
             </div>
 
@@ -112,7 +114,7 @@ export function LandscapeBulletinLayout({
                 Semana {agentInfo.week}
               </Badge>
               <Badge variant="outline" className="border-white/10 text-slate-400 font-bold text-[8px] uppercase tracking-widest">
-                SE {(() => { const { week, year } = getEpiWeek(new Date(`${getOperationalDate()}T12:00:00`)); return `${String(week).padStart(2,'0')}/${year}`; })()}
+                SE {(() => { const { week, year } = getEpiWeek(new Date(`${productionDate}T12:00:00`)); return `${String(week).padStart(2,'0')}/${year}`; })()}
               </Badge>
             </div>
           </CardContent>
