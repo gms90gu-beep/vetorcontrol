@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { safeSupabaseRead, createOffline, updateOffline, removeOffline } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline, updateOffline, removeOffline } from "@/lib/offline/repos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,11 +120,21 @@ function EditarBoletim() {
     if (showSpinner) setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
-        .from("boletins_rg").select("*").eq("id", id).maybeSingle();
-      console.log("Boletim carregado", data, err);
-      if (err) throw err;
-      if (!data) { setError("Boletim não encontrado."); return; }
+      const boletimRows = await listRemoteOrCache<any>({
+        name: "boletins_rg",
+        remote: () => supabase.from("boletins_rg").select("*").eq("id", id) as any,
+        filter: (row) => row.id === id,
+      });
+      const data = boletimRows[0] ?? null;
+      console.log("Boletim carregado", data, boletimRows.source);
+      if (!data) {
+        setError(
+          typeof navigator !== "undefined" && !navigator.onLine
+            ? "Este boletim não está salvo neste dispositivo. Abra-o enquanto estiver conectado para prepará-lo para uso offline."
+            : "Boletim não encontrado ou indisponível.",
+        );
+        return;
+      }
       setBoletimId(data.id);
       setBlockId(data.block_id);
       setAgentId(data.agent_id);
@@ -143,14 +153,18 @@ function EditarBoletim() {
 
       // Load properties strictly linked to this boletim (sem fallback por
       // block_id, para não puxar imóveis de outros boletins).
-      const { data: props } = await supabase
-        .from("properties")
-        .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
-        .eq("boletim_id", data.id)
-        .order("sequence", { ascending: true });
+      const props = await listRemoteOrCache<Imovel>({
+        name: "properties",
+        remote: () => supabase
+          .from("properties")
+          .select("id, block_id, boletim_id, street_name, side, number, sequence, complement, type, inhabitants")
+          .eq("boletim_id", data.id)
+          .order("sequence", { ascending: true }) as any,
+        filter: (property) => property.boletim_id === data.id,
+      });
 
-      console.log("Imóveis carregados:", props?.length || 0);
-      const normalized = ((props || []) as Imovel[]).map((p) => {
+      console.log("Imóveis carregados:", props.length);
+      const normalized = (props as Imovel[]).map((p) => {
         const raw = (p as any).number;
         console.log("[PROPERTY_NUMBER_RAW]", {
           id: p.id, raw, type: raw === null ? "null" : typeof raw,
@@ -167,11 +181,15 @@ function EditarBoletim() {
 
       // Load block location data (hybrid GPS / manual address)
       if (data.block_id) {
-        const { data: block } = await supabase
-          .from("blocks")
-          .select("address, neighborhood, city, latitude, longitude, location_source")
-          .eq("id", data.block_id)
-          .maybeSingle();
+        const blocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase
+            .from("blocks")
+            .select("id, address, neighborhood, city, latitude, longitude, location_source")
+            .eq("id", data.block_id) as any,
+          filter: (item) => item.id === data.block_id,
+        });
+        const block = blocks[0] ?? null;
         if (block) {
           setBlockLoc({
             address: (block as any).address || "",
