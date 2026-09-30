@@ -72,7 +72,7 @@ export function MunicipalIntelligence() {
             ? sups.filter((p: any) => p.coordinator_id === user.id)
             : [];
           console.log("[COORDINATOR_FILTER] Escopo vinculado", {
-            coordId: user.id,
+            coordId: user?.id,
             supervisorsFound: sups.length,
           });
         }

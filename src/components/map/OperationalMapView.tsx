@@ -22,8 +22,8 @@ import {
   type PropertyMapPoint,
   type BlockRiskScore,
   type MapCycleOption,
-  type PropertyCycleHistory,
 } from "@/lib/wave-c.functions";
+import type { PropertyCycleHistory } from "@/lib/map-cycle-history";
 import { getOperationalDate } from "@/lib/operational-date";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import {
