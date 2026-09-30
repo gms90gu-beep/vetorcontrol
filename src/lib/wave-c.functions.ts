@@ -6,7 +6,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildPropertyCycleHistory, type PropertyCycleHistory, type PropertyCycleVisit } from "@/lib/map-cycle-history";
-import { isPositiveMapVisit } from "@/lib/map-point-status";
 
 function sumDepJson(j: any): number {
   if (!j || typeof j !== "object") return 0;
@@ -612,27 +611,6 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
 
     const historyVisitIds = ((visits ?? []) as any[]).map((visit) => visit.id);
-    const positiveHistoryVisitIds = new Set<string>(
-      ((visits ?? []) as any[])
-        .filter((visit) => visit.focus_analysis_status === "positive")
-        .map((visit) => visit.id),
-    );
-    if (historyVisitIds.length > 0) {
-      const { data: positiveDeposits, error: positiveDepositError } = await supabaseAdmin
-        .from("visit_deposits")
-        .select("visit_id, is_positive")
-        .in("visit_id", historyVisitIds)
-        .eq("is_positive", true);
-      if (positiveDepositError) {
-        throw new Error(`Falha ao carregar focos do histórico: ${positiveDepositError.message}`);
-      }
-      for (const deposit of positiveDeposits ?? []) {
-        if (isPositiveMapVisit(false, Boolean(deposit.is_positive))) {
-          positiveHistoryVisitIds.add(deposit.visit_id);
-        }
-      }
-    }
-
     const normalizedVisits: PropertyCycleVisit[] = ((visits ?? []) as any[]).map((visit) => ({
         id: visit.id,
         cycle_id: visit.cycle_id,
@@ -807,7 +785,6 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       const deps = depResults.flatMap((result) => result.data ?? []);
       for (const d of deps) {
         const pid = visitToProp.get(d.visit_id);
-        if (isPositiveMapVisit(false, Boolean(d.is_positive))) positiveVisitIds.add(d.visit_id);
         if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
       }
     }
