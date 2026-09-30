@@ -17,9 +17,14 @@ import {
   getPropertyMapPoints,
   getBlockRiskScores,
   getGpsCoverage,
+  getMapCycleOptions,
+  getPropertyCycleHistory,
   type PropertyMapPoint,
   type BlockRiskScore,
+  type MapCycleOption,
 } from "@/lib/wave-c.functions";
+import type { PropertyCycleHistory } from "@/lib/map-cycle-history";
+import { getOperationalDate } from "@/lib/operational-date";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import {
   currentEpiRange,
@@ -85,7 +90,28 @@ const FILTERS: { id: "all" | Category; label: string }[] = [
   { id: "clean", label: "Regular." },
 ];
 
+function cycleStatusLabel(status: string) {
+  if (status === "in_progress") return "Em andamento";
+  if (status === "finished") return "Concluído";
+  return "Aguardando";
+}
+
+function activityTypeLabel(activityType: string) {
+  if (activityType === "routine") return "Rotina";
+  if (activityType === "infestation_survey") return "Pesquisa de infestação";
+  if (activityType === "pending") return "Retorno pendente";
+  return activityType;
+}
+
+function visitStatusLabel(status: string) {
+  if (status === "closed") return "Fechada";
+  if (status === "refused") return "Recusada";
+  if (status === "visited") return "Visitada";
+  return status || "Situação não informada";
+}
+
 type Preset = "current" | "previous" | "last4" | "custom";
+type MapPeriodMode = "year" | "cycle" | "custom";
 type HeatMode = "count" | "focus" | "pendency";
 type PanelView = "default" | "detail";
 
@@ -135,6 +161,10 @@ export default function OperationalMapView() {
   const initial = lastNWeeksRange(4);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
+  const [selectedYear, setSelectedYear] = useState(() => Number(getOperationalDate().slice(0, 4)));
+  const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [mapPeriodMode, setMapPeriodMode] = useState<MapPeriodMode>("cycle");
+  const cycleDefaultsInitialized = useRef(false);
   const [filter, setFilter] = useState<"all" | Category>("all");
   const [search, setSearch] = useState("");
   const [showHeat, setShowHeat] = useState(false);
@@ -160,14 +190,64 @@ export default function OperationalMapView() {
   const fetchProps = useServerFn(getPropertyMapPoints);
   const fetchBlocks = useServerFn(getBlockRiskScores);
   const fetchCoverage = useServerFn(getGpsCoverage);
+  const fetchCycles = useServerFn(getMapCycleOptions);
+
+  const cycleOptionsQuery = useQuery({
+    queryKey: ["op-map-cycles"],
+    queryFn: () => fetchCycles(),
+  });
+  const cycleOptions = (cycleOptionsQuery.data ?? []) as MapCycleOption[];
+  const years = useMemo(
+    () => Array.from(new Set([
+      Number(getOperationalDate().slice(0, 4)),
+      ...cycleOptions.map((cycle) => cycle.year).filter((year): year is number => year != null),
+    ])).sort((a, b) => b - a),
+    [cycleOptions],
+  );
+  const cyclesForYear = useMemo(
+    () => cycleOptions.filter((cycle) => cycle.year === selectedYear).sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
+    [cycleOptions, selectedYear],
+  );
+  const selectedCycle = cyclesForYear.find((cycle) => cycle.id === selectedCycleId) ?? null;
+  const filterCycleIds = mapPeriodMode === "year"
+    ? cyclesForYear.map((cycle) => cycle.id)
+    : mapPeriodMode === "cycle"
+      ? (selectedCycle ? [selectedCycle.id] : [])
+      : undefined;
+
+  useEffect(() => {
+    if (cycleOptionsQuery.isLoading || cycleDefaultsInitialized.current) return;
+    cycleDefaultsInitialized.current = true;
+
+    const todayYear = Number(getOperationalDate().slice(0, 4));
+    const defaultYear = years.includes(todayYear) ? todayYear : (years[0] ?? todayYear);
+    const sameYear = cycleOptions.filter((cycle) => cycle.year === defaultYear);
+    const defaultCycle = sameYear.find((cycle) => cycle.status === "in_progress")
+      ?? [...sameYear].sort((a, b) => (b.number ?? 0) - (a.number ?? 0))[0];
+
+    setSelectedYear(defaultYear);
+    if (defaultCycle) {
+      setSelectedCycleId(defaultCycle.id);
+      setMapPeriodMode("cycle");
+      setFrom(defaultCycle.start_date);
+      setTo(defaultCycle.end_date);
+      setPreset("custom");
+    } else {
+      setSelectedCycleId("");
+      setMapPeriodMode("year");
+      setFrom(`${defaultYear}-01-01`);
+      setTo(`${defaultYear}-12-31`);
+      setPreset("custom");
+    }
+  }, [cycleOptionsQuery.isLoading, cycleOptions, years]);
 
   const props = useQuery({
-    queryKey: ["op-map-points", from, to],
-    queryFn: () => fetchProps({ data: { from, to } }),
+    queryKey: ["op-map-points", from, to, filterCycleIds],
+    queryFn: () => fetchProps({ data: { from, to, cycleIds: filterCycleIds } }),
   });
   const blocks = useQuery({
-    queryKey: ["op-map-blocks", from, to],
-    queryFn: () => fetchBlocks({ data: { from, to } }),
+    queryKey: ["op-map-blocks", from, to, filterCycleIds],
+    queryFn: () => fetchBlocks({ data: { from, to, cycleIds: filterCycleIds } }),
     enabled: showBlocks,
   });
   const coverage = useQuery({
@@ -304,6 +384,45 @@ export default function OperationalMapView() {
     setPanelView("default");
   }
 
+  function selectYear(year: number) {
+    setSelectedYear(year);
+    setSelectedCycleId("");
+    setMapPeriodMode("year");
+    setPreset("custom");
+    setFrom(`${year}-01-01`);
+    setTo(`${year}-12-31`);
+  }
+
+  function selectCycle(cycleId: string) {
+    const cycle = cyclesForYear.find((item) => item.id === cycleId);
+    if (!cycle) return;
+    setSelectedCycleId(cycle.id);
+    setMapPeriodMode("cycle");
+    setPreset("custom");
+    setFrom(cycle.start_date);
+    setTo(cycle.end_date);
+  }
+
+  function selectMapPeriodMode(mode: MapPeriodMode) {
+    setMapPeriodMode(mode);
+    if (mode === "year") {
+      setSelectedCycleId("");
+      setPreset("custom");
+      setFrom(`${selectedYear}-01-01`);
+      setTo(`${selectedYear}-12-31`);
+      return;
+    }
+    if (mode === "cycle") {
+      const cycle = cyclesForYear.find((item) => item.id === selectedCycleId)
+        ?? cyclesForYear.find((item) => item.status === "in_progress")
+        ?? cyclesForYear[0];
+      if (cycle) selectCycle(cycle.id);
+      else setSelectedCycleId("");
+      return;
+    }
+    setSelectedCycleId("");
+  }
+
   // KPI strip — clickable filters
   const kpis: Array<{
     id: string;
@@ -358,8 +477,17 @@ export default function OperationalMapView() {
         setPreset={setPreset}
         from={from}
         to={to}
-        setFrom={setFrom}
-        setTo={setTo}
+        setFrom={(value) => { setMapPeriodMode("custom"); setSelectedCycleId(""); setPreset("custom"); setFrom(value); }}
+        setTo={(value) => { setMapPeriodMode("custom"); setSelectedCycleId(""); setPreset("custom"); setTo(value); }}
+        selectedYear={selectedYear}
+        years={years}
+        cycleOptionsError={cycleOptionsQuery.isError}
+        onYearChange={selectYear}
+        cycles={cyclesForYear}
+        selectedCycleId={selectedCycleId}
+        onCycleChange={selectCycle}
+        mapPeriodMode={mapPeriodMode}
+        onMapPeriodModeChange={selectMapPeriodMode}
       />
       <LegendSection counts={counts} />
       <ExportSection exportPDF={exportPDF} head={head} rows={rows} />
@@ -369,6 +497,7 @@ export default function OperationalMapView() {
   const PanelDetail = selected && (
     <PropertyDetailPanel
       point={selected}
+      historyYear={selectedYear}
       onClose={clearSelection}
       onCenter={() => setFlyTo({ lat: selected.latitude, lng: selected.longitude, ts: Date.now() })}
     />
@@ -522,8 +651,14 @@ export default function OperationalMapView() {
 /* ============= Detail panel ============= */
 
 function PropertyDetailPanel({
-  point, onClose, onCenter,
-}: { point: PropertyMapPoint; onClose: () => void; onCenter: () => void }) {
+  point, historyYear, onClose, onCenter,
+}: { point: PropertyMapPoint; historyYear: number; onClose: () => void; onCenter: () => void }) {
+  const fetchHistory = useServerFn(getPropertyCycleHistory);
+  const historyQuery = useQuery({
+    queryKey: ["op-map-property-history", point.id, historyYear],
+    queryFn: () => fetchHistory({ data: { propertyId: point.id, year: historyYear } }),
+    enabled: Boolean(point.id && historyYear),
+  });
   const cat = classify(point);
   const meta = CATEGORY_META[cat];
   const risk = RISK_META[point.risk_level];
@@ -591,6 +726,72 @@ function PropertyDetailPanel({
             />
             <DetailRow label="ID" value={point.id} mono />
           </div>
+
+          <section className="space-y-2 border-t pt-3">
+            <div>
+              <h3 className="text-sm font-bold">Histórico de visitas · {historyYear}</h3>
+              <p className="text-[11px] text-muted-foreground">Registros preservados e organizados por ciclo.</p>
+            </div>
+            {historyQuery.isLoading ? (
+              <div className="text-xs text-muted-foreground">Carregando ciclos e visitas…</div>
+            ) : historyQuery.isError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+                Não foi possível carregar o histórico deste imóvel.
+              </div>
+            ) : (historyQuery.data ?? []).length === 0 ? (
+              <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+                Nenhum ciclo ou visita registrado em {historyYear}.
+              </div>
+            ) : (
+              <div className="max-h-[36vh] space-y-2 overflow-y-auto pr-1">
+                {(historyQuery.data as PropertyCycleHistory[]).map((cycle) => (
+                  <div key={cycle.cycle_id} className="rounded-md border p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-bold">
+                        {cycle.cycle_number ? `Ciclo ${cycle.cycle_number}` : cycle.cycle_name}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground">{cycleStatusLabel(cycle.status)}</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {cycle.visits.length} {cycle.visits.length === 1 ? "visita" : "visitas"}
+                        </Badge>
+                      </div>
+                    </div>
+                    {cycle.visits.length === 0 ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">Nenhuma visita neste ciclo.</p>
+                    ) : (
+                      <ol className="mt-2 space-y-2">
+                        {cycle.visits.map((visit) => (
+                          <li key={visit.id} className="border-l-2 border-muted pl-2 text-[11px]">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-semibold">
+                                {new Date(visit.visit_date).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {visitStatusLabel(visit.status)}
+                              </span>
+                              {visit.has_focus && <Badge className="h-5 bg-red-600 px-1.5 text-[9px]">Foco</Badge>}
+                              {visit.is_recovered && <Badge variant="outline" className="h-5 px-1.5 text-[9px]">Recuperado</Badge>}
+                            </div>
+                            <div className="mt-0.5 text-muted-foreground">
+                              {[
+                                activityTypeLabel(visit.activity_type),
+                                visit.treatment_amount != null ? `${visit.treatment_amount} de inseticida` : null,
+                                visit.sample_collected ? "Amostra coletada" : null,
+                                visit.treated_deposits != null ? `${visit.treated_deposits} depósitos tratados` : null,
+                                visit.elimination_amount != null ? `${visit.elimination_amount} eliminados` : null]
+                                .filter(Boolean).join(" · ")}
+                            </div>
+                            {visit.notes && <p className="mt-0.5 whitespace-pre-wrap">{visit.notes}</p>}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           <div className="grid grid-cols-2 gap-1.5 pt-1">
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onCenter}>
@@ -825,6 +1026,8 @@ function LayerSwitch({
 function FiltersSection({
   search, setSearch, filter, setFilter, counts, total,
   preset, setPreset, from, to, setFrom, setTo,
+  selectedYear, years, cycleOptionsError, onYearChange, cycles, selectedCycleId, onCycleChange,
+  mapPeriodMode, onMapPeriodModeChange,
 }: {
   search: string; setSearch: (v: string) => void;
   filter: "all" | Category; setFilter: (v: "all" | Category) => void;
@@ -832,7 +1035,11 @@ function FiltersSection({
   preset: Preset; setPreset: (v: Preset) => void;
   from: string; to: string;
   setFrom: (v: string) => void; setTo: (v: string) => void;
+  selectedYear: number; years: number[]; cycleOptionsError: boolean; onYearChange: (year: number) => void;
+  cycles: MapCycleOption[]; selectedCycleId: string; onCycleChange: (cycleId: string) => void;
+  mapPeriodMode: MapPeriodMode; onMapPeriodModeChange: (mode: MapPeriodMode) => void;
 }) {
+  const selectClass = "h-8 w-full rounded-md border border-input bg-background px-2 text-xs";
   return (
     <section>
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -851,7 +1058,62 @@ function FiltersSection({
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
-            {([
+            <label className="text-[10px] font-semibold text-muted-foreground">
+              Ano do mapa e histórico
+              <select
+                aria-label="Ano do mapa e histórico"
+                className={selectClass}
+                value={selectedYear}
+                onChange={(event) => onYearChange(Number(event.target.value))}
+              >
+                {years.length === 0 && <option value={selectedYear}>{selectedYear}</option>}
+                {years.map((year) => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+            <label className="text-[10px] font-semibold text-muted-foreground">
+              Período
+              <select
+                aria-label="Período do mapa"
+                className={selectClass}
+                value={mapPeriodMode}
+                onChange={(event) => onMapPeriodModeChange(event.target.value as MapPeriodMode)}
+              >
+                <option value="cycle">Ciclo</option>
+                <option value="year">Ano inteiro</option>
+                <option value="custom">Datas / semanas</option>
+              </select>
+            </label>
+          </div>
+          {cycleOptionsError && (
+            <p className="text-[10px] text-destructive">
+              Não foi possível carregar os ciclos. Atualize a página para filtrar por ciclo.
+            </p>
+          )}
+
+          {mapPeriodMode === "cycle" && (
+            <label className="block text-[10px] font-semibold text-muted-foreground">
+              Ciclo do ano selecionado
+              <select
+                aria-label="Ciclo do ano selecionado"
+                className={selectClass}
+                value={selectedCycleId}
+                onChange={(event) => onCycleChange(event.target.value)}
+                disabled={cycles.length === 0}
+              >
+                {cycles.length === 0
+                  ? <option value="">Nenhum ciclo cadastrado</option>
+                  : cycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.number ? `Ciclo ${cycle.number}` : cycle.name} · {cycle.status === "in_progress" ? "em andamento" : cycle.status === "finished" ? "concluído" : "aguardando"}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+
+          {mapPeriodMode === "custom" && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
               { id: "current", label: "SE Atual" },
               { id: "previous", label: "SE Anterior" },
               { id: "last4", label: "4 semanas" },
@@ -859,7 +1121,7 @@ function FiltersSection({
             ] as { id: Preset; label: string }[]).map((p) => (
               <button
                 key={p.id}
-                onClick={() => setPreset(p.id)}
+                onClick={() => { setPreset(p.id); onMapPeriodModeChange("custom"); }}
                 className={`text-[11px] px-2 py-1.5 rounded-lg border transition ${
                   preset === p.id ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
                 }`}
@@ -867,9 +1129,10 @@ function FiltersSection({
                 {p.label}
               </button>
             ))}
-          </div>
+            </div>
+          )}
 
-          {preset === "custom" && (
+          {mapPeriodMode === "custom" && preset === "custom" && (
             <div className="grid grid-cols-2 gap-1.5">
               <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 text-xs" />
               <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 text-xs" />
@@ -898,7 +1161,13 @@ function FiltersSection({
             variant="outline"
             size="sm"
             className="w-full h-8 text-xs"
-            onClick={() => { setSearch(""); setFilter("all"); setPreset("current"); }}
+            onClick={() => {
+              setSearch("");
+              setFilter("all");
+              onYearChange(Number(getOperationalDate().slice(0, 4)));
+              onMapPeriodModeChange("custom");
+              setPreset("current");
+            }}
           >
             Limpar filtros
           </Button>

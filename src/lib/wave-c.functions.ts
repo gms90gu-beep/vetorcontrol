@@ -5,6 +5,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buildPropertyCycleHistory, type PropertyCycleHistory, type PropertyCycleVisit } from "@/lib/map-cycle-history";
 
 function sumDepJson(j: any): number {
   if (!j || typeof j !== "object") return 0;
@@ -536,6 +537,97 @@ async function scopedProfileIds(
   return (profiles ?? []).map((p: any) => p.id);
 }
 
+export interface MapCycleOption {
+  id: string;
+  name: string;
+  number: number | null;
+  year: number | null;
+  start_date: string;
+  end_date: string;
+  status: string;
+}
+
+export const getMapCycleOptions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<MapCycleOption[]> => {
+    const { supabase, userId } = context;
+    await requireAdminOrSupervisor(supabase, userId);
+    const { data, error } = await supabase
+      .from("cycles")
+      .select("id, name, number, year, start_date, end_date, status")
+      .order("year", { ascending: false })
+      .order("number", { ascending: true });
+    if (error) throw new Error(`Falha ao carregar ciclos do mapa: ${error.message}`);
+    return (data ?? []) as MapCycleOption[];
+  });
+
+export const getPropertyCycleHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { propertyId: string; year: number }) => input)
+  .handler(async ({ data, context }): Promise<PropertyCycleHistory[]> => {
+    const { supabase, userId } = context;
+    const role = await requireAdminOrSupervisor(supabase, userId);
+    const year = Number(data.year);
+    if (!data.propertyId || !Number.isInteger(year) || year < 2000 || year > 2200) {
+      throw new Error("Imóvel ou ano inválido.");
+    }
+
+    const profileIds = await scopedProfileIds(supabase, userId, role);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: property, error: propertyError } = await supabaseAdmin
+      .from("properties")
+      .select("id, boletim_id")
+      .eq("id", data.propertyId)
+      .maybeSingle();
+    if (propertyError) throw new Error(`Falha ao carregar imóvel: ${propertyError.message}`);
+    if (!property?.boletim_id) throw new Error("Imóvel sem vínculo com o RG.");
+
+    const { data: boletim, error: boletimError } = await supabaseAdmin
+      .from("boletins_rg")
+      .select("id, agent_id")
+      .eq("id", property.boletim_id)
+      .maybeSingle();
+    if (boletimError) throw new Error(`Falha ao validar o escopo do imóvel: ${boletimError.message}`);
+    if (!boletim || (profileIds !== null && !profileIds.includes(boletim.agent_id))) {
+      throw new Error("Forbidden");
+    }
+
+    const { data: cycles, error: cycleError } = await supabase
+      .from("cycles")
+      .select("id, name, number, year, status")
+      .eq("year", year)
+      .order("number", { ascending: true });
+    if (cycleError) throw new Error(`Falha ao carregar ciclos do ano: ${cycleError.message}`);
+    const yearCycles = cycles ?? [];
+    if (yearCycles.length === 0) return [];
+
+    const cycleIds = yearCycles.map((cycle: any) => cycle.id);
+    const { data: visits, error: visitError } = await supabaseAdmin
+      .from("visits")
+      .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
+      .eq("property_id", data.propertyId)
+      .in("cycle_id", cycleIds)
+      .order("visit_date", { ascending: false });
+    if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
+
+    const normalizedVisits: PropertyCycleVisit[] = ((visits ?? []) as any[]).map((visit) => ({
+        id: visit.id,
+        cycle_id: visit.cycle_id,
+        visit_date: visit.visit_date,
+        status: String(visit.status ?? ""),
+        has_focus: Boolean(visit.has_focus),
+        activity_type: String(visit.activity_type ?? ""),
+        notes: visit.notes ?? null,
+        treatment_amount: visit.treatment_amount ?? null,
+        elimination_amount: visit.elimination_amount ?? null,
+        treated_deposits: visit.treated_deposits ?? null,
+        sample_collected: visit.sample_collected ?? null,
+        is_recovered: visit.is_recovered ?? null,
+      }));
+
+    return buildPropertyCycleHistory(yearCycles as any[], normalizedVisits, year);
+  });
+
 /** @deprecated kept for compat — use scopedProfileIds */
 async function scopedAgentIds(
   supabase: any,
@@ -552,7 +644,7 @@ async function scopedAgentIds(
 
 export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null }) => input)
   .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
@@ -636,22 +728,26 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
     const periodStart = `${data.from}T00:00:00-03:00`;
     const periodEnd = `${data.to}T23:59:59.999-03:00`;
-    const visitResults = await Promise.all(
-      idChunks.map((ids) =>
-        supabaseAdmin
-          .from("visits")
-          .select("id, property_id, agent_id, has_focus, status, visit_date")
-          .in("property_id", ids)
-          .gte("visit_date", periodStart)
-          .lte("visit_date", periodEnd)
-          .order("visit_date", { ascending: false }),
-      ),
-    );
-    const visitError = visitResults.find((result) => result.error)?.error;
-    if (visitError) throw new Error(`Falha ao carregar visitas do mapa: ${visitError.message}`);
-    const visits = visitResults
-      .flatMap((result) => result.data ?? [])
-      .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
+    let visits: any[] = [];
+    if (data.cycleIds === undefined || data.cycleIds === null || data.cycleIds.length > 0) {
+      const visitResults = await Promise.all(
+        idChunks.map((ids) => {
+          let query = supabaseAdmin
+            .from("visits")
+            .select("id, property_id, agent_id, has_focus, status, visit_date")
+            .in("property_id", ids)
+            .gte("visit_date", periodStart)
+            .lte("visit_date", periodEnd);
+          if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
+          return query.order("visit_date", { ascending: false });
+        }),
+      );
+      const visitError = visitResults.find((result) => result.error)?.error;
+      if (visitError) throw new Error(`Falha ao carregar visitas do mapa: ${visitError.message}`);
+      visits = visitResults
+        .flatMap((result) => result.data ?? [])
+        .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
+    }
 
     const focusByProp = new Map<string, number>();
     const lastVisitByProp = new Map<string, string>();
@@ -746,7 +842,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
 export const getBlockRiskScores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null }) => input)
   .handler(async ({ data, context }): Promise<{ blocks: BlockRiskScore[] }> => {
     const result = await (getPropertyMapPoints as any)({ data });
     const points = (result.points ?? []) as PropertyMapPoint[];
@@ -840,5 +936,3 @@ export const getGpsCoverage = createServerFn({ method: "POST" })
       blocks_geo: blocksGeo.size,
     };
   });
-
-

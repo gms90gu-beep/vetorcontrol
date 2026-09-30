@@ -10,93 +10,12 @@ import {
   SharedRouteLayer,
   SharedUserLocationLayer,
   useFitBounds,
-  useSharedMap,
   type NumberedPoint,
 } from "@/components/map/shared";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { comparePropertyOrder } from "@/lib/property-order";
-import {
-  Home, AlertTriangle, Flame, CheckCircle2,
-  Landmark, Trees, X, LocateFixed,
-} from "lucide-react";
-
-// ─── Território do agente (aditivo, local a este arquivo) ────────────────────
-// Cor determinística por agente: hash simples do nome → hue estável.
-function agentHue(name: string): number {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
-  return h;
-}
-
-// Convex hull (monotone chain) sobre lng/lat.
-function convexHull(pts: { lat: number; lng: number }[]): [number, number][] {
-  const p = [...pts].sort((a, b) => (a.lng - b.lng) || (a.lat - b.lat));
-  if (p.length < 3) return [];
-  const cross = (o: typeof p[0], a: typeof p[0], b: typeof p[0]) =>
-    (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng);
-  const build = (src: typeof p) => {
-    const st: typeof p = [];
-    for (const q of src) {
-      while (st.length >= 2 && cross(st[st.length - 2]!, st[st.length - 1]!, q) <= 0) st.pop();
-      st.push(q);
-    }
-    return st;
-  };
-  const lower = build(p);
-  const upper = build([...p].reverse());
-  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
-  if (hull.length < 3) return [];
-  return hull.map((q) => [q.lat, q.lng] as [number, number]);
-}
-
-function escapeLabel(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
-  ));
-}
-
-function AgentTerritoryOverlay({
-  agentName, points,
-}: { agentName: string; points: { lat: number; lng: number }[] }) {
-  const map = useSharedMap();
-  const hull = useMemo(() => convexHull(points), [points]);
-
-  useEffect(() => {
-    if (!map || hull.length < 3) return;
-    const hue = agentHue(agentName);
-    const stroke = `hsl(${hue} 70% 45%)`;
-    const fill = `hsl(${hue} 70% 55%)`;
-    const group = L.layerGroup().addTo(map);
-
-    L.polygon(hull, {
-      color: stroke,
-      weight: 2,
-      opacity: 0.9,
-      fillColor: fill,
-      fillOpacity: 0.18,
-      interactive: false,
-    }).addTo(group);
-
-    const lat = hull.reduce((s, h) => s + h[0], 0) / hull.length;
-    const lng = hull.reduce((s, h) => s + h[1], 0) / hull.length;
-    L.marker([lat, lng], {
-      interactive: false,
-      zIndexOffset: -500,
-      icon: L.divIcon({
-        className: "rg-agent-territory-pill",
-        html: `<div style="transform:translate(-50%,-50%);background:${stroke};color:#fff;padding:3px 9px;border-radius:9999px;font:700 11px system-ui;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35)">${escapeLabel(agentName)} · ${points.length}</div>`,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
-      }),
-    }).addTo(group);
-
-    return () => { try { map.removeLayer(group); } catch { /* noop */ } };
-  }, [map, hull, agentName, points.length]);
-
-  return null;
-}
-
+import { X, LocateFixed } from "lucide-react";
 
 export type RGMapProperty = {
   id: string;
@@ -115,7 +34,6 @@ export type RGMapProperty = {
   // `visits.status`, não confundir com `status` acima (property_status, quase estático).
   visit_status?: string | null;
   accuracy?: number | null;
-  last_visit_date?: string | null;
   // Timestamp de georreferenciamento — usado só para desenhar a linha-guia do
   // mapa na ordem cronológica real da caminhada em campo.
   geocoded_at?: string | null;
@@ -123,7 +41,6 @@ export type RGMapProperty = {
 
 interface Props {
   blockNumber: string | null;
-  agentName?: string | null;
   properties: RGMapProperty[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -131,38 +48,6 @@ interface Props {
   className?: string;
 }
 
-type Kind = "focus" | "closed" | "visited" | "pending" | "strategic" | "vacant";
-
-const KIND_COLOR: Record<Kind, string> = {
-  focus: "#ef4444", closed: "#2563eb", visited: "#10b981",
-  pending: "#f97316", strategic: "#a855f7", vacant: "#1f2937",
-};
-const KIND_LABEL: Record<Kind, string> = {
-  focus: "Foco positivo", closed: "Fechado", visited: "Visitado",
-  pending: "Pendente", strategic: "Ponto Estratégico", vacant: "Terreno Baldio",
-};
-
-function normType(t: string | null | undefined): string { return (t || "").toLowerCase(); }
-function classify(p: RGMapProperty): Kind {
-  if (p.had_previous_focus) return "focus";
-  const t = normType(p.type);
-  if (t === "strategic_point" || t === "pe") return "strategic";
-  if (t === "vacant_lot" || t === "tb") return "vacant";
-  // Fonte de verdade: visit_status (tabela visits/visit_status). `status` (property_status)
-  // é mantido só como fallback para dados antigos que ainda não têm visit_status calculado.
-  const s = (p.visit_status ?? p.status ?? "").toLowerCase();
-  if (s === "closed" || s === "refused") return "closed";
-  if (s === "visited") return "visited";
-  return "pending";
-}
-function tipoSigla(t: string | null | undefined): string {
-  const x = normType(t);
-  if (x === "residence" || x === "residential" || x === "r") return "R";
-  if (x === "commerce" || x === "commercial" || x === "c") return "C";
-  if (x === "vacant_lot" || x === "tb") return "TB";
-  if (x === "strategic_point" || x === "pe") return "PE";
-  return "O";
-}
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
@@ -173,31 +58,17 @@ function fmtCoord(n: number | null | undefined): string {
 }
 
 export function RGOperationalMap({
-  blockNumber, agentName, properties, selectedId, onSelect, onClose, className,
+  blockNumber, properties, selectedId, onSelect, onClose, className,
 }: Props) {
   const ordered = useMemo(() => [...properties].sort(comparePropertyOrder), [properties]);
   const enriched = useMemo(() => ordered.map((p) => {
-    const kind = classify(p);
     // Rótulo do pin = número REAL do imóvel (`p.number`), a mesma numeração
     // exibida no boletim/PDF/painel. Não é rank de posição no array.
     // Imóveis com mesmo número (complemento/anexo) mostram o número igual,
     // exatamente como no boletim impresso.
     const label = String(p.number ?? "—");
-    return { p, kind, label };
+    return { p, label };
   }), [ordered]);
-
-  const totals = useMemo(() => {
-    const t = { total: ordered.length, visited: 0, pending: 0, focus: 0, closed: 0, strategic: 0, vacant: 0 };
-    for (const e of enriched) {
-      if (e.kind === "focus") t.focus++;
-      else if (e.kind === "closed") t.closed++;
-      else if (e.kind === "visited") t.visited++;
-      else if (e.kind === "strategic") t.strategic++;
-      else if (e.kind === "vacant") t.vacant++;
-      else t.pending++;
-    }
-    return t;
-  }, [enriched, ordered.length]);
 
   const missingGeo = useMemo(
     () => enriched.filter((e) => e.p.latitude == null || e.p.longitude == null),
@@ -206,28 +77,18 @@ export function RGOperationalMap({
 
   const points: NumberedPoint[] = useMemo(() => enriched
     .filter((e) => e.p.latitude != null && e.p.longitude != null)
-    .map(({ p, kind, label }) => {
-      const color = KIND_COLOR[kind];
+    .map(({ p, label }) => {
       const acc = p.accuracy != null ? `${Math.round(p.accuracy)} m` : "—";
       const addr = [p.street_name, p.side ? `Lado ${p.side}` : null].filter(Boolean).join(" · ");
-      const lastVisit = p.last_visit_date
-        ? new Date(p.last_visit_date).toLocaleDateString("pt-BR")
-        : "—";
       const popup = `
         <div style="font-family:system-ui;font-size:12px;min-width:220px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:11px">${label}</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#2563eb;color:#fff;font-weight:800;font-size:11px">${escapeHtml(label)}</span>
             <b style="font-size:13px">Nº ${escapeHtml(String(p.number ?? "—"))}${p.complement ? " · " + escapeHtml(p.complement) : ""}</b>
           </div>
           <div style="color:#475569;margin-bottom:6px">${escapeHtml(addr || "—")}</div>
           <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;color:#334155">
             ${p.sequence != null ? `<span style="color:#64748b">Sequência</span><b>${p.sequence}</b>` : ""}
-            <span style="color:#64748b">Tipo</span><b>${tipoSigla(p.type)}</b>
-            <span style="color:#64748b">Hab.</span><b>${p.inhabitants ?? 0}</b>
-            <span style="color:#64748b">Situação</span><b style="color:${color}">${KIND_LABEL[kind]}</b>
-            <span style="color:#64748b">Foco</span><b>${p.had_previous_focus ? "Sim" : "Não"}</b>
-            <span style="color:#64748b">Agente</span><b>${escapeHtml(agentName || "—")}</b>
-            <span style="color:#64748b">Última visita</span><b>${escapeHtml(lastVisit)}</b>
             <span style="color:#64748b">Latitude</span><b>${fmtCoord(p.latitude)}</b>
             <span style="color:#64748b">Longitude</span><b>${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
@@ -245,10 +106,10 @@ export function RGOperationalMap({
         id: p.id,
         lat: p.latitude as number,
         lng: p.longitude as number,
-        label, color, popupHtml: popup,
+        label, color: "#2563eb", popupHtml: popup,
         tooltip: `Nº ${p.number ?? "—"}${p.complement ? " · " + p.complement : ""}`,
       };
-    }), [enriched, agentName]);
+    }), [enriched]);
 
   const geoCount = points.length;
 
@@ -382,13 +243,9 @@ export function RGOperationalMap({
           )}
         </header>
 
-        <div className="grid grid-cols-3 gap-1.5 text-center">
-          <Kpi icon={<Home className="h-3.5 w-3.5" />} label="Total" value={totals.total} tone="slate" />
-          <Kpi icon={<CheckCircle2 className="h-3.5 w-3.5" />} label="Visit." value={totals.visited} tone="emerald" />
-          <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Pend." value={totals.pending} tone="orange" />
-          <Kpi icon={<Flame className="h-3.5 w-3.5" />} label="Focos" value={totals.focus} tone="red" />
-          <Kpi icon={<Landmark className="h-3.5 w-3.5" />} label="Fech." value={totals.closed} tone="blue" />
-          <Kpi icon={<Trees className="h-3.5 w-3.5" />} label="TB/PE" value={totals.vacant + totals.strategic} tone="slate" />
+        <div className="grid grid-cols-2 gap-1.5 text-center">
+          <Kpi label="Imóveis" value={ordered.length} />
+          <Kpi label="Com coordenadas" value={points.length} />
         </div>
 
         <div className="mt-2">
@@ -415,7 +272,7 @@ export function RGOperationalMap({
         )}
 
         <div className="mt-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          Imóveis ({geoCount}/{totals.total} no mapa)
+          Imóveis ({geoCount}/{ordered.length} no mapa)
         </div>
 
         <div ref={listRef} className="mt-1 flex-1 min-h-0 overflow-auto rounded-md border border-slate-100">
@@ -423,7 +280,7 @@ export function RGOperationalMap({
             <div className="p-4 text-center text-xs text-slate-400">Sem imóveis.</div>
           ) : (
             <ul>
-              {enriched.map(({ p, kind, label }) => {
+              {enriched.map(({ p, label }) => {
                 const isSel = p.id === selectedId;
                 const hasGeo = p.latitude != null && p.longitude != null;
                 return (
@@ -439,8 +296,8 @@ export function RGOperationalMap({
                     >
                       <span
                         className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-black text-white shrink-0"
-                        style={{ background: KIND_COLOR[kind] }}
-                        title={KIND_LABEL[kind]}
+                        style={{ background: "#2563eb" }}
+                        title={hasGeo ? "Georreferenciado" : "Sem coordenadas"}
                       >
                         {label}
                       </span>
@@ -449,7 +306,7 @@ export function RGOperationalMap({
                           Nº {p.number}{p.complement ? ` · ${p.complement}` : ""}
                         </span>
                         <span className="block text-[10px] text-slate-500 truncate">
-                          {p.street_name || "—"} · {tipoSigla(p.type)}
+                          {p.street_name || "Endereço não informado"}
                           {!hasGeo && " · sem GPS"}
                         </span>
                       </span>
@@ -491,9 +348,6 @@ export function RGOperationalMap({
           legend="none"
           onReady={setMapInst}
         >
-          {agentName && routePoints.length >= 3 && (
-            <AgentTerritoryOverlay agentName={agentName} points={routePoints} />
-          )}
           {routePoints.length > 1 && (
             <SharedRouteLayer
               points={routePoints}
@@ -533,38 +387,23 @@ export function RGOperationalMap({
   );
 }
 
-function Kpi({
-  icon, label, value, tone,
-}: { icon: React.ReactNode; label: string; value: number; tone: "slate" | "emerald" | "orange" | "red" | "blue" }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-50 text-slate-700 border-slate-200",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    orange: "bg-orange-50 text-orange-700 border-orange-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-  };
+function Kpi({ label, value }: { label: string; value: number }) {
   return (
-    <div className={cn("rounded-md border px-1 py-1.5", tones[tone])}>
-      <div className="flex items-center justify-center gap-1 opacity-80">{icon}</div>
-      <div className="text-sm font-black leading-none mt-0.5">{value}</div>
-      <div className="text-[9px] font-bold uppercase tracking-wider opacity-70">{label}</div>
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-1 py-1.5 text-slate-700">
+      <div className="text-sm font-black leading-none">{value}</div>
+      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider opacity-70">{label}</div>
     </div>
   );
 }
 
 function MapLegend() {
-  const entries: { kind: Kind }[] = [
-    { kind: "visited" }, { kind: "pending" }, { kind: "closed" },
-    { kind: "focus" }, { kind: "strategic" }, { kind: "vacant" },
-  ];
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-600">
-      {entries.map(({ kind }) => (
-        <span key={kind} className="inline-flex items-center gap-1">
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[kind] }} />
-          {KIND_LABEL[kind]}
-        </span>
-      ))}
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" />
+        Imóvel georreferenciado
+      </span>
+      <span>Imóveis sem coordenadas aparecem na lista ao lado.</span>
     </div>
   );
 }
