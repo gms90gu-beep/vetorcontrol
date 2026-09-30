@@ -781,7 +781,7 @@ function PropertyDetailPanel({
                               <span className="text-muted-foreground">
                                 {visitStatusLabel(visit.status)}
                               </span>
-                              {visit.has_focus && <Badge className="h-5 bg-red-600 px-1.5 text-[9px]">Foco</Badge>}
+                              {visit.has_focus && <Badge className={`h-5 px-1.5 text-[9px] ${visit.focus_analysis_status === "positive" ? "bg-red-600" : "bg-amber-500"}`}>{visit.focus_analysis_status === "positive" ? "Foco positivo" : visit.focus_analysis_status === "negative" ? "Foco analisado: negativo" : "Foco pendente de análise"}</Badge>}
                               {visit.is_recovered && <Badge variant="outline" className="h-5 px-1.5 text-[9px]">Recuperado</Badge>}
                             </div>
                             <div className="mt-0.5 text-muted-foreground">
