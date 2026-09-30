@@ -10,7 +10,7 @@ vi.mock("@/integrations/supabase/client", async () => {
         rows: [
           { id: "v1", status: "closed", has_focus: false, property_id: "p1" },
           { id: "v2", status: "refused", has_focus: false, property_id: "p2" },
-          { id: "v3", status: "visited", has_focus: true, property_id: "p3" },
+          { id: "v3", status: "visited", has_focus: true, focus_analysis_status: "positive", property_id: "p3" },
         ],
       },
       visit_deposits: { rows: [{ visit_id: "v3", type_code: "A1", quantity: 2, is_positive: true }] },
