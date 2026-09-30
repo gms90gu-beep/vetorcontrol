@@ -374,7 +374,6 @@ export function RGOperationalMap({
             />
           )}
           <SharedMapControls
-            autoNight
             fitPoints={points.map((p) => [p.lat, p.lng] as [number, number])}
             onRefresh={() => {
               if (mapInst) mapInst.invalidateSize();
