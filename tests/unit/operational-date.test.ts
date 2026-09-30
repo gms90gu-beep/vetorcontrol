@@ -52,16 +52,16 @@ describe("resolveOperationalCloseTarget", () => {
     expect(result).toEqual({ workDate: "2026-07-27", sessionId: "old", source: "visit" });
   });
 
-  it("A: session opened X, visit recovered X+1 (<=7d) consolidates on session_date", () => {
+  it("assigns a cross-midnight visit to its own operational date", () => {
     const result = resolveOperationalCloseTarget(
-      [{ id: "s1", session_date: "2026-07-29", status: "in_progress", created_at: "2026-07-29T11:00:00Z" }],
+      [{ id: "s1", session_date: "2026-09-28", status: "in_progress", created_at: "2026-09-28T11:00:00Z" }],
       [
-        { field_work_session_id: "s1", visit_date: "2026-07-29T17:00:00Z" },
-        { field_work_session_id: "s1", visit_date: "2026-07-30T15:00:00Z" },
+        { field_work_session_id: "s1", visit_date: "2026-09-28T17:00:00-03:00" },
+        { field_work_session_id: "s1", visit_date: "2026-09-29T23:40:00-03:00" },
       ],
-      "2026-07-30",
+      "2026-09-29",
     );
-    expect(result).toEqual({ workDate: "2026-07-29", sessionId: "s1", source: "session_open" });
+    expect(result).toEqual({ workDate: "2026-09-29", sessionId: "s1", source: "visit" });
   });
 
   it("B: session stale for more than 7 days keeps the visit-based work_date", () => {

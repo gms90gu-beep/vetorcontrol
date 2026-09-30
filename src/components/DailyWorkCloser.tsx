@@ -848,26 +848,6 @@ export function DailyWorkCloser({
     }
   };
 
-  /**
-   * Resolve qual sessão in_progress representa "a jornada ativa" para fins
-   * de Data da Produção / encerramento.
-   *
-   * Bug corrigido: escolher simplesmente a mais recente por created_at
-   * falha sempre que existe mais de uma sessão in_progress ao mesmo tempo
-   * (ex.: uma jornada retroativa antiga ainda aberta + uma nova criada sem
-   * querer para hoje, cenário que já aconteceu na prática — ver auditoria
-   * de sessões retroativas). A sessão criada por último nem sempre é a que
-   * o agente está tentando fechar agora.
-   *
-   * Prioridade:
-   *   1) sessão com session_date === hoje e NÃO retroativa (fluxo normal)
-   *   2) sessão retroativa (is_retroactive=true) mais recentemente
-   *      ATUALIZADA (não criada) — reflete em qual jornada retroativa o
-   *      agente mexeu por último
-   *   3) fallback: mais recente por created_at (comportamento antigo)
-   */
-  const resolveActiveSessionForDayClose = resolveActiveSessionCandidate;
-
   // 🆕 Função auxiliar: Cleanup de visitas órfãs
   const cleanupOrphanVisits = async (userId: string, workDate: string): Promise<number> => {
     try {
@@ -969,9 +949,7 @@ export function DailyWorkCloser({
           latest_visit_date: toOperationalDate(closeContext.visits[0]?.visit_date) ?? null,
           consolidated_work_date: workDate,
           source: closeContext.target.source,
-          note: closeContext.target.source === "session_open"
-            ? "produção consolidada no dia de ABERTURA do quarteirão"
-            : "produção contabilizada na data da visita mais recente",
+          note: "produção contabilizada na data operacional da visita mais recente",
         });
       }
 
@@ -1076,13 +1054,8 @@ export function DailyWorkCloser({
       
       if (agentData) setAgent(agentData);
 
-      const { data: activeSessionRows } = await supabase
-        .from("field_work_sessions")
-        .select("id, session_date, cycle_id, block_number, is_retroactive, retroactive_reason, created_at, updated_at")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("created_at", { ascending: false });
-      const activeSession = resolveActiveSessionForDayClose(activeSessionRows || [], getOperationalDate());
+      const closeContext = await loadOpenDayCloseContext(user.id);
+      const activeSession = closeContext.activeSession;
 
       // Usa o ciclo vinculado à jornada selecionada. Isso mantém o fechamento
       // alinhado à Data da Produção quando a sessão é de amanhã ou cruza um ciclo.
@@ -1100,7 +1073,7 @@ export function DailyWorkCloser({
           .from("cycles")
           .select("*")
           .eq("status", "in_progress")
-          .eq("year", new Date().getFullYear())
+          .eq("year", Number(closeContext.target.workDate.slice(0, 4)))
           .limit(1)
           .maybeSingle();
         cycle = data;
@@ -1109,10 +1082,8 @@ export function DailyWorkCloser({
       if (cycle) {
         setActiveCycle(cycle);
 
-        // Considera a data da jornada ativa (se existir) como referência
-        // operacional. Busca TODAS as sessões in_progress (não só a mais
-        // recente por created_at) e usa resolveActiveSessionForDayClose —
-        // ver comentário na definição da função para o motivo.
+        // O resumo usa o mesmo alvo operacional do fluxo de fechamento,
+        // inclusive quando a sessão atravessa a meia-noite.
         setActiveSessionId(activeSession?.id ?? null);
         setOpenBlock(activeSession?.block_number ?? null);
         setSessionRetro({
@@ -1121,14 +1092,14 @@ export function DailyWorkCloser({
           createdAt: (activeSession as any)?.created_at ?? null,
         });
 
-        if (!activeSession?.session_date) {
+        if (!activeSession?.session_date && !closeContext.target.sessionId) {
           console.warn("[PRODUCTION_DATE_ERROR]", {
             module: "DailyWorkCloser.fetchDailyContext",
             reason: "sem session_date; não é possível resolver semana/data operacional",
           });
           return;
         }
-        const opDateStr: string = activeSession.session_date;
+        const opDateStr: string = closeContext.target.workDate;
 
         const { data: week } = await supabase
           .from("weeks")
@@ -1140,8 +1111,7 @@ export function DailyWorkCloser({
 
         if (week) setActiveWeek(week);
         setJornadaDate(opDateStr);
-        const startOfDay = new Date(`${opDateStr}T00:00:00`);
-        const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+        const { startIso: startOfDayIso, endIso: endOfDayIso } = operationalDateBoundsUtcIso(opDateStr);
 
         console.log("[DailyWorkCloser] Data atual:", new Date().toISOString());
         console.log("[DailyWorkCloser] Data da jornada:", opDateStr);
@@ -1151,8 +1121,8 @@ export function DailyWorkCloser({
           .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, larvicide_unit, tubitos_coletados, sample_collected, visit_date, field_work_session_id")
           .eq("cycle_id", cycle.id)
           .eq("agent_id", user.id)
-          .gte("visit_date", startOfDay.toISOString())
-          .lte("visit_date", endOfDay.toISOString());
+          .gte("visit_date", startOfDayIso)
+          .lte("visit_date", endOfDayIso);
         
         // === INSTRUMENTAÇÃO: comparar fontes do resumo ===
         console.log("[SESSION_SUMMARY_INPUT]", {
@@ -1334,8 +1304,8 @@ export function DailyWorkCloser({
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
-          .gte("resolved_at", startOfDay.toISOString())
-          .lte("resolved_at", endOfDay.toISOString());
+          .gte("resolved_at", startOfDayIso)
+          .lte("resolved_at", endOfDayIso);
         setRecoveredCount(rCount || 0);
       }
     } catch (error) {
