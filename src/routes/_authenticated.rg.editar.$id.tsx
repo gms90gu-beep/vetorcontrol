@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
-import { safeSupabaseRead, createOffline, updateOffline, removeOffline } from "@/lib/offline/repos";
+import { listRemoteOrCache, createOffline, updateOffline, removeOffline, enqueueRpcOffline } from "@/lib/offline/repos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -120,11 +120,26 @@ function EditarBoletim() {
     if (showSpinner) setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
-        .from("boletins_rg").select("*").eq("id", id).maybeSingle();
-      console.log("Boletim carregado", data, err);
-      if (err) throw err;
-      if (!data) { setError("Boletim não encontrado."); return; }
+      const { data: { user } } = await safeGetUser();
+      if (!user) {
+        setError("Sua sessão não está disponível neste dispositivo. Conecte-se novamente para abrir este boletim.");
+        return;
+      }
+      const boletimRows = await listRemoteOrCache<any>({
+        name: "boletins_rg",
+        remote: () => supabase.from("boletins_rg").select("*").eq("id", id) as any,
+        filter: (row) => row.id === id && row.agent_id === user.id,
+      });
+      const data = boletimRows[0] ?? null;
+      console.log("Boletim carregado", data, boletimRows.source);
+      if (!data) {
+        setError(
+          typeof navigator !== "undefined" && !navigator.onLine
+            ? "Este boletim não está salvo neste dispositivo. Abra-o enquanto estiver conectado para prepará-lo para uso offline."
+            : "Boletim não encontrado ou indisponível.",
+        );
+        return;
+      }
       setBoletimId(data.id);
       setBlockId(data.block_id);
       setAgentId(data.agent_id);
@@ -143,14 +158,18 @@ function EditarBoletim() {
 
       // Load properties strictly linked to this boletim (sem fallback por
       // block_id, para não puxar imóveis de outros boletins).
-      const { data: props } = await supabase
-        .from("properties")
-        .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
-        .eq("boletim_id", data.id)
-        .order("sequence", { ascending: true });
+      const props = await listRemoteOrCache<Imovel>({
+        name: "properties",
+        remote: () => supabase
+          .from("properties")
+          .select("id, block_id, boletim_id, street_name, side, number, sequence, complement, type, inhabitants")
+          .eq("boletim_id", data.id)
+          .order("sequence", { ascending: true }) as any,
+        filter: (property) => property.boletim_id === data.id,
+      });
 
-      console.log("Imóveis carregados:", props?.length || 0);
-      const normalized = ((props || []) as Imovel[]).map((p) => {
+      console.log("Imóveis carregados:", props.length);
+      const normalized = (props as Imovel[]).map((p) => {
         const raw = (p as any).number;
         console.log("[PROPERTY_NUMBER_RAW]", {
           id: p.id, raw, type: raw === null ? "null" : typeof raw,
@@ -167,11 +186,15 @@ function EditarBoletim() {
 
       // Load block location data (hybrid GPS / manual address)
       if (data.block_id) {
-        const { data: block } = await supabase
-          .from("blocks")
-          .select("address, neighborhood, city, latitude, longitude, location_source")
-          .eq("id", data.block_id)
-          .maybeSingle();
+        const blocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase
+            .from("blocks")
+            .select("id, address, neighborhood, city, latitude, longitude, location_source")
+            .eq("id", data.block_id) as any,
+          filter: (item) => item.id === data.block_id,
+        });
+        const block = blocks[0] ?? null;
         if (block) {
           setBlockLoc({
             address: (block as any).address || "",
@@ -340,13 +363,18 @@ function EditarBoletim() {
       setImoveis(sortedImoveis);
 
       const effectiveAgentId = agentId || user.id;
+      const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
       let effectiveBlockId = blockId || sortedImoveis.find((im) => !im._deleted && im.block_id)?.block_id || null;
 
-      // Validate cached block_id still exists (cleanups / SET NULL race conditions).
+      // Resolve block IDs through the offline-first repository so the edit flow
+      // does not make a direct network request when the device is offline.
       if (effectiveBlockId) {
-        const { data: existsBlock } = await supabase
-          .from("blocks").select("id").eq("id", effectiveBlockId).maybeSingle();
-        if (!existsBlock?.id) {
+        const existingBlocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId!) as any,
+          filter: (block) => block.id === effectiveBlockId,
+        });
+        if (!existingBlocks[0]?.id) {
           console.warn("[RG Editar] block_id em cache não existe mais; recriando.", effectiveBlockId);
           effectiveBlockId = null;
           setBlockId(null);
@@ -356,16 +384,21 @@ function EditarBoletim() {
       if (!effectiveBlockId && form.block_number.trim()) {
         const blockPayload = { number: form.block_number.trim(), total_properties: 0 };
         console.log("[RG Editar] Dados do quarteirão:", blockPayload);
-        const { data: existingBlock, error: existingBlockError } = await supabase
-          .from("blocks")
-          .select("id, number, total_properties")
-          .eq("number", blockPayload.number)
-          .maybeSingle();
-        console.log("[RG Editar] Resultado busca quarteirão:", existingBlock, "Erro:", existingBlockError);
-        if (existingBlockError) throw existingBlockError;
+        const existingBlocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase
+            .from("blocks")
+            .select("id, number, total_properties")
+            .eq("number", blockPayload.number) as any,
+          filter: (block) => String(block.number) === blockPayload.number,
+        });
+        const existingBlock = existingBlocks[0] ?? null;
+        console.log("[RG Editar] Resultado busca quarteirão:", existingBlock, "Fonte:", existingBlocks.source);
 
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
+        } else if (!isOnline) {
+          throw new Error("Este quarteirão não está salvo neste dispositivo. Abra o boletim enquanto estiver conectado antes de editá-lo offline.");
         } else {
           // Criação via RPC segura (valida perfil ativo no servidor).
           const { data: ensuredId, error: blockError } = await (supabase as any).rpc("ensure_block", {
@@ -383,35 +416,44 @@ function EditarBoletim() {
         throw new Error("Quarteirão obrigatório: informe o número do quarteirão antes de salvar.");
       }
 
+      const boletimPatch = {
+        uf: form.uf || null,
+        municipality: form.municipality || null,
+        locality: form.locality || null,
+        sublocality: form.sublocality || null,
+        district: form.district || null,
+        subdistrict: form.subdistrict || null,
+        block_number: form.block_number || null,
+        side: form.side || null,
+        category_1: form.category_1 || null,
+        category_2: form.category_2 || null,
+        block_id: effectiveBlockId,
+      };
+      if (isOnline) {
+        const { error: updateError } = await supabase
+          .from("boletins_rg")
+          .update(boletimPatch)
+          .eq("id", boletimId);
+        if (updateError) throw updateError;
+      } else {
+        await updateOffline("boletins_rg", boletimId, {
+          ...boletimPatch,
+          updated_at: new Date().toISOString(),
+        });
+      }
 
-      const boletimUpdate = supabase
-        .from("boletins_rg")
-        .update({
-          uf: form.uf || null,
-          municipality: form.municipality || null,
-          locality: form.locality || null,
-          sublocality: form.sublocality || null,
-          district: form.district || null,
-          subdistrict: form.subdistrict || null,
-          block_number: form.block_number || null,
-          side: form.side || null,
-          category_1: form.category_1 || null,
-          category_2: form.category_2 || null,
-          block_id: effectiveBlockId,
-        })
-        .eq("id", boletimId);
-
-      const blockUpdatePromise = effectiveBlockId
-        ? (supabase as any).rpc("set_block_location", {
-            _block_id: effectiveBlockId,
-            _address: blockLoc.address || null,
-            _neighborhood: blockLoc.neighborhood || null,
-            _city: blockLoc.city || form.municipality || null,
-            _latitude: blockLoc.latitude,
-            _longitude: blockLoc.longitude,
-            _location_source: blockLoc.location_source,
-          })
-        : Promise.resolve({ error: null } as any);
+      const locationPayload = {
+        _block_id: effectiveBlockId,
+        _address: blockLoc.address || null,
+        _neighborhood: blockLoc.neighborhood || null,
+        _city: blockLoc.city || form.municipality || null,
+        _latitude: blockLoc.latitude,
+        _longitude: blockLoc.longitude,
+        _location_source: blockLoc.location_source,
+      };
+      const blockUpdatePromise = isOnline
+        ? (supabase as any).rpc("set_block_location", locationPayload)
+        : enqueueRpcOffline("set_block_location", locationPayload).then(() => ({ error: null } as any));
 
       const toDelete = sortedImoveis.filter((i) => i._deleted && i.id).map((i) => i.id as string);
       const deletePromise = toDelete.length > 0
@@ -419,7 +461,6 @@ function EditarBoletim() {
         : Promise.resolve({ error: null } as any);
 
       const dirtyUpdates = sortedImoveis.filter((im) => !im._deleted && !im._new && im.id && im._dirty);
-      const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
       const updatePromises = dirtyUpdates.map((im) => {
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
         const numero = (im.number || "").trim() || "S/N";
@@ -452,11 +493,12 @@ function EditarBoletim() {
 
       // ─── RC-13 Audit: divergência boletim × imóvel ─────────────────────
       if (toInsert.length > 0) {
-        const { data: boletimSnap } = await supabase
-          .from("boletins_rg")
-          .select("id, block_id, block_number")
-          .eq("id", boletimId!)
-          .maybeSingle();
+        const boletimRows = await listRemoteOrCache<any>({
+          name: "boletins_rg",
+          remote: () => supabase.from("boletins_rg").select("id, block_id, block_number").eq("id", boletimId!) as any,
+          filter: (row) => row.id === boletimId,
+        });
+        const boletimSnap = boletimRows[0] ?? null;
         console.log("[PROPERTY_ADD_START]", {
           boletim_id: boletimSnap?.id ?? boletimId,
           boletim_block_id: boletimSnap?.block_id ?? null,
@@ -496,7 +538,7 @@ function EditarBoletim() {
         }
       }
 
-      const insertPromises = toInsert.map((im) => {
+      const insertPromises = toInsert.map(async (im) => {
         const numero = (im.number || "").trim() || "S/N";
         if (!im.type) throw new Error("Tipo do imóvel é obrigatório.");
         if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para salvar o imóvel.");
@@ -513,21 +555,23 @@ function EditarBoletim() {
           user_id: effectiveAgentId,
         };
         console.log("[PROPERTY_SAVE_PAYLOAD]", { payload });
-        return supabase
+        if (!isOnline) {
+          const saved = await createOffline("properties", {
+            ...payload,
+            updated_at: new Date().toISOString(),
+          });
+          return { res: { data: saved, error: null }, im };
+        }
+        const res = await supabase
           .from("properties")
           .insert(payload)
           .select("id, block_id, street_name, side, number, sequence, complement, type, inhabitants")
-          .single()
-          .then((res) => ({ res, im }));
+          .single();
+        return { res, im };
       });
 
-      // IMPORTANT: atualizar o boletim ANTES das properties. O trigger
-      // validate_property_boletim_block_match lê boletim.block_id no momento
-      // do INSERT/UPDATE do imóvel; se as duas escritas correrem em paralelo,
-      // o trigger enxerga o block_id antigo do boletim e rejeita com divergência.
-      const bRes = await boletimUpdate;
-      if ((bRes as any).error) throw (bRes as any).error;
-
+      // O boletim já foi persistido ou enfileirado acima antes das operações
+      // dos imóveis, preservando a ordem esperada pelo trigger de integridade.
       const [locRes, delRes, updResults, insResults] = await Promise.all([
         blockUpdatePromise,
         deletePromise,
@@ -584,33 +628,40 @@ function EditarBoletim() {
       const { data: { user } } = await safeGetUser();
       if (!user) throw new Error("Não autenticado");
       const effectiveAgentId = agentId || user.id;
+      const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
 
       let effectiveBlockId = blockId || null;
       if (effectiveBlockId) {
-        const { data: existsBlock } = await supabase
-          .from("blocks")
-          .select("id")
-          .eq("id", effectiveBlockId)
-          .maybeSingle();
-        if (!existsBlock?.id) {
+        const existingBlocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId!) as any,
+          filter: (block) => block.id === effectiveBlockId,
+        });
+        if (!existingBlocks[0]?.id) {
           effectiveBlockId = null;
           setBlockId(null);
         }
       }
 
       if (!effectiveBlockId && form.block_number.trim()) {
-        const { data: existingBlock, error: existingBlockError } = await supabase
-          .from("blocks")
-          .select("id, number, total_properties")
-          .eq("number", form.block_number.trim())
-          .maybeSingle();
-        if (existingBlockError) throw existingBlockError;
+        const blockNumber = form.block_number.trim();
+        const existingBlocks = await listRemoteOrCache<any>({
+          name: "blocks",
+          remote: () => supabase
+            .from("blocks")
+            .select("id, number, total_properties")
+            .eq("number", blockNumber) as any,
+          filter: (block) => String(block.number) === blockNumber,
+        });
+        const existingBlock = existingBlocks[0] ?? null;
 
         if (existingBlock?.id) {
           effectiveBlockId = existingBlock.id;
+        } else if (!isOnline) {
+          throw new Error("Este quarteirão não está salvo neste dispositivo. Abra o boletim enquanto estiver conectado antes de criar imóveis offline.");
         } else {
           const { data: ensuredId, error: blockError } = await (supabase as any).rpc("ensure_block", {
-            _number: form.block_number.trim(),
+            _number: blockNumber,
             _locality: null,
           });
           if (blockError) throw blockError;
@@ -621,12 +672,18 @@ function EditarBoletim() {
 
       if (!effectiveBlockId) throw new Error("Quarteirão obrigatório para criar imóveis.");
 
-      const { data: lastProps } = await supabase
-        .from("properties")
-        .select("number, street_name, side, type, block_id, sequence")
-        .eq("boletim_id", boletimId)
-        .order("sequence", { ascending: false })
-        .limit(1);
+      const cachedOrRemoteProps = await listRemoteOrCache<any>({
+        name: "properties",
+        remote: () => supabase
+          .from("properties")
+          .select("id, boletim_id, number, street_name, side, type, block_id, sequence")
+          .eq("boletim_id", boletimId) as any,
+        filter: (property) => property.boletim_id === boletimId,
+      });
+      const lastProps = cachedOrRemoteProps
+        .slice()
+        .sort((a, b) => Number(b.sequence ?? 0) - Number(a.sequence ?? 0))
+        .slice(0, 1);
 
       const last = lastProps?.[0];
       const parsed = last ? parseInt((last.number || "").replace(/\D/g, ""), 10) : NaN;
@@ -656,11 +713,12 @@ function EditarBoletim() {
       }
 
       // ─── RC-13 Audit: divergência boletim × imóvel (batch) ──────────────
-      const { data: boletimSnap } = await supabase
-        .from("boletins_rg")
-        .select("id, block_id, block_number")
-        .eq("id", boletimId!)
-        .maybeSingle();
+      const boletimRows = await listRemoteOrCache<any>({
+        name: "boletins_rg",
+        remote: () => supabase.from("boletins_rg").select("id, block_id, block_number").eq("id", boletimId!) as any,
+        filter: (row) => row.id === boletimId,
+      });
+      const boletimSnap = boletimRows[0] ?? null;
       console.log("[PROPERTY_ADD_START]", {
         boletim_id: boletimSnap?.id ?? boletimId,
         boletim_block_id: boletimSnap?.block_id ?? null,
@@ -693,7 +751,6 @@ function EditarBoletim() {
       }
 
       try {
-        const isOnline = typeof navigator === "undefined" ? true : navigator.onLine;
         if (isOnline) {
           const { error: insErr } = await supabase.from("properties").insert(payload);
           if (insErr) throw insErr;
