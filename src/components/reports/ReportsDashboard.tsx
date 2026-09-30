@@ -19,10 +19,12 @@ import { getEpiWeek } from "@/lib/cycle-week";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 import { getReportMetrics, logDirectSource } from "@/lib/operational-metrics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FocusAreaDashboard } from "./FocusAreaDashboard";
 
 
 export function ReportsDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const [focusDashboardOpen, setFocusDashboardOpen] = useState(false);
   const { userRole } = useOperationalDate();
   const [filters, setFilters] = useState({
     agent: "all",
@@ -309,6 +311,10 @@ export function ReportsDashboard() {
   const isAdminMaster = userRole === "admin_master";
 
 
+  if (focusDashboardOpen) {
+    return <FocusAreaDashboard onBack={() => setFocusDashboardOpen(false)} />;
+  }
+
   return (
     <div id="reports-content" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
@@ -321,6 +327,13 @@ export function ReportsDashboard() {
           <p className="text-sm font-bold text-slate-500 mt-1">Dashboards analíticos e cobertura territorial</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setFocusDashboardOpen(true)}
+            variant="outline"
+            className="h-14 rounded-2xl border-rose-200 bg-rose-50 px-5 text-xs font-black uppercase tracking-wider text-rose-800 shadow-sm hover:bg-rose-100"
+          >
+            <BarChart3 className="mr-2 h-4 w-4" /> Focos por área
+          </Button>
           {(isSupervisor || isAdminMaster) && (
             <Button
               onClick={handleRebuild}
