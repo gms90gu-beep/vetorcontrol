@@ -712,7 +712,7 @@ export function DailyWorkCloser({
   const displayWorked   = externalStats ? externalStats.worked   : (snapshot.workedCount  || localStats.worked);
   const displayClosed   = externalStats ? externalStats.closed   : (snapshot.closedCount  || localStats.closed);
   const displayRefused  = externalStats ? externalStats.refused  : (snapshot.refusedCount || localStats.refused);
-  const displayFocus    = externalStats ? externalStats.focus    : (snapshot.focusCount   || localStats.focus);
+  const displayFocus    = externalStats ? externalStats.focus    : snapshot.focusCount;
   const displayPending  = externalStats ? externalStats.pending  : (snapshot.pendingLocal || localStats.pending);
   const displayTreatedDep    = externalStats ? (externalStats.treatedDeposits ?? 0) : (snapshot.depTreated    || localStats.treatedDeposits);
   const displayEliminated    = externalStats ? externalStats.eliminated              : (snapshot.depEliminated || localStats.eliminated);
@@ -1940,7 +1940,7 @@ export function DailyWorkCloser({
         deposits_inspected: snap.depInspected,
         deposits_treated: depTreated,
         deposits_eliminated: depEliminated,
-        positive_foci: snap.focusCount || stats.focus,
+        positive_foci: snap.focusCount,
         larvicide_amount: larvicideAmount,
         larvicide_unit: snap.larvicideUnit,
         tubitos_collected: snap.tubitos,
@@ -2644,7 +2644,7 @@ export function DailyWorkCloser({
             <div>
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Focos · Larvicida · Coletas</h4>
               <div className="grid grid-cols-3 gap-3">
-                <SummaryItem icon={CheckCircle2} label="Focos positivos" value={snapshot.focusCount || stats.focus} color="text-orange-500" />
+                <SummaryItem icon={CheckCircle2} label="Focos positivos" value={snapshot.focusCount} color="text-orange-500" />
                 <SummaryItem
                   icon={Droplets}
                   label="Larvicida"
