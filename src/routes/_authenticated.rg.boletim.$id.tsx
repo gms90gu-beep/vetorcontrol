@@ -823,7 +823,6 @@ function BoletimView() {
         <div className="mx-auto w-full max-w-7xl px-2 pt-2 sm:px-4">
           <RGOperationalMap
             blockNumber={boletim.block_number}
-            agentName={boletim.agent_name}
             properties={imoveis}
             selectedId={selectedPropertyId}
             onSelect={setSelectedPropertyId}
