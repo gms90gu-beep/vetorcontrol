@@ -1430,6 +1430,7 @@ export type Database = {
           field_work_session_id?: string | null
           guidance_given?: boolean | null
           has_focus?: boolean | null
+          focus_analysis_status?: string | null
           id?: string
           is_recovered?: boolean | null
           larvicide_unit?: string | null
