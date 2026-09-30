@@ -120,10 +120,15 @@ function EditarBoletim() {
     if (showSpinner) setLoading(true);
     setError(null);
     try {
+      const { data: { user } } = await safeGetUser();
+      if (!user) {
+        setError("Sua sessão não está disponível neste dispositivo. Conecte-se novamente para abrir este boletim.");
+        return;
+      }
       const boletimRows = await listRemoteOrCache<any>({
         name: "boletins_rg",
         remote: () => supabase.from("boletins_rg").select("*").eq("id", id) as any,
-        filter: (row) => row.id === id,
+        filter: (row) => row.id === id && row.agent_id === user.id,
       });
       const data = boletimRows[0] ?? null;
       console.log("Boletim carregado", data, boletimRows.source);
