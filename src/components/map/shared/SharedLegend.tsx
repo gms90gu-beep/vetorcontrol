@@ -7,7 +7,8 @@ export const DEFAULT_LEGEND: LegendEntry[] = [
   { color: MARKER_COLORS.focus, label: "Foco positivo" },
   { color: MARKER_COLORS.refused, label: "Fechada/Recusada" },
   { color: MARKER_COLORS.pendency, label: "Pendência" },
-  { color: MARKER_COLORS.clean, label: "Sem foco" },
+  { color: MARKER_COLORS.clean, label: "Visitado sem foco" },
+  { color: MARKER_COLORS.unvisited, label: "Sem visita no período" },
   { color: MARKER_COLORS.strategic, label: "Ponto estratégico" },
 ];
 

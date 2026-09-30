@@ -6,7 +6,7 @@ import L from "leaflet";
 import { Layers, Plus, Minus, LocateFixed, Maximize2, RotateCw, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSharedMapContext } from "./context";
-import { BASE_LAYERS, BASE_LAYER_ORDER, autoBaseLayerForTime, type BaseLayerId } from "./base-layers";
+import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./base-layers";
 
 export interface SharedMapControlsProps {
   /** Pontos [lat, lng] para o botão "Centralizar Quarteirão". */
@@ -19,9 +19,7 @@ export interface SharedMapControlsProps {
   showFit?: boolean;
   showRefresh?: boolean;
   showLayers?: boolean;
-  /** Ativar noturno automaticamente após 18h. */
-  autoNight?: boolean;
-  className?: string;
+undefined  className?: string;
 }
 
 export function SharedMapControls({
@@ -32,27 +30,13 @@ export function SharedMapControls({
   showFit = true,
   showRefresh = true,
   showLayers = true,
-  autoNight = false,
   className,
 }: SharedMapControlsProps) {
   const { map, activeBaseLayerId, changeBaseLayer } = useSharedMapContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const autoAppliedRef = useRef(false);
-
-  // Auto-noturno após 18h (apenas uma vez após montar).
-  useEffect(() => {
-    if (!autoNight || autoAppliedRef.current) return;
-    if (!changeBaseLayer) return;
-    const pick = autoBaseLayerForTime();
-    if (pick === "night" && activeBaseLayerId !== "night") {
-      changeBaseLayer("night");
-    }
-    autoAppliedRef.current = true;
-  }, [autoNight, changeBaseLayer, activeBaseLayerId]);
-
-  // Fecha menu ao clicar fora.
+undefined  // Fecha menu ao clicar fora.
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {

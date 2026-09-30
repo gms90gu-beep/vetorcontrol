@@ -2,7 +2,7 @@
 // base (imagem/vetor) e uma camada de overlay (rótulos, ruas). Usado pelo
 // SharedMapControls para alternar sem recarregar o mapa.
 
-export type BaseLayerId = "operational" | "satellite" | "hybrid" | "terrain" | "night";
+export type BaseLayerId = "operational" | "satellite" | "hybrid" | "terrain";
 
 export type BaseLayerDef = {
   id: BaseLayerId;
@@ -78,28 +78,11 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerDef> = {
     baseSubdomains: "abc",
     maxZoom: 17,
   },
-  night: {
-    id: "night",
-    name: "Noturno",
-    emoji: "🌙",
-    description: "Carto Dark — visualização em baixa luz",
-    baseUrl: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    baseAttribution: "© OpenStreetMap, © CARTO",
-    baseSubdomains: "abcd",
-    maxZoom: 19,
-  },
-};
+undefined};
 
 export const BASE_LAYER_ORDER: BaseLayerId[] = [
   "operational",
   "satellite",
   "hybrid",
   "terrain",
-  "night",
 ];
-
-/** Retorna "night" se estivermos após as 18h ou antes das 6h. */
-export function autoBaseLayerForTime(now: Date = new Date()): BaseLayerId {
-  const h = now.getHours();
-  return h >= 18 || h < 6 ? "night" : "operational";
-}
