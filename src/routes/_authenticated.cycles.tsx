@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { blockManagersGuard } from "@/lib/role-guards";
+import { requireCycleAccessGuard } from "@/lib/role-guards";
 import { useState, useEffect } from "react";
 import { 
   Calendar, 
@@ -34,6 +34,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { generateInstitutionalPDF } from "@/lib/institutional-export";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Datas de ciclo vêm como coluna DATE (YYYY-MM-DD, sem hora). Parsear com
 // `new Date(str)` interpreta como UTC meia-noite e, ao formatar de volta pro
@@ -47,11 +49,14 @@ function formatCycleDate(s: string | null | undefined): string {
 }
 
 export const Route = createFileRoute("/_authenticated/cycles")({
-  beforeLoad: blockManagersGuard,
+  beforeLoad: requireCycleAccessGuard,
   component: CyclesPage,
 });
 
 function CyclesPage() {
+  const { userRole } = useOperationalDate();
+  const isManager = ["supervisor", "coordenador", "admin_master"].includes(userRole || "");
+  const [yearFilter, setYearFilter] = useState("all");
   const [cycles, setCycles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverageData, setCoverageData] = useState<Record<string, any>>({});
@@ -59,8 +64,10 @@ function CyclesPage() {
   const [cycleToFinish, setCycleToFinish] = useState<any | null>(null);
 
   useEffect(() => {
-    fetchCycles();
-  }, []);
+    if (userRole) fetchCycles();
+    // fetchCycles is a local loader; role changes are the only reload trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
 
   async function fetchCycles() {
     setIsLoading(true);
@@ -73,6 +80,12 @@ function CyclesPage() {
       
       if (error) throw error;
       setCycles(cyclesData || []);
+
+      if (isManager) {
+        setCoverageData({});
+        setFocosData({});
+        return;
+      }
 
       const { data: coverage } = await supabase
         .from("cycle_coverage_summary")
@@ -159,8 +172,15 @@ function CyclesPage() {
     }
   };
 
-  const groupedCycles = cycles.reduce((acc: Record<number, any[]>, cycle) => {
-    const year = cycle.year || new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+  const availableYears = Array.from(
+    new Set(cycles.map((cycle) => Number(cycle.year) || currentYear)),
+  ).sort((a, b) => b - a);
+  const filteredCycles = yearFilter === "all"
+    ? cycles
+    : cycles.filter((cycle) => String(Number(cycle.year) || currentYear) === yearFilter);
+  const groupedCycles = filteredCycles.reduce((acc: Record<number, any[]>, cycle) => {
+    const year = Number(cycle.year) || currentYear;
     if (!acc[year]) acc[year] = [];
     acc[year].push(cycle);
     return acc;
@@ -170,9 +190,25 @@ function CyclesPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
-      <div className="flex flex-col gap-1 px-1">
-        <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase underline decoration-primary/20 decoration-4 underline-offset-8">Ciclos Operacionais</h2>
-        <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Gestão Anual de Vigilância</p>
+      <div className="flex flex-col gap-4 px-1 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-3xl font-black tracking-tighter text-slate-900 uppercase underline decoration-primary/20 decoration-4 underline-offset-8">Ciclos Operacionais</h2>
+          <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px] mt-2">Gestão Anual de Vigilância</p>
+        </div>
+        <div className="w-full md:w-56">
+          <label className="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Consultar ano</label>
+          <Select value={yearFilter} onValueChange={setYearFilter}>
+            <SelectTrigger className="h-11 rounded-xl bg-white font-bold">
+              <SelectValue placeholder="Todos os anos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os anos</SelectItem>
+              {availableYears.map((year) => (
+                <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -230,7 +266,13 @@ function CyclesPage() {
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="pt-2 pb-6 space-y-6">
+                      <CardContent className="pt-2 pb-6">
+            {isManager ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-600">
+                Histórico de ciclos e períodos. Para consultar indicadores operacionais, use os relatórios filtrados por equipe e área.
+              </p>
+            ) : (
+              <div className="space-y-6">
                         <div className="space-y-2">
                           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
                             <span>Cobertura de Visitas</span>
@@ -264,6 +306,8 @@ function CyclesPage() {
                             <FileText className="h-4 w-4" /> Gerar Relatório {isCompleted ? 'Final' : 'Parcial'}
                           </Button>
                         </div>
+              </div>
+            )}
                       </CardContent>
                     </Card>
                   );
