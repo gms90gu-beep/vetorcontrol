@@ -78,7 +78,7 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerDef> = {
     baseSubdomains: "abc",
     maxZoom: 17,
   },
-undefined};
+};
 
 export const BASE_LAYER_ORDER: BaseLayerId[] = [
   "operational",

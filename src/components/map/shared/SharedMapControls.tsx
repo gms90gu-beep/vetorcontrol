@@ -19,7 +19,7 @@ export interface SharedMapControlsProps {
   showFit?: boolean;
   showRefresh?: boolean;
   showLayers?: boolean;
-undefined  className?: string;
+  className?: string;
 }
 
 export function SharedMapControls({
@@ -36,7 +36,7 @@ export function SharedMapControls({
   const [menuOpen, setMenuOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-undefined  // Fecha menu ao clicar fora.
+  // Fecha menu ao clicar fora.
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
