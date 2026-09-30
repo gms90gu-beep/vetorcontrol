@@ -232,7 +232,7 @@ async function buildDailySnapshot(
     if (v.status === "closed") snap.closedCount++;
     if (v.status === "refused") snap.refusedCount++;
     if (v.status === "visited") snap.visitedCount++;
-    if (v.has_focus) { snap.focusCount++; snap.positiveProps++; }
+    if (v.focus_analysis_status === "positive") { snap.focusCount++; snap.positiveProps++; }
     if (propType.get(v.property_id) === "strategic_point") {
       strategicPropIds.add(v.property_id);
     }
@@ -267,7 +267,7 @@ async function buildDailySnapshot(
       const qty = Number(d.quantity) || 0;
       if (code in snap.depByType) {
         snap.depByType[code] += qty;
-        if (d.is_positive) snap.fociByType[code] += qty;
+        if (d.is_positive && v.focus_analysis_status === "positive") snap.fociByType[code] += qty;
       }
     }
     const treatAmt = Number(v.treatment_amount) || 0;
@@ -712,7 +712,7 @@ export function DailyWorkCloser({
   const displayWorked   = externalStats ? externalStats.worked   : (snapshot.workedCount  || localStats.worked);
   const displayClosed   = externalStats ? externalStats.closed   : (snapshot.closedCount  || localStats.closed);
   const displayRefused  = externalStats ? externalStats.refused  : (snapshot.refusedCount || localStats.refused);
-  const displayFocus    = externalStats ? externalStats.focus    : (snapshot.focusCount   || localStats.focus);
+  const displayFocus    = externalStats ? externalStats.focus    : snapshot.focusCount;
   const displayPending  = externalStats ? externalStats.pending  : (snapshot.pendingLocal || localStats.pending);
   const displayTreatedDep    = externalStats ? (externalStats.treatedDeposits ?? 0) : (snapshot.depTreated    || localStats.treatedDeposits);
   const displayEliminated    = externalStats ? externalStats.eliminated              : (snapshot.depEliminated || localStats.eliminated);
@@ -1118,7 +1118,7 @@ export function DailyWorkCloser({
 
         const { data: todayVisits } = await supabase
           .from("visits")
-          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, larvicide_unit, tubitos_coletados, sample_collected, visit_date, field_work_session_id")
+          .select("id, status, property_id, treatment_amount, treated_deposits, elimination_amount, has_focus, focus_analysis_status, larvicide_unit, tubitos_coletados, sample_collected, visit_date, field_work_session_id")
           .eq("cycle_id", cycle.id)
           .eq("agent_id", user.id)
           .gte("visit_date", startOfDayIso)
@@ -1176,7 +1176,7 @@ export function DailyWorkCloser({
             if (v.status === "closed") rebuilt.closedCount++;
             if (v.status === "refused") rebuilt.refusedCount++;
             if (v.status === "visited") rebuilt.visitedCount++;
-            if (v.has_focus) { rebuilt.focusCount++; rebuilt.positiveProps++; }
+            if (v.focus_analysis_status === "positive") { rebuilt.focusCount++; rebuilt.positiveProps++; }
             const deps = depByVisit.get(v.id) || [];
             const q = deps.reduce((a: number, d: any) => a + (Number(d.quantity) || 0), 0);
             rebuilt.depExisting += q;
@@ -1194,7 +1194,7 @@ export function DailyWorkCloser({
               const qty = Number(d.quantity) || 0;
               if (code in rebuilt.depByType) {
                 rebuilt.depByType[code] += qty;
-                if (d.is_positive) rebuilt.fociByType[code] += qty;
+                if (d.is_positive && v.focus_analysis_status === "positive") rebuilt.fociByType[code] += qty;
               }
             }
             const treatAmt = Number(v.treatment_amount) || 0;
@@ -1231,7 +1231,7 @@ export function DailyWorkCloser({
         // Cálculo paralelo direto do Supabase (mesma fórmula do Dashboard)
         const dashClosed = (todayVisits || []).filter((v: any) => v.status === "closed").length;
         const dashRefused = (todayVisits || []).filter((v: any) => v.status === "refused").length;
-        const dashFocus = (todayVisits || []).filter((v: any) => v.has_focus).length;
+        const dashFocus = (todayVisits || []).filter((v: any) => v.focus_analysis_status === "positive").length;
         const dashLarvicida = Math.round((todayVisits || []).reduce((s: number, v: any) => s + Number(v.treatment_amount || 0), 0));
         const dashTreatedDep = (todayVisits || []).reduce((s: number, v: any) => s + Number(v.treated_deposits || 0), 0);
         const dashEliminated = (todayVisits || []).reduce((s: number, v: any) => s + Number(v.elimination_amount || 0), 0);
@@ -1805,7 +1805,7 @@ export function DailyWorkCloser({
         const status = String((v as any).status ?? "").toLowerCase();
         if (status === "closed" || status === "fechado") cur.closed += 1;
         else cur.visited += 1;
-        if ((v as any).positive_focus || (v as any).has_focus) cur.focus += 1;
+        if ((v as any).focus_analysis_status === "positive") cur.focus += 1;
         __snapVisitedByBlock.set(bn, cur);
       }
       const __diagBlocks: DayCloseDiagnosticBlock[] = __perBlockAudit.map((m) => {
@@ -1940,7 +1940,7 @@ export function DailyWorkCloser({
         deposits_inspected: snap.depInspected,
         deposits_treated: depTreated,
         deposits_eliminated: depEliminated,
-        positive_foci: snap.focusCount || stats.focus,
+        positive_foci: snap.focusCount,
         larvicide_amount: larvicideAmount,
         larvicide_unit: snap.larvicideUnit,
         tubitos_collected: snap.tubitos,
@@ -2280,7 +2280,7 @@ export function DailyWorkCloser({
           .from("visits")
           .select(`
             id, status, visit_date, treatment_amount, treated_deposits,
-            elimination_amount, has_focus, sample_collected, tubitos_coletados,
+            elimination_amount, has_focus, focus_analysis_status, sample_collected, tubitos_coletados,
             larvicide_unit, treatment_applied, notes, property_id,
             property:properties(number, sequence, complement, type, status, block_number),
             deposits:visit_deposits(quantity, is_positive, is_treated, is_eliminated)
@@ -2360,7 +2360,7 @@ export function DailyWorkCloser({
           const code = String(d.type_code || "").toUpperCase().trim() as keyof typeof depByType;
           if (code in depByType) depByType[code] += Number(d.quantity) || 0;
         }
-        if (v.has_focus) { focos += 1; imoveisPositivos += 1; }
+        if (v.focus_analysis_status === "positive") { focos += 1; imoveisPositivos += 1; }
         larvicida += Number(v.treatment_amount) || 0;
         if (v.larvicide_unit) larvicideUnit = v.larvicide_unit;
         if ((Number(v.treatment_amount) || 0) > 0 || (Number(v.treated_deposits) || 0) > 0) imoveisTratados += 1;
@@ -2439,7 +2439,7 @@ export function DailyWorkCloser({
       y += 2;
       autoTable(doc, {
         startY: y + 1,
-        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos (+)", "Imóveis (+)", `Larvicida (${larvicideUnit})`, "Imóveis Trat."]],
+        head: [["Dep. Existentes", "Inspecionados", "Tratados", "Eliminados", "Focos positivos", "Imóveis (+)", `Larvicida (${larvicideUnit})`, "Imóveis Trat."]],
         body: [[
           String(depExistentes),
           String(depInspecionados),
@@ -2644,7 +2644,7 @@ export function DailyWorkCloser({
             <div>
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Focos · Larvicida · Coletas</h4>
               <div className="grid grid-cols-3 gap-3">
-                <SummaryItem icon={CheckCircle2} label="Focos (+)" value={snapshot.focusCount || stats.focus} color="text-orange-500" />
+                <SummaryItem icon={CheckCircle2} label="Focos positivos" value={snapshot.focusCount} color="text-orange-500" />
                 <SummaryItem
                   icon={Droplets}
                   label="Larvicida"
@@ -2819,7 +2819,7 @@ export function DailyWorkCloser({
 
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 pt-2">Focos & Larvicida</h4>
             <div className="grid grid-cols-2 gap-3">
-              <SummaryItemSmall label="Focos (+)" value={displayFocus} icon={CheckCircle2} />
+              <SummaryItemSmall label="Focos positivos" value={displayFocus} icon={CheckCircle2} />
               <SummaryItemSmall label="Imóveis (+)" value={snapshot.positiveProps} icon={Target} />
               <SummaryItemSmall
                 label="Larvicida"

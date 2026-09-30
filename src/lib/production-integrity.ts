@@ -90,7 +90,7 @@ export async function runProductionIntegrity(
       // Visitas do servidor
       let vq = supabase
         .from("visits")
-        .select("id, status, has_focus, property_id")
+        .select("id, status, has_focus, focus_analysis_status, property_id")
         .eq("agent_id", agentId)
         .gte("visit_date", startOfDay)
         .lte("visit_date", endOfDay);
@@ -103,7 +103,7 @@ export async function runProductionIntegrity(
       const closed = v.filter((x) => x.status === "closed").length;
       const refused = v.filter((x) => x.status === "refused").length;
       const visited = v.filter((x) => x.status === "visited").length;
-      const focus = v.filter((x) => x.has_focus).length;
+      const focus = v.filter((x) => x.focus_analysis_status === "positive").length;
 
       totalChecks += 5;
       compare("properties_worked", "snapshot(local)", snapshot.workedCount, "visits(server)", worked, divergences);

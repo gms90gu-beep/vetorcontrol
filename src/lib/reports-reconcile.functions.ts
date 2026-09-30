@@ -74,7 +74,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     let vq = supabaseAdmin
       .from("visits")
-      .select("id, agent_id, property_id, visit_date, status, has_focus, treatment_amount, elimination_amount, sample_collected, tubitos_coletados, treated_deposits, is_recovered, cycle_id, week_id")
+      .select("id, agent_id, property_id, visit_date, status, has_focus, focus_analysis_status, treatment_amount, elimination_amount, sample_collected, tubitos_coletados, treated_deposits, is_recovered, cycle_id, week_id")
       .gte("visit_date", fromTs)
       .lte("visit_date", toTs);
     if (data.agentId) vq = vq.eq("agent_id", data.agentId);
@@ -161,14 +161,15 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
       const byType: Record<string, number> = { a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0 };
       const fociByType: Record<string, number> = { a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0 };
+      const positiveVisitIds = new Set(vs.filter((v) => v.focus_analysis_status === "positive").map((v) => v.id));
       for (const d of deps) {
         const k = String(d.type_code || "").toLowerCase();
         if ((DEP_KEYS as readonly string[]).includes(k)) {
           byType[k] += Number(d.quantity) || 0;
-          if (d.is_positive) fociByType[k] += Number(d.quantity) || 0;
+          if (d.is_positive && positiveVisitIds.has(d.visit_id)) fociByType[k] += Number(d.quantity) || 0;
         }
       }
-      const positiveFoci = Object.values(fociByType).reduce((a, b) => a + b, 0) || vs.filter((v) => v.has_focus).length;
+      const positiveFoci = Object.values(fociByType).reduce((a, b) => a + b, 0) || positiveVisitIds.size;
 
       const payload: any = {
         properties_worked: worked,

@@ -584,6 +584,7 @@ function FieldWorkListPage() {
             status,
             activity_type,
             has_focus,
+            focus_analysis_status,
             treatment_applied,
             treatment_amount,
             larvicide_unit,
@@ -807,6 +808,7 @@ function FieldWorkListPage() {
               ...p,
               status: latestVisit?.status || "not_visited",
               has_focus: latestVisit?.has_focus || latestVisit?.visit_deposits?.some((d: any) => d.is_positive) || false,
+              has_positive_focus: latestVisit?.focus_analysis_status === "positive",
               treatment_applied: latestVisit?.treatment_applied || latestVisit?.visit_deposits?.some((d: any) => d.is_treated) || false,
               is_pending: latestVisit?.activity_type === 'pending' || latestVisit?.status === 'closed' || latestVisit?.status === 'refused',
               latest_visit: latestVisit
@@ -907,7 +909,7 @@ function FieldWorkListPage() {
     
     doc.text(`Depósitos Tratados: ${treatedDepositsCount}`, 85, 55);
     doc.text(`Depósitos Eliminados: ${eliminationCount}`, 85, 62);
-    doc.text(`Focos Positivos: ${focusCount}`, 85, 69);
+    doc.text(`Focos Positivos (análise): ${focusCount}`, 85, 69);
 
     doc.text(`Larvicida Utilizado: ${larvicideUsed}g/ml`, 145, 55);
     doc.text(`Cobertura: ${progressPercent}%`, 145, 62);
@@ -956,7 +958,7 @@ function FieldWorkListPage() {
   const workedCount = properties.filter(p => ["visited", "closed", "refused", "abandoned"].includes(p.status)).length;
   const closedCount = properties.filter(p => p.status === "closed").length;
   const refusedCount = properties.filter(p => p.status === "refused").length;
-  const focusCount = properties.filter(p => p.has_focus).length;
+  const focusCount = properties.filter(p => p.has_positive_focus).length;
   const treatedCount = properties.filter(p => p.treatment_applied).length;
   const treatedDepositsCount = properties.reduce((acc, p) => acc + (p.latest_visit?.treated_deposits || 0), 0);
   const larvicideUsed = properties.reduce((acc, p) => acc + (Number(p.latest_visit?.treatment_amount) || 0), 0);
@@ -1296,7 +1298,7 @@ function FieldWorkListPage() {
               { label: translate("worked"), val: workedCount, color: "emerald", icon: CheckCircle2 },
               { label: translate("CLOSED"), val: closedCount, color: "yellow", icon: XCircle },
               { label: translate("REFUSED"), val: refusedCount, color: "red", icon: AlertCircle },
-              { label: "Focos (+)", val: focusCount, color: "red", icon: BarChart3, highlight: true },
+              { label: "Focos positivos (análise)", val: focusCount, color: "red", icon: BarChart3, highlight: true },
               { label: translate("TREATED"), val: treatedDepositsCount, color: "blue", icon: Layers },
               { label: "Larvicida (g/ml)", val: larvicideUsed, color: "cyan", icon: Droplets }
             ].map((s, i) => (

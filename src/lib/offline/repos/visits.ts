@@ -25,6 +25,7 @@ export interface VisitPayload {
   activity_type: string;
   visit_date: string;
   has_focus?: boolean;
+  focus_analysis_status?: "pending" | "positive" | "negative" | "inconclusive" | null;
   sample_collected?: boolean;
   tubitos_coletados?: number;
   treatment_applied?: boolean;

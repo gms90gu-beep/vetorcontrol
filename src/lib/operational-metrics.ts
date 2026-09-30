@@ -357,7 +357,7 @@ export async function getPropertyMetrics(
     visit_count: rows.length,
     last_visit_at: rows[0]?.visit_date ?? null,
     last_status: rows[0]?.status ?? null,
-    positive_foci: rows.filter((r: any) => r.has_focus).length,
+    positive_foci: rows.filter((r: any) => r.focus_analysis_status === "positive").length,
     deposits: Array.from(depMap.values()),
     has_geo: !!(property?.latitude && property?.longitude),
     visits: rows,

@@ -4,6 +4,7 @@ export interface PropertyCycleVisit {
   visit_date: string;
   status: string;
   has_focus: boolean;
+  focus_analysis_status: "pending" | "positive" | "negative" | "inconclusive" | null;
   activity_type: string;
   notes: string | null;
   treatment_amount: number | null;

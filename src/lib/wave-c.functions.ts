@@ -6,7 +6,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildPropertyCycleHistory, type PropertyCycleHistory, type PropertyCycleVisit } from "@/lib/map-cycle-history";
-import { isPositiveMapVisit } from "@/lib/map-point-status";
 
 function sumDepJson(j: any): number {
   if (!j || typeof j !== "object") return 0;
@@ -605,40 +604,20 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     const cycleIds = yearCycles.map((cycle: any) => cycle.id);
     const { data: visits, error: visitError } = await supabaseAdmin
       .from("visits")
-      .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
+      .select("id, cycle_id, visit_date, status, has_focus, focus_analysis_status, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
       .eq("property_id", data.propertyId)
       .in("cycle_id", cycleIds)
       .order("visit_date", { ascending: false });
     if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
 
     const historyVisitIds = ((visits ?? []) as any[]).map((visit) => visit.id);
-    const positiveHistoryVisitIds = new Set<string>(
-      ((visits ?? []) as any[])
-        .filter((visit) => isPositiveMapVisit(Boolean(visit.has_focus), false))
-        .map((visit) => visit.id),
-    );
-    if (historyVisitIds.length > 0) {
-      const { data: positiveDeposits, error: positiveDepositError } = await supabaseAdmin
-        .from("visit_deposits")
-        .select("visit_id, is_positive")
-        .in("visit_id", historyVisitIds)
-        .eq("is_positive", true);
-      if (positiveDepositError) {
-        throw new Error(`Falha ao carregar focos do histórico: ${positiveDepositError.message}`);
-      }
-      for (const deposit of positiveDeposits ?? []) {
-        if (isPositiveMapVisit(false, Boolean(deposit.is_positive))) {
-          positiveHistoryVisitIds.add(deposit.visit_id);
-        }
-      }
-    }
-
     const normalizedVisits: PropertyCycleVisit[] = ((visits ?? []) as any[]).map((visit) => ({
         id: visit.id,
         cycle_id: visit.cycle_id,
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
-        has_focus: positiveHistoryVisitIds.has(visit.id),
+        has_focus: Boolean(visit.has_focus),
+        focus_analysis_status: visit.focus_analysis_status ?? null,
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -757,7 +736,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         idChunks.map((ids) => {
           let query = supabaseAdmin
             .from("visits")
-            .select("id, property_id, agent_id, has_focus, status, visit_date")
+            .select("id, property_id, agent_id, has_focus, focus_analysis_status, status, visit_date")
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
@@ -782,7 +761,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
-      if (isPositiveMapVisit(Boolean(v.has_focus), false)) positiveVisitIds.add(v.id);
+      if (v.focus_analysis_status === "positive") positiveVisitIds.add(v.id);
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
@@ -806,7 +785,6 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       const deps = depResults.flatMap((result) => result.data ?? []);
       for (const d of deps) {
         const pid = visitToProp.get(d.visit_id);
-        if (isPositiveMapVisit(false, Boolean(d.is_positive))) positiveVisitIds.add(d.visit_id);
         if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
       }
     }
