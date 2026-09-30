@@ -349,3 +349,19 @@ BEGIN
 END $function$;
 
 GRANT EXECUTE ON FUNCTION public.recompute_block_progress(uuid, text, uuid) TO authenticated, service_role;
+
+-- Recalcula métricas derivadas com base apenas em resultados confirmados.
+DO $$
+DECLARE
+  r record;
+BEGIN
+  PERFORM public.rebuild_daily_work_records(NULL, NULL, NULL);
+  FOR r IN
+    SELECT DISTINCT v.cycle_id, p.block_number, v.agent_id
+    FROM public.visits v
+    JOIN public.properties p ON p.id = v.property_id
+    WHERE v.cycle_id IS NOT NULL AND p.block_number IS NOT NULL AND v.agent_id IS NOT NULL
+  LOOP
+    PERFORM public.recompute_block_progress(r.cycle_id, r.block_number, r.agent_id);
+  END LOOP;
+END $$;
