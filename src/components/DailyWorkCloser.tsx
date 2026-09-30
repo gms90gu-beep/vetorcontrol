@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 37747)
-Total output lines: 3258
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
@@ -1416,7 +1413,665 @@ export function DailyWorkCloser({
       console.log("[SESSION_CLOSE_START]", {
         session_id: activeSessionForClose?.id ?? null,
         block_number: activeSessionForClose?.block_number ?? null,
-        block_id: (ac…7747 tokens truncated…lizando agents");
+        block_id: (activeSessionForClose as any)?.block_id ?? null,
+        agent_id: currentAgent.id,
+        work_date: operationalWorkDate,
+      });
+
+      // CONSOLIDAÇÃO OFICIAL: soma TODAS as jornadas do agente na mesma
+      // Data da Produção. Nunca escopar por currentSession.id — o encerramento
+      // do expediente deve refletir a produção do dia inteiro.
+      const dayAllSessions = await loadDayCloseSessions(user.id, operationalWorkDate, activeSessionForClose?.id ?? null);
+      const dayAllSessionIds = dayAllSessions.map((s: any) => s.id);
+      console.log("[DAY_CLOSE_SESSIONS]", {
+        op_date: operationalWorkDate,
+        count: dayAllSessions.length,
+        sessions: dayAllSessions.map((s: any) => ({
+          id: s.id, block_number: s.block_number, block_id: s.block_id, status: s.status,
+        })),
+      });
+      const visitsByAllSessions = await loadDayCloseVisits(user.id, operationalWorkDate);
+      const visitsPerSession: Record<string, number> = {};
+      for (const v of visitsByAllSessions) {
+        const key = v.field_work_session_id || "sem_sessao";
+        visitsPerSession[key] = (visitsPerSession[key] || 0) + 1;
+      }
+      console.log("[DAY_CLOSE_VISITS]", {
+        op_date: operationalWorkDate,
+        total_visits: visitsByAllSessions.length,
+        per_session: visitsPerSession,
+        session_ids: dayAllSessionIds,
+      });
+      console.log("[DAY_CLOSE_DEBUG]", {
+        phase: "scope_loaded",
+        workDate: operationalWorkDate,
+        date_source: closeContext.target.source,
+        active_session_id: activeSessionForClose.id,
+        day_sessions: dayAllSessions.length,
+        day_session_ids: dayAllSessionIds,
+        visits_count: visitsByAllSessions.length,
+      });
+
+      // Snapshot único — sem scope: consolida TODAS as jornadas da Data da Produção
+      const snap = await buildDailySnapshot(user.id, operationalWorkDate);
+      console.log("[DAY_CLOSE_CONSOLIDATED]", {
+        op_date: operationalWorkDate,
+        sessions: dayAllSessions.length,
+        worked: snap.workedCount,
+        closed: snap.closedCount,
+        refused: snap.refusedCount,
+        visited: snap.visitedCount,
+        focus: snap.focusCount,
+        depInspected: snap.depInspected,
+        larvicide: snap.larvicideAmount,
+        tubitos: snap.tubitos,
+        blocks_worked: snap.blocksWorked,
+      });
+      console.log("[SESSION_TOTAL_VISITS]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_TOTAL_PROPERTIES]", { session_id: activeSessionForClose?.id ?? null, total: snap.workedCount });
+      console.log("[SESSION_SUMMARY]", {
+        session_id: activeSessionForClose?.id ?? null,
+        worked: snap.workedCount,
+        closed: snap.closedCount,
+        refused: snap.refusedCount,
+        visited: snap.visitedCount,
+        focus: snap.focusCount,
+      });
+
+      // Reconciliação oficial: agrupamentos por tipo são fonte de verdade.
+      const { reconcileIntegrity } = await import("@/lib/daily-integrity");
+      const integrity = reconcileIntegrity({
+        depByType: {
+          a1: snap.depByType.A1, a2: snap.depByType.A2,
+          b: snap.depByType.B,  c:  snap.depByType.C,
+          d1: snap.depByType.D1, d2: snap.depByType.D2, e: snap.depByType.E,
+        },
+        fociByType: {
+          a1: snap.fociByType.A1, a2: snap.fociByType.A2,
+          b: snap.fociByType.B,  c:  snap.fociByType.C,
+          d1: snap.fociByType.D1, d2: snap.fociByType.D2, e: snap.fociByType.E,
+        },
+        declaredTotalDeposits: snap.depInspected,
+        declaredPositiveFoci: snap.focusCount,
+      });
+      if (integrity.log.reconciled) {
+        console.warn("[INTEGRIDADE] divergência reconciliada", integrity.log);
+        snap.depExisting = integrity.totalDeposits;
+        snap.depInspected = integrity.totalDeposits;
+        snap.focusCount = integrity.totalFoci;
+      }
+      setSnapshot(snap);
+
+      // ═══════════ AUDITORIA DO ENCERRAMENTO ═══════════
+      // Regra: o encerramento consome exclusivamente `operational-metrics`.
+      // Compara UI (Tela de Trabalho) × Metrics × BlockStatus × Snapshot × DWR.
+      const { getOperationalMetrics: __getMetrics } = await import("@/lib/operational-metrics");
+      const __propsAll = await loadDayCloseProperties(dayAllSessions);
+      const { byPropertyId: __propertyById, blockNumberByPropertyId: __propBlock } =
+        mapPropertiesToSessionBlockNumbers(__propsAll, dayAllSessions);
+      const __cycleIdForClose =
+        activeCycle?.id ??
+        activeSessionForClose?.cycle_id ??
+        dayAllSessions.find((s: any) => s?.cycle_id)?.cycle_id ??
+        null;
+
+      // Recomputa block_progress de forma SÍNCRONA antes de comparar
+      // Snapshot × Metrics. Sem isso, um bloco cuja linha nunca foi criada
+      // aparece como "0 visitado / tudo pendente" e bloqueia o encerramento.
+      if (__cycleIdForClose) {
+        const { recomputeBlockProgressNow: __recompute } = await import(
+          "@/lib/offline/repos/blockProgress"
+        );
+        const __blockNums = Array.from(
+          new Set(dayAllSessions.map((s) => normalizeBlockNumber(s.block_number)).filter(Boolean)),
+        );
+        for (const bn of __blockNums) {
+          await __recompute({ cycle_id: __cycleIdForClose, block_number: bn, agent_id: user.id });
+        }
+      }
+
+      const __dwrProperties = { total: 0, visited: 0, pending: 0, closed: 0, recovered: 0, deposits: 0, focuses: 0 };
+      const __perBlockAudit: any[] = [];
+      // Uma jornada POR BLOCO: se houver 2+ jornadas no mesmo quarteirão no dia,
+      // iterar por sessão contava os mesmos imóveis/visitas duas vezes
+      // (total_properties inflado ~2x no diagnóstico).
+      const __blockSessions = Array.from(
+        dayAllSessions
+          .reduce((map: Map<string, any>, s: any) => {
+            const key = s?.block_id
+              ? `id:${String(s.block_id)}`
+              : `n:${normalizeBlockNumber(s?.block_number)}`;
+            const prev = map.get(key);
+            if (!prev) map.set(key, s);
+            else if (Number(s.property_count || 0) > Number(prev.property_count || 0)) map.set(key, s);
+            return map;
+          }, new Map<string, any>())
+          .values(),
+      );
+      for (const s of __blockSessions) {
+        const bn = String(s.block_number ?? "");
+        const propIds = __propsAll.filter((p) => propertyBelongsToSessionBlock(p, s)).map((p) => p.id);
+        const vs = visitsByAllSessions.filter((v) => {
+          const property = __propertyById.get(v.property_id);
+          return propertyBelongsToSessionBlock(property, s);
+        });
+        const metrics = __getMetrics({
+          module: "DailyWorkCloser/audit",
+          productionDate: operationalWorkDate,
+          blockId: s.block_id,
+          sessionId: s.id,
+          propertyIds: propIds,
+          visits: vs,
+          fallbackTotal: Number(s.property_count || 0),
+        });
+        // Log detalhado da consulta de métricas por bloco
+        console.log("[METRICS_QUERY]", {
+          agent_id: user.id,
+          cycle_id: __cycleIdForClose,
+          operational_date: operationalWorkDate,
+          work_date: operationalWorkDate,
+          block_number: bn,
+          session_date: s.session_date ?? s.started_at ?? null,
+          filter: {
+            agent_id: user.id,
+            cycle_id: __cycleIdForClose,
+            block_number: bn,
+            property_ids_count: propIds.length,
+            visits_scoped_count: vs.length,
+            block_id: s.block_id ?? null,
+          },
+          result: {
+            properties_found: propIds.length,
+            visits_found: vs.length,
+            total: metrics.totalProperties,
+            visited: metrics.visitedProperties,
+            closed: metrics.closedProperties,
+            pending: metrics.pendingProperties,
+          },
+        });
+        __perBlockAudit.push({ block_number: bn, ...metrics });
+        __dwrProperties.total += metrics.totalProperties;
+        __dwrProperties.visited += metrics.visitedProperties;
+        __dwrProperties.pending += metrics.pendingProperties;
+        __dwrProperties.closed += metrics.closedProperties;
+        __dwrProperties.recovered += metrics.recoveredProperties;
+      }
+      __dwrProperties.deposits = snap.depInspected;
+      __dwrProperties.focuses = snap.focusCount;
+
+      const __uiPayload = {
+        operational_date: operationalWorkDate,
+        cycle: __cycleIdForClose,
+        blocks: __perBlockAudit.map((b) => b.block_number),
+        total_properties: __dwrProperties.total,
+        visited: __dwrProperties.visited,
+        pending: __dwrProperties.pending,
+        closed: __dwrProperties.closed,
+        recovered: __dwrProperties.recovered,
+        deposits: __dwrProperties.deposits,
+        focuses: __dwrProperties.focuses,
+      };
+      console.log("[DAY_CLOSE_UI]", __uiPayload);
+      console.log("[DAY_CLOSE_METRICS]", { ...__uiPayload, source: "operational-metrics" });
+      console.log("[DAY_CLOSE_BLOCK_STATUS]", { blocks: __perBlockAudit });
+
+      // ─── Validação cruzada: snapshot tem dados mas metrics veio zero? ───
+      try {
+        const __snapTotal = Number(snap.workedCount || 0);
+        const __snapVisited = Number(snap.visitedCount || 0) + Number(snap.closedCount || 0);
+        if ((__snapTotal > 0 || __snapVisited > 0) && __dwrProperties.total === 0 && __dwrProperties.visited === 0) {
+          console.error("[METRICS_EMPTY_RESULT]", {
+            agent_id: user.id,
+            cycle_id: __cycleIdForClose,
+            operational_date: operationalWorkDate,
+            snapshot: {
+              total: __snapTotal,
+              visited: snap.visitedCount,
+              closed: snap.closedCount,
+              pending: snap.pendingLocal,
+            },
+            metrics: __dwrProperties,
+            empty_query: "operational-metrics/getOperationalMetrics (propertyIds/visits vazios por bloco)",
+            hint: "dayAllSessions.length=" + dayAllSessions.length +
+                  " | propertyIds_total=" + __propsAll.length +
+                  " | visits_scoped_total=" + visitsByAllSessions.length,
+          });
+
+          // Cross-check direto em block_progress (Dexie + Supabase)
+          try {
+            const { db: __offlineDb } = await import("@/lib/offline/db");
+            const __bpAll = await __offlineDb.block_progress.toArray();
+            const __bpMatch = __bpAll
+              .map((r) => r.data as any)
+              .filter((r) =>
+                r &&
+                r.agent_id === user.id &&
+                (!__cycleIdForClose || r.cycle_id === __cycleIdForClose),
+              );
+            const __agg = __bpMatch.reduce(
+              (a, r) => {
+                a.count += 1;
+                a.total += Number(r.total_properties || 0);
+                a.visited += Number(r.visited_properties || 0);
+                a.closed += Number(r.closed_properties || 0);
+                a.pending += Number(r.pending_properties || 0);
+                return a;
+              },
+              { count: 0, total: 0, visited: 0, closed: 0, pending: 0 },
+            );
+            console.log("[BLOCK_PROGRESS_CHECK]", {
+              source: "dexie(block_progress)",
+              filter: {
+                agent_id: user.id,
+                cycle_id: __cycleIdForClose,
+                operational_date: operationalWorkDate,
+              },
+              ...__agg,
+            });
+            if (__agg.count === 0) {
+              console.error("[BLOCK_PROGRESS_NOT_UPDATED]", {
+                agent_id: user.id,
+                cycle_id: __cycleIdForClose,
+                operational_date: operationalWorkDate,
+                reason: "Nenhuma linha em block_progress para o agente/ciclo — trigger de recompute pode não ter executado.",
+              });
+            } else if (__agg.total > 0 && __dwrProperties.total === 0) {
+              console.error("[BLOCK_PROGRESS_FILTER_ERROR]", {
+                agent_id: user.id,
+                cycle_id: __cycleIdForClose,
+                operational_date: operationalWorkDate,
+                block_progress_aggregate: __agg,
+                metrics_aggregate: __dwrProperties,
+                reason: "block_progress possui dados mas o loop por sessão não encontrou propriedades/visitas — verificar filtros (block_number, cycle_id) ou hidratação de properties/visits no cache.",
+              });
+            }
+          } catch (e) {
+            console.warn("[BLOCK_PROGRESS_CHECK_FAIL]", e);
+          }
+        }
+      } catch (e) {
+        console.warn("[METRICS_CROSS_CHECK_FAIL]", e);
+      }
+
+
+      const __snapshotView = {
+        total_properties: snap.workedCount,
+        visited: snap.visitedCount,
+        pending: snap.pendingLocal,
+        closed: snap.closedCount,
+        deposits: snap.depInspected,
+        focuses: snap.focusCount,
+      };
+      console.log("[DAY_CLOSE_PRE_SNAPSHOT]", __snapshotView);
+
+      // Comparação: divergências entre módulos
+      const __divergences: any[] = [];
+      const __check = (module: string, expected: any, found: any) => {
+        for (const k of Object.keys(expected)) {
+          if (Number(expected[k]) !== Number(found[k])) {
+            __divergences.push({ module, field: k, expected: expected[k], found: found[k] });
+          }
+        }
+      };
+      // ATENÇÃO: NÃO comparar `pending` aqui.
+      // `metrics.pendingProperties` = imóveis do TERRITÓRIO do quarteirão ainda
+      // não trabalhados (total - trabalhados), enquanto `snap.pendingLocal` =
+      // pendências reais do dia (imóveis fechados/recusados a recuperar).
+      // São definições diferentes; comparar as duas bloqueava o encerramento
+      // sempre que um quarteirão não terminasse 100% no dia (ex.: 3 vs 38).
+      // Idem para total_properties (trabalhados no dia × total do quarteirão).
+      console.log("[DAY_CLOSE_PENDING_SEMANTICS]", {
+        metrics_pending_territory: __dwrProperties.pending,
+        snapshot_pending_recovery: snap.pendingLocal,
+        metrics_total_territory: __dwrProperties.total,
+        snapshot_worked_today: snap.workedCount,
+        note: "definições distintas — não é divergência",
+      });
+
+      // ATENÇÃO: NÃO comparar visited/closed usando `snap.visitedCount`/
+      // `snap.closedCount` diretamente. Esses contam TODAS as visitas do dia
+      // (inclusive revisitas de recuperação — uma propriedade visitada e depois
+      // recuperada gera 2 visitas, ambas contadas no snapshot). Já
+      // `metrics.visitedProperties`/`closedProperties` vêm de
+      // `getOperationalBlockStatus`, que considera apenas a ÚLTIMA visita por
+      // imóvel (dedup). Revisitas legítimas produziam divergências como "-65"
+      // e bloqueavam o encerramento sem motivo. Aqui dedupamos o lado snapshot
+      // pela mesma regra (última visita por imóvel prevalece), mantendo a rede
+      // de segurança para divergências reais (visita presente no snapshot mas
+      // ausente do metrics por bug de filtro).
+      const __snapDedupByProp = new Map<string, any>();
+      const __sortedForDedup = [...visitsByAllSessions].sort((a: any, b: any) =>
+        String(a.visit_date || "").localeCompare(String(b.visit_date || "")),
+      );
+      for (const v of __sortedForDedup) {
+        if (v.property_id) __snapDedupByProp.set(v.property_id, v);
+      }
+      let __snapDedupVisited = 0;
+      let __snapDedupClosed = 0;
+      for (const v of __snapDedupByProp.values()) {
+        const st = String(v.status ?? "").toLowerCase();
+        if (st === "visited") __snapDedupVisited++;
+        else if (st === "closed") __snapDedupClosed++;
+      }
+      console.log("[DAY_CLOSE_VISITED_SEMANTICS]", {
+        snapshot_raw_visited: snap.visitedCount,
+        snapshot_raw_closed: snap.closedCount,
+        snapshot_dedup_visited: __snapDedupVisited,
+        snapshot_dedup_closed: __snapDedupClosed,
+        metrics_visited: __dwrProperties.visited,
+        metrics_closed: __dwrProperties.closed,
+        revisits_collapsed: snap.visitedCount - __snapDedupVisited,
+        note: "snapshot dedupado pela última visita por imóvel (mesma regra do operational-block-status)",
+      });
+      __check("Snapshot vs Metrics", {
+        visited: __dwrProperties.visited,
+        closed: __dwrProperties.closed,
+      }, {
+        visited: __snapDedupVisited,
+        closed: __snapDedupClosed,
+      });
+
+      // Cache: comparar Dexie × Supabase (total de visitas do dia)
+      let __remoteCount = 0;
+      try {
+        if (isOnline()) {
+          // Bounds em UTC com offset explícito (-03:00), não a string naive
+          // "YYYY-MM-DDT00:00:00" — essa era interpretada pelo Postgres no
+          // fuso da sessão do banco, deslocando o corte do dia em ~3h e
+          // gerando falsos positivos de "[DAY_CLOSE_CACHE] divergent".
+          const { startIso: __dayStartUtc, endIso: __dayEndUtc } = operationalDateBoundsUtcIso(operationalWorkDate);
+          const { count } = await supabase
+            .from("visits")
+            .select("id", { count: "exact", head: true })
+            .eq("agent_id", user.id)
+            .gte("visit_date", __dayStartUtc)
+            .lte("visit_date", __dayEndUtc);
+          __remoteCount = count || 0;
+        }
+      } catch {}
+      const __cacheDiv = __remoteCount > 0 && __remoteCount !== visitsByAllSessions.length;
+      console.log("[DAY_CLOSE_CACHE]", {
+        local_total: visitsByAllSessions.length,
+        remote_total: __remoteCount,
+        divergent: __cacheDiv,
+      });
+
+      // ─── Diagnóstico rico (snapshot × metrics, agregado + por quarteirão) ───
+      const __snapVisitedByBlock = new Map<string, { visited: number; closed: number; focus: number }>();
+      for (const v of visitsByAllSessions) {
+        const bn = __propBlock.get(v.property_id) ?? "";
+        if (!bn) continue;
+        const cur = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const status = String((v as any).status ?? "").toLowerCase();
+        if (status === "closed" || status === "fechado") cur.closed += 1;
+        else cur.visited += 1;
+        if ((v as any).positive_focus || (v as any).has_focus) cur.focus += 1;
+        __snapVisitedByBlock.set(bn, cur);
+      }
+      const __diagBlocks: DayCloseDiagnosticBlock[] = __perBlockAudit.map((m) => {
+        const bn = String(m.block_number);
+        const snapB = __snapVisitedByBlock.get(bn) ?? { visited: 0, closed: 0, focus: 0 };
+        const total = Number(m.totalProperties || 0);
+        const snapshot: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: snapB.visited,
+          closed: snapB.closed,
+          pending: Math.max(0, total - snapB.visited - snapB.closed),
+          recovered: 0,
+          focus: snapB.focus,
+        };
+        const metrics: DayCloseDiagnosticSide = {
+          total_properties: total,
+          visited: Number(m.visitedProperties || 0),
+          closed: Number(m.closedProperties || 0),
+          pending: Number(m.pendingProperties || 0),
+          recovered: Number(m.recoveredProperties || 0),
+          focus: Number((m as any).focusProperties || (m as any).positiveFocus || 0),
+        };
+        const delta_visited = snapshot.visited - metrics.visited;
+        const delta_closed = snapshot.closed - metrics.closed;
+        const delta_pending = snapshot.pending - metrics.pending;
+        const delta_recovered = snapshot.recovered - metrics.recovered;
+        const delta_focus = snapshot.focus - metrics.focus;
+        return {
+          block_number: bn,
+          snapshot,
+          metrics,
+          delta_visited, delta_closed, delta_pending, delta_recovered, delta_focus,
+          has_divergence: !!(delta_visited || delta_closed || delta_pending || delta_recovered || delta_focus),
+        };
+      });
+
+      const __totalsSnapshot: DayCloseDiagnosticSide = {
+        total_properties: snap.workedCount,
+        visited: snap.visitedCount,
+        closed: snap.closedCount,
+        pending: snap.pendingLocal,
+        recovered: Number((snap as any).recoveredCount || 0),
+        focus: snap.focusCount,
+      };
+      const __totalsMetrics: DayCloseDiagnosticSide = {
+        total_properties: __dwrProperties.total,
+        visited: __dwrProperties.visited,
+        closed: __dwrProperties.closed,
+        pending: __dwrProperties.pending,
+        recovered: __dwrProperties.recovered,
+        focus: __dwrProperties.focuses,
+      };
+      const __diag: DayCloseDiagnostic = {
+        agent_id: user.id,
+        cycle_id: __cycleIdForClose,
+        operational_date: operationalWorkDate,
+        source_snapshot: "get_session_visits + daily snapshot",
+        source_metrics: "operational-metrics (properties/visits scoped by block_id)",
+        totals: {
+          snapshot: __totalsSnapshot,
+          metrics: __totalsMetrics,
+          delta_visited: __totalsSnapshot.visited - __totalsMetrics.visited,
+          delta_closed: __totalsSnapshot.closed - __totalsMetrics.closed,
+          delta_pending: __totalsSnapshot.pending - __totalsMetrics.pending,
+          delta_recovered: __totalsSnapshot.recovered - __totalsMetrics.recovered,
+          delta_focus: __totalsSnapshot.focus - __totalsMetrics.focus,
+        },
+        blocks: __diagBlocks,
+        divergences: __divergences,
+      };
+
+      if (__divergences.length > 0 || __diagBlocks.some((b) => b.delta_visited !== 0 || b.delta_closed !== 0 || b.delta_focus !== 0)) {
+        console.error("[DAY_CLOSE_DIAGNOSTIC]", __diag);
+        setDayCloseDiagnostic(__diag);
+        setShowDiagnostic(true);
+      } else {
+        setDayCloseDiagnostic(null);
+      }
+
+      if (__divergences.length > 0) {
+        for (const d of __divergences) console.error("[DAY_CLOSE_METRICS_DIVERGENCE]", d);
+        const first = __divergences[0];
+        console.error("[DAY_CLOSE_BLOCK_REASON]", {
+          module: first.module,
+          field: first.field,
+          expected: first.expected,
+          found: first.found,
+          reason: `Divergência entre ${first.module} no campo ${first.field}: esperado ${first.expected}, encontrado ${first.found}`,
+          diagnostic: __diag,
+        });
+        toast.error(
+          `Encerramento bloqueado — ${first.module}: ${first.field} esperado ${first.expected}, encontrado ${first.found}. Toque em "Ver diagnóstico" para detalhes.`,
+        );
+        throw new Error(`[DAY_CLOSE_BLOCK_REASON] ${first.module}/${first.field}`);
+      }
+
+      console.log("[DAY_CLOSE_POST_SNAPSHOT]", __snapshotView);
+      // ═════════════════════════════════════════════════
+
+
+
+      let { depTreated, depEliminated, larvicideAmount } = snap;
+      if (depTreated === 0 && stats.treatedDeposits) depTreated = stats.treatedDeposits;
+      if (depEliminated === 0 && stats.eliminated) depEliminated = stats.eliminated;
+      if (larvicideAmount === 0 && stats.larvicideUsed) larvicideAmount = stats.larvicideUsed;
+
+      const { getEpiWeek, resolveCycleWeek } = await import("@/lib/cycle-week");
+      const epi = getEpiWeek(new Date(`${operationalWorkDate}T12:00:00`));
+      const resolvedCycleWeek = __cycleIdForClose
+        ? await resolveCycleWeek(__cycleIdForClose, new Date(`${operationalWorkDate}T12:00:00`))
+        : null;
+      console.log("[SE]", { work_date: operationalWorkDate, epi_week: epi.week, epi_year: epi.year });
+      console.log("[CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose });
+      console.log("[SEMANA_CICLO]", { work_date: operationalWorkDate, cycle_id: __cycleIdForClose, cycle_week: resolvedCycleWeek?.number ?? null });
+
+      const recordData: any = {
+        // agent_id DEVE ser auth.uid()/profile id (RLS dwr_insert_self_or_admin).
+        // legacy_agent_id é o PK real de `agents` (usado no onConflict).
+        agent_id: user?.id ?? currentAgent.profile_id ?? currentAgent.id,
+        legacy_agent_id: currentAgent.id,
+        cycle_id: __cycleIdForClose,
+        week_id: resolvedCycleWeek?.id ?? activeWeek?.id,
+        work_date: operationalWorkDate,
+        status: 'completed',
+        end_time: new Date().toISOString(),
+        properties_worked: snap.workedCount || stats.worked,
+        properties_closed: snap.closedCount || stats.closed,
+        properties_refused: snap.refusedCount || stats.refused,
+        properties_recovered: recoveredCount,
+        properties_positive: snap.positiveProps,
+        deposits_existing: snap.depExisting,
+        deposits_inspected: snap.depInspected,
+        deposits_treated: depTreated,
+        deposits_eliminated: depEliminated,
+        positive_foci: snap.focusCount || stats.focus,
+        larvicide_amount: larvicideAmount,
+        larvicide_unit: snap.larvicideUnit,
+        tubitos_collected: snap.tubitos,
+        tubitos_properties: snap.tubitosProps,
+        samples_collected: snap.samples,
+        samples_total: snap.samples,
+        blocks_worked: snap.blocksWorked,
+        blocks_completed: snap.blocksCompleted,
+        deposits_a1: snap.depByType.A1,
+        deposits_a2: snap.depByType.A2,
+        deposits_b: snap.depByType.B,
+        deposits_c: snap.depByType.C,
+        deposits_d1: snap.depByType.D1,
+        deposits_d2: snap.depByType.D2,
+        deposits_e: snap.depByType.E,
+        pending_visits: snap.pendingLocal || pendingCount,
+        strategic_points_worked: snap.strategicPointsWorked,
+        tubitos_used: snap.tubitosUsed,
+        larvae_collected: snap.larvaeCollected,
+        cargas_collected: snap.cargasCollected,
+        foci_by_type: integrity.fociByType,
+        deposits_by_type: integrity.depByType,
+        data_integrity_log: integrity.log,
+        epi_week: epi.week,
+        epi_year: epi.year,
+        is_retroactive: sessionIsRetro,
+        retroactive_reason: sessionRetroReason,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("[DIÁRIA] Snapshot criado", recordData);
+
+
+      // 1) Upsert do daily_work_records — local + fila
+      console.log("[ENCERRAR] salvando daily_work_records");
+      // agent_id (auth.uid()/profile_id) é estável via RLS; legacy_agent_id já foi instável
+      // e gerou duplicidade de DWR no mesmo dia. Constraint atual: UNIQUE(agent_id, work_date).
+      const dwrConflictTarget = "agent_id,work_date";
+      console.log("[DWR_UPSERT]", { table: "daily_work_records", agent_id: recordData.agent_id, legacy_agent_id: recordData.legacy_agent_id, work_date: recordData.work_date });
+      console.log("[DWR_CONFLICT_TARGET]", { onConflict: dwrConflictTarget, uniqueIndex: "daily_work_records_agent_work_date_key(agent_id, work_date)" });
+      let savedDaily: any;
+      try {
+        console.log("[DAY_CLOSE_DWR_PRE]", {
+          work_date: recordData.work_date,
+          properties_worked: recordData.properties_worked,
+          properties_closed: recordData.properties_closed,
+          properties_refused: recordData.properties_refused,
+          properties_recovered: recordData.properties_recovered,
+          pending_visits: recordData.pending_visits,
+          deposits_inspected: recordData.deposits_inspected,
+          positive_foci: recordData.positive_foci,
+        });
+        savedDaily = await upsertOffline(
+          "daily_work_records",
+          { ...recordData },
+          { onConflict: dwrConflictTarget },
+        );
+        console.log("[DAY_CLOSE_DWR_POST]", {
+          dwr_id: savedDaily?.id ?? null,
+          work_date: savedDaily?.work_date ?? recordData.work_date,
+          properties_worked: savedDaily?.properties_worked ?? recordData.properties_worked,
+          properties_closed: savedDaily?.properties_closed ?? recordData.properties_closed,
+          properties_refused: savedDaily?.properties_refused ?? recordData.properties_refused,
+          pending_visits: savedDaily?.pending_visits ?? recordData.pending_visits,
+          deposits_inspected: savedDaily?.deposits_inspected ?? recordData.deposits_inspected,
+          positive_foci: savedDaily?.positive_foci ?? recordData.positive_foci,
+        });
+
+      } catch (e: any) {
+        console.error("[DWR_CONFLICT_ERROR]", { onConflict: dwrConflictTarget, message: e?.message, details: e?.details, hint: e?.hint });
+        throw e;
+      }
+      console.log("[DIARIA_SALVA]", {
+        id: savedDaily?.id ?? null,
+        agent_id: recordData.agent_id,
+        work_date: recordData.work_date,
+        cycle_id: recordData.cycle_id,
+        epi_week: recordData.epi_week,
+        epi_year: recordData.epi_year,
+      });
+      console.log("[DAY_CLOSE_DWR]", {
+        dwr_id: savedDaily?.id ?? null,
+        agent_id: recordData.agent_id,
+        work_date: recordData.work_date,
+        sessions_consolidated: dayAllSessions.length,
+        session_ids: dayAllSessionIds,
+        properties_worked: recordData.properties_worked,
+        properties_closed: recordData.properties_closed,
+        properties_refused: recordData.properties_refused,
+        properties_positive: recordData.properties_positive,
+        positive_foci: recordData.positive_foci,
+        deposits_inspected: recordData.deposits_inspected,
+        deposits_treated: recordData.deposits_treated,
+        deposits_eliminated: recordData.deposits_eliminated,
+        larvicide_amount: recordData.larvicide_amount,
+        tubitos_collected: recordData.tubitos_collected,
+        blocks_worked: recordData.blocks_worked,
+      });
+
+      // 1.1) Validador de integridade da produção — nunca bloqueia
+      try {
+        const { runProductionIntegrity } = await import("@/lib/production-integrity");
+        const integrityReport = await runProductionIntegrity({
+          agentId: user.id,
+          workDate: operationalWorkDate,
+          cycleId: __cycleIdForClose,
+          snapshot: {
+            workedCount: snap.workedCount,
+            closedCount: snap.closedCount,
+            refusedCount: snap.refusedCount,
+            visitedCount: snap.visitedCount,
+            focusCount: snap.focusCount,
+            depInspected: snap.depInspected,
+            depByType: snap.depByType as any,
+            fociByType: snap.fociByType as any,
+            strategicPointsWorked: snap.strategicPointsWorked,
+          },
+        });
+        if (integrityReport.ok) {
+          toast.success(`Integridade da Produção: ${integrityReport.score}%`);
+        } else {
+          toast.warning(
+            `Integridade da Produção: ${integrityReport.score}% — ${integrityReport.divergences.length} divergência(s) encontrada(s).`,
+          );
+        }
+      } catch (e) {
+        console.error("[PRODUCTION_INTEGRITY_ERROR]", { reason: "runner_failed", message: (e as any)?.message });
+      }
+
+      // 2) Marca agente como work_completed — local + fila
+      console.log("[ENCERRAR] atualizando agents");
       try { await updateOffline("agents", currentAgent.id, { work_status: 'work_completed' }); } catch (e) {
         console.warn("[ENCERRAR] falha ao atualizar agents", e);
       }
