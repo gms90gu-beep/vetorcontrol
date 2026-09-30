@@ -24,6 +24,7 @@ import {
   type MapCycleOption,
 } from "@/lib/wave-c.functions";
 import type { PropertyCycleHistory } from "@/lib/map-cycle-history";
+import { classifyMapPoint, type MapPointCategory } from "@/lib/map-point-status";
 import { getOperationalDate } from "@/lib/operational-date";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import {
@@ -60,13 +61,17 @@ import {
   X,
 } from "lucide-react";
 
-type Category = "focus" | "pendency" | "strategic" | "clean";
+type Category = MapPointCategory;
 
 const CATEGORY_META: Record<Category, { color: string; label: string; emoji: string }> = {
   focus: { color: "#dc2626", label: "Foco positivo", emoji: "🔴" },
-  pendency: { color: "#f97316", label: "Pendência", emoji: "🟠" },
-  strategic: { color: "#2563eb", label: "Ponto Estratégico", emoji: "🔵" },
-  clean: { color: "#16a34a", label: "Regularizado", emoji: "🟢" },
+  pendency: { color: "#f97316", label: "Pendência aberta", emoji: "🟠" },
+  closed: { color: "#f97316", label: "Fechada", emoji: "🟠" },
+  refused: { color: "#f97316", label: "Recusa", emoji: "🟠" },
+  abandoned: { color: "#f97316", label: "Abandonada", emoji: "🟠" },
+  strategic: { color: "#2563eb", label: "Ponto estratégico", emoji: "🔵" },
+  clean: { color: "#16a34a", label: "Visitado sem foco", emoji: "🟢" },
+  unvisited: { color: "#64748b", label: "Sem visita no período", emoji: "⚪" },
 };
 
 const RISK_META: Record<"low" | "med" | "high", { color: string; label: string }> = {
@@ -76,18 +81,19 @@ const RISK_META: Record<"low" | "med" | "high", { color: string; label: string }
 };
 
 function classify(p: PropertyMapPoint): Category {
-  if (p.has_positive_focus) return "focus";
-  if (p.has_pendency) return "pendency";
-  if (p.is_strategic) return "strategic";
-  return "clean";
+  return classifyMapPoint(p);
 }
 
 const FILTERS: { id: "all" | Category; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "focus", label: "Focos" },
   { id: "pendency", label: "Pendências" },
+  { id: "closed", label: "Fechadas" },
+  { id: "refused", label: "Recusas" },
+  { id: "abandoned", label: "Abandonadas" },
   { id: "strategic", label: "PE" },
-  { id: "clean", label: "Regular." },
+  { id: "clean", label: "Visitados sem foco" },
+  { id: "unvisited", label: "Sem visita" },
 ];
 
 function cycleStatusLabel(status: string) {
@@ -133,13 +139,8 @@ function isValidCoord(lat: unknown, lng: unknown): boolean {
   );
 }
 
-type BaseLayerId = "osm" | "carto" | "esri";
+type BaseLayerId = "osm" | "esri";
 const BASE_LAYERS: Record<BaseLayerId, { name: string; url: string; attribution: string }> = {
-  carto: {
-    name: "Carto Positron",
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution: "&copy; OpenStreetMap &copy; CARTO",
-  },
   osm: {
     name: "OpenStreetMap",
     url: "https://{s}.tile.openstreetmap.org/{z}/{y}/{x}.png",
@@ -171,7 +172,7 @@ export default function OperationalMapView() {
   const [heatMode, setHeatMode] = useState<HeatMode>("count");
   const [showBlocks, setShowBlocks] = useState(false);
   const [showProperties, setShowProperties] = useState(true);
-  const [baseLayer, setBaseLayer] = useState<BaseLayerId>("carto");
+  const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
   const [fullscreen, setFullscreen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selected, setSelected] = useState<PropertyMapPoint | null>(null);
@@ -272,7 +273,10 @@ export default function OperationalMapView() {
   }, [allPoints, filter, search]);
 
   const counts = useMemo(() => {
-    const c = { focus: 0, pendency: 0, strategic: 0, clean: 0 };
+    const c: Record<Category, number> = {
+      focus: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
+      strategic: 0, clean: 0, unvisited: 0,
+    };
     for (const p of allPoints) c[classify(p)]++;
     return c;
   }, [allPoints]);
@@ -434,8 +438,12 @@ export default function OperationalMapView() {
     suffix?: string;
   }> = [
     { id: "total", label: "Total imóveis", value: allPoints.length, accent: "from-slate-500/15 to-slate-500/0", onClick: () => setFilter("all"), active: filter === "all" },
-    { id: "clean", label: "Regularizados", value: counts.clean, accent: "from-emerald-500/25 to-emerald-500/0", onClick: () => setFilter("clean"), active: filter === "clean" },
+    { id: "clean", label: "Visitados sem foco", value: counts.clean, accent: "from-emerald-500/25 to-emerald-500/0", onClick: () => setFilter("clean"), active: filter === "clean" },
+    { id: "unvisited", label: "Sem visita", value: counts.unvisited, accent: "from-slate-500/20 to-slate-500/0", onClick: () => setFilter("unvisited"), active: filter === "unvisited" },
     { id: "pendency", label: "Pendências", value: counts.pendency, accent: "from-orange-500/25 to-orange-500/0", onClick: () => setFilter("pendency"), active: filter === "pendency" },
+    { id: "closed", label: "Fechadas", value: counts.closed, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("closed"), active: filter === "closed" },
+    { id: "refused", label: "Recusas", value: counts.refused, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("refused"), active: filter === "refused" },
+    { id: "abandoned", label: "Abandonadas", value: counts.abandoned, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("abandoned"), active: filter === "abandoned" },
     { id: "focus", label: "Focos", value: counts.focus, accent: "from-rose-500/25 to-rose-500/0", onClick: () => setFilter("focus"), active: filter === "focus" },
     { id: "strategic", label: "PE", value: counts.strategic, accent: "from-blue-500/25 to-blue-500/0", onClick: () => setFilter("strategic"), active: filter === "strategic" },
     { id: "nocoord", label: "Sem coordenadas", value: withoutCoords, accent: "from-amber-500/20 to-amber-500/0" },
@@ -519,6 +527,9 @@ export default function OperationalMapView() {
                 Centro de Inteligência Territorial
               </h1>
               <p className="text-[11px] text-muted-foreground leading-tight">
+                Visão territorial por ciclo/ano · pendências abertas permanecem até serem resolvidas
+              </p>
+              <p className="text-[10px] text-muted-foreground/80 leading-tight">
                 Última sincronização: {lastSync}
               </p>
             </div>
@@ -989,7 +1000,7 @@ function LayersSection({
           )}
           <div className="pt-2 border-t">
             <div className="text-[11px] text-muted-foreground mb-1.5">Mapa base</div>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {(Object.keys(BASE_LAYERS) as BaseLayerId[]).map((id) => (
                 <button
                   key={id}
@@ -998,7 +1009,7 @@ function LayersSection({
                     baseLayer === id ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"
                   }`}
                 >
-                  {id === "carto" ? "Claro" : id === "osm" ? "OSM" : "Satélite"}
+                  {id === "osm" ? "OSM" : "Satélite"}
                 </button>
               ))}
             </div>
@@ -1156,6 +1167,10 @@ function FiltersSection({
               );
             })}
           </div>
+
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Foco e situação da visita seguem o ciclo/período escolhido. Pendência aberta e ponto estratégico não dependem do ciclo. Verde exige visita sem foco; cinza indica que não houve visita no período.
+          </p>
 
           <Button
             variant="outline"

@@ -10,16 +10,8 @@ export type TileProvider = {
   subdomains?: string;
 };
 
-// Order = fallback priority. First entry is the default for thematic maps.
+// Order = fallback priority. OSM is the default because CARTO now requires an API key.
 export const TILE_PROVIDERS: TileProvider[] = [
-  {
-    id: "carto-positron",
-    name: "Carto Positron",
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution: "© OpenStreetMap, © CARTO",
-    maxZoom: 19,
-    subdomains: "abcd",
-  },
   {
     id: "osm",
     name: "OpenStreetMap",
@@ -43,6 +35,8 @@ export function getProvider(id: string): TileProvider {
 // Shared semantic colors for property markers across the app.
 export const MARKER_COLORS = {
   focus: "#dc2626",      // foco positivo (vermelho vibrante)
+  unvisited: "#64748b",  // imóvel sem visita no período selecionado
+  abandoned: "#f97316",  // visita abandonada no período selecionado
   pendency: "#f97316",   // pendência (laranja)
   closed: "#f97316",     // fechada/recusada (laranja - mesmo de pendência)
   refused: "#f97316",    // recusa de acesso (laranja - mesmo de pendência)

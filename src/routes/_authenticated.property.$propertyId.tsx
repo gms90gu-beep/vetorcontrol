@@ -824,7 +824,9 @@ function PropertyVisitPage() {
         activity_type: (activityMap[activity] || "routine") as any,
         visit_date: operationalVisitDate,
 
-        has_focus: (status === 'visited' && activity === 'survey') ? surveyData.hasFocus : false,
+        has_focus: (status === 'visited' && activity === 'survey')
+          ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)
+          : false,
         sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,

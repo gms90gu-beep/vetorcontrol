@@ -9,12 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet, Loader2, MapPin } from "lucide-react";
+import { classifyMapPoint, MAP_POINT_CATEGORY_META, type MapPointCategory } from "@/lib/map-point-status";
 import {
   SharedMap,
   SharedMarkerLayer,
   SharedAgentTerritoryLayer,
-  classifyProperty,
-  MARKER_COLORS,
   type SharedMarkerPoint,
 } from "@/components/map/shared";
 
@@ -47,35 +46,14 @@ function isoOffset(days: number) {
 }
 
 function classify(p: PropertyMapPoint) {
-  // Prioridade operacional: foco > fechada/recusada > pendência > PE > sem foco
-  if (p.has_positive_focus) {
-    return { status: "focus" as const, color: MARKER_COLORS.focus, label: "Foco positivo" };
-  }
-  const st = (p.last_visit_status ?? "").toLowerCase();
-  if (st === "closed") {
-    return { status: "closed" as const, color: MARKER_COLORS.closed, label: "Fechada" };
-  }
-  if (st === "refused") {
-    return { status: "refused" as const, color: MARKER_COLORS.refused, label: "Recusada" };
-  }
-  if (p.has_pendency) {
-    return { status: "pendency" as const, color: MARKER_COLORS.pendency, label: "Pendência" };
-  }
-  return classifyProperty({
-    had_previous_focus: false,
-    has_pendency: false,
-    type: p.is_strategic ? "strategic_point" : null,
-  });
+  const status = classifyMapPoint(p);
+  return { status, ...MAP_POINT_CATEGORY_META[status] };
 }
 
-const HEATMAP_LEGEND = [
-  { color: MARKER_COLORS.focus, label: "Foco positivo" },
-  { color: MARKER_COLORS.closed, label: "Fechada" },
-  { color: MARKER_COLORS.refused, label: "Recusada" },
-  { color: MARKER_COLORS.pendency, label: "Pendência" },
-  { color: MARKER_COLORS.strategic, label: "Ponto estratégico" },
-  { color: MARKER_COLORS.clean, label: "Sem foco" },
-];
+const HEATMAP_LEGEND = ([
+  "focus", "pendency", "closed", "refused", "abandoned",
+  "strategic", "clean", "unvisited",
+] as MapPointCategory[]).map((status) => MAP_POINT_CATEGORY_META[status]);
 
 
 function isValidCoord(lat: unknown, lng: unknown) {
@@ -170,12 +148,15 @@ function HeatmapPage() {
 
 
   const counts = useMemo(() => {
-    const c = { focus: 0, closed: 0, refused: 0, pendency: 0, strategic: 0, clean: 0 } as Record<string, number>;
+    const c: Record<MapPointCategory, number> = {
+      focus: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
+      strategic: 0, clean: 0, unvisited: 0,
+    };
     for (const p of geoPoints) {
       const st = classify(p).status;
       c[st] = (c[st] ?? 0) + 1;
     }
-    return c as { focus: number; closed: number; refused: number; pendency: number; strategic: number; clean: number };
+    return c;
   }, [geoPoints]);
 
   const territoryPoints = useMemo(
@@ -198,6 +179,9 @@ function HeatmapPage() {
             <MapPin className="h-5 w-5 text-rose-500" />
             Mapa Epidemiológico — imóveis georreferenciados
           </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Recorte por datas para indicadores epidemiológicos e exportação. Para acompanhar visitas por ciclo, use Mapa.
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">

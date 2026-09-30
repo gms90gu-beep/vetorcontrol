@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildPropertyCycleHistory, type PropertyCycleHistory, type PropertyCycleVisit } from "@/lib/map-cycle-history";
+import { isPositiveMapVisit } from "@/lib/map-point-status";
 
 function sumDepJson(j: any): number {
   if (!j || typeof j !== "object") return 0;
@@ -610,12 +611,34 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
       .order("visit_date", { ascending: false });
     if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
 
+    const historyVisitIds = ((visits ?? []) as any[]).map((visit) => visit.id);
+    const positiveHistoryVisitIds = new Set<string>(
+      ((visits ?? []) as any[])
+        .filter((visit) => isPositiveMapVisit(Boolean(visit.has_focus), false))
+        .map((visit) => visit.id),
+    );
+    if (historyVisitIds.length > 0) {
+      const { data: positiveDeposits, error: positiveDepositError } = await supabaseAdmin
+        .from("visit_deposits")
+        .select("visit_id, is_positive")
+        .in("visit_id", historyVisitIds)
+        .eq("is_positive", true);
+      if (positiveDepositError) {
+        throw new Error(`Falha ao carregar focos do histórico: ${positiveDepositError.message}`);
+      }
+      for (const deposit of positiveDeposits ?? []) {
+        if (isPositiveMapVisit(false, Boolean(deposit.is_positive))) {
+          positiveHistoryVisitIds.add(deposit.visit_id);
+        }
+      }
+    }
+
     const normalizedVisits: PropertyCycleVisit[] = ((visits ?? []) as any[]).map((visit) => ({
         id: visit.id,
         cycle_id: visit.cycle_id,
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
-        has_focus: Boolean(visit.has_focus),
+        has_focus: positiveHistoryVisitIds.has(visit.id),
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -753,10 +776,13 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const lastVisitByProp = new Map<string, string>();
     const lastAgentByProp = new Map<string, string>();
     const lastStatusByProp = new Map<string, string>();
+    const visitToProp = new Map<string, string>();
+    const positiveVisitIds = new Set<string>();
     const visitIds: string[] = [];
     for (const v of visits) {
       visitIds.push(v.id);
-      if (v.has_focus) focusByProp.set(v.property_id, (focusByProp.get(v.property_id) ?? 0) + 1);
+      visitToProp.set(v.id, v.property_id);
+      if (isPositiveMapVisit(Boolean(v.has_focus), false)) positiveVisitIds.add(v.id);
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
@@ -772,18 +798,22 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       }
       const depResults = await Promise.all(
         visitIdChunks.map((ids) =>
-          supabaseAdmin.from("visit_deposits").select("visit_id").in("visit_id", ids),
+          supabaseAdmin.from("visit_deposits").select("visit_id, is_positive").in("visit_id", ids),
         ),
       );
       const depError = depResults.find((result) => result.error)?.error;
       if (depError) throw new Error(`Falha ao carregar depósitos do mapa: ${depError.message}`);
       const deps = depResults.flatMap((result) => result.data ?? []);
-      const visitToProp = new Map<string, string>();
-      for (const v of visits) visitToProp.set(v.id, v.property_id);
       for (const d of deps) {
         const pid = visitToProp.get(d.visit_id);
+        if (isPositiveMapVisit(false, Boolean(d.is_positive))) positiveVisitIds.add(d.visit_id);
         if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
       }
+    }
+
+    for (const visitId of positiveVisitIds) {
+      const propertyId = visitToProp.get(visitId);
+      if (propertyId) focusByProp.set(propertyId, (focusByProp.get(propertyId) ?? 0) + 1);
     }
 
     // agent_id (em visits e boletins_rg) referencia profiles.id
