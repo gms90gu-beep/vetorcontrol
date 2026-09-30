@@ -35,6 +35,7 @@ export function getProvider(id: string): TileProvider {
 // Shared semantic colors for property markers across the app.
 export const MARKER_COLORS = {
   focus: "#dc2626",      // foco positivo (vermelho vibrante)
+  focus_found: "#eab308", // foco observado sem confirmação positiva (alerta)
   unvisited: "#64748b",  // imóvel sem visita no período selecionado
   abandoned: "#f97316",  // visita abandonada no período selecionado
   pendency: "#f97316",   // pendência (laranja)

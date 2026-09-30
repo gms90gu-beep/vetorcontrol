@@ -65,6 +65,7 @@ type Category = MapPointCategory;
 
 const CATEGORY_META: Record<Category, { color: string; label: string; emoji: string }> = {
   focus: { color: "#dc2626", label: "Foco positivo", emoji: "🔴" },
+  focus_found: { color: "#eab308", label: "Foco encontrado · alerta", emoji: "🟡" },
   pendency: { color: "#f97316", label: "Pendência aberta", emoji: "🟠" },
   closed: { color: "#f97316", label: "Fechada", emoji: "🟠" },
   refused: { color: "#f97316", label: "Recusa", emoji: "🟠" },
@@ -86,7 +87,8 @@ function classify(p: PropertyMapPoint): Category {
 
 const FILTERS: { id: "all" | Category; label: string }[] = [
   { id: "all", label: "Todos" },
-  { id: "focus", label: "Focos" },
+  { id: "focus_found", label: "Alertas de foco" },
+  { id: "focus", label: "Focos positivos" },
   { id: "pendency", label: "Pendências" },
   { id: "closed", label: "Fechadas" },
   { id: "refused", label: "Recusas" },
@@ -274,7 +276,7 @@ export default function OperationalMapView() {
 
   const counts = useMemo(() => {
     const c: Record<Category, number> = {
-      focus: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
+      focus: 0, focus_found: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
       strategic: 0, clean: 0, unvisited: 0,
     };
     for (const p of allPoints) c[classify(p)]++;
@@ -331,7 +333,7 @@ export default function OperationalMapView() {
 
   const head = [
     "ID","Quart.","Localidade","Endereço","Nº","Lat","Lng","Agente","Última visita",
-    "Focos","Pendências","Depósitos","Risco",
+    "Focos encontrados","Focos positivos","Pendências","Depósitos","Risco",
   ];
   const rows = useMemo(
     () =>
@@ -345,6 +347,7 @@ export default function OperationalMapView() {
         p.longitude.toFixed(6),
         p.agent_name ?? "",
         p.last_visit_at ?? "",
+        p.focus_found_count,
         p.positive_foci_count,
         p.pendency_count,
         p.deposits_found,
@@ -444,7 +447,8 @@ export default function OperationalMapView() {
     { id: "closed", label: "Fechadas", value: counts.closed, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("closed"), active: filter === "closed" },
     { id: "refused", label: "Recusas", value: counts.refused, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("refused"), active: filter === "refused" },
     { id: "abandoned", label: "Abandonadas", value: counts.abandoned, accent: "from-orange-500/20 to-orange-500/0", onClick: () => setFilter("abandoned"), active: filter === "abandoned" },
-    { id: "focus", label: "Focos", value: counts.focus, accent: "from-rose-500/25 to-rose-500/0", onClick: () => setFilter("focus"), active: filter === "focus" },
+    { id: "focus_found", label: "Alertas de foco", value: counts.focus_found, accent: "from-amber-500/25 to-amber-500/0", onClick: () => setFilter("focus_found"), active: filter === "focus_found" },
+    { id: "focus", label: "Focos positivos", value: counts.focus, accent: "from-rose-500/25 to-rose-500/0", onClick: () => setFilter("focus"), active: filter === "focus" },
     { id: "strategic", label: "PE", value: counts.strategic, accent: "from-blue-500/25 to-blue-500/0", onClick: () => setFilter("strategic"), active: filter === "strategic" },
     { id: "nocoord", label: "Sem coordenadas", value: withoutCoords, accent: "from-amber-500/20 to-amber-500/0" },
     { id: "gps", label: "Cobertura GPS", value: cov?.coverage_pct ?? 0, suffix: "%", accent: "from-violet-500/25 to-violet-500/0" },
@@ -721,8 +725,9 @@ function PropertyDetailPanel({
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <MiniStat label="Focos" value={point.positive_foci_count} accent="text-rose-600" />
+          <div className="grid grid-cols-4 gap-2">
+            <MiniStat label="Focos encontrados" value={point.focus_found_count} accent="text-amber-600" />
+            <MiniStat label="Positivos" value={point.positive_foci_count} accent="text-rose-600" />
             <MiniStat label="Depósitos" value={point.deposits_found} accent="text-amber-600" />
             <MiniStat label="Pend." value={point.pendency_count} accent="text-orange-600" />
           </div>
@@ -870,7 +875,8 @@ function SummarySection({
     { label: "Total", value: total, color: "from-slate-500/15 to-slate-500/5", text: "text-slate-700 dark:text-slate-200", icon: <Building2 className="h-4 w-4" /> },
     { label: "Regular.", value: counts.clean, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-700 dark:text-emerald-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
     { label: "Pendências", value: counts.pendency, color: "from-orange-500/20 to-orange-500/5", text: "text-orange-700 dark:text-orange-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> },
-    { label: "Focos", value: counts.focus, color: "from-rose-500/20 to-rose-500/5", text: "text-rose-700 dark:text-rose-300", icon: <Flame className="h-4 w-4" /> },
+    { label: "Alertas", value: counts.focus_found, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-700 dark:text-amber-300", icon: <Flame className="h-4 w-4" /> },
+    { label: "Positivos", value: counts.focus, color: "from-rose-500/20 to-rose-500/5", text: "text-rose-700 dark:text-rose-300", icon: <Flame className="h-4 w-4" /> },
     { label: "PE", value: counts.strategic, color: "from-blue-500/20 to-blue-500/5", text: "text-blue-700 dark:text-blue-300", icon: <Target className="h-4 w-4" /> },
   ];
   return (
@@ -903,7 +909,8 @@ function DistributionsSection({
   const statusRows: [string, number, string][] = [
     ["Regularizados", statusCounts.clean, CATEGORY_META.clean.color],
     ["Pendências", statusCounts.pendency, CATEGORY_META.pendency.color],
-    ["Focos", statusCounts.focus, CATEGORY_META.focus.color],
+    ["Foco encontrado · alerta", statusCounts.focus_found, CATEGORY_META.focus_found.color],
+    ["Foco positivo", statusCounts.focus, CATEGORY_META.focus.color],
     ["PE", statusCounts.strategic, CATEGORY_META.strategic.color],
   ];
   return (
@@ -983,7 +990,7 @@ function LayersSection({
             <div className="pl-6 grid grid-cols-3 gap-1 animate-in fade-in slide-in-from-top-1">
               {([
                 { id: "count", label: "Quantidade" },
-                { id: "focus", label: "Focos" },
+                { id: "focus", label: "Focos e alertas" },
                 { id: "pendency", label: "Pend." },
               ] as { id: HeatMode; label: string }[]).map((m) => (
                 <button
@@ -1475,9 +1482,10 @@ function BlockPopup({ block }: { block: BlockRiskScore }) {
       <Badge style={{ background: risk.color, color: "#fff" }} className="border-none">
         Risco {risk.label} ({block.score})
       </Badge>
-      <div className="grid grid-cols-3 gap-1 text-center pt-1">
+      <div className="grid grid-cols-2 gap-1 text-center pt-1">
         <Stat label="Imóveis" value={block.props_count} />
-        <Stat label="Focos" value={block.focus_count} />
+        <Stat label="Encontrados" value={block.focus_found_count} />
+        <Stat label="Positivos" value={block.focus_count} />
         <Stat label="Pend." value={block.pending_count} />
       </div>
     </div>
@@ -1520,7 +1528,7 @@ function HeatLayer({ points, mode }: { points: PropertyMapPoint[]; mode: HeatMod
         .filter((p) => isValidCoord(p.latitude, p.longitude))
         .map((p) => {
           let w = 0.3;
-          if (mode === "focus") w = p.has_positive_focus ? 1 : 0.1;
+          if (mode === "focus") w = p.has_positive_focus ? 1 : p.has_observed_focus ? 0.7 : 0.1;
           else if (mode === "pendency") w = p.has_pendency ? 0.9 : 0.1;
           else w = 0.5;
           return [p.latitude, p.longitude, w];

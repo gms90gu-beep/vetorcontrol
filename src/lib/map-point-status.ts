@@ -1,5 +1,6 @@
 export type MapPointCategory =
   | "focus"
+  | "focus_found"
   | "pendency"
   | "closed"
   | "refused"
@@ -8,11 +9,9 @@ export type MapPointCategory =
   | "clean"
   | "unvisited";
 
-export const MAP_POINT_CATEGORY_META: Record<
-  MapPointCategory,
-  { color: string; label: string }
-> = {
+export const MAP_POINT_CATEGORY_META: Record<MapPointCategory, { color: string; label: string }> = {
   focus: { color: "#dc2626", label: "Foco positivo" },
+  focus_found: { color: "#eab308", label: "Foco encontrado · alerta" },
   pendency: { color: "#f97316", label: "Pendência aberta" },
   closed: { color: "#f97316", label: "Fechada" },
   refused: { color: "#f97316", label: "Recusa" },
@@ -24,6 +23,7 @@ export const MAP_POINT_CATEGORY_META: Record<
 
 export interface MapPointClassificationInput {
   has_positive_focus?: boolean | null;
+  has_observed_focus?: boolean | null;
   has_pendency?: boolean | null;
   is_strategic?: boolean | null;
   last_visit_status?: string | null;
@@ -32,6 +32,7 @@ export interface MapPointClassificationInput {
 /** Applies the same precedence and period semantics in both supervisor maps. */
 export function classifyMapPoint(point: MapPointClassificationInput): MapPointCategory {
   if (point.has_positive_focus) return "focus";
+  if (point.has_observed_focus) return "focus_found";
   if (point.has_pendency) return "pendency";
 
   const visitStatus = String(point.last_visit_status ?? "").toLowerCase();
@@ -41,9 +42,4 @@ export function classifyMapPoint(point: MapPointClassificationInput): MapPointCa
   if (point.is_strategic) return "strategic";
   if (visitStatus === "visited") return "clean";
   return "unvisited";
-}
-
-/** A positive deposit is also a positive focus for its visit. */
-export function isPositiveMapVisit(hasFocus: boolean, hasPositiveDeposit: boolean): boolean {
-  return hasFocus || hasPositiveDeposit;
 }
