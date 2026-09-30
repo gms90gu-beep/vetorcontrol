@@ -371,7 +371,7 @@ function EditarBoletim() {
       if (effectiveBlockId) {
         const existingBlocks = await listRemoteOrCache<any>({
           name: "blocks",
-          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId) as any,
+          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId!) as any,
           filter: (block) => block.id === effectiveBlockId,
         });
         if (!existingBlocks[0]?.id) {
@@ -634,7 +634,7 @@ function EditarBoletim() {
       if (effectiveBlockId) {
         const existingBlocks = await listRemoteOrCache<any>({
           name: "blocks",
-          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId) as any,
+          remote: () => supabase.from("blocks").select("id").eq("id", effectiveBlockId!) as any,
           filter: (block) => block.id === effectiveBlockId,
         });
         if (!existingBlocks[0]?.id) {
