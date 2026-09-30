@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
@@ -18,6 +19,7 @@ import {
   Eye,
   RefreshCw,
   AlertTriangle,
+  RotateCw,
 } from "lucide-react";
 import { logDirectSource } from "@/lib/operational-metrics";
 logDirectSource({ module: "agent/AgentReportsSimple", file: "src/components/agent/AgentReportsSimple.tsx", source: "daily_work_records", note: "listagem simples do agente — usar getDateMetrics após refator" });
@@ -30,6 +32,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getOperationalDate } from "@/lib/operational-date";
+import { getAgentRebuildRange } from "@/lib/reports-reconcile-policy";
+import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { generatePcfadDailyPDF } from "@/components/reports/PcfadDailyPdfGenerator";
 
 // Gerador retrato antigo (seções 1–8) permanece em WeeklyReportGenerator.tsx, sem uso aqui.
@@ -59,7 +73,10 @@ type Daily = {
 };
 
 export function AgentReportsSimple() {
+  const rebuildFn = useServerFn(rebuildDailyRecords);
   const [loading, setLoading] = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
+  const [rebuildConfirmOpen, setRebuildConfirmOpen] = useState(false);
   const [authId, setAuthId] = useState<string | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState({
@@ -296,6 +313,28 @@ export function AgentReportsSimple() {
     if (res) {
       res.pdf.save(res.fileName);
       toast.success("PDF gerado");
+    }
+  };
+
+  const handleRebuildMyReports = async () => {
+    if (!authId || rebuilding || !isOnline()) return;
+    setRebuildConfirmOpen(false);
+    setRebuilding(true);
+    const { from, to } = getAgentRebuildRange(getOperationalDate());
+    try {
+      const result = await rebuildFn({ data: { from, to, agentId: authId } });
+      await fetchDailies(authId);
+      setSelectedDailyId(null);
+      if (result.scanned === 0) {
+        toast.info("Não há visitas sincronizadas nos últimos 90 dias para reconstruir.");
+      } else {
+        toast.success(`Reconstrução concluída: ${result.updated} diária(s) criada(s) ou corrigida(s), de ${result.scanned} encontrada(s).`);
+      }
+    } catch (e: any) {
+      console.error("[AGENT_REPORT_REBUILD_ERROR]", e);
+      toast.error(`Não foi possível reconstruir seus boletins: ${e?.message || "erro desconhecido"}`);
+    } finally {
+      setRebuilding(false);
     }
   };
 
@@ -594,6 +633,41 @@ export function AgentReportsSimple() {
           </Button>
         </div>
       </Card>
+
+      <Card className="p-5 rounded-3xl border-amber-200 bg-amber-50/60 shadow-sm">
+        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">
+          Recuperar meus boletins
+        </h3>
+        <p className="text-xs text-slate-600 mb-4">
+          Recalcula somente os seus boletins dos últimos 90 dias usando as visitas já sincronizadas. Cria diárias ausentes e corrige totais divergentes.
+        </p>
+        <Button
+          onClick={() => setRebuildConfirmOpen(true)}
+          disabled={!authId || rebuilding || !isOnline()}
+          variant="outline"
+          className="rounded-xl h-11 px-4 font-bold text-xs uppercase tracking-wide border-amber-300 text-amber-900 hover:bg-amber-100"
+        >
+          <RotateCw className={`h-4 w-4 mr-2 ${rebuilding ? "animate-spin" : ""}`} />
+          {rebuilding ? "Reconstruindo…" : "Reconstruir meus boletins"}
+        </Button>
+      </Card>
+
+      <AlertDialog open={rebuildConfirmOpen} onOpenChange={setRebuildConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reconstruir seus boletins?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O sistema vai recalcular suas diárias dos últimos 90 dias a partir das visitas sincronizadas. A ação não altera visitas nem dados de outros agentes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRebuildMyReports}>
+              Reconstruir meus boletins
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

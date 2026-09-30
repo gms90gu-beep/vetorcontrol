@@ -1,15 +1,16 @@
 /**
  * reports-reconcile.functions.ts
  * Reconstrói totais consolidados em daily_work_records a partir de visits
- * e visit_deposits. Fonte usada apenas pela ação "Reconstruir Relatórios"
- * do Admin/Supervisor — Reports continuam consumindo somente DWR.
+ * e visit_deposits. Fonte usada pela ação "Reconstruir Relatórios" para
+ * gestão e pela recuperação limitada aos próprios dados para agentes.
  *
  * Logs: [REPORT_REBUILD_START|SCAN|APPLY|ERROR|FINISH]
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEpiWeek } from "@/lib/cycle-week";
-import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
+import { getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
+import { getRebuildAuthorizationError } from "@/lib/reports-reconcile-policy";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
@@ -45,9 +46,15 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     const { data: roleRow } = await supabase.rpc("get_user_role", { u_id: userId });
     const role = (roleRow as string) || "agente";
-    if (!["admin_master", "coordenador", "supervisor"].includes(role)) {
-      throw new Error("Forbidden: requer supervisor ou admin_master");
-    }
+    const authorizationError = getRebuildAuthorizationError({
+      role,
+      userId,
+      agentId: data.agentId,
+      from: data.from,
+      to: data.to,
+      today: getOperationalDate(),
+    });
+    if (authorizationError) throw new Error(authorizationError);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -257,4 +264,3 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     console.log("[REPORT_REBUILD_FINISH]", { scanned: groups.size, updated });
     return { scanned: groups.size, updated, rows };
   });
-
