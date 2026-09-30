@@ -605,7 +605,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     const cycleIds = yearCycles.map((cycle: any) => cycle.id);
     const { data: visits, error: visitError } = await supabaseAdmin
       .from("visits")
-      .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
+      .select("id, cycle_id, visit_date, status, has_focus, focus_analysis_status, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
       .eq("property_id", data.propertyId)
       .in("cycle_id", cycleIds)
       .order("visit_date", { ascending: false });
@@ -614,7 +614,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     const historyVisitIds = ((visits ?? []) as any[]).map((visit) => visit.id);
     const positiveHistoryVisitIds = new Set<string>(
       ((visits ?? []) as any[])
-        .filter((visit) => isPositiveMapVisit(Boolean(visit.has_focus), false))
+        .filter((visit) => visit.focus_analysis_status === "positive")
         .map((visit) => visit.id),
     );
     if (historyVisitIds.length > 0) {
@@ -638,7 +638,8 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
         cycle_id: visit.cycle_id,
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
-        has_focus: positiveHistoryVisitIds.has(visit.id),
+        has_focus: Boolean(visit.has_focus),
+        focus_analysis_status: visit.focus_analysis_status ?? null,
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -757,7 +758,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         idChunks.map((ids) => {
           let query = supabaseAdmin
             .from("visits")
-            .select("id, property_id, agent_id, has_focus, status, visit_date")
+            .select("id, property_id, agent_id, has_focus, focus_analysis_status, status, visit_date")
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
@@ -782,7 +783,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
-      if (isPositiveMapVisit(Boolean(v.has_focus), false)) positiveVisitIds.add(v.id);
+      if (v.focus_analysis_status === "positive") positiveVisitIds.add(v.id);
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
