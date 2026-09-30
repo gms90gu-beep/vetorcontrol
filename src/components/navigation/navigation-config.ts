@@ -85,6 +85,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
 
       // ── Administração ───────────────────────────────────────────
       { key: "mgr-reports", label: "Relatórios", icon: FileText, to: "/relatorios", group: "administracao" },
+      { key: "mgr-cycles", label: "Ciclos por Ano", icon: Layers, to: "/cycles", group: "administracao" },
       { key: "mgr-gps-audit", label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit", group: "administracao" },
       { key: "mgr-sync", label: "Sincronização", icon: RefreshCw, to: "/sync-status", group: "administracao", badge: "sync" },
       { key: "mgr-settings", label: "Configurações", icon: Settings, to: "/settings", group: "administracao" },
@@ -118,7 +119,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
   return [
     // ── Operação ──────────────────────────────────────────────────
     { key: "agt-home", label: getPanelTitle(userRole), icon: LayoutDashboard, to: "/dashboard", group: "operacao", primary: true },
-    { key: "agt-cycles", label: "Ciclos", icon: Layers, to: "/cycles", group: "operacao" },
+    { key: "agt-cycles", label: "Ciclos por Ano", icon: Layers, to: "/cycles", group: "operacao" },
     { key: "agt-field", label: "Trabalho", icon: CheckSquare, to: "/field-work", group: "operacao", primary: true },
     { key: "agt-my-sessions", label: "Minhas Jornadas", icon: CalendarDays, to: "/minhas-jornadas", group: "operacao" },
     { key: "agt-rg", label: "RG", icon: MapPin, to: "/rg", group: "operacao", primary: true },

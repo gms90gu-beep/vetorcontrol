@@ -142,3 +142,31 @@ export async function requireManagerGuard() {
     throw redirect({ to: "/dashboard", replace: true });
   }
 }
+
+
+/**
+ * Allows the cycle history page to be opened by field agents and managers.
+ * Manager pages use cycle metadata only; scoped operational totals stay in reports.
+ */
+export async function requireCycleAccessGuard() {
+  if (typeof window === "undefined") return;
+
+  const { data: verifiedUser } = await safeGetUser();
+  const user = verifiedUser?.user;
+  if (!user) {
+    throw redirect({ to: "/login", replace: true });
+  }
+
+  if (isOwnerBypass(user.email)) return;
+
+  let role: string | null = null;
+  try {
+    role = await getCachedUserRole(user.id);
+  } catch {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+
+  if (role !== "agente" && !isManagerRole(role)) {
+    throw redirect({ to: "/dashboard", replace: true });
+  }
+}
