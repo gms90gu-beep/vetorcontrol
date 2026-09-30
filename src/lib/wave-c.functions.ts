@@ -475,6 +475,7 @@ export interface PropertyMapPoint {
   status: string | null;
   last_visit_status: string | null;
   has_pendency: boolean;
+  has_observed_focus: boolean;
   has_positive_focus: boolean;
   is_strategic: boolean;
 
@@ -482,6 +483,7 @@ export interface PropertyMapPoint {
   agent_name: string | null;
   last_visit_at: string | null;
   deposits_found: number;
+  focus_found_count: number;
   positive_foci_count: number;
   pendency_count: number;
   is_recurrent: boolean;
@@ -496,6 +498,7 @@ export interface BlockRiskScore {
   level: "low" | "med" | "high";
   props_count: number;
   focus_count: number;
+  focus_found_count: number;
   pending_count: number;
   centroid: { lat: number; lng: number };
 }
@@ -751,6 +754,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
     }
 
+    const focusFoundByProp = new Map<string, number>();
     const focusByProp = new Map<string, number>();
     const lastVisitByProp = new Map<string, string>();
     const lastAgentByProp = new Map<string, string>();
@@ -761,6 +765,9 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
+      if (v.has_focus || v.focus_analysis_status === "positive") {
+        focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
+      }
       if (v.focus_analysis_status === "positive") positiveVisitIds.add(v.id);
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
@@ -815,11 +822,12 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const points: PropertyMapPoint[] = propList.map((p) => {
       const boletim = p.boletim_id ? boletimAgentMap.get(p.boletim_id) : null;
       const agentId = lastAgentByProp.get(p.id) || boletim?.agent_id || null;
+      const focusFound = focusFoundByProp.get(p.id) ?? 0;
       const foci = focusByProp.get(p.id) ?? 0;
       const pend = pendingByProp.get(p.id) ?? 0;
-      const recurrent = foci >= 2;
+      const recurrent = focusFound >= 2;
       const isPe = p.type === "strategic_point";
-      const score = foci * 3 + pend * 2 + (recurrent ? 2 : 0) + (isPe ? 1 : 0);
+      const score = foci * 3 + Math.max(0, focusFound - foci) * 2 + pend * 2 + (recurrent ? 2 : 0) + (isPe ? 1 : 0);
       return {
         id: p.id,
         number: p.number ?? null,
@@ -831,12 +839,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         status: p.status ?? null,
         last_visit_status: lastStatusByProp.get(p.id) ?? null,
         has_pendency: pend > 0,
+        has_observed_focus: focusFound > 0,
         has_positive_focus: foci > 0,
         is_strategic: isPe,
         boletim_id: p.boletim_id ?? null,
         agent_name: agentId ? agentNameById.get(agentId) ?? null : null,
         last_visit_at: lastVisitByProp.get(p.id) ?? null,
         deposits_found: depByProp.get(p.id) ?? 0,
+        focus_found_count: focusFound,
         positive_foci_count: foci,
         pendency_count: pend,
         is_recurrent: recurrent,
@@ -870,6 +880,7 @@ export const getBlockRiskScores = createServerFn({ method: "POST" })
           level: "low" as const,
           props_count: 0,
           focus_count: 0,
+          focus_found_count: 0,
           pending_count: 0,
           centroid: { lat: 0, lng: 0 },
           latSum: 0,
@@ -878,6 +889,7 @@ export const getBlockRiskScores = createServerFn({ method: "POST" })
       cur.score += p.risk_score;
       cur.props_count += 1;
       cur.focus_count += p.positive_foci_count;
+      cur.focus_found_count += p.focus_found_count;
       cur.pending_count += p.pendency_count;
       cur.latSum += p.latitude;
       cur.lngSum += p.longitude;
@@ -892,6 +904,7 @@ export const getBlockRiskScores = createServerFn({ method: "POST" })
         level: riskLevel(avgScore),
         props_count: b.props_count,
         focus_count: b.focus_count,
+        focus_found_count: b.focus_found_count,
         pending_count: b.pending_count,
         centroid: { lat: b.latSum / b.props_count, lng: b.lngSum / b.props_count },
       };
