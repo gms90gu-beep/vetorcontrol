@@ -51,7 +51,7 @@ function classify(p: PropertyMapPoint) {
 }
 
 const HEATMAP_LEGEND = ([
-  "focus", "pendency", "closed", "refused", "abandoned",
+  "focus", "focus_found", "pendency", "closed", "refused", "abandoned",
   "strategic", "clean", "unvisited",
 ] as MapPointCategory[]).map((status) => MAP_POINT_CATEGORY_META[status]);
 
@@ -113,7 +113,8 @@ function HeatmapPage() {
     pendency: 2,
     refused: 3,
     closed: 4,
-    focus: 5,
+    focus_found: 5,
+    focus: 6,
   };
 
   const markers: SharedMarkerPoint[] = useMemo(
@@ -149,7 +150,7 @@ function HeatmapPage() {
 
   const counts = useMemo(() => {
     const c: Record<MapPointCategory, number> = {
-      focus: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
+      focus: 0, focus_found: 0, pendency: 0, closed: 0, refused: 0, abandoned: 0,
       strategic: 0, clean: 0, unvisited: 0,
     };
     for (const p of geoPoints) {
@@ -204,8 +205,9 @@ function HeatmapPage() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-sm">
             <Stat label="Imóveis no mapa" value={geoPoints.length} />
+            <Stat label="Focos identificados · alerta" value={counts.focus_found} />
             <Stat label="Focos positivos" value={counts.focus} />
             <Stat label="Fechadas/Recusadas" value={counts.closed + counts.refused} />
             <Stat label="Pendências" value={counts.pendency} />
@@ -240,7 +242,7 @@ function HeatmapPage() {
             isEmpty={geoPoints.length === 0}
             emptyVariant={allPoints.length === 0 ? "no-data" : "no-geo"}
             legendEntries={HEATMAP_LEGEND}
-            legendTrailing={`${geoPoints.length} imóveis · ${counts.focus} focos · ${counts.closed + counts.refused} fechadas/recusadas · ${counts.pendency} pendências`}
+            legendTrailing={`${geoPoints.length} imóveis · ${counts.focus_found} alertas · ${counts.focus} positivos · ${counts.closed + counts.refused} fechadas/recusadas · ${counts.pendency} pendências`}
           >
             <SharedMarkerLayer
               points={markers}

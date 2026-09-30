@@ -5,6 +5,7 @@ export type LegendEntry = { color: string; label: string };
 
 export const DEFAULT_LEGEND: LegendEntry[] = [
   { color: MARKER_COLORS.focus, label: "Foco positivo" },
+  { color: MARKER_COLORS.focus_found, label: "Foco encontrado · alerta" },
   { color: MARKER_COLORS.refused, label: "Fechada/Recusada" },
   { color: MARKER_COLORS.pendency, label: "Pendência" },
   { color: MARKER_COLORS.clean, label: "Visitado sem foco" },
