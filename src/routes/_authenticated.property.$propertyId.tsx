@@ -115,7 +115,7 @@ const DEFAULT_ROUTINE = {
   guidance: false,
   notes: ""
 };
-const DEFAULT_SURVEY = { hasFocus: false, sampleCollected: false, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 };
+const DEFAULT_SURVEY = { hasFocus: false, sampleCollected: false, focusAnalysisStatus: null as string | null, tubitosColetados: 0, treatment: false, treatmentAmount: 0, larvicideUnit: "gramas", treatedDeposits: 0 };
 const DEFAULT_PENDING = { isRecovered: false, notes: "" };
 
 const operationalDateFormatter = new Intl.DateTimeFormat("en-CA", {
@@ -536,7 +536,7 @@ function PropertyVisitPage() {
             remote: () =>
               supabase
                 .from("visits")
-                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
+                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, focus_analysis_status, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
                 .eq("property_id", propertyId as string)
                 .eq("agent_id", user.id)
                 .eq("cycle_id", session.cycle_id as string)
@@ -585,6 +585,7 @@ function PropertyVisitPage() {
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
               sampleCollected: existingVisit.sample_collected || false,
+              focusAnalysisStatus: existingVisit.focus_analysis_status ?? (existingVisit.sample_collected ? "pending" : null),
               tubitosColetados: existingVisit.tubitos_coletados || 0,
               treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
               treatmentAmount: existingVisit.activity_type === 'infestation_survey' ? (Number(existingVisit.treatment_amount) || 0) : 0,
@@ -828,6 +829,9 @@ function PropertyVisitPage() {
           ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)
           : false,
         sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+        focus_analysis_status: (status === 'visited' && activity === 'survey' && (surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected)
+          ? (surveyData.focusAnalysisStatus || "pending")
+          : null,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
         treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
@@ -1470,20 +1474,35 @@ function PropertyVisitPage() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <BooleanButton 
-                      label="Teve foco?" 
+                      label="Foco identificado na visita?" 
                       value={surveyData.hasFocus} 
                       onChange={(v) => setSurveyData({...surveyData, hasFocus: v})} 
                     />
                     <BooleanButton 
                       label="Coleta realizada?" 
                       value={surveyData.sampleCollected} 
-                      onChange={(v) => {
-                        setSurveyData({...surveyData, sampleCollected: v});
-                        if (v && surveyData.tubitosColetados === 0) {
-                          setSurveyData(prev => ({...prev, sampleCollected: v, tubitosColetados: 1}));
-                        }
-                      }} 
+                      onChange={(v) => setSurveyData(prev => ({
+                        ...prev,
+                        sampleCollected: v,
+                        focusAnalysisStatus: v ? (prev.focusAnalysisStatus || "pending") : null,
+                        tubitosColetados: v && prev.tubitosColetados === 0 ? 1 : prev.tubitosColetados,
+                      }))} 
                     />
+                    {(surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected && (
+                      <div className="space-y-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700">Resultado da análise</Label>
+                        <select aria-label="Resultado da análise do foco"
+                          value={surveyData.focusAnalysisStatus || "pending"}
+                          onChange={(e) => setSurveyData(prev => ({ ...prev, focusAnalysisStatus: e.target.value }))}
+                          className="h-11 w-full rounded-xl border border-blue-200 bg-white px-3 text-sm font-semibold text-slate-800">
+                          <option value="pending">Aguardando análise</option>
+                          <option value="positive">Positivo</option>
+                          <option value="negative">Negativo</option>
+                          <option value="inconclusive">Inconclusivo</option>
+                        </select>
+                        <p className="text-xs text-blue-800">Marque o resultado somente quando a análise estiver concluída.</p>
+                      </div>
+                    )}
 
                     {surveyData.sampleCollected && (
                       <div className="space-y-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in zoom-in duration-300">
