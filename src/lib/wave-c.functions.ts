@@ -607,7 +607,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     const cycleIds = yearCycles.map((cycle: any) => cycle.id);
     const { data: visits, error: visitError } = await supabaseAdmin
       .from("visits")
-      .select("id, cycle_id, visit_date, status, has_focus, focus_analysis_status, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
+      .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
       .eq("property_id", data.propertyId)
       .in("cycle_id", cycleIds)
       .order("visit_date", { ascending: false });
@@ -620,7 +620,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
         has_focus: Boolean(visit.has_focus),
-        focus_analysis_status: visit.focus_analysis_status ?? null,
+        focus_analysis_status: visit.has_focus ? "positive" : null,
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -739,7 +739,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
         idChunks.map((ids) => {
           let query = supabaseAdmin
             .from("visits")
-            .select("id, property_id, agent_id, has_focus, focus_analysis_status, status, visit_date")
+            .select("id, property_id, agent_id, has_focus, status, visit_date")
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
@@ -765,10 +765,10 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
-      if (v.has_focus || v.focus_analysis_status === "positive") {
+      if (v.has_focus) {
         focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
       }
-      if (v.focus_analysis_status === "positive") positiveVisitIds.add(v.id);
+      if (v.has_focus) positiveVisitIds.add(v.id);
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);

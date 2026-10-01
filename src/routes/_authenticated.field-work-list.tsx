@@ -584,7 +584,6 @@ function FieldWorkListPage() {
             status,
             activity_type,
             has_focus,
-            focus_analysis_status,
             treatment_applied,
             treatment_amount,
             larvicide_unit,
@@ -808,7 +807,7 @@ function FieldWorkListPage() {
               ...p,
               status: latestVisit?.status || "not_visited",
               has_focus: latestVisit?.has_focus || latestVisit?.visit_deposits?.some((d: any) => d.is_positive) || false,
-              has_positive_focus: latestVisit?.focus_analysis_status === "positive",
+              has_positive_focus: Boolean(latestVisit?.has_focus),
               treatment_applied: latestVisit?.treatment_applied || latestVisit?.visit_deposits?.some((d: any) => d.is_treated) || false,
               is_pending: latestVisit?.activity_type === 'pending' || latestVisit?.status === 'closed' || latestVisit?.status === 'refused',
               latest_visit: latestVisit

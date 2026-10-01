@@ -536,7 +536,7 @@ function PropertyVisitPage() {
             remote: () =>
               supabase
                 .from("visits")
-                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, focus_analysis_status, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
+                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
                 .eq("property_id", propertyId as string)
                 .eq("agent_id", user.id)
                 .eq("cycle_id", session.cycle_id as string)
@@ -585,7 +585,9 @@ function PropertyVisitPage() {
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
               sampleCollected: existingVisit.sample_collected || false,
-              focusAnalysisStatus: existingVisit.focus_analysis_status ?? (existingVisit.sample_collected ? "pending" : null),
+              focusAnalysisStatus: existingVisit.has_focus
+                ? (existingVisit.sample_collected ? "pending" : null)
+                : null,
               tubitosColetados: existingVisit.tubitos_coletados || 0,
               treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
               treatmentAmount: existingVisit.activity_type === 'infestation_survey' ? (Number(existingVisit.treatment_amount) || 0) : 0,
@@ -829,9 +831,6 @@ function PropertyVisitPage() {
           ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)
           : false,
         sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
-        focus_analysis_status: (status === 'visited' && activity === 'survey' && (surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected)
-          ? (surveyData.focusAnalysisStatus || "pending")
-          : null,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
         treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
