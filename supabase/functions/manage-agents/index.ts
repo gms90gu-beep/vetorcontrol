@@ -312,7 +312,8 @@ serve(async (req) => {
 
     throw new Error("Invalid action: " + action);
   } catch (error) {
-    console.error("[manage-agents] Error:", error.message);
-    return jsonResponse({ error: error.message }, 400);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[manage-agents] Error:", message);
+    return jsonResponse({ error: message }, 400);
   }
 });
