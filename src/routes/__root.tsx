@@ -9,6 +9,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -49,7 +50,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   const e = error as any;
   const msg = String(e?.message || error || "");

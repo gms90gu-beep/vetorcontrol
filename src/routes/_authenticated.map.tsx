@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
@@ -19,14 +19,15 @@ const OperationalMapView = lazy(() => {
     });
 });
 
-function MapRouteErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function MapRouteErrorComponent({ error, reset }: ErrorComponentProps) {
+  const routeError = error instanceof Error ? error : new Error(String(error));
   useEffect(() => {
     console.error("[MAP_ROUTE_ERROR_BOUNDARY]", {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
+      message: routeError.message,
+      stack: routeError.stack,
+      name: routeError.name,
     });
-  }, [error]);
+  }, [routeError.message, routeError.name, routeError.stack]);
   return (
     <div className="container mx-auto max-w-3xl p-6">
       <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
@@ -35,8 +36,8 @@ function MapRouteErrorComponent({ error, reset }: { error: Error; reset: () => v
           Verifique o console (procure por <code>[MAP_*]</code>) para o stack trace completo.
         </p>
         <pre className="text-xs bg-background p-3 rounded border overflow-auto max-h-64 whitespace-pre-wrap">
-{error.name}: {error.message}
-{error.stack}
+{routeError.name}: {routeError.message}
+{routeError.stack}
         </pre>
         <button
           onClick={() => reset()}
