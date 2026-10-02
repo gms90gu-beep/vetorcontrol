@@ -67,6 +67,26 @@ const PROPERTY_TYPE_MAP: Record<string, string> = {
   "VACANT_LOT": "Terreno Baldio"
 };
 
+function formatPropertyReference(property: any): string | undefined {
+  if (!property) return undefined;
+
+  const parts: string[] = [];
+  if (property.number != null && String(property.number).trim()) {
+    parts.push(`Imóvel ${property.number}`);
+  }
+
+  const type = property.type ? PROPERTY_TYPE_MAP[property.type] || property.type : null;
+  if (type) parts.push(type);
+  if (property.sequence != null && String(property.sequence).trim()) {
+    parts.push(`Sequência ${property.sequence}`);
+  }
+
+  const complement = String(property.complement ?? "").trim();
+  if (complement) parts.push(`Compl. ${complement}`);
+
+  return parts.length ? parts.join(" · ") : undefined;
+}
+
 const PROPERTY_STATUS_MAP: Record<string, string> = {
   "active": "Aberto",
   "pending": "Pendente",
@@ -1013,7 +1033,7 @@ function PropertyVisitPage() {
         open={geoDialogOpen}
         propertyId={(property?.id as string) || (propertyId as string)}
         actorId={userId ?? null}
-        propertyLabel={property?.number ? `Imóvel ${property.number}` : undefined}
+        propertyLabel={formatPropertyReference(property)}
         onClose={async (saved, coords) => {
           setGeoDialogOpen(false);
           if (!saved) return;
