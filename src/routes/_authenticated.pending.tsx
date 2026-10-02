@@ -134,6 +134,7 @@ function PendingPage() {
   const [pendencies, setPendencies] = useState<EnrichedPendency[]>([]);
   const [cycles, setCycles] = useState<CycleOption[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [activeCycleId, setActiveCycleId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<EnrichedPendency | null>(null);
@@ -233,6 +234,7 @@ function PendingPage() {
       if (cancelled) return;
       const availableCycles = cycleRows || [];
       setCycles(availableCycles);
+      setActiveCycleId(activeCycle?.id || availableCycles.find((cycle) => cycle.status === "in_progress")?.id || "");
       const defaultCycleId = activeCycle?.id || availableCycles.find((cycle) => cycle.status === "in_progress")?.id || availableCycles[0]?.id || "";
       setSelectedCycleId(defaultCycleId);
       if (!defaultCycleId) setLoading(false);
@@ -262,8 +264,9 @@ function PendingPage() {
             .from("property_recovery_attempts")
             .select("*")
             .eq("property_id", propertyId)
+            .eq("cycle_id", selectedCycleId)
             .order("attempted_at", { ascending: true }),
-        filter: (a) => a.property_id === propertyId,
+        filter: (a) => a.property_id === propertyId && a.cycle_id === selectedCycleId,
       });
       const sorted = [...(data || [])].sort((a, b) => {
         const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;
@@ -421,6 +424,7 @@ function PendingPage() {
             <DetailsPanel
               pendency={selected}
               attempts={attempts}
+              canAttempt={selectedCycleId === activeCycleId}
               onAttempt={() => setAttemptDialogOpen(true)}
             />
           )}
@@ -507,10 +511,12 @@ function PendencyCard({ p, onClick }: { p: EnrichedPendency; onClick: () => void
 function DetailsPanel({
   pendency,
   attempts,
+  canAttempt,
   onAttempt,
 }: {
   pendency: EnrichedPendency;
   attempts: Attempt[];
+  canAttempt: boolean;
   onAttempt: () => void;
 }) {
   return (
@@ -548,7 +554,7 @@ function DetailsPanel({
           </div>
         )}
 
-        {!pendency.resolved_at && (
+        {!pendency.resolved_at && canAttempt && (
           <Button onClick={onAttempt} className="w-full gap-2 bg-primary">
             <RefreshCw className="h-4 w-4" />
             Realizar Nova Tentativa
