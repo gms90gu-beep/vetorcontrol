@@ -2195,6 +2195,39 @@ export function DailyWorkCloser({
       const closedBlockId = (activeSessionForClose as any)?.block_id ?? activeSessionForClose?.block_number ?? null;
       console.log("[SESSION_END]", { session_id: closedSessionId, block_id: closedBlockId });
 
+      // Online, só declaramos persistência concluída depois que a fila crítica
+      // foi enviada e o DWR pôde ser lido de volta pela chave canônica.
+      let dwrConfirmedRemotely = false;
+      let closePendingSync = !isOnline();
+      if (isOnline()) {
+        const syncResult = await flushMutations({ retryErroredImmediately: true });
+        const { data: confirmedDwr, error: confirmError } = await supabase
+          .from("daily_work_records")
+          .select("id, updated_at")
+          .eq("agent_id", recordData.agent_id)
+          .eq("work_date", recordData.work_date)
+          .maybeSingle();
+        const remoteUpdatedAt = confirmedDwr?.updated_at
+          ? Date.parse(confirmedDwr.updated_at)
+          : Number.NaN;
+        const closeUpdatedAt = Date.parse(recordData.updated_at);
+        dwrConfirmedRemotely =
+          syncResult.failed === 0 &&
+          !confirmError &&
+          Boolean(confirmedDwr?.id) &&
+          Number.isFinite(remoteUpdatedAt) &&
+          remoteUpdatedAt >= closeUpdatedAt;
+        closePendingSync = !dwrConfirmedRemotely;
+        console.log("[DAY_CLOSE_REMOTE_CONFIRMATION]", {
+          agent_id: recordData.agent_id,
+          work_date: recordData.work_date,
+          confirmed: dwrConfirmedRemotely,
+          sync_ok: syncResult.ok,
+          sync_failed: syncResult.failed,
+          error: confirmError?.message ?? null,
+        });
+      }
+
       // 5) Limpeza completa do estado operacional local
       // NAO zera jornadaDate/resolvedCloseDate aqui: a tela de Resumo
       // Diario (showSummary) que abre logo em seguida ainda usa esses
@@ -2233,10 +2266,15 @@ export function DailyWorkCloser({
       // Jornada efetivamente finalizada agora — seguro liberar uma
       // atualização de PWA pendente (aplicada só a partir daqui).
       try { (window as any).__vcSetJourneyActive?.(false); } catch {}
-      const msg = isOnline()
-        ? "Trabalho do dia encerrado com sucesso!"
-        : "Jornada encerrada localmente. Será sincronizada quando houver conexão.";
-      toast.success(msg);
+      if (dwrConfirmedRemotely) {
+        toast.success("Trabalho do dia encerrado e salvo na base de dados!");
+      } else if (closePendingSync) {
+        toast.warning(
+          isOnline()
+            ? "Jornada encerrada localmente, mas o relatório ainda aguarda sincronização. Use Sincronização para tentar novamente."
+            : "Jornada encerrada localmente. Será sincronizada quando houver conexão.",
+        );
+      }
       setShowSummary(true);
       setIsOpen(false);
     } catch (error: any) {

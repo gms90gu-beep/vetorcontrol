@@ -26,12 +26,14 @@ export function attachResilientTileLayer(
     TILE_PROVIDERS.findIndex((p) => p.id === opts?.startId),
   );
   let idx = startIdx === -1 ? 0 : startIdx;
+  const attempted = new Set<number>();
   let errors = 0;
   let layer: L.TileLayer;
 
   const build = (provider: TileProvider) => {
     const next = L.tileLayer(provider.url, {
       maxZoom: provider.maxZoom,
+      maxNativeZoom: provider.maxNativeZoom,
       subdomains: provider.subdomains as any,
       attribution: provider.attribution,
       crossOrigin: true,
@@ -44,8 +46,11 @@ export function attachResilientTileLayer(
         coords: (e as any)?.coords,
       });
       if (errors >= threshold) {
-        if (idx < TILE_PROVIDERS.length - 1) {
-          idx += 1;
+        attempted.add(idx);
+        if (attempted.size < TILE_PROVIDERS.length) {
+          let nextIdx = (idx + 1) % TILE_PROVIDERS.length;
+          while (attempted.has(nextIdx)) nextIdx = (nextIdx + 1) % TILE_PROVIDERS.length;
+          idx = nextIdx;
           errors = 0;
           mapLogger.warn("tile-fallback", "switching provider", {
             to: TILE_PROVIDERS[idx].id,

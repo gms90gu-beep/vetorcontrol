@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 
 import {
   MapContainer,
-  TileLayer,
   CircleMarker,
   Popup,
   useMap,
@@ -12,6 +11,7 @@ import {
 import L from "leaflet";
 // CSS de Leaflet/MarkerCluster vai no shell (src/styles.css) p/ evitar chunks offline.
 import "leaflet.heat";
+import { attachResilientTileLayer } from "@/components/map/shared";
 
 import {
   getPropertyMapPoints,
@@ -142,16 +142,12 @@ function isValidCoord(lat: unknown, lng: unknown): boolean {
 }
 
 type BaseLayerId = "osm" | "esri";
-const BASE_LAYERS: Record<BaseLayerId, { name: string; url: string; attribution: string }> = {
+const BASE_LAYERS: Record<BaseLayerId, { name: string }> = {
   osm: {
     name: "OpenStreetMap",
-    url: "https://{s}.tile.openstreetmap.org/{z}/{y}/{x}.png",
-    attribution: "&copy; OpenStreetMap",
   },
   esri: {
     name: "Satélite (Esri)",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Tiles &copy; Esri",
   },
 };
 
@@ -175,6 +171,9 @@ export default function OperationalMapView() {
   const [showBlocks, setShowBlocks] = useState(false);
   const [showProperties, setShowProperties] = useState(true);
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
+  const [tileProvidersFailed, setTileProvidersFailed] = useState(false);
+  const handleTileReady = useCallback(() => setTileProvidersFailed(false), []);
+  const handleTileFailure = useCallback(() => setTileProvidersFailed(true), []);
   const [fullscreen, setFullscreen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selected, setSelected] = useState<PropertyMapPoint | null>(null);
@@ -625,10 +624,17 @@ export default function OperationalMapView() {
                     showProperties={showProperties}
                     blocks={blocks.data?.blocks ?? []}
                     baseLayer={baseLayer}
+                    onTileReady={handleTileReady}
+                    onTileFailure={handleTileFailure}
                     selectedId={selected?.id ?? null}
                     onSelectPoint={handleSelectPoint}
                     flyTo={flyTo}
                   />
+                  {tileProvidersFailed && (
+                    <div className="absolute inset-x-3 top-3 z-[500] rounded-xl border border-amber-300 bg-amber-50/95 px-3 py-2 text-center text-xs font-medium text-amber-900 shadow-md backdrop-blur">
+                      Os dados foram carregados, mas os provedores do mapa não responderam. Verifique a conexão e tente atualizar.
+                    </div>
+                  )}
                   {/* Floating glass legend */}
                   <div className="absolute bottom-3 left-3 z-[400] bg-card/80 backdrop-blur-xl border rounded-xl px-3 py-2 shadow-lg hidden sm:flex items-center gap-3 text-[11px] animate-in fade-in slide-in-from-bottom-2">
                     {(Object.keys(CATEGORY_META) as Category[]).map((k) => (
@@ -1262,6 +1268,8 @@ function SafeMap({
   showProperties,
   blocks,
   baseLayer,
+  onTileReady,
+  onTileFailure,
   selectedId,
   onSelectPoint,
   flyTo,
@@ -1274,12 +1282,13 @@ function SafeMap({
   showProperties: boolean;
   blocks: BlockRiskScore[];
   baseLayer: BaseLayerId;
+  onTileReady: () => void;
+  onTileFailure: () => void;
   selectedId: string | null;
   onSelectPoint: (p: PropertyMapPoint) => void;
   flyTo: { lat: number; lng: number; ts: number } | null;
 }) {
   try {
-    const base = BASE_LAYERS[baseLayer];
     return (
       <MapContainer
         center={center}
@@ -1289,7 +1298,7 @@ function SafeMap({
         preferCanvas
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer key={baseLayer} attribution={base.attribution} url={base.url} />
+        <ResilientBaseLayer requested={baseLayer} onReady={onTileReady} onFailure={onTileFailure} />
         <FitBounds points={visiblePoints} />
         <FlyController target={flyTo} />
         {showHeat && <HeatLayer points={visiblePoints} mode={heatMode} />}
@@ -1334,6 +1343,33 @@ function SafeMap({
       </div>
     );
   }
+}
+
+function ResilientBaseLayer({
+  requested,
+  onReady,
+  onFailure,
+}: {
+  requested: BaseLayerId;
+  onReady: () => void;
+  onFailure: () => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    onReady();
+    const handle = attachResilientTileLayer(map, {
+      startId: requested === "esri" ? "esri-imagery" : "osm",
+      onProviderChange: (provider) => {
+        console.info("[MAP_TILE_PROVIDER]", { provider: provider.id });
+      },
+      onAllFailed: () => {
+        console.error("[MAP_TILE_ERROR]", { reason: "all_providers_failed" });
+        onFailure();
+      },
+    });
+    return () => handle.destroy();
+  }, [map, onFailure, onReady, requested]);
+  return null;
 }
 
 function FlyController({ target }: { target: { lat: number; lng: number; ts: number } | null }) {
