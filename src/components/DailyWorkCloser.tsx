@@ -2203,11 +2203,20 @@ export function DailyWorkCloser({
         const syncResult = await flushMutations({ retryErroredImmediately: true });
         const { data: confirmedDwr, error: confirmError } = await supabase
           .from("daily_work_records")
-          .select("id")
+          .select("id, updated_at")
           .eq("agent_id", recordData.agent_id)
           .eq("work_date", recordData.work_date)
           .maybeSingle();
-        dwrConfirmedRemotely = !confirmError && Boolean(confirmedDwr?.id);
+        const remoteUpdatedAt = confirmedDwr?.updated_at
+          ? Date.parse(confirmedDwr.updated_at)
+          : Number.NaN;
+        const closeUpdatedAt = Date.parse(recordData.updated_at);
+        dwrConfirmedRemotely =
+          syncResult.failed === 0 &&
+          !confirmError &&
+          Boolean(confirmedDwr?.id) &&
+          Number.isFinite(remoteUpdatedAt) &&
+          remoteUpdatedAt >= closeUpdatedAt;
         closePendingSync = !dwrConfirmedRemotely;
         console.log("[DAY_CLOSE_REMOTE_CONFIRMATION]", {
           agent_id: recordData.agent_id,
