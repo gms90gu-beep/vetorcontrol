@@ -184,7 +184,7 @@ export function OperationalDashboard() {
         count,
       }))
       .sort((a, b) => b.count - a.count);
-    return { total: pendencies.length, byStatus, byAgentRows };
+    return { total: pendencies.filter((p) => !!cycleFilter && p.cycle_id === cycleFilter).length, byStatus, byAgentRows };
   }, [pendencies, agents, cycleFilter]);
 
   return (
