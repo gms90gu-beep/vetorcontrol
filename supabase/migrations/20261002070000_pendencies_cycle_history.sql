@@ -41,7 +41,7 @@ UPDATE public.property_recovery_attempts pra
 SET cycle_id = c.id
 FROM public.cycles c
 WHERE pra.cycle_id IS NULL
-  AND pra.attempted_at::date BETWEEN c.start_date AND c.end_date;
+  AND timezone('America/Sao_Paulo', pra.attempted_at)::date BETWEEN c.start_date AND c.end_date;
 
 UPDATE public.property_pendencies p
 SET cycle_id = (
@@ -62,7 +62,7 @@ UPDATE public.property_pendencies p
 SET cycle_id = c.id
 FROM public.cycles c
 WHERE p.cycle_id IS NULL
-  AND COALESCE(p.last_attempt_at, p.created_at)::date BETWEEN c.start_date AND c.end_date;
+  AND timezone('America/Sao_Paulo', COALESCE(p.last_attempt_at, p.created_at))::date BETWEEN c.start_date AND c.end_date;
 
 ALTER TABLE public.property_pendencies
   DROP CONSTRAINT IF EXISTS property_pendencies_property_id_key;
@@ -127,7 +127,7 @@ BEGIN
   IF resolved_cycle_id IS NULL THEN
     SELECT c.id INTO resolved_cycle_id
     FROM public.cycles c
-    WHERE NEW.attempted_at::date BETWEEN c.start_date AND c.end_date
+    WHERE timezone('America/Sao_Paulo', NEW.attempted_at)::date BETWEEN c.start_date AND c.end_date
     ORDER BY c.start_date DESC
     LIMIT 1;
   END IF;
@@ -136,7 +136,9 @@ BEGIN
 
   SELECT COALESCE(MAX(attempt_number), 0) + 1 INTO next_attempt
   FROM public.property_recovery_attempts
-  WHERE property_id = NEW.property_id AND id <> NEW.id;
+  WHERE property_id = NEW.property_id
+    AND cycle_id IS NOT DISTINCT FROM resolved_cycle_id
+    AND id <> NEW.id;
 
   UPDATE public.property_recovery_attempts
   SET attempt_number = next_attempt, cycle_id = resolved_cycle_id
