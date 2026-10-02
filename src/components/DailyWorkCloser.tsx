@@ -1297,6 +1297,7 @@ export function DailyWorkCloser({
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
+          .eq("cycle_id", activeCycle?.id ?? "")
           .is("resolved_at", null);
         setPendingCount(pCount || 0);
 
@@ -1304,6 +1305,7 @@ export function DailyWorkCloser({
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
+          .eq("cycle_id", activeCycle?.id ?? "")
           .gte("resolved_at", startOfDayIso)
           .lte("resolved_at", endOfDayIso);
         setRecoveredCount(rCount || 0);
