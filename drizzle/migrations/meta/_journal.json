@@ -8,6 +8,13 @@
       "when": 1790979517114,
       "tag": "0000_fix_daily_close_consolidation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790979697671,
+      "tag": "0001_restrict_dwr_trigger_function",
+      "breakpoints": true
     }
   ]
 }
