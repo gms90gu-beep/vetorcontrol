@@ -81,7 +81,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     (input: {
       from: string;
       to: string;
-      cycleId?: string | null;
+      cycleId: string;
       supervisorId?: string | null;
       agentId?: string | null;
       municipality?: string | null;
@@ -129,7 +129,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .in("agent_id", scopedProfiles)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
-    if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
+    dwrQ = dwrQ.eq("cycle_id", data.cycleId);
     const { data: dwr, error: de } = await dwrQ;
     if (de) throw new Error(de.message);
 
@@ -139,7 +139,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
       .in("agent_id", scopedProfiles);
-    if (data.cycleId) pendQ = pendQ.eq("cycle_id", data.cycleId);
+    pendQ = pendQ.eq("cycle_id", data.cycleId);
     const { count: pendOpen } = await pendQ;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
