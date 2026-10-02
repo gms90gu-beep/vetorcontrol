@@ -134,11 +134,13 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     if (de) throw new Error(de.message);
 
     // Pendencies open (no resolved_at) — agent_id é profile_id
-    const { count: pendOpen } = await supabase
+    let pendQ = supabase
       .from("property_pendencies")
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
       .in("agent_id", scopedProfiles);
+    if (data.cycleId) pendQ = pendQ.eq("cycle_id", data.cycleId);
+    const { count: pendOpen } = await pendQ;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
@@ -716,12 +718,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     // ocultem visitas e pendências de agentes subordinados.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = await Promise.all(
-      idChunks.map((ids) =>
-        supabaseAdmin
+      idChunks.map((ids) => {
+        let pendingQuery = supabaseAdmin
           .from("property_pendencies")
-          .select("property_id, resolved_at")
-          .in("property_id", ids),
-      ),
+          .select("property_id, cycle_id, resolved_at")
+          .in("property_id", ids);
+        if (data.cycleIds?.length) pendingQuery = pendingQuery.in("cycle_id", data.cycleIds);
+        return pendingQuery;
+      }),
     );
     const pendError = pendResults.find((result) => result.error)?.error;
     if (pendError) throw new Error(`Falha ao carregar pendências do mapa: ${pendError.message}`);
