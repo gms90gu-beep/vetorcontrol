@@ -1,6 +1,9 @@
 # Tarefas
 
-- [x] Remover referências ao campo inexistente de análise de foco nas consultas de visitas.
-- [x] Corrigir o tratamento de erro da função de gestão de agentes.
-- [x] Aplicar a atualização rotineira de segurança dos pacotes.
-- [x] Confirmar que a prévia volta a compilar sem erros.
+- [x] Diagnosticar a falha de carregamento dos mapas.
+- [x] Diagnosticar fechamentos ausentes nos relatórios.
+- [ ] Adotar fallback resiliente no mapa operacional.
+- [ ] Confirmar persistência remota antes do sucesso do fechamento online.
+- [ ] Corrigir o gatilho e a reconstrução de registros diários no banco.
+- [ ] Validar mapas, fechamento online/offline, relatórios, testes e segurança.
+- [ ] Aguardar autorização específica para reconstrução dos 28 pares históricos ausentes.
