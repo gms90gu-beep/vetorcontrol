@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 
@@ -172,6 +172,8 @@ export default function OperationalMapView() {
   const [showProperties, setShowProperties] = useState(true);
   const [baseLayer, setBaseLayer] = useState<BaseLayerId>("osm");
   const [tileProvidersFailed, setTileProvidersFailed] = useState(false);
+  const handleTileReady = useCallback(() => setTileProvidersFailed(false), []);
+  const handleTileFailure = useCallback(() => setTileProvidersFailed(true), []);
   const [fullscreen, setFullscreen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selected, setSelected] = useState<PropertyMapPoint | null>(null);
@@ -622,8 +624,8 @@ export default function OperationalMapView() {
                     showProperties={showProperties}
                     blocks={blocks.data?.blocks ?? []}
                     baseLayer={baseLayer}
-                    onTileReady={() => setTileProvidersFailed(false)}
-                    onTileFailure={() => setTileProvidersFailed(true)}
+                    onTileReady={handleTileReady}
+                    onTileFailure={handleTileFailure}
                     selectedId={selected?.id ?? null}
                     onSelectPoint={handleSelectPoint}
                     flyTo={flyTo}
