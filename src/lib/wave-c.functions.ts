@@ -298,7 +298,7 @@ export interface PendencyReportResult {
 
 export const getPendencyReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { supervisorId?: string | null; onlyOpen?: boolean; limit?: number }) => input)
+  .inputValidator((input: { cycleId: string; supervisorId?: string | null; onlyOpen?: boolean; limit?: number }) => input)
   .handler(async ({ data, context }): Promise<PendencyReportResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
@@ -320,6 +320,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .from("property_pendencies")
       .select("*")
       .in("agent_id", profileIds)
+      .eq("cycle_id", data.cycleId)
       .order("last_attempt_at", { ascending: false })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
