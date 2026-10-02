@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +42,7 @@ function isoOffset(days: number) {
 
 function ExecutiveDashboardPage() {
   const { online } = useSyncStatus();
+  const { user } = useAuth();
 
   // ⛔ Bloquear acesso offline: Dashboard administrativo requer conexão
   if (!online) {
@@ -48,7 +51,7 @@ function ExecutiveDashboardPage() {
 
   const [from, setFrom] = useState(isoOffset(-30));
   const [to, setTo] = useState(isoOffset(0));
-  const [cycleId, setCycleId] = useState<string>("all");
+  const [cycleId, setCycleId] = useState<string>("");
   const [supervisorId, setSupervisorId] = useState<string>("all");
   const [municipality, setMunicipality] = useState<string>("all");
 
@@ -57,8 +60,9 @@ function ExecutiveDashboardPage() {
   const [cities, setCities] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
-      const [c, s, cs] = await Promise.all([
+      const [c, s, cs, activeCycle] = await Promise.all([
         listRemoteOrCache<any>({
           name: "cycles",
           remote: async () => await supabase.from("cycles").select("id, name, number, year").order("year", { ascending: false }),
@@ -72,12 +76,14 @@ function ExecutiveDashboardPage() {
           name: "profiles",
           remote: async () => await supabase.from("profiles").select("city"),
         }),
+        getActiveCycleForUser(user.id),
       ]);
       setCycles(c || []);
+      setCycleId(activeCycle?.id || c?.[0]?.id || "");
       setSupervisors(s || []);
       setCities(Array.from(new Set((cs ?? []).map((x: any) => x.city).filter(Boolean))) as string[]);
     })();
-  }, []);
+  }, [user?.id]);
 
   const fetchDash = useServerFn(getExecutiveDashboard);
   const { data, isLoading, isFetching, refetch } = useQuery({
@@ -86,11 +92,12 @@ function ExecutiveDashboardPage() {
       fetchDash({
         data: {
           from, to,
-          cycleId: cycleId === "all" ? null : cycleId,
+          cycleId,
           supervisorId: supervisorId === "all" ? null : supervisorId,
           municipality: municipality === "all" ? null : municipality,
         },
       }),
+    enabled: Boolean(cycleId),
   });
 
   const k = data?.kpis;
@@ -186,7 +193,6 @@ function ExecutiveDashboardPage() {
               <Select value={cycleId} onValueChange={setCycleId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
                   {cycles.map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number}/${c.year}`}</SelectItem>
                   ))}
