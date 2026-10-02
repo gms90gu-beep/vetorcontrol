@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -42,7 +41,6 @@ function isoOffset(days: number) {
 
 function ExecutiveDashboardPage() {
   const { online } = useSyncStatus();
-  const { user } = useAuth();
 
   // ⛔ Bloquear acesso offline: Dashboard administrativo requer conexão
   if (!online) {
@@ -60,8 +58,9 @@ function ExecutiveDashboardPage() {
   const [cities, setCities] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!user) return;
     (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       const [c, s, cs, activeCycle] = await Promise.all([
         listRemoteOrCache<any>({
           name: "cycles",
@@ -83,7 +82,7 @@ function ExecutiveDashboardPage() {
       setSupervisors(s || []);
       setCities(Array.from(new Set((cs ?? []).map((x: any) => x.city).filter(Boolean))) as string[]);
     })();
-  }, [user?.id]);
+  }, []);
 
   const fetchDash = useServerFn(getExecutiveDashboard);
   const { data, isLoading, isFetching, refetch } = useQuery({
