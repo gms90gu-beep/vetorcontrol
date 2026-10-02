@@ -7,6 +7,7 @@ export type TileProvider = {
   url: string;
   attribution: string;
   maxZoom: number;
+  maxNativeZoom?: number;
   subdomains?: string;
 };
 
@@ -18,6 +19,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: "© OpenStreetMap",
     maxZoom: 19,
+    maxNativeZoom: 19,
   },
   {
     id: "esri-imagery",
@@ -25,6 +27,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "© Esri, Maxar, Earthstar Geographics",
     maxZoom: 19,
+    maxNativeZoom: 17,
   },
 ];
 

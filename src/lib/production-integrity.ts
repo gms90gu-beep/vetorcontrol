@@ -128,7 +128,7 @@ export async function runProductionIntegrity(
       const { data: dwr } = await supabase
         .from("daily_work_records")
         .select("properties_worked, properties_closed, properties_refused, positive_foci, deposits_inspected")
-        .eq("legacy_agent_id", agentId)
+        .eq("agent_id", agentId)
         .eq("work_date", workDate)
         .maybeSingle();
       if (dwr) {

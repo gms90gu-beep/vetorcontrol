@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
   MapContainer,
-  TileLayer,
   CircleMarker,
   Popup,
   useMap,
@@ -12,6 +11,7 @@ import {
 import L from "leaflet";
 // CSS de Leaflet/MarkerCluster vai no shell (src/styles.css) p/ evitar chunks offline.
 import "leaflet.heat";
+import { attachResilientTileLayer } from "@/components/map/shared";
 
 import {
   getPropertyMapPoints,
@@ -1279,7 +1279,6 @@ function SafeMap({
   flyTo: { lat: number; lng: number; ts: number } | null;
 }) {
   try {
-    const base = BASE_LAYERS[baseLayer];
     return (
       <MapContainer
         center={center}
@@ -1289,7 +1288,7 @@ function SafeMap({
         preferCanvas
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer key={baseLayer} attribution={base.attribution} url={base.url} />
+        <ResilientBaseLayer requested={baseLayer} />
         <FitBounds points={visiblePoints} />
         <FlyController target={flyTo} />
         {showHeat && <HeatLayer points={visiblePoints} mode={heatMode} />}
@@ -1334,6 +1333,23 @@ function SafeMap({
       </div>
     );
   }
+}
+
+function ResilientBaseLayer({ requested }: { requested: BaseLayerId }) {
+  const map = useMap();
+  useEffect(() => {
+    const handle = attachResilientTileLayer(map, {
+      startId: requested === "esri" ? "esri-imagery" : "osm",
+      onProviderChange: (provider) => {
+        console.info("[MAP_TILE_PROVIDER]", { provider: provider.id });
+      },
+      onAllFailed: () => {
+        console.error("[MAP_TILE_ERROR]", { reason: "all_providers_failed" });
+      },
+    });
+    return () => handle.destroy();
+  }, [map, requested]);
+  return null;
 }
 
 function FlyController({ target }: { target: { lat: number; lng: number; ts: number } | null }) {
