@@ -1,60 +1,97 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export interface FocusObservation {
-  quarteirão: string;
-  imóvel: string;
-  tipoDepósito: string;
-  data: string;
-  tipoImóvel: string;
+  quarteirao: string;
+  numeroImovel: string;
+  endereco: string;
+  tipoDeposito: string;
+  quantidade: number | null;
+  dataColeta: string;
+  tipoImovel: string;
+}
+
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  residence: "Residencial",
+  commerce: "Comercial",
+  vacant_lot: "Terreno baldio",
+  strategic_point: "Ponto estratégico",
+  others: "Outro",
+};
+
+function formatCollectionDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  const dateKey = String(value).slice(0, 10);
+  const date = new Date(`${dateKey}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("pt-BR");
 }
 
 export async function fetchFocusObservations(
   agentId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<FocusObservation[]> {
   try {
     const { data, error } = await supabase
-      .from('visits')
-      .select(`
+      .from("visits")
+      .select(
+        `
         visit_date,
         has_focus,
-        visit_deposits (type_code),
-        properties (block_number, address, property_type)
-      `)
-      .eq('agent_id', agentId)
-      .eq('has_focus', true)
-      .gte('visit_date', startDate)
-      .lte('visit_date', endDate)
-      .order('visit_date', { ascending: true });
+        visit_deposits (type_code, quantity, is_positive),
+        properties (number, block_number, street_name, type)
+      `,
+      )
+      .eq("agent_id", agentId)
+      .gte("visit_date", startDate)
+      .lt("visit_date", `${endDate}T23:59:59.999Z`)
+      .order("visit_date", { ascending: true });
 
     if (error) {
-      console.error('[FOCUS_OBSERVATIONS] Erro ao buscar focos:', error);
+      console.error("[FOCUS_OBSERVATIONS] Erro ao buscar focos:", error);
       return [];
     }
 
     if (!data) return [];
 
-    // Transformar dados em FocusObservation
     const observations: FocusObservation[] = [];
-    
+
     data.forEach((visit: any) => {
-      if (visit.visit_deposits && visit.properties) {
-        visit.visit_deposits.forEach((deposit: any) => {
+      const property = Array.isArray(visit.properties) ? visit.properties[0] : visit.properties;
+      if (!property) return;
+
+      const positiveDeposits = (visit.visit_deposits || []).filter(
+        (deposit: any) => deposit.is_positive === true,
+      );
+      if (positiveDeposits.length > 0) {
+        positiveDeposits.forEach((deposit: any) => {
           observations.push({
-            quarteirão: visit.properties.block_number || '-',
-            imóvel: visit.properties.address || '-',
-            tipoDepósito: deposit.type_code || '-',
-            data: new Date(visit.visit_date).toLocaleDateString('pt-BR'),
-            tipoImóvel: visit.properties.property_type || '-',
+            quarteirao: property.block_number || "—",
+            numeroImovel: property.number || "—",
+            endereco: property.street_name || "—",
+            tipoDeposito: deposit.type_code || "—",
+            quantidade: deposit.quantity == null ? null : Number(deposit.quantity) || 0,
+            dataColeta: formatCollectionDate(visit.visit_date),
+            tipoImovel: PROPERTY_TYPE_LABELS[property.type] || property.type || "—",
           });
+        });
+      } else if (visit.has_focus === true) {
+        // Mantém rastreabilidade para registros antigos que tinham foco geral,
+        // mas não possuíam o depósito positivo detalhado.
+        observations.push({
+          quarteirao: property.block_number || "—",
+          numeroImovel: property.number || "—",
+          endereco: property.street_name || "—",
+          tipoDeposito: "Não informado",
+          quantidade: null,
+          dataColeta: formatCollectionDate(visit.visit_date),
+          tipoImovel: PROPERTY_TYPE_LABELS[property.type] || property.type || "—",
         });
       }
     });
 
     return observations;
   } catch (err) {
-    console.error('[FOCUS_OBSERVATIONS] Erro:', err);
+    console.error("[FOCUS_OBSERVATIONS] Erro:", err);
     return [];
   }
 }

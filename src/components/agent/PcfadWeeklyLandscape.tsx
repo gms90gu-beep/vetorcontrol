@@ -8,6 +8,8 @@ import {
   PCFAD_DASH,
   type PcfadRow,
 } from "@/lib/pcfad-week";
+import { fetchFocusObservations, type FocusObservation } from "@/lib/focus-observations";
+import { FocusObservationsGrid } from "@/components/FocusObservationsGrid";
 import { useOrientation } from "@/hooks/useOrientation";
 
 /**
@@ -36,6 +38,7 @@ export function PcfadWeeklyLandscape({
 }) {
   const isLandscape = useOrientation();
   const [rows, setRows] = useState<PcfadRow[]>([]);
+  const [focusObservations, setFocusObservations] = useState<FocusObservation[]>([]);
   const [loading, setLoading] = useState(false);
 
   const range = useMemo(() => epiWeekToDateRange(week, year), [week, year]);
@@ -46,13 +49,17 @@ export function PcfadWeeklyLandscape({
     (async () => {
       setLoading(true);
       const data = await buildPcfadWeekData({ agentAuthId, week, year });
+      const observations = await fetchFocusObservations(agentAuthId, range.start, range.end);
       if (!cancelled) {
         setRows(data.rows);
+        setFocusObservations(observations);
         setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [isLandscape, agentAuthId, week, year]);
+    return () => {
+      cancelled = true;
+    };
+  }, [isLandscape, agentAuthId, week, year, range.start, range.end]);
 
   const total = useMemo(() => sumPcfadRows(rows), [rows]);
 
@@ -61,8 +68,10 @@ export function PcfadWeeklyLandscape({
   const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
   const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
 
-  const th = "border border-slate-300 px-1 py-0.5 text-[9px] font-black uppercase tracking-tight text-center bg-slate-100 text-slate-700";
-  const td = "border border-slate-200 px-1 py-0.5 text-[10px] tabular-nums text-center text-slate-800";
+  const th =
+    "border border-slate-300 px-1 py-0.5 text-[9px] font-black uppercase tracking-tight text-center bg-slate-100 text-slate-700";
+  const td =
+    "border border-slate-200 px-1 py-0.5 text-[10px] tabular-nums text-center text-slate-800";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3 print:border-0 print:p-0">
@@ -85,20 +94,48 @@ export function PcfadWeeklyLandscape({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className={th} rowSpan={2}>Data</th>
-                <th className={th} colSpan={6}>Nº Imóveis trabalhados por tipo</th>
-                <th className={th} colSpan={7}>Depósitos inspecionados por tipo</th>
-                <th className={th} rowSpan={2}>Total dep.</th>
-                <th className={th} rowSpan={2}>Amostras</th>
-                <th className={th} rowSpan={2}>Quart.</th>
-                <th className={th} colSpan={6}>Imóveis tratados por tipo</th>
-                <th className={th} colSpan={3}>Depósitos</th>
-                <th className={th} colSpan={2}>Larvicida</th>
-                <th className={th} colSpan={2}>Inseticida 2</th>
-                <th className={th} colSpan={5}>Imóveis</th>
-                <th className={th} rowSpan={2}>IIP</th>
-                <th className={th} rowSpan={2}>Homem-dia</th>
-                <th className={th} rowSpan={2}>Rendim.</th>
+                <th className={th} rowSpan={2}>
+                  Data
+                </th>
+                <th className={th} colSpan={6}>
+                  Nº Imóveis trabalhados por tipo
+                </th>
+                <th className={th} colSpan={7}>
+                  Depósitos inspecionados por tipo
+                </th>
+                <th className={th} rowSpan={2}>
+                  Total dep.
+                </th>
+                <th className={th} rowSpan={2}>
+                  Amostras
+                </th>
+                <th className={th} rowSpan={2}>
+                  Quart.
+                </th>
+                <th className={th} colSpan={6}>
+                  Imóveis tratados por tipo
+                </th>
+                <th className={th} colSpan={3}>
+                  Depósitos
+                </th>
+                <th className={th} colSpan={2}>
+                  Larvicida
+                </th>
+                <th className={th} colSpan={2}>
+                  Inseticida 2
+                </th>
+                <th className={th} colSpan={5}>
+                  Imóveis
+                </th>
+                <th className={th} rowSpan={2}>
+                  IIP
+                </th>
+                <th className={th} rowSpan={2}>
+                  Homem-dia
+                </th>
+                <th className={th} rowSpan={2}>
+                  Rendim.
+                </th>
               </tr>
               <tr>
                 <th className={th}>R</th>
@@ -232,9 +269,11 @@ export function PcfadWeeklyLandscape({
       )}
 
       <p className="mt-2 text-[8px] font-semibold uppercase tracking-wider text-slate-400">
-        IIP = imóveis positivos ÷ imóveis inspecionados × 100. Campos sem dado no
-        sistema exibem "—". Fonte: relatórios diários (daily_work_records) da SE.
+        IIP = imóveis positivos ÷ imóveis inspecionados × 100. Campos sem dado no sistema exibem
+        "—". Fonte: relatórios diários (daily_work_records) da SE.
       </p>
+
+      <FocusObservationsGrid focos={focusObservations} />
     </div>
   );
 }

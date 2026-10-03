@@ -17,7 +17,8 @@ const SUPABASE_URL_FALLBACK = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
 const SUPABASE_PUBLISHABLE_FALLBACK =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0anpnc3p4cm5tY3N5Z3R6ZmN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTkyMDMsImV4cCI6MjA5NDQzNTIwM30.cP_-LNb9jIfeXFjUSZSh7Lf7JWQm2o9D7oYRrDweBsw";
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || SUPABASE_URL_FALLBACK;
+const supabaseUrl =
+  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || SUPABASE_URL_FALLBACK;
 const supabaseKey =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   process.env.VITE_SUPABASE_ANON_KEY ||
@@ -39,6 +40,16 @@ export default defineConfig({
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
       "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseKey),
       "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(supabaseProjectId),
+      // Server functions run in the published worker. Inject the same public
+      // Supabase configuration there too; otherwise requireSupabaseAuth can
+      // fail before the function reaches the database.
+      "process.env.SUPABASE_URL": JSON.stringify(supabaseUrl),
+      "process.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
+      "process.env.SUPABASE_PROJECT_URL": JSON.stringify(supabaseUrl),
+      "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
+      "process.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabaseKey),
+      "process.env.SUPABASE_ANON_KEY": JSON.stringify(supabaseKey),
+      "process.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseKey),
     },
     plugins: [
       VitePWA({
@@ -70,8 +81,7 @@ export default defineConfig({
             // 1) Navegações (HTML SSR): NetworkFirst.
             //    Cada rota visitada online fica cacheada e abre offline.
             {
-              urlPattern: ({ request, sameOrigin }) =>
-                sameOrigin && request.mode === "navigate",
+              urlPattern: ({ request, sameOrigin }) => sameOrigin && request.mode === "navigate",
               handler: "NetworkFirst",
               options: {
                 cacheName: "pages",

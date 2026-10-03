@@ -4,12 +4,8 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
-import {
-  buildPcfadWeekData,
-  pcfadIip,
-  PCFAD_DASH,
-  type PcfadRow,
-} from "@/lib/pcfad-week";
+import { buildPcfadWeekData, pcfadIip, PCFAD_DASH, type PcfadRow } from "@/lib/pcfad-week";
+import { fetchFocusObservations } from "@/lib/focus-observations";
 
 /**
  * BOLETIM SEMANAL — P.C.F.A.D. em PAISAGEM.
@@ -40,10 +36,10 @@ export async function generatePcfadWeeklyPDF(params: {
     const agentName = (profile as any)?.full_name || (agentRow as any)?.name || "—";
     const registration =
       (profile as any)?.registration_number || (agentRow as any)?.registration_id || "—";
-    const municipality =
-      (agentRow as any)?.municipality || (profile as any)?.city || "—";
+    const municipality = (agentRow as any)?.municipality || (profile as any)?.city || "—";
 
     const { rows, total, range } = await buildPcfadWeekData({ agentAuthId, week, year });
+    const focusObservations = await fetchFocusObservations(agentAuthId, range.start, range.end);
 
     const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
     const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
@@ -61,52 +57,69 @@ export async function generatePcfadWeeklyPDF(params: {
 
     pdf.setFontSize(8);
     pdf.setTextColor(80, 80, 80);
-    const cycleLabel = cycle?.number ? `Ciclo ${cycle.number}${cycle.year ? `/${cycle.year}` : ""}` : "Ciclo —";
+    const cycleLabel = cycle?.number
+      ? `Ciclo ${cycle.number}${cycle.year ? `/${cycle.year}` : ""}`
+      : "Ciclo —";
     pdf.text(
       `${municipality} · ${agentName} · Matrícula ${registration} · SE ${String(week).padStart(2, "0")}/${year} (${f(range.start)}–${f(range.end)}) · ${cycleLabel}`,
       pageW / 2,
       17.5,
-      { align: "center" }
+      { align: "center" },
     );
 
-    const line = (r: PcfadRow, label: string) => [
-      label,
-      r.propertiesByType.residence,
-      r.propertiesByType.commerce,
-      r.propertiesByType.vacant_lot,
-      r.propertiesByType.strategic_point,
-      r.propertiesByType.others,
-      r.propertiesByTypeTotal,
-      r.a1, r.a2, r.b, r.c, r.d1, r.d2, r.e,
-      r.depTotal,
-      r.samples,
-      r.blocks,
-      r.treated.residence,
-      r.treated.commerce,
-      r.treated.vacant_lot,
-      r.treated.strategic_point,
-      r.treated.others,
-      r.treatedTotal,
-      r.depInspected,
-      r.depTreated,
-      r.depEliminated,
-      r.larvicideUnit,
-      r.larvicideAmount,
-      PCFAD_DASH,
-      PCFAD_DASH,
-      r.worked,
-      r.refused,
-      r.closed,
-      r.recovered,
-      r.worked + r.closed,
-      pcfadIip(r.positive, r.worked),
-      PCFAD_DASH,
-      PCFAD_DASH,
-    ].map(String);
+    const line = (r: PcfadRow, label: string) =>
+      [
+        label,
+        r.propertiesByType.residence,
+        r.propertiesByType.commerce,
+        r.propertiesByType.vacant_lot,
+        r.propertiesByType.strategic_point,
+        r.propertiesByType.others,
+        r.propertiesByTypeTotal,
+        r.a1,
+        r.a2,
+        r.b,
+        r.c,
+        r.d1,
+        r.d2,
+        r.e,
+        r.depTotal,
+        r.samples,
+        r.blocks,
+        r.treated.residence,
+        r.treated.commerce,
+        r.treated.vacant_lot,
+        r.treated.strategic_point,
+        r.treated.others,
+        r.treatedTotal,
+        r.depInspected,
+        r.depTreated,
+        r.depEliminated,
+        r.larvicideUnit,
+        r.larvicideAmount,
+        PCFAD_DASH,
+        PCFAD_DASH,
+        r.worked,
+        r.refused,
+        r.closed,
+        r.recovered,
+        r.worked + r.closed,
+        pcfadIip(r.positive, r.worked),
+        PCFAD_DASH,
+        PCFAD_DASH,
+      ].map(String);
 
     const body =
       rows.length === 0
-        ? [[{ content: "Sem diárias registradas nesta semana epidemiológica.", colSpan: 38, styles: { halign: "center" as const } }]]
+        ? [
+            [
+              {
+                content: "Sem diárias registradas nesta semana epidemiológica.",
+                colSpan: 38,
+                styles: { halign: "center" as const },
+              },
+            ],
+          ]
         : rows.map((r) => line(r, rf(r.work_date)));
 
     if (rows.length > 0) body.push(line(total, "TOTAL") as any);
@@ -131,14 +144,38 @@ export async function generatePcfadWeeklyPDF(params: {
           { content: "Rendim.", rowSpan: 2 },
         ],
         [
-          "R", "C", "TB", "PE", "OUT", "Total",
-          "A1", "A2", "B", "C", "D1", "D2", "E",
-          "R", "C", "TB", "PE", "OUT", "Total",
+          "R",
+          "C",
+          "TB",
+          "PE",
+          "OUT",
+          "Total",
+          "A1",
+          "A2",
+          "B",
+          "C",
+          "D1",
+          "D2",
+          "E",
+          "R",
+          "C",
+          "TB",
+          "PE",
+          "OUT",
+          "Total",
 
-          "Inspec.", "Trat.", "Elim.",
-          "Tipo", "Qtd",
-          "Tipo", "Qtd",
-          "Inspec.", "Recusa", "Fechada", "Recup.", "Total",
+          "Inspec.",
+          "Trat.",
+          "Elim.",
+          "Tipo",
+          "Qtd",
+          "Tipo",
+          "Qtd",
+          "Inspec.",
+          "Recusa",
+          "Fechada",
+          "Recup.",
+          "Total",
         ],
       ] as any,
       body: body as any,
@@ -162,25 +199,92 @@ export async function generatePcfadWeeklyPDF(params: {
       columnStyles: { 0: { cellWidth: 16, fontStyle: "bold" } },
       margin: { left: 6, right: 6 },
       didParseCell: (data) => {
-        if (
-          data.section === "body" &&
-          rows.length > 0 &&
-          data.row.index === body.length - 1
-        ) {
+        if (data.section === "body" && rows.length > 0 && data.row.index === body.length - 1) {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [248, 250, 252];
         }
       },
     });
 
-    const finalY = (pdf as any).lastAutoTable?.finalY || 60;
+    const firstTableFinalY = (pdf as any).lastAutoTable?.finalY || 60;
+    let finalY = firstTableFinalY;
+
+    if (focusObservations.length > 0) {
+      let observationsTitleY = firstTableFinalY + 6;
+      if (observationsTitleY > pageH - 20) {
+        pdf.addPage();
+        observationsTitleY = 12;
+      }
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text("OBSERVAÇÕES — FOCOS ENCONTRADOS", 6, observationsTitleY);
+
+      autoTable(pdf, {
+        startY: observationsTitleY + 2,
+        head: [
+          [
+            "Nº imóvel",
+            "Depósito positivo",
+            "Qtd.",
+            "Data da coleta",
+            "Quarteirão",
+            "Endereço",
+            "Tipo de imóvel",
+          ],
+        ],
+        body: focusObservations.map((observation) => [
+          observation.numeroImovel,
+          observation.tipoDeposito,
+          observation.quantidade ?? PCFAD_DASH,
+          observation.dataColeta,
+          observation.quarteirao,
+          observation.endereco,
+          observation.tipoImovel,
+        ]),
+        theme: "grid",
+        styles: {
+          fontSize: 7,
+          cellPadding: 1.1,
+          halign: "center",
+          valign: "middle",
+          lineWidth: 0.1,
+          lineColor: [200, 200, 200],
+          textColor: [15, 23, 42],
+        },
+        headStyles: {
+          fillColor: [254, 242, 242],
+          textColor: [153, 27, 27],
+          fontStyle: "bold",
+          fontSize: 7,
+        },
+        columnStyles: {
+          0: { cellWidth: 20, fontStyle: "bold" },
+          1: { cellWidth: 28 },
+          2: { cellWidth: 12 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 22 },
+        },
+        margin: { left: 6, right: 6, bottom: 18 },
+      });
+      finalY = (pdf as any).lastAutoTable?.finalY || firstTableFinalY;
+    }
+
+    if (finalY > pageH - 20) {
+      pdf.addPage();
+      finalY = 12;
+    } else {
+      finalY += 5;
+    }
+
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(6.5);
     pdf.setTextColor(120, 120, 120);
     pdf.text(
       'IIP = imóveis positivos ÷ imóveis inspecionados × 100. Campos sem dado no sistema exibem "—". Fonte: relatórios diários (daily_work_records) da SE.',
       6,
-      Math.min(finalY + 5, pageH - 18)
+      finalY,
     );
 
     const sigY = pageH - 10;
