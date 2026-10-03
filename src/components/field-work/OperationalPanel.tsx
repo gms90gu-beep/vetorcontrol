@@ -182,9 +182,10 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         const pend = await listRemoteOrCache<any>({
           name: "property_pendencies",
           remote: () => supabase.from("property_pendencies")
-            .select("id, property_id, current_status, resolved_at")
-            .in("property_id", propIds) as any,
-          filter: (p) => propIds.includes(p.property_id),
+            .select("id, property_id, cycle_id, current_status, resolved_at")
+            .in("property_id", propIds)
+            .eq("cycle_id", session.cycle_id ?? "") as any,
+          filter: (p) => propIds.includes(p.property_id) && p.cycle_id === session.cycle_id,
         });
         setPendencies(pend || []);
       }

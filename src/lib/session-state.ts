@@ -253,7 +253,8 @@ export async function canCloseSession(sessionId: string): Promise<DecisionResult
     supabase
       .from("property_pendencies")
       .select("id", { count: "exact", head: true })
-      .eq("agent_id", s.user_id),
+      .eq("agent_id", s.user_id)
+      .eq("cycle_id", s.cycle_id ?? ""),
   ]);
 
   const snapshot: CloseSnapshot = {

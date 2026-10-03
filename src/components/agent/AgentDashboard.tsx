@@ -243,6 +243,7 @@ export function AgentDashboard() {
           .from("property_pendencies")
           .select("id", { count: "exact", head: true })
           .eq("agent_id", user.id)
+          .eq("cycle_id", activeCycleId || "")
           .is("resolved_at", null);
         if (!cancelled) setPendingCount(count || 0);
       } catch (e) {

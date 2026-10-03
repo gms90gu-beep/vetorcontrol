@@ -81,7 +81,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     (input: {
       from: string;
       to: string;
-      cycleId?: string | null;
+      cycleId: string;
       supervisorId?: string | null;
       agentId?: string | null;
       municipality?: string | null;
@@ -129,16 +129,18 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .in("agent_id", scopedProfiles)
       .gte("work_date", data.from)
       .lte("work_date", data.to);
-    if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
+    dwrQ = dwrQ.eq("cycle_id", data.cycleId);
     const { data: dwr, error: de } = await dwrQ;
     if (de) throw new Error(de.message);
 
     // Pendencies open (no resolved_at) — agent_id é profile_id
-    const { count: pendOpen } = await supabase
+    let pendQ = supabase
       .from("property_pendencies")
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
       .in("agent_id", scopedProfiles);
+    pendQ = pendQ.eq("cycle_id", data.cycleId);
+    const { count: pendOpen } = await pendQ;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
@@ -296,7 +298,7 @@ export interface PendencyReportResult {
 
 export const getPendencyReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { supervisorId?: string | null; onlyOpen?: boolean; limit?: number }) => input)
+  .inputValidator((input: { cycleId: string; supervisorId?: string | null; onlyOpen?: boolean; limit?: number }) => input)
   .handler(async ({ data, context }): Promise<PendencyReportResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
@@ -318,6 +320,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .from("property_pendencies")
       .select("*")
       .in("agent_id", profileIds)
+      .eq("cycle_id", data.cycleId)
       .order("last_attempt_at", { ascending: false })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
@@ -716,12 +719,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     // ocultem visitas e pendências de agentes subordinados.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = await Promise.all(
-      idChunks.map((ids) =>
-        supabaseAdmin
+      idChunks.map((ids) => {
+        let pendingQuery = supabaseAdmin
           .from("property_pendencies")
-          .select("property_id, resolved_at")
-          .in("property_id", ids),
-      ),
+          .select("property_id, cycle_id, resolved_at")
+          .in("property_id", ids);
+        if (data.cycleIds?.length) pendingQuery = pendingQuery.in("cycle_id", data.cycleIds);
+        return pendingQuery;
+      }),
     );
     const pendError = pendResults.find((result) => result.error)?.error;
     if (pendError) throw new Error(`Falha ao carregar pendências do mapa: ${pendError.message}`);

@@ -71,7 +71,10 @@ type Pendency = {
   resolved_at: string | null;
   resolved_status: RecoveryResult | null;
   created_at: string;
+  cycle_id: string | null;
 };
+
+type CycleOption = { id: string; name: string | null; number: number; year: number; status: string };
 
 type PropertyRow = {
   id: string;
@@ -129,6 +132,9 @@ function PendingPage() {
   const { user, role } = useAuth();
   const [loading, setLoading] = useState(true);
   const [pendencies, setPendencies] = useState<EnrichedPendency[]>([]);
+  const [cycles, setCycles] = useState<CycleOption[]>([]);
+  const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [activeCycleId, setActiveCycleId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<EnrichedPendency | null>(null);
@@ -140,21 +146,24 @@ function PendingPage() {
     document.title = "Pendências — VetorControl";
   }, []);
 
-  const load = async (): Promise<EnrichedPendency[]> => {
+  const load = async (cycleId = selectedCycleId): Promise<EnrichedPendency[]> => {
     if (!user) return [];
+    if (!cycleId) {
+      setPendencies([]);
+      setLoading(false);
+      return [];
+    }
     setLoading(true);
     try {
-      // Buscar ciclo ativo
-      const activeCycle = await getActiveCycleForUser(user.id);
-
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",
         remote: () =>
           (supabase as any)
             .from("property_pendencies")
             .select("*")
-            .eq("cycle_id", activeCycle?.id || "")  // ← Filtrar por ciclo ativo
+            .eq("cycle_id", cycleId)
             .order("last_attempt_at", { ascending: false }),
+        filter: (p) => p.cycle_id === cycleId,
       });
 
       const sorted = [...(pends || [])].sort((a, b) => {
@@ -211,9 +220,33 @@ function PendingPage() {
   };
 
   useEffect(() => {
-    load();
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setSelectedCycleId("");
+      const [cycleRows, activeCycle] = await Promise.all([
+        listRemoteOrCache<CycleOption>({
+          name: "cycles",
+          remote: () => (supabase as any).from("cycles").select("id, name, number, year, status").order("year", { ascending: false }),
+        }),
+        getActiveCycleForUser(user.id),
+      ]);
+      if (cancelled) return;
+      const availableCycles = cycleRows || [];
+      setCycles(availableCycles);
+      setActiveCycleId(activeCycle?.id || availableCycles.find((cycle) => cycle.status === "in_progress")?.id || "");
+      const defaultCycleId = activeCycle?.id || availableCycles.find((cycle) => cycle.status === "in_progress")?.id || availableCycles[0]?.id || "";
+      setSelectedCycleId(defaultCycleId);
+      if (!defaultCycleId) setLoading(false);
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    if (selectedCycleId) void load(selectedCycleId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCycleId, user?.id]);
 
   // Guarda de staleness: se o agente abrir os detalhes de um imóvel e, antes da
   // busca terminar, abrir outro, a resposta mais lenta do primeiro não pode
@@ -231,8 +264,9 @@ function PendingPage() {
             .from("property_recovery_attempts")
             .select("*")
             .eq("property_id", propertyId)
+            .eq("cycle_id", selectedCycleId)
             .order("attempted_at", { ascending: true }),
-        filter: (a) => a.property_id === propertyId,
+        filter: (a) => a.property_id === propertyId && a.cycle_id === selectedCycleId,
       });
       const sorted = [...(data || [])].sort((a, b) => {
         const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;
@@ -298,7 +332,7 @@ function PendingPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => void load(selectedCycleId)} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
@@ -309,6 +343,18 @@ function PendingPage() {
             <FileText className="h-4 w-4" /> PDF
           </Button>
         </div>
+      </div>
+
+      <div className="w-full sm:w-80">
+        <label className="mb-1 block text-xs font-bold text-muted-foreground">Ciclo consultado</label>
+        <Select value={selectedCycleId} onValueChange={setSelectedCycleId}>
+          <SelectTrigger><SelectValue placeholder="Selecione um ciclo" /></SelectTrigger>
+          <SelectContent>
+            {cycles.map((cycle) => (
+              <SelectItem key={cycle.id} value={cycle.id}>{cycle.name || `Ciclo ${cycle.number}/${cycle.year}`}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* KPIs */}
@@ -378,6 +424,7 @@ function PendingPage() {
             <DetailsPanel
               pendency={selected}
               attempts={attempts}
+              canAttempt={selectedCycleId === activeCycleId}
               onAttempt={() => setAttemptDialogOpen(true)}
             />
           )}
@@ -464,10 +511,12 @@ function PendencyCard({ p, onClick }: { p: EnrichedPendency; onClick: () => void
 function DetailsPanel({
   pendency,
   attempts,
+  canAttempt,
   onAttempt,
 }: {
   pendency: EnrichedPendency;
   attempts: Attempt[];
+  canAttempt: boolean;
   onAttempt: () => void;
 }) {
   return (
@@ -505,7 +554,7 @@ function DetailsPanel({
           </div>
         )}
 
-        {!pendency.resolved_at && (
+        {!pendency.resolved_at && canAttempt && (
           <Button onClick={onAttempt} className="w-full gap-2 bg-primary">
             <RefreshCw className="h-4 w-4" />
             Realizar Nova Tentativa
