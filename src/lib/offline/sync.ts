@@ -256,10 +256,10 @@ export function flushMutations(options?: { retryErroredImmediately?: boolean }):
     return activeFlush.then(() => flushMutations(options));
   }
   const flush = runFlushMutations(options);
-  activeFlush = flush.finally(() => {
-    if (activeFlush === flush || activeFlush === wrapped) activeFlush = null;
+  const wrapped = flush.finally(() => {
+    if (activeFlush === wrapped) activeFlush = null;
   });
-  const wrapped = activeFlush;
+  activeFlush = wrapped;
   return wrapped;
 }
 

@@ -7,6 +7,11 @@ vi.mock("leaflet", () => {
     handlers = new Map<string, Handler>();
     constructor(public url: string, public opts: any) {}
     on(event: string, fn: Handler) { this.handlers.set(event, fn); return this; }
+    off(event?: string, fn?: Handler) {
+      if (!event) this.handlers.clear();
+      else if (!fn || this.handlers.get(event) === fn) this.handlers.delete(event);
+      return this;
+    }
     addTo(_map: any) { return this; }
     fire(event: string, payload: any) { this.handlers.get(event)?.(payload); }
   }
@@ -40,5 +45,22 @@ describe("attachResilientTileLayer", () => {
     const handle = attachResilientTileLayer(map, { onAllFailed: onFail, errorThreshold: 1 });
     for (let i = 0; i < TILE_PROVIDERS.length; i++) (handle.layer as any).fire("tileerror", {});
     expect(onFail).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores late errors from a provider that was already replaced", () => {
+    const map = makeMap();
+    const onFail = vi.fn();
+    const handle = attachResilientTileLayer(map, { onAllFailed: onFail, errorThreshold: 1 });
+    const firstLayer = handle.layer as any;
+    firstLayer.fire("tileerror", {});
+    firstLayer.fire("tileerror", {});
+    expect(handle.current.id).toBe(TILE_PROVIDERS[1].id);
+    expect(onFail).not.toHaveBeenCalled();
+  });
+
+  it("always passes valid subdomains to Leaflet", () => {
+    const map = makeMap();
+    const handle = attachResilientTileLayer(map, { startId: "esri-imagery" });
+    expect((handle.layer as any).opts.subdomains).toBe("abc");
   });
 });
