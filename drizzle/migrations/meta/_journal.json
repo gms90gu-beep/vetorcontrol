@@ -15,6 +15,13 @@
       "when": 1790979697671,
       "tag": "0001_restrict_dwr_trigger_function",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791003383980,
+      "tag": "0002_fix_dwr_trigger_and_rebuild_20260930",
+      "breakpoints": true
     }
   ]
 }
