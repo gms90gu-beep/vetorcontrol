@@ -4,6 +4,7 @@ import { db, type Mutation } from "./db";
 import { isJourneyPermissionError, journeyPermissionMessage } from "@/lib/journey-permission-error";
 
 let running = false;
+let activeFlush: Promise<{ ok: number; failed: number }> | null = null;
 const MAX_RETRIES = 5;
 // Backoff exponencial por mutação — evita que uma falha transitória (rede
 // instável em campo) esgote as 5 tentativas em menos de um minuto só porque
@@ -149,8 +150,7 @@ async function purgeInvalidTmpMutations(): Promise<number> {
   return removed;
 }
 
-export async function flushMutations(options?: { retryErroredImmediately?: boolean }): Promise<{ ok: number; failed: number }> {
-  if (running) return { ok: 0, failed: 0 };
+async function runFlushMutations(options?: { retryErroredImmediately?: boolean }): Promise<{ ok: number; failed: number }> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: 0, failed: 0 };
   running = true;
   syncingFlag = true;
@@ -245,6 +245,22 @@ export async function flushMutations(options?: { retryErroredImmediately?: boole
     }
   }
   return { ok, failed };
+}
+
+export function flushMutations(options?: { retryErroredImmediately?: boolean }): Promise<{ ok: number; failed: number }> {
+  // A close can start while the background poll is already flushing. Returning
+  // `{0,0}` here made the close read the server too early and clear the local
+  // journey before its DWR mutation had actually been attempted. Wait for the
+  // active pass, then run one more pass so mutations queued during it are sent.
+  if (activeFlush) {
+    return activeFlush.then(() => flushMutations(options));
+  }
+  const flush = runFlushMutations(options);
+  activeFlush = flush.finally(() => {
+    if (activeFlush === flush || activeFlush === wrapped) activeFlush = null;
+  });
+  const wrapped = activeFlush;
+  return wrapped;
 }
 
 export async function pendingMutationCount(): Promise<number> {
