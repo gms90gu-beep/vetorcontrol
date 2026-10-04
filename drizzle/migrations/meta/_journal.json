@@ -36,6 +36,13 @@
       "when": 1791076147384,
       "tag": "0004_preserve_real_production_20261001",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791081464023,
+      "tag": "0005_preserve_real_production_20261001",
+      "breakpoints": true
     }
   ]
 }
