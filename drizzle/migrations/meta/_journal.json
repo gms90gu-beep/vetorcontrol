@@ -29,6 +29,13 @@
       "when": 1791003401617,
       "tag": "0003_reconcile_real_production_20261001",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791076147384,
+      "tag": "0004_preserve_real_production_20261001",
+      "breakpoints": true
     }
   ]
 }
