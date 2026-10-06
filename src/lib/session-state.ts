@@ -250,10 +250,14 @@ export async function canCloseSession(sessionId: string): Promise<DecisionResult
       .select("id", { count: "exact", head: true })
       .eq("agent_id", s.user_id)
       .eq("block_number", s.block_number ?? ""),
-    supabase
-      .from("property_pendencies")
-      .select("id", { count: "exact", head: true })
-      .eq("agent_id", s.user_id),
+    (() => {
+      let q = supabase
+        .from("property_pendencies")
+        .select("id", { count: "exact", head: true })
+        .eq("agent_id", s.user_id);
+      if (s.cycle_id) q = q.eq("cycle_id", s.cycle_id);
+      return q;
+    })(),
   ]);
 
   const snapshot: CloseSnapshot = {

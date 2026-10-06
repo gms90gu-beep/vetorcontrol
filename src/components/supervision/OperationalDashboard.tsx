@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { listRemoteOrCache } from "@/lib/offline/repos";
+import { filterPendencies } from "@/lib/pendency-scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +32,8 @@ type PendencyRow = {
   resolved_at: string | null;
   reason: string | null;
   created_at: string;
+  cycle_id: string | null;
+  week_id: string | null;
 };
 
 
@@ -73,7 +76,7 @@ export function OperationalDashboard() {
           }),
           listRemoteOrCache<any>({
             name: "property_pendencies",
-            remote: () => supabase.from("property_pendencies").select("id, agent_id, current_status, resolved_at, reason, created_at") as any,
+            remote: () => supabase.from("property_pendencies").select("id, agent_id, cycle_id, week_id, current_status, resolved_at, reason, created_at") as any,
             filter: (r: any) => !r.resolved_at,
           }),
         ]);
@@ -92,7 +95,11 @@ export function OperationalDashboard() {
         setVisits(normalizedVisits);
         setCycles(cs || []);
         setWeeks(ws || []);
-        setPendencies(((pends || []) as PendencyRow[]).filter((p) => !p.resolved_at));
+        const visibleAgentIds = new Set((profs || []).map((p: any) => p.id));
+        setPendencies(filterPendencies((pends || []) as PendencyRow[], {
+          visibleAgentIds,
+          onlyOpen: true,
+        }));
       } catch (e) {
         console.error("[OFFLINE_ERROR] OperationalDashboard", e);
         toast.error("Erro ao carregar dados operacionais");
@@ -162,12 +169,19 @@ export function OperationalDashboard() {
 
   const weeksOfCycle = weeks.filter((w) => cycleFilter === "all" || w.cycle_id === cycleFilter);
 
+  const filteredPendencies = useMemo(() => filterPendencies(pendencies, {
+    cycleId: cycleFilter === "all" ? null : cycleFilter,
+    weekId: weekFilter === "all" ? null : weekFilter,
+    agentId: agentFilter === "all" ? null : agentFilter,
+    onlyOpen: true,
+  }), [pendencies, cycleFilter, weekFilter, agentFilter]);
+
   const pendencyStats = useMemo(() => {
     const byAgent = new Map<string, number>();
-    const byStatus: Record<string, number> = { refused: 0, absent: 0, not_located: 0 };
-    for (const p of pendencies) {
+    const byStatus: Record<string, number> = {};
+    for (const p of filteredPendencies) {
       byAgent.set(p.agent_id, (byAgent.get(p.agent_id) || 0) + 1);
-      if (p.current_status in byStatus) byStatus[p.current_status] += 1;
+      byStatus[p.current_status] = (byStatus[p.current_status] || 0) + 1;
     }
     const byAgentRows = Array.from(byAgent.entries())
       .map(([agentId, count]) => ({
@@ -176,8 +190,8 @@ export function OperationalDashboard() {
         count,
       }))
       .sort((a, b) => b.count - a.count);
-    return { total: pendencies.length, byStatus, byAgentRows };
-  }, [pendencies, agents]);
+    return { total: filteredPendencies.length, byStatus, byAgentRows };
+  }, [filteredPendencies, agents]);
 
   return (
     <div className="space-y-5">
@@ -319,19 +333,19 @@ export function OperationalDashboard() {
                 </p>
               </div>
               <div className="bg-red-50 rounded-xl p-3">
-                <p className="text-2xl font-black text-red-700 mt-1">{pendencyStats.byStatus.refused}</p>
+                <p className="text-2xl font-black text-red-700 mt-1">{pendencyStats.byStatus.refused ?? 0}</p>
                 <p className="text-[10px] font-bold text-red-700/70 uppercase tracking-wider mt-1">
                   Recusados
                 </p>
               </div>
               <div className="bg-slate-100 rounded-xl p-3">
-                <p className="text-2xl font-black text-slate-700 mt-1">{pendencyStats.byStatus.absent}</p>
+                <p className="text-2xl font-black text-slate-700 mt-1">{pendencyStats.byStatus.absent ?? 0}</p>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
                   Ausentes
                 </p>
               </div>
               <div className="bg-purple-50 rounded-xl p-3">
-                <p className="text-2xl font-black text-purple-700 mt-1">{pendencyStats.byStatus.not_located}</p>
+                <p className="text-2xl font-black text-purple-700 mt-1">{pendencyStats.byStatus.not_located ?? 0}</p>
                 <p className="text-[10px] font-bold text-purple-700/70 uppercase tracking-wider mt-1">
                   Não localizados
                 </p>

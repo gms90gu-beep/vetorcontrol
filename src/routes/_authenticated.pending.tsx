@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { filterPendencies } from "@/lib/pendency-scope";
+import { saveRecoveryAttemptOffline } from "@/lib/offline/repos/recovery";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
@@ -71,6 +73,8 @@ type Pendency = {
   resolved_at: string | null;
   resolved_status: RecoveryResult | null;
   created_at: string;
+  cycle_id: string | null;
+  week_id: string | null;
 };
 
 type PropertyRow = {
@@ -153,8 +157,12 @@ function PendingPage() {
           (supabase as any)
             .from("property_pendencies")
             .select("*")
-            .eq("cycle_id", activeCycle?.id || "")  // ← Filtrar por ciclo ativo
+            .eq("cycle_id", activeCycle?.id || "")
             .order("last_attempt_at", { ascending: false }),
+        filter: (p) => filterPendencies([p], {
+          cycleId: activeCycle?.id ?? null,
+          agentId: role === "agente" ? user.id : null,
+        }).length > 0,
       });
 
       const sorted = [...(pends || [])].sort((a, b) => {
@@ -221,7 +229,7 @@ function PendingPage() {
   // corrigida no StreetAutocomplete da área RG).
   const attemptsRequestRef = useRef(0);
 
-  const loadAttempts = async (propertyId: string) => {
+  const loadAttempts = async (propertyId: string, cycleId?: string | null) => {
     const requestId = ++attemptsRequestRef.current;
     try {
       const data = await listRemoteOrCache<any>({
@@ -231,8 +239,9 @@ function PendingPage() {
             .from("property_recovery_attempts")
             .select("*")
             .eq("property_id", propertyId)
+            .eq("cycle_id", cycleId || "")
             .order("attempted_at", { ascending: true }),
-        filter: (a) => a.property_id === propertyId,
+        filter: (a) => a.property_id === propertyId && (!cycleId || a.cycle_id === cycleId),
       });
       const sorted = [...(data || [])].sort((a, b) => {
         const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;
@@ -250,7 +259,7 @@ function PendingPage() {
   const openDetails = async (p: EnrichedPendency) => {
     setSelected(p);
     setAttempts([]);
-    await loadAttempts(p.property_id);
+    await loadAttempts(p.property_id, p.cycle_id);
   };
 
   const filtered = useMemo(() => {
@@ -605,15 +614,17 @@ function NewAttemptDialog({
         finalNotes = finalNotes ? `${finalNotes}\n${meta}` : meta;
       }
 
-      const { error } = await (supabase as any).from("property_recovery_attempts").insert({
+      await saveRecoveryAttemptOffline({
         property_id: pendency.property_id,
+        visit_id: null,
         agent_id: user.id,
+        cycle_id: pendency.cycle_id,
+        week_id: pendency.week_id,
         result,
         notes: finalNotes || null,
         latitude: lat,
         longitude: lng,
       });
-      if (error) throw error;
       toast.success("Tentativa registrada");
       setNotes("");
       setResult("closed");

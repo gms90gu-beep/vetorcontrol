@@ -239,11 +239,23 @@ export function AgentDashboard() {
 
       // Pendências ativas do agente
       try {
-        const { count } = await (supabase as any)
+        // O contador do painel precisa usar a mesma fonte/escopo da tela
+        // /pending. Antes ele ignorava cycle_id e somava pendências abertas
+        // de todos os ciclos, fazendo o agente ver, por exemplo, 93 no
+        // painel enquanto a lista mostrava apenas o ciclo atual.
+        let pendingQuery = (supabase as any)
           .from("property_pendencies")
           .select("id", { count: "exact", head: true })
           .eq("agent_id", user.id)
           .is("resolved_at", null);
+        if (activeCycleId) pendingQuery = pendingQuery.eq("cycle_id", activeCycleId);
+        const { count, error: pendingError } = await pendingQuery;
+        if (pendingError) throw pendingError;
+        console.log("[PENDENCY_COUNT_SCOPE]", {
+          agent_id: user.id,
+          cycle_id: activeCycleId,
+          count: count ?? 0,
+        });
         if (!cancelled) setPendingCount(count || 0);
       } catch (e) {
         console.warn("[Dashboard] pendências:", e);
