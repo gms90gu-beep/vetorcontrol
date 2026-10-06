@@ -134,11 +134,13 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     if (de) throw new Error(de.message);
 
     // Pendencies open (no resolved_at) — agent_id é profile_id
-    const { count: pendOpen } = await supabase
+    let pendOpenQ = supabase
       .from("property_pendencies")
       .select("*", { count: "exact", head: true })
       .is("resolved_at", null)
       .in("agent_id", scopedProfiles);
+    if (data.cycleId) pendOpenQ = pendOpenQ.eq("cycle_id", data.cycleId);
+    const { count: pendOpen } = await pendOpenQ;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
@@ -279,6 +281,8 @@ export interface PendencyRow {
   street: string | null;
   block_number: string | null;
   agent_id: string | null;
+  cycle_id: string | null;
+  week_id: string | null;
   agent_name: string;
   current_status: string;
   reason: string | null;
@@ -296,7 +300,13 @@ export interface PendencyReportResult {
 
 export const getPendencyReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { supervisorId?: string | null; onlyOpen?: boolean; limit?: number }) => input)
+  .inputValidator((input: {
+    supervisorId?: string | null;
+    cycleId?: string | null;
+    weekId?: string | null;
+    onlyOpen?: boolean;
+    limit?: number;
+  }) => input)
   .handler(async ({ data, context }): Promise<PendencyReportResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
@@ -321,6 +331,8 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .order("last_attempt_at", { ascending: false })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
+    if (data.cycleId) q = q.eq("cycle_id", data.cycleId);
+    if (data.weekId) q = q.eq("week_id", data.weekId);
     const { data: pends, error } = await q;
     if (error) throw new Error(error.message);
     console.log("[RBAC_RESULT]", "pendencies", (pends ?? []).length);
@@ -352,6 +364,8 @@ export const getPendencyReport = createServerFn({ method: "POST" })
         street: prop.street_name ?? null,
         block_number: prop.block_number ?? null,
         agent_id: p.agent_id,
+        cycle_id: p.cycle_id ?? null,
+        week_id: p.week_id ?? null,
         agent_name: p.agent_id ? nameByProfile.get(p.agent_id) || "Sem nome" : "Sem agente",
         current_status: status,
         reason: p.reason ?? null,

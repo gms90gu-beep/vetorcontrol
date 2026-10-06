@@ -68,9 +68,60 @@ function stripUpdatedAt(table: string, payload: any): any {
   return rest;
 }
 
+/**
+ * As mutações offline podem sobreviver a um refresh mesmo quando a mutação
+ * que criava o registro-pai já saiu da fila. Antes disso, uma visita era
+ * reenviada diretamente e ficava presa para sempre na FK
+ * visits_field_work_session_id_fkey.
+ *
+ * Recuperamos apenas dependências que ainda existem no cache local. A inserção
+ * é idempotente (23505 é sucesso), portanto a rotina também é segura quando
+ * outra aba já sincronizou o pai entre a consulta e a inserção.
+ */
+async function remoteRowExists(table: "field_work_sessions" | "visits", id: string): Promise<boolean> {
+  const { data, error } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.id);
+}
+
+async function restoreCachedRow(table: "field_work_sessions" | "visits", id: string): Promise<void> {
+  if (await remoteRowExists(table, id)) return;
+
+  const cached = await (db as any)[table].get(id);
+  const row = cached?.data;
+  if (!row) {
+    throw new Error(
+      `[SYNC_DEPENDENCY] ${table} ${id} não existe no servidor nem no cache local; ` +
+      "a jornada precisa ser reaberta para vincular as visitas.",
+    );
+  }
+
+  if (table === "visits" && row.field_work_session_id) {
+    await restoreCachedRow("field_work_sessions", String(row.field_work_session_id));
+  }
+
+  const { error } = await supabase.from(table as any).insert(stripUpdatedAt(table, row));
+  if (error && !isDuplicateKey(error)) throw error;
+}
+
+async function ensureMutationDependencies(m: Mutation): Promise<void> {
+  if (m.op !== "insert" && m.op !== "upsert" && m.op !== "update") return;
+  const payload = m.payload as any;
+  if (m.table === "visits" && payload?.field_work_session_id) {
+    await restoreCachedRow("field_work_sessions", String(payload.field_work_session_id));
+  }
+  if (m.table === "visit_deposits" && payload?.visit_id) {
+    await restoreCachedRow("visits", String(payload.visit_id));
+  }
+  if (m.table === "property_recovery_attempts" && payload?.visit_id) {
+    await restoreCachedRow("visits", String(payload.visit_id));
+  }
+}
+
 async function applyMutation(m: Mutation): Promise<void> {
   const table = m.table as any;
   const payload = stripUpdatedAt(m.table, m.payload);
+  await ensureMutationDependencies(m);
   if (m.op === "rpc") {
     if (!m.rpc_name) throw new Error("rpc sem rpc_name");
     const { error } = await supabase.rpc(m.rpc_name as any, m.payload as any);

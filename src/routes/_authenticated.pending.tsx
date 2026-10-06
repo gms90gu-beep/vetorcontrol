@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { filterPendencies } from "@/lib/pendency-scope";
+import { saveRecoveryAttemptOffline } from "@/lib/offline/repos/recovery";
 import { useAuth } from "@/hooks/useAuth";
 import {
   AlertTriangle,
@@ -47,6 +49,14 @@ import { toast } from "sonner";
 import { getOperationalDate } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/pending")({
+  head: () => ({ meta: [
+    { title: "Pendências por ciclo — VetorControl" },
+    { name: "description", content: "Pendências e tentativas de recuperação por ciclo e semana operacional no VetorControl." },
+    { property: "og:title", content: "Pendências por ciclo — VetorControl" },
+    { property: "og:description", content: "Acompanhe pendências e recuperações do trabalho de campo." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: PendingPage,
 });
 
@@ -71,6 +81,8 @@ type Pendency = {
   resolved_at: string | null;
   resolved_status: RecoveryResult | null;
   created_at: string;
+  cycle_id: string | null;
+  week_id: string | null;
 };
 
 type PropertyRow = {
@@ -134,6 +146,11 @@ function PendingPage() {
   const [selected, setSelected] = useState<EnrichedPendency | null>(null);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [attemptDialogOpen, setAttemptDialogOpen] = useState(false);
+  const [cycleFilter, setCycleFilter] = useState("");
+  const [weekFilter, setWeekFilter] = useState("");
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [weeks, setWeeks] = useState<any[]>([]);
+  const [scopeReady, setScopeReady] = useState(false);
 
 
   useEffect(() => {
@@ -144,17 +161,23 @@ function PendingPage() {
     if (!user) return [];
     setLoading(true);
     try {
-      // Buscar ciclo ativo
-      const activeCycle = await getActiveCycleForUser(user.id);
-
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",
-        remote: () =>
-          (supabase as any)
+        remote: () => {
+          let query = supabase
             .from("property_pendencies")
             .select("*")
-            .eq("cycle_id", activeCycle?.id || "")  // ← Filtrar por ciclo ativo
-            .order("last_attempt_at", { ascending: false }),
+            .order("last_attempt_at", { ascending: false });
+          if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
+          if (weekFilter) query = query.eq("week_id", weekFilter);
+          if (role === "agente") query = query.eq("agent_id", user.id);
+          return query as any;
+        },
+        filter: (p) => filterPendencies([p], {
+          cycleId: cycleFilter || null,
+          weekId: weekFilter || null,
+          agentId: role === "agente" ? user.id : null,
+        }).length > 0,
       });
 
       const sorted = [...(pends || [])].sort((a, b) => {
@@ -211,9 +234,26 @@ function PendingPage() {
   };
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!user?.id) return;
+    let cancelled = false;
+    void Promise.all([
+      listRemoteOrCache<any>({ name: "cycles", remote: () => supabase.from("cycles").select("id, name, number, year").order("year", { ascending: false }) as any }),
+      listRemoteOrCache<any>({ name: "weeks", remote: () => supabase.from("weeks").select("id, number, cycle_id").order("number") as any }),
+      getActiveCycleForUser(user.id),
+    ]).then(([cycleRows, weekRows, active]) => {
+      if (cancelled) return;
+      setCycles(cycleRows);
+      setWeeks(weekRows);
+      setCycleFilter(active?.id ?? "");
+      setScopeReady(true);
+    }).catch(() => { if (!cancelled) setScopeReady(true); });
+    return () => { cancelled = true; };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (scopeReady) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, role, scopeReady, cycleFilter, weekFilter]);
 
   // Guarda de staleness: se o agente abrir os detalhes de um imóvel e, antes da
   // busca terminar, abrir outro, a resposta mais lenta do primeiro não pode
@@ -221,18 +261,21 @@ function PendingPage() {
   // corrigida no StreetAutocomplete da área RG).
   const attemptsRequestRef = useRef(0);
 
-  const loadAttempts = async (propertyId: string) => {
+  const loadAttempts = async (propertyId: string, cycleId?: string | null) => {
     const requestId = ++attemptsRequestRef.current;
     try {
       const data = await listRemoteOrCache<any>({
         name: "property_recovery_attempts",
-        remote: () =>
-          (supabase as any)
+        remote: () => {
+          let query = supabase
             .from("property_recovery_attempts")
             .select("*")
             .eq("property_id", propertyId)
-            .order("attempted_at", { ascending: true }),
-        filter: (a) => a.property_id === propertyId,
+            .order("attempted_at", { ascending: true });
+          query = cycleId ? query.eq("cycle_id", cycleId) : query.is("cycle_id", null);
+          return query as any;
+        },
+        filter: (a) => a.property_id === propertyId && (a.cycle_id ?? null) === (cycleId ?? null),
       });
       const sorted = [...(data || [])].sort((a, b) => {
         const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;
@@ -250,7 +293,7 @@ function PendingPage() {
   const openDetails = async (p: EnrichedPendency) => {
     setSelected(p);
     setAttempts([]);
-    await loadAttempts(p.property_id);
+    await loadAttempts(p.property_id, p.cycle_id);
   };
 
   const filtered = useMemo(() => {
@@ -324,6 +367,20 @@ function PendingPage() {
 
       {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
+        <Select value={cycleFilter || "all"} onValueChange={(value) => { setCycleFilter(value === "all" ? "" : value); setWeekFilter(""); }}>
+          <SelectTrigger aria-label="Ciclo" className="w-[190px]"><SelectValue placeholder="Ciclo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os ciclos</SelectItem>
+            {cycles.map((c) => <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number}/${c.year}`}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={weekFilter || "all"} onValueChange={(value) => setWeekFilter(value === "all" ? "" : value)}>
+          <SelectTrigger aria-label="Semana" className="w-[160px]"><SelectValue placeholder="Semana" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as semanas</SelectItem>
+            {weeks.filter((w) => !cycleFilter || w.cycle_id === cycleFilter).map((w) => <SelectItem key={w.id} value={w.id}>Semana {w.number}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -391,7 +448,7 @@ function PendingPage() {
           pendency={selected}
           onCreated={async () => {
             setAttemptDialogOpen(false);
-            await loadAttempts(selected.property_id);
+            await loadAttempts(selected.property_id, selected.cycle_id);
             // `load()` retorna a lista recém-buscada — usar isso em vez do estado
             // `pendencies` (que, neste closure, ainda é a versão anterior à
             // atualização: setPendencies agenda o novo valor para o próximo
@@ -399,7 +456,7 @@ function PendingPage() {
             // painel de detalhes continuava mostrando o status/tentativas
             // antigos até o agente fechar e reabrir.
             const refreshed = await load();
-            const fresh = refreshed.find((x) => x.property_id === selected.property_id);
+            const fresh = refreshed.find((x) => x.id === selected.id);
             if (fresh) setSelected(fresh);
           }}
         />
@@ -605,15 +662,17 @@ function NewAttemptDialog({
         finalNotes = finalNotes ? `${finalNotes}\n${meta}` : meta;
       }
 
-      const { error } = await (supabase as any).from("property_recovery_attempts").insert({
+      await saveRecoveryAttemptOffline({
         property_id: pendency.property_id,
+        visit_id: null,
         agent_id: user.id,
+        cycle_id: pendency.cycle_id,
+        week_id: pendency.week_id,
         result,
         notes: finalNotes || null,
         latitude: lat,
         longitude: lng,
       });
-      if (error) throw error;
       toast.success("Tentativa registrada");
       setNotes("");
       setResult("closed");

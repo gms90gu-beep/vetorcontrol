@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getPendencyReport } from "@/lib/wave-c.functions";
+import { useAuth } from "@/hooks/useAuth";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { listRemoteOrCache } from "@/lib/offline/repos";
 import {
   generateInstitutionalPDF, downloadCSV, downloadXLSX,
 } from "@/lib/institutional-export";
@@ -12,19 +15,54 @@ import { Switch } from "@/components/ui/switch";
 import { AlertTriangle, Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { requireManagerGuard } from "@/lib/role-guards";
 import { getOperationalDate } from "@/lib/operational-date";
+import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/admin/pendencias")({
+  head: () => ({ meta: [
+    { title: "Relatório de Pendências — VetorControl" },
+    { name: "description", content: "Relatório de pendências da equipe por ciclo e semana no VetorControl." },
+    { property: "og:title", content: "Relatório de Pendências — VetorControl" },
+    { property: "og:description", content: "Consulte e exporte as pendências operacionais da equipe." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   beforeLoad: requireManagerGuard,
   component: PendencyReportPage,
 });
 
 function PendencyReportPage() {
+  const { user } = useAuth();
   const [onlyOpen, setOnlyOpen] = useState(true);
+  const [cycleId, setCycleId] = useState<string>("");
+  const [weekId, setWeekId] = useState<string>("");
+  const [cycles, setCycles] = useState<any[]>([]);
+  const [weeks, setWeeks] = useState<any[]>([]);
   const fetchPend = useServerFn(getPendencyReport);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    void (async () => {
+      const [cycleRows, weekRows, active] = await Promise.all([
+        listRemoteOrCache<any>({
+          name: "cycles",
+          remote: () => supabase.from("cycles").select("id, name, number, year, start_date, end_date").order("year", { ascending: false }) as any,
+        }),
+        listRemoteOrCache<any>({
+          name: "weeks",
+          remote: () => supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) as any,
+        }),
+        getActiveCycleForUser(user.id),
+      ]);
+      setCycles(cycleRows || []);
+      setWeeks(weekRows || []);
+      if (active?.id) setCycleId(active.id);
+    })();
+  }, [user?.id]);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["pendency-report", onlyOpen],
-    queryFn: () => fetchPend({ data: { onlyOpen, limit: 1000 } }),
+    queryKey: ["pendency-report", onlyOpen, cycleId, weekId],
+    queryFn: () => fetchPend({ data: { onlyOpen, cycleId: cycleId || null, weekId: weekId || null, limit: 1000 } }),
   });
 
   const exportPDF = () => {
@@ -90,6 +128,20 @@ function PendencyReportPage() {
               <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
               Somente pendências abertas
             </label>
+            <Select value={cycleId || "all"} onValueChange={(value) => { setCycleId(value === "all" ? "" : value); setWeekId(""); }}>
+              <SelectTrigger className="h-9 w-[190px] text-xs"><SelectValue placeholder="Ciclo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os ciclos</SelectItem>
+                {cycles.map((c) => <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number ?? "—"}/${c.year ?? "—"}`}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={weekId || "all"} onValueChange={(value) => setWeekId(value === "all" ? "" : value)}>
+              <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Semana" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as semanas</SelectItem>
+                {weeks.filter((w) => !cycleId || w.cycle_id === cycleId).map((w) => <SelectItem key={w.id} value={w.id}>Semana {w.number ?? "—"}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
               {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
             </Button>

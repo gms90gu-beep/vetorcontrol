@@ -14,6 +14,15 @@
 
 export const MAX_FUTURE_PRODUCTION_DAYS = 1;
 
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year &&
+    candidate.getUTCMonth() === month - 1 &&
+    candidate.getUTCDate() === day;
+}
+
 export function getOperationalVisitDate(
   sessionDate?: string | null,
   moduleName: string = "unknown",
@@ -31,7 +40,7 @@ export function getOperationalVisitDate(
   }
 
   const [y, m, d] = sessionDate.split("-").map(Number);
-  if (!y || !m || !d) {
+  if (!isValidDateOnly(sessionDate) || !y || !m || !d) {
     console.error("[PRODUCTION_DATE_ERROR]", {
       module: moduleName,
       reason: "session_date inválida",
@@ -41,8 +50,25 @@ export function getOperationalVisitDate(
     return now.toISOString();
   }
 
-  const combined = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-  const iso = combined.toISOString();
+  // `new Date(y, m - 1, d, ...)` usa o fuso local do dispositivo. Em um
+  // celular configurado em UTC, ou no intervalo 21:00–23:59 BRT, o
+  // `toISOString()` podia avançar o dia e gravar a visita na data seguinte.
+  // A Data da Produção é brasileira; preserve-a explicitamente com o offset
+  // de America/Sao_Paulo (-03:00). O horário atual é convertido para BRT
+  // antes de ser combinado com a data da sessão.
+  const clock = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const part = (type: string) => clock.find((p) => p.type === type)?.value ?? "00";
+  const localBrazilTimestamp = `${sessionDate}T${part("hour")}:${part("minute")}:${part("second")}.${String(now.getMilliseconds()).padStart(3, "0")}-03:00`;
+  // Preserve the explicit -03:00 representation. Converting immediately to
+  // UTC would produce `2025-07-11T02:30:00Z` for 23:30 BRT and make legacy
+  // consumers that read the date prefix believe it was the next day.
+  const iso = localBrazilTimestamp;
 
   console.log("[PRODUCTION_DATE_SOURCE]", {
     module: moduleName,
@@ -117,11 +143,11 @@ export function isOperationalDateInWindow(
 }
 
 export function getOperationalDayRange(sessionDate?: string | null): { start: string; end: string; dateOnly: string } {
-  const base = sessionDate ? new Date(`${sessionDate}T00:00:00`) : new Date();
-  const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, 0);
-  const end = new Date(base.getFullYear(), base.getMonth(), base.getDate(), 23, 59, 59, 999);
-  const dateOnly = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-  return { start: start.toISOString(), end: end.toISOString(), dateOnly };
+  const dateOnly = sessionDate && isValidDateOnly(sessionDate)
+    ? sessionDate
+    : getOperationalDate();
+  const { startIso, endIso } = operationalDateBoundsUtcIso(dateOnly);
+  return { start: startIso, end: endIso, dateOnly };
 }
 
 /**

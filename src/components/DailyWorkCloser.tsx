@@ -862,10 +862,15 @@ export function DailyWorkCloser({
       const orphans = dayVisits.filter((v) => v.property_id && !validPropIds.has(v.property_id));
 
       if (orphans.length > 0) {
-        console.log("[CLEANUP_ORPHANS]", { count: orphans.length, ids: orphans.map((v) => v.id.substring(0, 8)) });
-        const { db: __offlineDb } = await import("@/lib/offline/db");
-        await __offlineDb.visits.bulkDelete(orphans.map((v) => v.id));
-        return orphans.length;
+        // O cache de properties pode estar incompleto no modo offline. Apagar
+        // visitas válidas só porque o imóvel ainda não foi hidratado remove
+        // produção do dispositivo e torna a recuperação impossível. Registre
+        // a divergência e deixe a sincronização/reconciliação resolver depois.
+        console.warn("[CLEANUP_ORPHANS_SKIPPED]", {
+          count: orphans.length,
+          ids: orphans.map((v) => v.id.substring(0, 8)),
+          reason: "property cache incomplete; visits preserved",
+        });
       }
       return 0;
     } catch (e) {
@@ -1293,19 +1298,23 @@ export function DailyWorkCloser({
 
 
         // Pendências em aberto + recuperadas hoje
-        const { count: pCount } = await supabase
+        let pendingCountQuery = supabase
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
           .is("resolved_at", null);
+        if (activeCycle?.id) pendingCountQuery = pendingCountQuery.eq("cycle_id", activeCycle.id);
+        const { count: pCount } = await pendingCountQuery;
         setPendingCount(pCount || 0);
 
-        const { count: rCount } = await supabase
+        let recoveredCountQuery = supabase
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
           .gte("resolved_at", startOfDayIso)
           .lte("resolved_at", endOfDayIso);
+        if (activeCycle?.id) recoveredCountQuery = recoveredCountQuery.eq("cycle_id", activeCycle.id);
+        const { count: rCount } = await recoveredCountQuery;
         setRecoveredCount(rCount || 0);
       }
     } catch (error) {

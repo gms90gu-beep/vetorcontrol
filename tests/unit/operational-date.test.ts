@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getOperationalDate, epiWeekFromDate, getOperationalVisitDate, assertProductionDate, resolveOperationalCloseTarget, isOperationalDateInWindow } from "@/lib/operational-date";
 
 describe("getOperationalDate (America/Sao_Paulo)", () => {
@@ -125,12 +125,25 @@ describe("getOperationalVisitDate", () => {
     const iso = getOperationalVisitDate("2025-07-10", "test");
     expect(iso.slice(0, 10)).toBe("2025-07-10");
   });
+  it("preserves the session date late at night in Brazil", () => {
+    vi.setSystemTime(new Date("2025-07-11T02:30:00.123Z")); // 23:30 BRT
+    try {
+      const iso = getOperationalVisitDate("2025-07-10", "test");
+      expect(iso.slice(0, 10)).toBe("2025-07-10");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("falls back to now() when session_date is null", () => {
     const iso = getOperationalVisitDate(null, "test");
     expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
   it("falls back on invalid session_date", () => {
     const iso = getOperationalVisitDate("garbage", "test");
+    expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+  it("rejects impossible calendar dates without throwing", () => {
+    const iso = getOperationalVisitDate("2025-02-30", "test");
     expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
