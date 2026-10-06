@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { listRemoteOrCache } from "@/lib/offline/repos";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getPendencyReport } from "@/lib/wave-c.functions";
@@ -19,12 +24,36 @@ export const Route = createFileRoute("/_authenticated/admin/pendencias")({
 });
 
 function PendencyReportPage() {
+  const { user } = useAuth();
   const [onlyOpen, setOnlyOpen] = useState(true);
+  const [cycles, setCycles] = useState<Array<{ id: string; name: string | null; number: number; year: number; status: string }>>([]);
+  const [cycleId, setCycleId] = useState("");
   const fetchPend = useServerFn(getPendencyReport);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      setCycleId("");
+      const [cycleRows, activeCycle] = await Promise.all([
+        listRemoteOrCache<any>({
+          name: "cycles",
+          remote: () => supabase.from("cycles").select("id, name, number, year, status").order("year", { ascending: false }) as any,
+        }),
+        getActiveCycleForUser(user.id),
+      ]);
+      if (cancelled) return;
+      const available = cycleRows || [];
+      setCycles(available);
+      setCycleId(activeCycle?.id || available.find((cycle: any) => cycle.status === "in_progress")?.id || available[0]?.id || "");
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["pendency-report", onlyOpen],
-    queryFn: () => fetchPend({ data: { onlyOpen, limit: 1000 } }),
+    queryKey: ["pendency-report", onlyOpen, cycleId],
+    queryFn: () => fetchPend({ data: { cycleId, onlyOpen, limit: 1000 } }),
+    enabled: Boolean(cycleId),
   });
 
   const exportPDF = () => {
@@ -33,7 +62,7 @@ function PendencyReportPage() {
       `pendencias_${getOperationalDate()}.pdf`,
       {
         title: "Relatório de Pendências",
-        subtitle: onlyOpen ? "Pendências abertas" : "Todas as pendências",
+        subtitle: `${onlyOpen ? "Pendências abertas" : "Todas as pendências"} · ${cycles.find((cycle) => cycle.id === cycleId)?.name || "Ciclo selecionado"}`,
         issuedBy: "Supervisão",
       },
       [
@@ -86,6 +115,16 @@ function PendencyReportPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
+            <div className="w-64">
+              <Select value={cycleId} onValueChange={setCycleId}>
+                <SelectTrigger><SelectValue placeholder="Selecione o ciclo" /></SelectTrigger>
+                <SelectContent>
+                  {cycles.map((cycle) => (
+                    <SelectItem key={cycle.id} value={cycle.id}>{cycle.name || `Ciclo ${cycle.number}/${cycle.year}`}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
               Somente pendências abertas

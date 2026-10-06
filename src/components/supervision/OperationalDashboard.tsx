@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +30,7 @@ type PendencyRow = {
   id: string;
   agent_id: string;
   current_status: string;
+  cycle_id: string | null;
   resolved_at: string | null;
   reason: string | null;
   created_at: string;
@@ -35,20 +38,23 @@ type PendencyRow = {
 
 
 export function OperationalDashboard() {
+  const { user } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
   const [pendencies, setPendencies] = useState<PendencyRow[]>([]);
-  const [cycleFilter, setCycleFilter] = useState<string>("all");
+  const [cycleFilter, setCycleFilter] = useState<string>("");
   const [weekFilter, setWeekFilter] = useState<string>("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       setLoading(true);
       try {
+        const activeCycle = await getActiveCycleForUser(user.id);
         const [profs, vs, agentLinks, cs, ws, pends] = await Promise.all([
           listRemoteOrCache<any>({
             name: "profiles",
@@ -73,7 +79,7 @@ export function OperationalDashboard() {
           }),
           listRemoteOrCache<any>({
             name: "property_pendencies",
-            remote: () => supabase.from("property_pendencies").select("id, agent_id, current_status, resolved_at, reason, created_at") as any,
+            remote: () => supabase.from("property_pendencies").select("id, agent_id, cycle_id, current_status, resolved_at, reason, created_at") as any,
             filter: (r: any) => !r.resolved_at,
           }),
         ]);
@@ -92,6 +98,7 @@ export function OperationalDashboard() {
         setVisits(normalizedVisits);
         setCycles(cs || []);
         setWeeks(ws || []);
+        setCycleFilter(activeCycle?.id || cs?.find((cycle: any) => cycle.status === "in_progress")?.id || cs?.[0]?.id || "");
         setPendencies(((pends || []) as PendencyRow[]).filter((p) => !p.resolved_at));
       } catch (e) {
         console.error("[OFFLINE_ERROR] OperationalDashboard", e);
@@ -100,11 +107,11 @@ export function OperationalDashboard() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [user?.id]);
 
   const filteredVisits = useMemo(() => {
     return visits.filter((v) => {
-      if (cycleFilter !== "all" && v.cycle_id !== cycleFilter) return false;
+      if (!cycleFilter || v.cycle_id !== cycleFilter) return false;
       if (weekFilter !== "all" && v.week_id !== weekFilter) return false;
       if (agentFilter !== "all" && v.agent_id !== agentFilter) return false;
       return true;
@@ -160,12 +167,13 @@ export function OperationalDashboard() {
     toast.success("Exportação concluída");
   };
 
-  const weeksOfCycle = weeks.filter((w) => cycleFilter === "all" || w.cycle_id === cycleFilter);
+  const weeksOfCycle = weeks.filter((w) => !!cycleFilter && w.cycle_id === cycleFilter);
 
   const pendencyStats = useMemo(() => {
     const byAgent = new Map<string, number>();
     const byStatus: Record<string, number> = { refused: 0, absent: 0, not_located: 0 };
     for (const p of pendencies) {
+      if (!cycleFilter || p.cycle_id !== cycleFilter) continue;
       byAgent.set(p.agent_id, (byAgent.get(p.agent_id) || 0) + 1);
       if (p.current_status in byStatus) byStatus[p.current_status] += 1;
     }
@@ -176,8 +184,8 @@ export function OperationalDashboard() {
         count,
       }))
       .sort((a, b) => b.count - a.count);
-    return { total: pendencies.length, byStatus, byAgentRows };
-  }, [pendencies, agents]);
+    return { total: pendencies.filter((p) => !!cycleFilter && p.cycle_id === cycleFilter).length, byStatus, byAgentRows };
+  }, [pendencies, agents, cycleFilter]);
 
   return (
     <div className="space-y-5">
@@ -191,7 +199,6 @@ export function OperationalDashboard() {
           <Select value={cycleFilter} onValueChange={setCycleFilter}>
             <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ciclo" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os ciclos</SelectItem>
               {cycles.map((c) => (
                 <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number}/${c.year}`}</SelectItem>
               ))}

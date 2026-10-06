@@ -961,6 +961,7 @@ export type Database = {
           agent_id: string
           attempt_count: number
           created_at: string
+          cycle_id: string | null
           current_status: Database["public"]["Enums"]["recovery_result"]
           id: string
           last_attempt_at: string | null
@@ -974,6 +975,7 @@ export type Database = {
           agent_id: string
           attempt_count?: number
           created_at?: string
+          cycle_id?: string | null
           current_status: Database["public"]["Enums"]["recovery_result"]
           id?: string
           last_attempt_at?: string | null
@@ -989,6 +991,7 @@ export type Database = {
           agent_id?: string
           attempt_count?: number
           created_at?: string
+          cycle_id?: string | null
           current_status?: Database["public"]["Enums"]["recovery_result"]
           id?: string
           last_attempt_at?: string | null
@@ -1006,6 +1009,7 @@ export type Database = {
         Row: {
           agent_id: string
           attempt_number: number
+          cycle_id: string | null
           attempted_at: string
           created_at: string
           id: string
@@ -1019,6 +1023,7 @@ export type Database = {
         Insert: {
           agent_id: string
           attempt_number?: number
+          cycle_id?: string | null
           attempted_at?: string
           created_at?: string
           id?: string
@@ -1032,6 +1037,7 @@ export type Database = {
         Update: {
           agent_id?: string
           attempt_number?: number
+          cycle_id?: string | null
           attempted_at?: string
           created_at?: string
           id?: string
