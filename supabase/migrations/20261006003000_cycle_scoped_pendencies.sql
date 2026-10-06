@@ -40,7 +40,7 @@ WITH latest_visit AS (
   FROM public.visits
   WHERE property_id IS NOT NULL
     AND cycle_id IS NOT NULL
-  ORDER BY property_id, visit_date DESC, created_at DESC
+  ORDER BY property_id, visit_date DESC, id DESC
 )
 UPDATE public.property_pendencies p
 SET cycle_id = latest_visit.cycle_id,
