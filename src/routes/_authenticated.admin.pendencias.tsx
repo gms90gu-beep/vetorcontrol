@@ -19,6 +19,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/admin/pendencias")({
+  head: () => ({ meta: [
+    { title: "Relatório de Pendências — VetorControl" },
+    { name: "description", content: "Relatório de pendências da equipe por ciclo e semana no VetorControl." },
+    { property: "og:title", content: "Relatório de Pendências — VetorControl" },
+    { property: "og:description", content: "Consulte e exporte as pendências operacionais da equipe." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   beforeLoad: requireManagerGuard,
   component: PendencyReportPage,
 });

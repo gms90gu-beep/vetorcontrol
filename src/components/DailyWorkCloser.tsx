@@ -1303,7 +1303,7 @@ export function DailyWorkCloser({
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
           .is("resolved_at", null);
-        if (activeCycleId) pendingCountQuery = pendingCountQuery.eq("cycle_id", activeCycleId);
+        if (activeCycle?.id) pendingCountQuery = pendingCountQuery.eq("cycle_id", activeCycle.id);
         const { count: pCount } = await pendingCountQuery;
         setPendingCount(pCount || 0);
 
@@ -1313,7 +1313,7 @@ export function DailyWorkCloser({
           .eq("agent_id", user.id)
           .gte("resolved_at", startOfDayIso)
           .lte("resolved_at", endOfDayIso);
-        if (activeCycleId) recoveredCountQuery = recoveredCountQuery.eq("cycle_id", activeCycleId);
+        if (activeCycle?.id) recoveredCountQuery = recoveredCountQuery.eq("cycle_id", activeCycle.id);
         const { count: rCount } = await recoveredCountQuery;
         setRecoveredCount(rCount || 0);
       }

@@ -78,8 +78,8 @@ function stripUpdatedAt(table: string, payload: any): any {
  * é idempotente (23505 é sucesso), portanto a rotina também é segura quando
  * outra aba já sincronizou o pai entre a consulta e a inserção.
  */
-async function remoteRowExists(table: string, id: string): Promise<boolean> {
-  const { data, error } = await supabase.from(table as any).select("id").eq("id", id).maybeSingle();
+async function remoteRowExists(table: "field_work_sessions" | "visits", id: string): Promise<boolean> {
+  const { data, error } = await supabase.from(table).select("id").eq("id", id).maybeSingle();
   if (error) throw error;
   return Boolean(data?.id);
 }
@@ -105,11 +105,15 @@ async function restoreCachedRow(table: "field_work_sessions" | "visits", id: str
 }
 
 async function ensureMutationDependencies(m: Mutation): Promise<void> {
+  if (m.op !== "insert" && m.op !== "upsert" && m.op !== "update") return;
   const payload = m.payload as any;
   if (m.table === "visits" && payload?.field_work_session_id) {
     await restoreCachedRow("field_work_sessions", String(payload.field_work_session_id));
   }
   if (m.table === "visit_deposits" && payload?.visit_id) {
+    await restoreCachedRow("visits", String(payload.visit_id));
+  }
+  if (m.table === "property_recovery_attempts" && payload?.visit_id) {
     await restoreCachedRow("visits", String(payload.visit_id));
   }
 }
