@@ -960,6 +960,7 @@ export type Database = {
         Row: {
           agent_id: string
           attempt_count: number
+          cycle_id: string | null
           created_at: string
           current_status: Database["public"]["Enums"]["recovery_result"]
           id: string
@@ -969,10 +970,12 @@ export type Database = {
           resolved_at: string | null
           resolved_status: Database["public"]["Enums"]["recovery_result"] | null
           updated_at: string
+          week_id: string | null
         }
         Insert: {
           agent_id: string
           attempt_count?: number
+          cycle_id?: string | null
           created_at?: string
           current_status: Database["public"]["Enums"]["recovery_result"]
           id?: string
@@ -984,10 +987,12 @@ export type Database = {
             | Database["public"]["Enums"]["recovery_result"]
             | null
           updated_at?: string
+          week_id?: string | null
         }
         Update: {
           agent_id?: string
           attempt_count?: number
+          cycle_id?: string | null
           created_at?: string
           current_status?: Database["public"]["Enums"]["recovery_result"]
           id?: string
@@ -999,6 +1004,7 @@ export type Database = {
             | Database["public"]["Enums"]["recovery_result"]
             | null
           updated_at?: string
+          week_id?: string | null
         }
         Relationships: []
       }
@@ -1007,6 +1013,7 @@ export type Database = {
           agent_id: string
           attempt_number: number
           attempted_at: string
+          cycle_id: string | null
           created_at: string
           id: string
           latitude: number | null
@@ -1015,11 +1022,13 @@ export type Database = {
           property_id: string
           result: Database["public"]["Enums"]["recovery_result"]
           visit_id: string | null
+          week_id: string | null
         }
         Insert: {
           agent_id: string
           attempt_number?: number
           attempted_at?: string
+          cycle_id?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
@@ -1028,11 +1037,13 @@ export type Database = {
           property_id: string
           result: Database["public"]["Enums"]["recovery_result"]
           visit_id?: string | null
+          week_id?: string | null
         }
         Update: {
           agent_id?: string
           attempt_number?: number
           attempted_at?: string
+          cycle_id?: string | null
           created_at?: string
           id?: string
           latitude?: number | null
@@ -1041,6 +1052,7 @@ export type Database = {
           property_id?: string
           result?: Database["public"]["Enums"]["recovery_result"]
           visit_id?: string | null
+          week_id?: string | null
         }
         Relationships: []
       }

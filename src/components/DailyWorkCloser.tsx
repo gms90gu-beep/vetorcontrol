@@ -862,10 +862,15 @@ export function DailyWorkCloser({
       const orphans = dayVisits.filter((v) => v.property_id && !validPropIds.has(v.property_id));
 
       if (orphans.length > 0) {
-        console.log("[CLEANUP_ORPHANS]", { count: orphans.length, ids: orphans.map((v) => v.id.substring(0, 8)) });
-        const { db: __offlineDb } = await import("@/lib/offline/db");
-        await __offlineDb.visits.bulkDelete(orphans.map((v) => v.id));
-        return orphans.length;
+        // O cache de properties pode estar incompleto no modo offline. Apagar
+        // visitas válidas só porque o imóvel ainda não foi hidratado remove
+        // produção do dispositivo e torna a recuperação impossível. Registre
+        // a divergência e deixe a sincronização/reconciliação resolver depois.
+        console.warn("[CLEANUP_ORPHANS_SKIPPED]", {
+          count: orphans.length,
+          ids: orphans.map((v) => v.id.substring(0, 8)),
+          reason: "property cache incomplete; visits preserved",
+        });
       }
       return 0;
     } catch (e) {
@@ -1293,19 +1298,23 @@ export function DailyWorkCloser({
 
 
         // Pendências em aberto + recuperadas hoje
-        const { count: pCount } = await supabase
+        let pendingCountQuery = supabase
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
           .is("resolved_at", null);
+        if (activeCycleId) pendingCountQuery = pendingCountQuery.eq("cycle_id", activeCycleId);
+        const { count: pCount } = await pendingCountQuery;
         setPendingCount(pCount || 0);
 
-        const { count: rCount } = await supabase
+        let recoveredCountQuery = supabase
           .from("property_pendencies")
           .select("id", { count: 'exact', head: true })
           .eq("agent_id", user.id)
           .gte("resolved_at", startOfDayIso)
           .lte("resolved_at", endOfDayIso);
+        if (activeCycleId) recoveredCountQuery = recoveredCountQuery.eq("cycle_id", activeCycleId);
+        const { count: rCount } = await recoveredCountQuery;
         setRecoveredCount(rCount || 0);
       }
     } catch (error) {
@@ -1589,7 +1598,7 @@ export function DailyWorkCloser({
             pending: metrics.pendingProperties,
           },
         });
-        __perBlockAudit.push({ block_number: bn, ...metrics });
+        __perBlockAudit.push({ block_id: s.block_id ?? null, block_number: bn, ...metrics });
         __dwrProperties.total += metrics.totalProperties;
         __dwrProperties.visited += metrics.visitedProperties;
         __dwrProperties.pending += metrics.pendingProperties;
@@ -2101,13 +2110,22 @@ export function DailyWorkCloser({
       // do mesmo quarteirão e podia marcar o dia como "paused" mesmo com
       // tudo trabalhado, além de depender de s.property_count, que é um
       // snapshot que pode estar desatualizado.
-      const blockMetricsByNumber = new Map<string, any>(
-        (__perBlockAudit || []).map((b: any) => [String(b.block_number), b]),
+      // block_number é apenas rótulo de exibição. O mesmo número pode existir
+      // em blocks distintos (por exemplo 4, 4/1 e 4/2); decidir o status por
+      // esse campo misturava jornadas. O block_id é a identidade canônica.
+      const blockMetricsByIdentity = new Map<string, any>(
+        (__perBlockAudit || []).map((b: any) => [
+          b.block_id ? `id:${String(b.block_id)}` : `n:${normalizeBlockNumber(b.block_number)}`,
+          b,
+        ]),
       );
 
       for (const s of sessionsToClose) {
         const bn = String(s.block_number ?? "");
-        const blockMetrics = blockMetricsByNumber.get(bn);
+        const blockIdentity = s.block_id
+          ? `id:${String(s.block_id)}`
+          : `n:${normalizeBlockNumber(s.block_number)}`;
+        const blockMetrics = blockMetricsByIdentity.get(blockIdentity);
 
         let total: number;
         let worked: number;
@@ -2300,8 +2318,7 @@ export function DailyWorkCloser({
         return;
       }
       const opDateStr = jornadaDate;
-      const startOfDay = new Date(`${opDateStr}T00:00:00`);
-      const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+      const { startIso, endIso } = operationalDateBoundsUtcIso(opDateStr);
 
       // Semana epidemiológica (SINAN, domingo-sábado) derivada da data
       // operacional (America/Sao_Paulo). Usa getEpiWeek — a MESMA função
@@ -2324,8 +2341,8 @@ export function DailyWorkCloser({
             deposits:visit_deposits(quantity, is_positive, is_treated, is_eliminated)
           `)
           .eq("agent_id", user.id)
-          .gte("visit_date", startOfDay.toISOString())
-          .lte("visit_date", endOfDay.toISOString())
+          .gte("visit_date", startIso)
+          .lte("visit_date", endIso)
           .order("visit_date", { ascending: true });
         if (activeCycle?.id) query = query.eq("cycle_id", activeCycle.id);
         try {
