@@ -37,7 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { OpenSessionModal, type OpenSessionInfo } from "@/components/field-work/OpenSessionModal";
 import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
-import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
+import { getOperationalDate, isOperationalDateInWindow, operationalDateBoundsUtcIso, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
@@ -166,12 +166,13 @@ async function assessSessionForResume(
     // Visitas da Data da Produção para esses imóveis (fonte da verdade)
     let visits: any[] = [];
     if (propertyIds.length > 0) {
+      const { startIso, endIso } = operationalDateBoundsUtcIso(session.session_date);
       const { data: vs } = await supabase
         .from("visits")
         .select("id, property_id, status, visit_date, is_recovery")
         .eq("agent_id", session.user_id)
-        .gte("visit_date", `${session.session_date}T00:00:00`)
-        .lte("visit_date", `${session.session_date}T23:59:59.999`)
+        .gte("visit_date", startIso)
+        .lte("visit_date", endIso)
         .in("property_id", propertyIds);
       visits = vs || [];
     }

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, isAfter, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
 
 export const Route = createFileRoute("/_authenticated/calendario-producao")({
   beforeLoad: blockManagersGuard,
@@ -29,6 +30,7 @@ interface SessionLite {
   session_date: string;
   status: string;
   block_number: string | null;
+  block_id: string | null;
   cycle_id: string | null;
   week_id: string | null;
 }
@@ -83,7 +85,7 @@ function ProductionCalendarPage() {
 
         const { data: sessions, error: sErr } = await supabase
           .from("field_work_sessions")
-          .select("id, session_date, status, block_number, cycle_id, week_id")
+          .select("id, session_date, status, block_number, block_id, cycle_id, week_id")
           .eq("user_id", userId)
           .gte("session_date", from)
           .lte("session_date", to);
@@ -93,12 +95,14 @@ function ProductionCalendarPage() {
         const sessionIds = sessionList.map((s) => s.id);
 
         // Visits for the month via session ids + date range fallback
+        const monthStartIso = operationalDateBoundsUtcIso(from).startIso;
+        const monthEndIso = operationalDateBoundsUtcIso(to).endIso;
         const { data: visits } = await supabase
           .from("visits")
           .select("id, property_id, status, has_focus, visit_date, field_work_session_id")
           .eq("agent_id", userId)
-          .gte("visit_date", `${from}T00:00:00`)
-          .lte("visit_date", `${to}T23:59:59`);
+          .gte("visit_date", monthStartIso)
+          .lte("visit_date", monthEndIso);
 
         const { data: deposits } = sessionIds.length
           ? await supabase.from("visit_deposits").select("id, visit_id").in("visit_id", (visits ?? []).map((v: any) => v.id))
@@ -131,22 +135,22 @@ function ProductionCalendarPage() {
         }
 
         // Total properties from sessions' blocks
-        const blockNumbers = Array.from(new Set(sessionList.map((s) => s.block_number).filter(Boolean))) as string[];
+        const blockIds = Array.from(new Set(sessionList.map((s) => s.block_id).filter(Boolean))) as string[];
         let propsByBlock: Record<string, number> = {};
-        if (blockNumbers.length) {
+        if (blockIds.length) {
           const { data: props } = await supabase
             .from("properties")
-            .select("block_number")
-            .in("block_number", blockNumbers);
+            .select("block_id")
+            .in("block_id", blockIds);
           for (const p of (props ?? []) as any[]) {
-            propsByBlock[p.block_number] = (propsByBlock[p.block_number] ?? 0) + 1;
+            propsByBlock[p.block_id] = (propsByBlock[p.block_id] ?? 0) + 1;
           }
         }
         for (const k of Object.keys(map)) {
-          const total = map[k].sessions.reduce((acc, s) => acc + (s.block_number ? (propsByBlock[s.block_number] ?? 0) : 0), 0);
+          const total = map[k].sessions.reduce((acc, s) => acc + (s.block_id ? (propsByBlock[s.block_id] ?? 0) : 0), 0);
           map[k].totalProperties = total;
           const today = startOfDay(new Date());
-          const dayDate = new Date(`${k}T00:00:00`);
+          const dayDate = new Date(`${k}T12:00:00-03:00`);
           if (isAfter(dayDate, today)) map[k].status = "future";
           else if (total > 0 && map[k].visits >= total) map[k].status = "complete";
           else if (map[k].visits > 0 || map[k].sessions.length > 0) map[k].status = "partial";
@@ -255,7 +259,7 @@ function ProductionCalendarPage() {
       <Dialog open={!!selectedDay} onOpenChange={(o) => !o && setSelectedDay(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{selectedDay && format(new Date(`${selectedDay}T00:00:00`), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</DialogTitle>
+            <DialogTitle>{selectedDay && format(new Date(`${selectedDay}T12:00:00-03:00`), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</DialogTitle>
             <DialogDescription>Resumo de produção do dia</DialogDescription>
           </DialogHeader>
           {openDay && (

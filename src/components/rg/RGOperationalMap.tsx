@@ -7,7 +7,6 @@ import {
   SharedMap,
   SharedMapControls,
   SharedNumberedMarkerLayer,
-  SharedRouteLayer,
   SharedUserLocationLayer,
   useFitBounds,
   type NumberedPoint,
@@ -33,9 +32,10 @@ export type RGMapProperty = {
   // Status real de campo (última visita), fonte preferida para classify() — vem de
   // `visits.status`, não confundir com `status` acima (property_status, quase estático).
   visit_status?: string | null;
+  has_focus?: boolean | null;
+  focus_analysis_status?: string | null;
   accuracy?: number | null;
-  // Timestamp de georreferenciamento — usado só para desenhar a linha-guia do
-  // mapa na ordem cronológica real da caminhada em campo.
+  // Timestamp de georreferenciamento — mantido para auditoria/histórico.
   geocoded_at?: string | null;
 };
 
@@ -93,51 +93,29 @@ export function RGOperationalMap({
             <span style="color:#64748b">Longitude</span><b>${fmtCoord(p.longitude)}</b>
             <span style="color:#64748b">Precisão GPS</span><b>${acc}</b>
           </div>
-          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <a href="https://www.google.com/maps/search/?api=1&query=${p.latitude},${p.longitude}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">
-              📍 Ver no Google Maps
-            </a>
-            <a href="https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;flex:1;justify-content:center;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap">
-              🧭 Navegar até aqui
-            </a>
+          <div style="margin-top:8px;color:${p.has_focus ? "#b91c1c" : "#64748b"};font-weight:700">
+            ${p.has_focus ? `⚠ Foco encontrado${p.focus_analysis_status ? ` · ${escapeHtml(p.focus_analysis_status)}` : ""}` : "Sem foco registrado nesta visita"}
           </div>
         </div>`;
+      const markerColor = p.has_focus
+        ? "#dc2626"
+        : p.visit_status === "closed" || p.visit_status === "refused"
+          ? "#f97316"
+          : "#2563eb";
       return {
         id: p.id,
         lat: p.latitude as number,
         lng: p.longitude as number,
-        label, color: "#2563eb", popupHtml: popup,
+        label, color: markerColor, popupHtml: popup,
         tooltip: `Nº ${p.number ?? "—"}${p.complement ? " · " + p.complement : ""}`,
       };
     }), [enriched]);
 
   const geoCount = points.length;
 
-  // Linha-guia: ordem CRONOLÓGICA de georreferenciamento (`geocoded_at`), que
-  // reproduz o perímetro real caminhado no quarteirão — diferente da ordem por
-  // número (comparePropertyOrder), que ziguezagueia entre lados da rua.
-  // Sem `geocoded_at` → vai para o fim, com `id` como desempate estável.
-  const chronological = useMemo(() => {
-    const byId = new Map(enriched.map((e) => [e.p.id, e.p]));
-    return [...points].sort((a, b) => {
-      const pa = byId.get(a.id);
-      const pb = byId.get(b.id);
-      const ta = pa?.geocoded_at ? Date.parse(pa.geocoded_at) : NaN;
-      const tb = pb?.geocoded_at ? Date.parse(pb.geocoded_at) : NaN;
-      const va = Number.isFinite(ta) ? ta : Number.MAX_SAFE_INTEGER;
-      const vb = Number.isFinite(tb) ? tb : Number.MAX_SAFE_INTEGER;
-      if (va !== vb) return va - vb;
-      return String(a.id).localeCompare(String(b.id));
-    });
-  }, [points, enriched]);
-
-  const routePoints = useMemo(
-    () => chronological.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [chronological],
-  );
-  const routeLatLngs = useMemo(
-    () => chronological.map((p) => [p.lat, p.lng] as [number, number]),
-    [chronological],
+  const mapLatLngs = useMemo(
+    () => points.map((p) => [p.lat, p.lng] as [number, number]),
+    [points],
   );
 
   // Instância do mapa (para centralizar na posição do agente sob demanda).
@@ -153,7 +131,7 @@ export function RGOperationalMap({
   // se re-enquadrar (perdendo zoom/pan manual do usuário) a cada atualização
   // de GPS ou outro estado não relacionado aos pontos.
   const fitBoundsOpts = useMemo(() => ({ maxZoom: 18, padding: [32, 32] as [number, number] }), []);
-  useFitBounds(mapInst, routeLatLngs, fitBoundsOpts);
+  useFitBounds(mapInst, mapLatLngs, fitBoundsOpts);
 
   // Geolocalização — apenas sob demanda.
   const [gpsOn, setGpsOn] = useState(false);
@@ -348,15 +326,6 @@ export function RGOperationalMap({
           legend="none"
           onReady={setMapInst}
         >
-          {routePoints.length > 1 && (
-            <SharedRouteLayer
-              points={routePoints}
-              color="#94a3b8"
-              weight={2}
-              opacity={0.75}
-              dashArray="4 7"
-            />
-          )}
           {/* Sem agrupamento: cada imóvel é desenhado individualmente, para que
               a sequência numérica nunca seja escondida numa bolha de cluster. */}
           <SharedNumberedMarkerLayer
@@ -401,6 +370,10 @@ function MapLegend() {
       <span className="inline-flex items-center gap-1">
         <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-600" />
         Imóvel georreferenciado
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
+        Foco encontrado
       </span>
       <span>Imóveis sem coordenadas aparecem na lista ao lado.</span>
     </div>

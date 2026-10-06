@@ -54,7 +54,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
-import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
+import { getOperationalDate, isOperationalDateInWindow, operationalDateBoundsUtcIso, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
@@ -157,7 +157,7 @@ function FieldWorkListPage() {
       // definição — assim que o relógio virava o dia, esta tela deixava de
       // encontrá-la, mostrando "Nenhuma sessão de trabalho ativa" mesmo com
       // a jornada ainda in_progress no banco. Agora busca todas as sessões
-      // in_progress do usuário (mesmo padrão já usado em
+      // in_progress/paused do usuário (mesmo padrão já usado em
       // property.$propertyId.tsx) e só depois decide qual é a "ativa":
       // prioriza a jornada de amanhã; depois a de hoje; na ausência delas,
       // aceita uma retroativa aberta.
@@ -168,10 +168,10 @@ function FieldWorkListPage() {
             .from("field_work_sessions")
             .select("*")
             .eq("user_id", user.id)
-            .eq("status", "in_progress")
+            .in("status", ["in_progress", "paused"])
             .order("created_at", { ascending: false })
             .limit(10) as any,
-        filter: (s) => s.user_id === user.id && s.status === "in_progress",
+        filter: (s) => s.user_id === user.id && (s.status === "in_progress" || s.status === "paused"),
       });
       const sorted = [...(sessions || [])].sort((a: any, b: any) =>
         String(b.created_at || "").localeCompare(String(a.created_at || ""))
@@ -182,7 +182,11 @@ function FieldWorkListPage() {
         isOperationalDateInWindow(s.session_date, todayOperational, 0, MAX_FUTURE_PRODUCTION_DAYS)
       );
       const sessionsToday = sorted.filter((s: any) => s.session_date === todayOperational);
-      const sessionsRetro = sorted.filter((s: any) => s.session_date !== todayOperational && s.is_retroactive);
+      const sessionsRetro = sorted.filter((s: any) =>
+        s.session_date !== todayOperational &&
+        s.is_retroactive &&
+        isOperationalDateInWindow(s.session_date, todayOperational, 5, 0),
+      );
       const candidates = [...sessionsFuture, ...sessionsToday, ...sessionsRetro];
       const session =
         (preferSessionId && candidates.find((s: any) => s.id === preferSessionId)) ||
@@ -643,7 +647,7 @@ function FieldWorkListPage() {
             let byDate: any[] = [];
             if (!sessionCycleId) {
               const startTs = session.session_date
-                ? new Date(`${session.session_date}T00:00:00`).getTime()
+                ? Date.parse(operationalDateBoundsUtcIso(session.session_date).startIso)
                 : null;
               const endTs = session.closed_at
                 ? new Date(session.closed_at).getTime()

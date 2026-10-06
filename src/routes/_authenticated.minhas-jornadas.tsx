@@ -197,9 +197,10 @@ function MySessionsPage() {
       }
 
       enriched.sort((a, b) => {
-        // in_progress first
-        const ap = a.status === "in_progress" ? 0 : 1;
-        const bp = b.status === "in_progress" ? 0 : 1;
+        // Jornadas em andamento e pausadas continuam abertas/resumíveis e
+        // devem aparecer antes das finalizadas.
+        const ap = a.status === "in_progress" || a.status === "paused" ? 0 : 1;
+        const bp = b.status === "in_progress" || b.status === "paused" ? 0 : 1;
         if (ap !== bp) return ap - bp;
         // then by session_date desc
         if (a.session_date !== b.session_date) return a.session_date < b.session_date ? 1 : -1;
@@ -223,7 +224,7 @@ function MySessionsPage() {
       switch (filter) {
         case "hoje": return r.session_date === today;
         case "5dias": return isOperationalDateInWindow(r.session_date, today, 5, MAX_FUTURE_PRODUCTION_DAYS);
-        case "in_progress": return r.status === "in_progress";
+        case "in_progress": return r.status === "in_progress" || r.status === "paused";
         case "closed": return r.status === "closed";
         default: return true;
       }
@@ -305,7 +306,7 @@ function MySessionsPage() {
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="hoje">Hoje</SelectItem>
               <SelectItem value="5dias">Últimos 5 dias e amanhã</SelectItem>
-              <SelectItem value="in_progress">Em andamento</SelectItem>
+              <SelectItem value="in_progress">Abertas/pausadas</SelectItem>
               <SelectItem value="closed">Finalizadas</SelectItem>
             </SelectContent>
           </Select>
@@ -356,6 +357,9 @@ function StatusBadge({ status, synced, error }: { status: string; synced?: boole
   if (status === "in_progress") {
     return <Badge className="bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">🟢 Em andamento</Badge>;
   }
+  if (status === "paused") {
+    return <Badge className="bg-amber-100 text-amber-700 border border-amber-200 rounded-full">🟡 Pausada — pronta para retomar</Badge>;
+  }
   if (status === "closed") {
     return <Badge className="bg-blue-100 text-blue-700 border border-blue-200 rounded-full">🔵 Finalizada</Badge>;
   }
@@ -381,7 +385,7 @@ function SessionCard({
   const updatedBR = row.updated_at
     ? format(new Date(row.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })
     : "—";
-  const isInProgress = row.status === "in_progress";
+  const isInProgress = row.status === "in_progress" || row.status === "paused";
   const hasVisits = hasRecordedVisits(row);
 
   return (

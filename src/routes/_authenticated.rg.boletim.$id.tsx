@@ -47,6 +47,8 @@ type Property = {
   // Status real de campo, derivado da última visita (tabela visits/visit_status) —
   // NÃO confundir com `status` acima, que é property_status (raramente muda).
   visit_status?: string | null;
+  has_focus?: boolean | null;
+  focus_analysis_status?: string | null;
   last_visit_date?: string | null;
 };
 
@@ -340,22 +342,34 @@ function BoletimView() {
             remote: () =>
               supabase
                 .from("visits")
-                .select("id, property_id, status, visit_date")
+                .select("id, property_id, status, has_focus, focus_analysis_status, visit_date")
                 .in("property_id", propertyIds)
                 .order("visit_date", { ascending: false }) as any,
             filter: (v: any) => propertyIds.includes(v.property_id),
           });
-          const lastVisitByProperty = new Map<string, { status: string | null; visit_date: string | null }>();
+          const lastVisitByProperty = new Map<string, {
+            status: string | null;
+            has_focus: boolean | null;
+            focus_analysis_status: string | null;
+            visit_date: string | null;
+          }>();
           for (const v of ((visitsForProps || []) as any[])) {
             if (!v?.property_id) continue;
             const existing = lastVisitByProperty.get(v.property_id);
             if (!existing || String(v.visit_date || "") > String(existing.visit_date || "")) {
-              lastVisitByProperty.set(v.property_id, { status: v.status ?? null, visit_date: v.visit_date ?? null });
+              lastVisitByProperty.set(v.property_id, {
+                status: v.status ?? null,
+                has_focus: v.has_focus ?? null,
+                focus_analysis_status: v.focus_analysis_status ?? null,
+                visit_date: v.visit_date ?? null,
+              });
             }
           }
           for (const p of props) {
             const last = lastVisitByProperty.get(p.id);
             p.visit_status = last?.status ?? null;
+            p.has_focus = last?.has_focus ?? null;
+            p.focus_analysis_status = last?.focus_analysis_status ?? null;
             p.last_visit_date = last?.visit_date ?? null;
           }
           console.log("[RG_VIEWER_VISIT_STATUS]", { boletim_id: b.id, properties: props.length, withVisit: lastVisitByProperty.size });

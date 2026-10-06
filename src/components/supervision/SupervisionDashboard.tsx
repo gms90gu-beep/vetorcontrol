@@ -178,9 +178,13 @@ export function SupervisionDashboard() {
         const closed = rows.reduce((s, r: any) => s + (r.closed_properties || 0), 0);
         const focus = rows.reduce((s, r: any) => s + (r.positive_focus || 0), 0);
         const todaySessions = (sessions || []).filter(
-          (s: any) => s.user_id === agent.id,
+          (s: any) => s.user_id === agent.id && s.session_date === todayISO,
         );
-        const hasOpenSession = todaySessions.some((s: any) => s.status === "active");
+        // O banco usa in_progress/paused; "active" é um valor legado e não
+        // representa uma jornada aberta no fluxo atual.
+        const hasOpenSession = todaySessions.some(
+          (s: any) => s.status === "in_progress" || s.status === "paused" || s.status === "active",
+        );
         const hasAnyToday = todaySessions.length > 0;
         return {
           ...agent,

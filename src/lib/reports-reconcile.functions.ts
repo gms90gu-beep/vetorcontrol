@@ -134,10 +134,30 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     const existingMap = new Map<string, any>();
     for (const r of existing) existingMap.set(`${r.agent_id}__${r.work_date}`, r);
 
+    // daily_work_records.agent_id é o profile_id, mas legacy_agent_id é o
+    // agents.id. Nunca reutilizar o profile id nesse campo: isso deixa o
+    // boletim inconsistente e pode fazê-lo desaparecer das consultas/RLS
+    // legadas. Resolva o vínculo uma vez para todos os agentes do rebuild.
+    const legacyAgentByProfile = new Map<string, string>();
+    if (agentIds.length > 0) {
+      const { data: agentRows, error: agentErr } = await supabaseAdmin
+        .from("agents")
+        .select("id, profile_id")
+        .in("profile_id", agentIds);
+      if (agentErr) throw new Error(agentErr.message);
+      for (const agent of agentRows ?? []) {
+        if (agent.profile_id && agent.id) legacyAgentByProfile.set(agent.profile_id, agent.id);
+      }
+    }
+
     const rows: RebuildRow[] = [];
     let updated = 0;
 
     for (const [key, g] of groups) {
+      const legacyAgentId = legacyAgentByProfile.get(g.agent_id);
+      if (!legacyAgentId) {
+        throw new Error(`Cadastro de agente não encontrado para o perfil ${g.agent_id}; reconstrução interrompida para evitar legacy_agent_id inválido.`);
+      }
       const vs = g.visits;
       const uniqueProps = new Set(vs.map((v) => v.property_id).filter(Boolean));
       const worked = uniqueProps.size;
@@ -172,6 +192,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       const positiveFoci = Object.values(fociByType).reduce((a, b) => a + b, 0) || positiveVisitIds.size;
 
       const payload: any = {
+        legacy_agent_id: legacyAgentId,
         properties_worked: worked,
         properties_closed: closed,
         properties_refused: refused,
@@ -240,7 +261,6 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         const insert = {
           ...payload,
           agent_id: g.agent_id,
-          legacy_agent_id: g.agent_id,
           work_date: g.work_date,
           cycle_id: g.cycle_id ?? null,
           week_id: g.week_id ?? null,

@@ -31,7 +31,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
-import { getOperationalDate } from "@/lib/operational-date";
+import { getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { ConnectivityBadge } from "@/components/ConnectivityBadge";
 import { CycleWeekBadge } from "@/components/CycleWeekBadge";
@@ -123,16 +123,15 @@ export function OperationalHeader() {
         console.log("[SEMANA_CICLO]", { work_date: opDateStr, cycle_id: cycle.id, cycle_week: (week as any)?.number ?? null });
 
         // 5. Get stats for the operational date
-        const startOfDay = new Date(`${opDateStr}T00:00:00`);
-        const endOfDay = new Date(`${opDateStr}T23:59:59.999`);
+        const { startIso, endIso } = operationalDateBoundsUtcIso(opDateStr);
 
         const { data: todayVisits } = await supabase
           .from("visits")
           .select("id, status")
           .eq("agent_id", user.id)
           .eq("cycle_id", cycle.id)
-          .gte("visit_date", startOfDay.toISOString())
-          .lte("visit_date", endOfDay.toISOString());
+          .gte("visit_date", startIso)
+          .lte("visit_date", endIso);
         
         console.log(`[CICLO] OperationalHeader consulta visits retornou ${todayVisits?.length || 0} registros do ciclo ${cycle.name}`);
 

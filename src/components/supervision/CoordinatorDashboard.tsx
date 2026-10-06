@@ -160,7 +160,9 @@ export function CoordinatorDashboard() {
   }
 
   const totals = useMemo(() => {
-    const activeSessions = sessions.filter((s) => s.status === "active").length;
+    const activeSessions = sessions.filter(
+      (s) => s.status === "in_progress" || s.status === "paused" || s.status === "active",
+    ).length;
     return {
       supervisors: supervisors.length,
       agents: agents.length,
