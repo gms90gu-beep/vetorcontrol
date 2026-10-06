@@ -7,3 +7,6 @@
 - [x] Corrigir o gatilho e a reconstrução de registros diários no banco.
 - [x] Validar o mapa real, a fila do fechamento, a leitura dos relatórios e os testes de regressão.
 - [ ] Aguardar autorização específica para reconstrução dos 28 pares históricos ausentes.
+- [ ] Aplicar `20261006003000_cycle_scoped_pendencies.sql` (bloqueado: arquivo ausente no repositório).
+- [ ] Validar Pendências, filtros por ciclo/semana e sincronização offline após a migration (bloqueado pela migration ausente).
+- [ ] Publicar a versão atual após a validação solicitada (bloqueado pela migration ausente).
