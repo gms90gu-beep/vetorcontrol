@@ -50,6 +50,13 @@
       "when": 1791282533689,
       "tag": "0006_cycle_scoped_pendencies",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791367865940,
+      "tag": "0007_scope_daily_rebuild_to_supervisor_team",
+      "breakpoints": true
     }
   ]
 }
