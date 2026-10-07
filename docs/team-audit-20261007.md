@@ -34,4 +34,17 @@ Mantido exclusivamente o projeto Cloud autorizado `ttjzgszxrnmcsygtzfcu`. Nenhum
 - Não foi gravada visita fictícia para comprovar fechamento/sincronização real. Essa validação depende de uma operação real autorizada.
 - Os 28 pares históricos anteriormente identificados continuam sem reconstrução, aguardando autorização específica.
 
-Publicação não executada: a validação completa exigida ainda não foi atingida.
+## Validação final como supervisor
+
+- Sessão real de Adenilson, obtida com autorização; projeto existente confirmado pelo destino da sessão. Nenhum papel foi simulado no armazenamento local.
+- Equipe visível: somente Gustavo Mota. Leituras reais de profiles, DWR, sessões, visitas e pendências de Charles retornaram zero linhas.
+- Atalhos Ver Relatório, Ver Jornada e Ver Quarteirões abriram os destinos com o ID de Gustavo; calendário mostrou produção e jornada existente de 01/10. URLs com Charles não revelaram produção.
+- Reconstrução SQL da migration 0007 rejeitou Charles com código 42501 antes de escrita; função de aplicação também rejeitou o agente externo. Nenhuma reconstrução histórica foi executada.
+- Mapa retornou 1.001 imóveis, exclusivamente Gustavo; ciclo ativo: um foco observado, zero positivos confirmados. Ciclo anterior: zero observados/positivos. Mapas e calor rejeitaram agente externo; relatório de pendências aplica sua própria equipe (não aceita filtro por agente).
+- Pendências permaneceram visíveis com conexão desligada, somente da equipe. Suíte existente cobre fila, dependências e jornadas retroativas, futuras e pausadas; não foram criadas visitas/jornadas fictícias.
+- Migration 0008 mantém RLS, classifica configurações como administrativas por padrão, permite master completo e leitura operacional explícita a supervisor/coordenador; agente e demais usuários não leem configurações administrativas. A única linha existente contém metadados administrativos; não há configuração operacional a liberar. Nenhuma linha foi reclassificada.
+- Correção adicional encontrada durante validação: limpeza de tiles mantinha ouvintes de zoom após sair do mapa. Ordem de remoção corrigida e verificada sem erros no navegador.
+- Resultado: 105 testes em 26 arquivos, mais 12 testes de mapas; compilação automática OK. Scanner de banco: zero críticos, sete avisos e uma informação mantidos sem supressão. Auditoria de dependências encontrou avisos adicionais; nenhuma biblioteca foi atualizada fora do escopo.
+- Contagens finais observadas: 1.151 visitas, 61 DWR, 128 pendências, 158 tentativas. A base recebeu 18 visitas durante esta janela; os scripts de validação fizeram somente leituras e chamadas rejeitadas, sem inserir produção. Não atribuir crescimento concomitante a uma reconstrução.
+
+Os bloqueios anteriores de sessão de supervisor e leitura ampla das configurações foram resolvidos. Gravação nova de produção continua dependendo de operação real autorizada; 28 pares históricos permanecem intactos.
