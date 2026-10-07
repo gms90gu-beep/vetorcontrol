@@ -4,6 +4,8 @@
  * RG (boletins_rg/properties/blocks), and property_pendencies.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { resolvePermittedAgentIds } from "@/lib/team-scope";
+import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { buildPropertyCycleHistory, type PropertyCycleHistory, type PropertyCycleVisit } from "@/lib/map-cycle-history";
 
@@ -399,13 +401,13 @@ export interface HeatmapResult {
 
 export const getHeatmapData = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
   .handler(async ({ data, context }): Promise<HeatmapResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
     // Escopo único por profile_id (DWR.agent_id e boletins_rg.agent_id são profile_id)
-    const profileIdsScope = await scopedProfileIds(supabase, userId, role);
+    const profileIdsScope = await resolvePermittedAgentIds(supabase, userId, role, data.agentId);
     console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIdsScope?.length ?? "all");
 
     let dwrQ = supabase
@@ -417,7 +419,12 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       if (profileIdsScope.length === 0) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
       dwrQ = dwrQ.in("agent_id", profileIdsScope);
     }
-    const { data: dwr } = await dwrQ;
+    if (data.cycleIds) {
+      if (!data.cycleIds.length) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
+      dwrQ = dwrQ.in("cycle_id", data.cycleIds);
+    }
+    const { data: dwr, error: dwrError } = await dwrQ;
+    if (dwrError) throw dwrError;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
     const { data: blocks } = await supabase
@@ -536,22 +543,7 @@ async function scopedProfileIds(
   userId: string,
   role: "admin_master" | "coordenador" | "supervisor",
 ): Promise<string[] | null> {
-  if (role === "admin_master") return null;
-  let profQ = supabase.from("profiles").select("id");
-  if (role === "supervisor") {
-    profQ = profQ.or(`supervisor_id.eq.${userId},id.eq.${userId}`);
-  } else if (role === "coordenador") {
-    // coordenador: próprios supervisores + agentes desses supervisores + ele mesmo
-    const { data: sups } = await supabase
-      .from("profiles").select("id").eq("coordinator_id", userId);
-    const supIds = (sups ?? []).map((s: any) => s.id);
-    const { data: ags } = supIds.length
-      ? await supabase.from("profiles").select("id").in("supervisor_id", supIds)
-      : { data: [] as any[] };
-    return Array.from(new Set([userId, ...supIds, ...(ags ?? []).map((a: any) => a.id)]));
-  }
-  const { data: profiles } = await profQ;
-  return (profiles ?? []).map((p: any) => p.id);
+  return resolvePermittedAgentIds(supabase, userId, role);
 }
 
 export interface MapCycleOption {
@@ -619,7 +611,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     if (yearCycles.length === 0) return [];
 
     const cycleIds = yearCycles.map((cycle: any) => cycle.id);
-    const { data: visits, error: visitError } = await supabaseAdmin
+    const { data: visits, error: visitError } = await supabase
       .from("visits")
       .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
       .eq("property_id", data.propertyId)
@@ -628,13 +620,18 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
 
     const historyVisitIds = ((visits ?? []) as any[]).map((visit) => visit.id);
+    const { data: historyDeposits, error: historyDepositError } = historyVisitIds.length
+      ? await supabase.from("visit_deposits").select("visit_id, is_positive").in("visit_id", historyVisitIds)
+      : { data: [], error: null };
+    if (historyDepositError) throw historyDepositError;
+    const historyPositiveIds = new Set((historyDeposits ?? []).filter((d) => d.is_positive).map((d) => d.visit_id));
     const normalizedVisits: PropertyCycleVisit[] = ((visits ?? []) as any[]).map((visit) => ({
         id: visit.id,
         cycle_id: visit.cycle_id,
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
         has_focus: Boolean(visit.has_focus),
-        focus_analysis_status: visit.has_focus ? "positive" : null,
+        focus_analysis_status: historyPositiveIds.has(visit.id) ? "positive" : null,
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -663,12 +660,12 @@ async function scopedAgentIds(
 
 export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
   .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
-    const profileIds = await scopedProfileIds(supabase, userId, role);
+    const profileIds = await resolvePermittedAgentIds(supabase, userId, role, data.agentId);
     console.log("[MAP_ROLE]", role);
     console.log("[MAP_USER]", userId);
     console.log("[MAP_SCOPE_PROFILES]", profileIds?.length ?? "all");
@@ -729,14 +726,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     // administrativo aqui evita que políticas de linha das tabelas operacionais
     // ocultem visitas e pendências de agentes subordinados.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const pendResults = await Promise.all(
-      idChunks.map((ids) =>
-        supabaseAdmin
-          .from("property_pendencies")
-          .select("property_id, resolved_at")
-          .in("property_id", ids),
-      ),
-    );
+    const pendResults = [];
+    for (const ids of idChunks) {
+      if (data.cycleIds?.length === 0) continue;
+      let query = supabaseAdmin.from("property_pendencies").select("property_id, resolved_at").in("property_id", ids);
+      if (profileIds) query = query.in("agent_id", profileIds);
+      if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
+      pendResults.push(await query);
+    }
     const pendError = pendResults.find((result) => result.error)?.error;
     if (pendError) throw new Error(`Falha ao carregar pendências do mapa: ${pendError.message}`);
     const pends = pendResults.flatMap((result) => result.data ?? []);
@@ -745,8 +742,8 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       if (!p.resolved_at) pendingByProp.set(p.property_id, (pendingByProp.get(p.property_id) ?? 0) + 1);
     }
 
-    const periodStart = `${data.from}T00:00:00-03:00`;
-    const periodEnd = `${data.to}T23:59:59.999-03:00`;
+    const periodStart = operationalDateBoundsUtcIso(data.from).startIso;
+    const periodEnd = operationalDateBoundsUtcIso(data.to).endIso;
     let visits: any[] = [];
     if (data.cycleIds === undefined || data.cycleIds === null || data.cycleIds.length > 0) {
       const visitResults = await Promise.all(
@@ -758,6 +755,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
           if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
+          if (profileIds) query = query.in("agent_id", profileIds);
           return query.order("visit_date", { ascending: false });
         }),
       );
@@ -782,7 +780,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       if (v.has_focus) {
         focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
       }
-      if (v.has_focus) positiveVisitIds.add(v.id);
+
       if (!lastVisitByProp.has(v.property_id)) {
         lastVisitByProp.set(v.property_id, v.visit_date);
         if (v.agent_id) lastAgentByProp.set(v.property_id, v.agent_id);
@@ -805,6 +803,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       if (depError) throw new Error(`Falha ao carregar depósitos do mapa: ${depError.message}`);
       const deps = depResults.flatMap((result) => result.data ?? []);
       for (const d of deps) {
+        if (d.is_positive) positiveVisitIds.add(d.visit_id);
         const pid = visitToProp.get(d.visit_id);
         if (pid) depByProp.set(pid, (depByProp.get(pid) ?? 0) + 1);
       }
@@ -874,7 +873,7 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
 
 export const getBlockRiskScores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
   .handler(async ({ data, context }): Promise<{ blocks: BlockRiskScore[] }> => {
     const result = await (getPropertyMapPoints as any)({ data });
     const points = (result.points ?? []) as PropertyMapPoint[];
