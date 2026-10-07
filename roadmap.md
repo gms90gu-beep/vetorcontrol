@@ -1,5 +1,11 @@
 # Tarefas
 
+- [x] Auditoria 07/10: implementar equipe no servidor em relatórios/reconstruções e preservar IDs canônicos; migration 0007 instalada, sem reconstruir dados.
+- [x] Auditoria 07/10: implementar calendário da equipe, atalhos filtrados por agente e ciclo ativo inicial.
+- [x] Auditoria 07/10: implementar escopo de mapas/calor/pendências e separar foco observado de positivo, informar truncamento.
+- [x] Auditoria 07/10: 96 testes em 25 arquivos aprovados, compilação automática OK; calendário/relatórios do agente e rejeição real de reconstrução externa verificados, contagens preservadas.
+- [ ] Auditoria 07/10: validar atalhos, mapas/calor e relatórios na interface do supervisor (bloqueio: sessão disponível é de agente); publicar apenas após isso e liberação do alerta crítico anterior.
+
 - [x] Diagnosticar a falha de carregamento dos mapas.
 - [x] Diagnosticar fechamentos ausentes nos relatórios.
 - [x] Corrigir a inicialização e o fallback resiliente dos mapas.

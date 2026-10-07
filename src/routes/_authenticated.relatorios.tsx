@@ -36,6 +36,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
+  head: () => ({ meta: [
+    { title: "Boletins e produção — VetorControl" },
+    { name: "description", content: "Boletins oficiais e produção operacional registrada." },
+    { property: "og:title", content: "Boletins e produção — VetorControl" },
+    { property: "og:description", content: "Histórico de produção e relatórios autorizados." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
   component: RelatoriosPage,
 });
 
@@ -54,7 +61,7 @@ function RelatoriosPage() {
   if (!userRole)
     return <div className="p-8 text-sm text-muted-foreground">Carregando…</div>;
 
-  const isAgent = userRole === "agente";
+  const isAgent = ["agente", "agent"].includes(userRole);
   const isSupervisor = userRole === "supervisor";
   const isCoordinator = userRole === "coordenador";
   const isAdmin = userRole === "admin_master";

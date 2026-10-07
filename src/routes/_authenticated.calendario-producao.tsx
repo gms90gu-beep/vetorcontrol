@@ -1,5 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { blockManagersGuard } from "@/lib/role-guards";
+import { useAuth } from "@/hooks/useAuth";
+import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
+import { getOperationalDate, toOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +21,14 @@ import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, ad
 import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/_authenticated/calendario-producao")({
-  beforeLoad: blockManagersGuard,
+  validateSearch: (search: Record<string, unknown>): { agentId?: string } => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
+  head: () => ({ meta: [
+    { title: "Calendário de produção — VetorControl" },
+    { name: "description", content: "Calendário das jornadas e produção da equipe autorizada." },
+    { property: "og:title", content: "Calendário de produção — VetorControl" },
+    { property: "og:description", content: "Produção por data operacional e agente." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
   component: ProductionCalendarPage,
 });
 
@@ -50,6 +60,11 @@ function toKey(d: Date) {
 
 function ProductionCalendarPage() {
   const navigate = useNavigate();
+  const { user, role } = useAuth();
+  const { agentId } = Route.useSearch();
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [scopeReady, setScopeReady] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState(agentId || "all");
   const [userId, setUserId] = useState<string | null>(null);
   const [month, setMonth] = useState<Date>(startOfMonth(new Date()));
   const [loading, setLoading] = useState(false);
@@ -57,11 +72,13 @@ function ProductionCalendarPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const res = await safeGetUser();
-      if (res.data.user?.id) setUserId(res.data.user.id);
-    })();
-  }, []);
+    if (!user?.id || !role) return;
+    setUserId(user.id);
+    void listPermittedAgentProfiles(user.id, role).then((rows) => {
+      setProfiles(rows);
+      setScopeReady(true);
+    }).catch(() => { setProfiles([]); setScopeReady(true); });
+  }, [user?.id, role]);
 
   const gridDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
@@ -73,18 +90,24 @@ function ProductionCalendarPage() {
   }, [month]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !scopeReady) return;
     const load = async () => {
       setLoading(true);
       try {
         const from = toKey(startOfMonth(month));
         const to = toKey(endOfMonth(month));
+        const ids = profiles.map((p) => p.id).filter((id) => selectedAgent === "all" || selectedAgent === id);
+        setDayMap({});
+        if (!ids.length) {
+          if (selectedAgent !== "all") toast.error("Agente fora da equipe permitida.");
+          return;
+        }
         console.log("[PRODUCTION_CALENDAR_LOAD]", { userId, from, to });
 
         const { data: sessions, error: sErr } = await supabase
           .from("field_work_sessions")
           .select("id, session_date, status, block_number, cycle_id, week_id")
-          .eq("user_id", userId)
+          .in("user_id", ids)
           .gte("session_date", from)
           .lte("session_date", to);
         if (sErr) throw sErr;
@@ -96,9 +119,9 @@ function ProductionCalendarPage() {
         const { data: visits } = await supabase
           .from("visits")
           .select("id, property_id, status, has_focus, visit_date, field_work_session_id")
-          .eq("agent_id", userId)
-          .gte("visit_date", `${from}T00:00:00`)
-          .lte("visit_date", `${to}T23:59:59`);
+          .in("agent_id", ids)
+          .gte("visit_date", operationalDateBoundsUtcIso(from).startIso)
+          .lte("visit_date", operationalDateBoundsUtcIso(to).endIso);
 
         const { data: deposits } = sessionIds.length
           ? await supabase.from("visit_deposits").select("id, visit_id").in("visit_id", (visits ?? []).map((v: any) => v.id))
@@ -114,7 +137,8 @@ function ProductionCalendarPage() {
         // Property counts per session (best-effort by block_number in the session)
         // Aggregate visits per day
         for (const v of (visits ?? []) as any[]) {
-          const k = (v.visit_date as string).slice(0, 10);
+          const k = toOperationalDate(v.visit_date);
+          if (!k) continue;
           if (!map[k]) map[k] = emptyDay(k);
           map[k].visits += 1;
           if (v.has_focus) map[k].positive += 1;
@@ -122,7 +146,10 @@ function ProductionCalendarPage() {
         }
 
         const visitIdToDate: Record<string, string> = {};
-        for (const v of (visits ?? []) as any[]) visitIdToDate[v.id] = (v.visit_date as string).slice(0, 10);
+        for (const v of (visits ?? []) as any[]) {
+          const date = toOperationalDate(v.visit_date);
+          if (date) visitIdToDate[v.id] = date;
+        }
         for (const d of (deposits ?? []) as any[]) {
           const k = visitIdToDate[d.visit_id];
           if (!k) continue;
@@ -145,7 +172,7 @@ function ProductionCalendarPage() {
         for (const k of Object.keys(map)) {
           const total = map[k].sessions.reduce((acc, s) => acc + (s.block_number ? (propsByBlock[s.block_number] ?? 0) : 0), 0);
           map[k].totalProperties = total;
-          const today = startOfDay(new Date());
+          const today = startOfDay(new Date(`${getOperationalDate()}T12:00:00`));
           const dayDate = new Date(`${k}T00:00:00`);
           if (isAfter(dayDate, today)) map[k].status = "future";
           else if (total > 0 && map[k].visits >= total) map[k].status = "complete";
@@ -162,7 +189,7 @@ function ProductionCalendarPage() {
       }
     };
     load();
-  }, [userId, month]);
+  }, [userId, month, profiles, scopeReady, selectedAgent]);
 
   const monthTotals = useMemo(() => {
     const acc = { total: 0, visits: 0, pending: 0, positive: 0, deposits: 0 };
@@ -194,6 +221,15 @@ function ProductionCalendarPage() {
         </div>
       </div>
 
+      {!["agente", "agent"].includes(role ?? "") && (
+        <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+          <SelectTrigger aria-label="Agente do calendário" className="w-full sm:w-72"><SelectValue placeholder="Equipe" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toda a equipe</SelectItem>
+            {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name || "Agente"}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg capitalize">{format(month, "MMMM 'de' yyyy", { locale: ptBR })}</CardTitle>
@@ -283,12 +319,12 @@ function ProductionCalendarPage() {
             </div>
           )}
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            {openDay && openDay.sessions.length === 0 && (
+            {openDay && openDay.sessions.length === 0 && ["agente", "agent"].includes(role ?? "") && (
               <Button onClick={() => navigate({ to: "/field-work" })}>
                 <Plus className="h-4 w-4 mr-1" /> Criar Jornada nesta Data
               </Button>
             )}
-            {openDay && openDay.sessions.length > 0 && (
+            {openDay && openDay.sessions.length > 0 && ["agente", "agent"].includes(role ?? "") && (
               <Button variant="outline" onClick={() => navigate({ to: "/minhas-jornadas" })}>
                 <Eye className="h-4 w-4 mr-1" /> Ver Jornadas
               </Button>

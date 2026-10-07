@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { getHeatmapData, getPropertyMapPoints, type PropertyMapPoint } from "@/lib/wave-c.functions";
+import { getHeatmapData, getPropertyMapPoints, getMapCycleOptions, type PropertyMapPoint } from "@/lib/wave-c.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import { getOperationalDate } from "@/lib/operational-date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,15 +74,27 @@ function HeatmapPage() {
   const [selected, setSelected] = useState<PropertyMapPoint | null>(null);
   const fetchHeat = useServerFn(getHeatmapData);
   const fetchProps = useServerFn(getPropertyMapPoints);
+  const fetchCycles = useServerFn(getMapCycleOptions);
+  const [cycleId, setCycleId] = useState("");
+  const [cyclesReady, setCyclesReady] = useState(false);
+  const cycles = useQuery({ queryKey: ["heatmap-cycles"], queryFn: () => fetchCycles() });
+  useEffect(() => {
+    if (!cycles.data || cyclesReady) return;
+    const active = cycles.data.find((c) => c.status === "in_progress");
+    if (active) { setCycleId(active.id); setFrom(active.start_date); setTo(active.end_date); }
+    setCyclesReady(true);
+  }, [cycles.data, cyclesReady]);
 
   const blocks = useQuery({
-    queryKey: ["heatmap", from, to],
-    queryFn: () => fetchHeat({ data: { from, to } }),
+    queryKey: ["heatmap", from, to, cycleId],
+    queryFn: () => fetchHeat({ data: { from, to, cycleIds: cycleId ? [cycleId] : null } }),
+    enabled: cyclesReady,
   });
 
   const props = useQuery({
-    queryKey: ["heatmap-props", from, to],
-    queryFn: () => fetchProps({ data: { from, to } }),
+    queryKey: ["heatmap-props", from, to, cycleId],
+    queryFn: () => fetchProps({ data: { from, to, cycleIds: cycleId ? [cycleId] : null } }),
+    enabled: cyclesReady,
   });
 
   const head = ["ID", "Quart.", "Endereço", "Nº", "Lat", "Lng", "Status"];
@@ -185,6 +198,17 @@ function HeatmapPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Select value={cycleId || "all"} onValueChange={(id) => {
+            setCycleId(id === "all" ? "" : id);
+            const cycle = cycles.data?.find((c) => c.id === id);
+            if (cycle) { setFrom(cycle.start_date); setTo(cycle.end_date); }
+          }}>
+            <SelectTrigger aria-label="Ciclo epidemiológico"><SelectValue placeholder="Ciclo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os ciclos</SelectItem>
+              {(cycles.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">
             <label className="text-xs">
               <div className="text-muted-foreground mb-1">De</div>

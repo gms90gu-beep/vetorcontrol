@@ -7,6 +7,7 @@ import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { filterPendencies } from "@/lib/pendency-scope";
 import { saveRecoveryAttemptOffline } from "@/lib/offline/repos/recovery";
 import { useAuth } from "@/hooks/useAuth";
+import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
 import {
   AlertTriangle,
   Home,
@@ -161,6 +162,7 @@ function PendingPage() {
     if (!user) return [];
     setLoading(true);
     try {
+      const permittedIds = (await listPermittedAgentProfiles(user.id, role ?? "")).map((p) => p.id);
       const pends = await listRemoteOrCache<any>({
         name: "property_pendencies",
         remote: () => {
@@ -168,15 +170,16 @@ function PendingPage() {
             .from("property_pendencies")
             .select("*")
             .order("last_attempt_at", { ascending: false });
+          query = query.in("agent_id", permittedIds);
           if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
           if (weekFilter) query = query.eq("week_id", weekFilter);
-          if (role === "agente") query = query.eq("agent_id", user.id);
+          if (["agente", "agent"].includes(role ?? "")) query = query.eq("agent_id", user.id);
           return query as any;
         },
-        filter: (p) => filterPendencies([p], {
+        filter: (p) => permittedIds.includes(p.agent_id) && filterPendencies([p], {
           cycleId: cycleFilter || null,
           weekId: weekFilter || null,
-          agentId: role === "agente" ? user.id : null,
+          agentId: ["agente", "agent"].includes(role ?? "") ? user.id : null,
         }).length > 0,
       });
 
@@ -264,6 +267,8 @@ function PendingPage() {
   const loadAttempts = async (propertyId: string, cycleId?: string | null) => {
     const requestId = ++attemptsRequestRef.current;
     try {
+      if (!user?.id) return;
+      const permittedIds = (await listPermittedAgentProfiles(user.id, role ?? "")).map((p) => p.id);
       const data = await listRemoteOrCache<any>({
         name: "property_recovery_attempts",
         remote: () => {
@@ -271,11 +276,12 @@ function PendingPage() {
             .from("property_recovery_attempts")
             .select("*")
             .eq("property_id", propertyId)
+            .in("agent_id", permittedIds)
             .order("attempted_at", { ascending: true });
           query = cycleId ? query.eq("cycle_id", cycleId) : query.is("cycle_id", null);
           return query as any;
         },
-        filter: (a) => a.property_id === propertyId && (a.cycle_id ?? null) === (cycleId ?? null),
+        filter: (a) => permittedIds.includes(a.agent_id) && a.property_id === propertyId && (a.cycle_id ?? null) === (cycleId ?? null),
       });
       const sorted = [...(data || [])].sort((a, b) => {
         const ta = a.attempted_at ? new Date(a.attempted_at).getTime() : 0;

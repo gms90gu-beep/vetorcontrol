@@ -151,7 +151,7 @@ const BASE_LAYERS: Record<BaseLayerId, { name: string }> = {
   },
 };
 
-export default function OperationalMapView() {
+export default function OperationalMapView({ agentId }: { agentId?: string }) {
   console.log("[MAP_COMPONENT_MOUNT]");
 
   // A SE atual costuma ter pouca ou nenhuma produção lançada (o mapa abria
@@ -244,12 +244,12 @@ export default function OperationalMapView() {
   }, [cycleOptionsQuery.isLoading, cycleOptions, years]);
 
   const props = useQuery({
-    queryKey: ["op-map-points", from, to, filterCycleIds],
-    queryFn: () => fetchProps({ data: { from, to, cycleIds: filterCycleIds } }),
+    queryKey: ["op-map-points", from, to, filterCycleIds, agentId],
+    queryFn: () => fetchProps({ data: { from, to, cycleIds: filterCycleIds, agentId } }),
   });
   const blocks = useQuery({
-    queryKey: ["op-map-blocks", from, to, filterCycleIds],
-    queryFn: () => fetchBlocks({ data: { from, to, cycleIds: filterCycleIds } }),
+    queryKey: ["op-map-blocks", from, to, filterCycleIds, agentId],
+    queryFn: () => fetchBlocks({ data: { from, to, cycleIds: filterCycleIds, agentId } }),
     enabled: showBlocks,
   });
   const coverage = useQuery({

@@ -107,7 +107,12 @@ export function SupervisionDashboard() {
       if (!profiles) {
         profiles = await listRemoteOrCache<any>({
           name: "profiles",
-          remote: () => supabase.from("profiles").select("*") as any,
+          remote: () => {
+            let query = supabase.from("profiles").select("*");
+            if (role === "supervisor") query = query.eq("supervisor_id", user?.id ?? "");
+            return query as any;
+          },
+          filter: (p) => role !== "supervisor" || p.supervisor_id === user?.id,
         });
       }
 
@@ -120,6 +125,7 @@ export function SupervisionDashboard() {
       const allSupervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
 
       let team: any[] = [...allAgents];
+      if (role === "supervisor") team = team.filter((p) => p.supervisor_id === user?.id);
       let visibleSupervisors: any[] = includeSupervisors ? [...allSupervisors] : [];
 
       // Se é coordenador: filtrar supervisores vinculados + agentes desses supervisores
@@ -645,13 +651,13 @@ export function SupervisionDashboard() {
                       <DropdownMenuItem onClick={() => openAgentRG(agent)}>
                         <ClipboardList className="h-3.5 w-3.5 mr-2" /> Ver RG
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate({ to: "/reports" })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/reports", search: { agentId: agent.id } })}>
                         <FileText className="h-3.5 w-3.5 mr-2" /> Ver Relatório
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setViewingAgent(agent)}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/calendario-producao", search: { agentId: agent.id } })}>
                         <Activity className="h-3.5 w-3.5 mr-2" /> Ver Jornada
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate({ to: "/map" })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/map", search: { agentId: agent.id } })}>
                         <MapPin className="h-3.5 w-3.5 mr-2" /> Ver Quarteirões
                       </DropdownMenuItem>
                     </DropdownMenuContent>

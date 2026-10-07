@@ -47,6 +47,7 @@ describe("daily report rebuild authorization", () => {
       role: "supervisor",
       userId: "supervisor-1",
       agentId: "agent-2",
+      supervisedAgentIds: ["agent-2"],
       from: "2026-01-01",
       to: "2026-12-31",
       today: "2026-09-30",
@@ -67,5 +68,11 @@ describe("daily report rebuild authorization", () => {
       from: "2026-07-03",
       to: "2026-09-30",
     });
+  });
+
+  it("rejects another team and missing supervisor scope", () => {
+    const input = { role: "supervisor", userId: "s", agentId: "other", from: "2026-09-01", to: "2026-09-30", today: "2026-09-30" };
+    expect(getRebuildAuthorizationError({ ...input, supervisedAgentIds: ["own"] })).toMatch(/própria equipe/);
+    expect(getRebuildAuthorizationError(input)).toMatch(/própria equipe/);
   });
 });

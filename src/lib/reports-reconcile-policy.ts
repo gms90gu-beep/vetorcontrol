@@ -8,6 +8,7 @@ export interface RebuildAuthorizationInput {
   from: string;
   to: string;
   today: string;
+  supervisedAgentIds?: string[];
 }
 
 function parseDateOnly(value: string): number | null {
@@ -34,7 +35,7 @@ export function getRebuildAuthorizationError(input: RebuildAuthorizationInput): 
     return "Intervalo de datas inválido.";
   }
 
-  if (input.role === "agente") {
+  if (input.role === "agente" || input.role === "agent") {
     if (!input.agentId || input.agentId !== input.userId) {
       return "Agente só pode reconstruir os próprios boletins.";
     }
@@ -45,6 +46,12 @@ export function getRebuildAuthorizationError(input: RebuildAuthorizationInput): 
     return null;
   }
 
-  if (["admin_master", "coordenador", "supervisor"].includes(input.role)) return null;
+  if (input.role === "supervisor") {
+    if (!input.supervisedAgentIds || (input.agentId && !input.supervisedAgentIds.includes(input.agentId))) {
+      return "Supervisor só pode reconstruir relatórios de agentes vinculados à própria equipe.";
+    }
+    return null;
+  }
+  if (["admin_master", "coordenador"].includes(input.role)) return null;
   return "Forbidden: requer agente, supervisor, coordenador ou admin_master.";
 }
