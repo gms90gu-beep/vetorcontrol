@@ -83,8 +83,10 @@ export function attachResilientTileLayer(
     get current() { return TILE_PROVIDERS[idx]; },
     destroy: () => {
       destroyed = true;
-      try { layer.off(); } catch { /* noop */ }
+      // Keep Leaflet's own `remove` listener until removeLayer has detached
+      // zoom/view callbacks. Clearing it first leaves callbacks on a dead map.
       try { map.removeLayer(layer); } catch { /* noop */ }
+      try { layer.off(); } catch { /* noop */ }
     },
   };
 }
