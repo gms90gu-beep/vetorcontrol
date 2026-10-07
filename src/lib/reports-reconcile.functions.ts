@@ -9,13 +9,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEpiWeek } from "@/lib/cycle-week";
-import { getOperationalDate, operationalDateBoundsUtcIso } from "@/lib/operational-date";
+import { getOperationalDate, operationalDateBoundsUtcIso, toOperationalDate } from "@/lib/operational-date";
 import { getRebuildAuthorizationError } from "@/lib/reports-reconcile-policy";
+import { resolvePermittedAgentIds, normalizeOperationalRole } from "@/lib/team-scope";
 
 interface RebuildInput {
   from: string; // yyyy-mm-dd
   to: string;   // yyyy-mm-dd
   agentId?: string;
+  cycleId?: string | null;
 }
 
 interface RebuildRow {
@@ -44,8 +46,10 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     console.log("[REPORT_REBUILD_START]", { from: data.from, to: data.to, agentId: data.agentId ?? null, by: userId });
 
-    const { data: roleRow } = await supabase.rpc("get_user_role", { u_id: userId });
-    const role = (roleRow as string) || "agente";
+    const { data: roleRow, error: roleError } = await supabase.rpc("get_user_role", { u_id: userId });
+    if (roleError) throw roleError;
+    const role = normalizeOperationalRole(roleRow as string);
+    const permittedIds = await resolvePermittedAgentIds(supabase, userId, role, data.agentId);
     const authorizationError = getRebuildAuthorizationError({
       role,
       userId,
@@ -53,18 +57,16 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       from: data.from,
       to: data.to,
       today: getOperationalDate(),
+      supervisedAgentIds: role === "supervisor" ? permittedIds ?? [] : undefined,
     });
     if (authorizationError) throw new Error(authorizationError);
+    if (permittedIds?.length === 0) return { scanned: 0, updated: 0, rows: [] };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Data operacional oficial: America/Sao_Paulo (Brasil sem DST → UTC-3 fixo).
     // Precisa bater com public.operational_date() no banco.
-    const localDate = (iso: string) => {
-      const d = new Date(iso);
-      const saoPaulo = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-      return saoPaulo.toISOString().slice(0, 10);
-    };
+    const localDate = (iso: string) => toOperationalDate(iso);
 
     // Range as timestamps covering local (America/Sao_Paulo) day boundaries.
     // Antes usava sufixo "Z" (UTC), deslocando o corte do dia em 3h e
@@ -77,7 +79,8 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       .select("id, agent_id, property_id, visit_date, status, has_focus, treatment_amount, elimination_amount, sample_collected, tubitos_coletados, treated_deposits, is_recovered, cycle_id, week_id")
       .gte("visit_date", fromTs)
       .lte("visit_date", toTs);
-    if (data.agentId) vq = vq.eq("agent_id", data.agentId);
+    if (permittedIds) vq = vq.in("agent_id", permittedIds);
+    if (data.cycleId) vq = vq.eq("cycle_id", data.cycleId);
     const { data: visits, error: vErr } = await vq;
     if (vErr) throw new Error(vErr.message);
 
@@ -108,6 +111,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     for (const v of vList) {
       if (!v.agent_id || !v.visit_date) continue;
       const wd = localDate(v.visit_date);
+      if (!wd) continue;
       const key = `${v.agent_id}__${wd}`;
       const g = groups.get(key) ?? { agent_id: v.agent_id, work_date: wd, visits: [] as any[], cycle_id: v.cycle_id, week_id: v.week_id };
       g.visits.push(v);
@@ -120,6 +124,11 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     // Preload existing DWRs matching those keys
     const agentIds = Array.from(new Set(Array.from(groups.values()).map((g) => g.agent_id)));
+    const { data: legacyAgents, error: legacyError } = agentIds.length
+      ? await supabaseAdmin.from("agents").select("id, profile_id").in("profile_id", agentIds)
+      : { data: [], error: null };
+    if (legacyError) throw legacyError;
+    const legacyByProfile = new Map((legacyAgents ?? []).map((agent) => [agent.profile_id, agent.id]));
     let existing: any[] = [];
     if (agentIds.length > 0) {
       const { data: exist, error: eErr } = await supabaseAdmin
@@ -138,6 +147,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     let updated = 0;
 
     for (const [key, g] of groups) {
+      if (!legacyByProfile.get(g.agent_id)) throw new Error("Agente sem vínculo cadastral; reconstrução bloqueada.");
       const vs = g.visits;
       const uniqueProps = new Set(vs.map((v) => v.property_id).filter(Boolean));
       const worked = uniqueProps.size;
@@ -228,7 +238,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         rows.push({ agent_id: g.agent_id, work_date: g.work_date, before, after, updated: changed });
       } else {
         // Missing DWR: create one. Data operacional derivada 100% em America/Sao_Paulo.
-        const todayOp = localDate(new Date().toISOString());
+        const todayOp = getOperationalDate();
         // Semana epidemiológica SINAN (domingo-sábado), a MESMA usada por
         // DailyWorkCloser.tsx ao gravar epi_week no fluxo normal de
         // fechamento. Antes esta reconstrução usava epiWeekFromDate
@@ -240,7 +250,9 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         const insert = {
           ...payload,
           agent_id: g.agent_id,
-          legacy_agent_id: g.agent_id,
+          legacy_agent_id: legacyByProfile.get(g.agent_id),
+          start_time: vs.map((v) => v.visit_date).sort()[0],
+          end_time: vs.map((v) => v.visit_date).sort().at(-1),
           work_date: g.work_date,
           cycle_id: g.cycle_id ?? null,
           week_id: g.week_id ?? null,
