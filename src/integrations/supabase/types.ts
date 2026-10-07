@@ -1258,16 +1258,19 @@ export type Database = {
       }
       system_settings: {
         Row: {
+          access_scope: string
           id: string
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
+          access_scope?: string
           id?: string
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
+          access_scope?: string
           id?: string
           updated_at?: string | null
           updated_by?: string | null

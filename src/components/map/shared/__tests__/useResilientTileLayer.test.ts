@@ -63,4 +63,18 @@ describe("attachResilientTileLayer", () => {
     const handle = attachResilientTileLayer(map, { startId: "esri-imagery" });
     expect((handle.layer as any).opts.subdomains).toBe("abc");
   });
+
+  it("detaches the layer before clearing Leaflet removal listeners", () => {
+    const map = makeMap();
+    const handle = attachResilientTileLayer(map);
+    const off = vi.spyOn(handle.layer, "off");
+    const remove = vi.mocked(map.removeLayer);
+    remove.mockImplementation(() => {
+      expect(off).not.toHaveBeenCalled();
+      return map;
+    });
+    handle.destroy();
+    expect(remove).toHaveBeenCalledWith(handle.layer);
+    expect(off).toHaveBeenCalled();
+  });
 });
