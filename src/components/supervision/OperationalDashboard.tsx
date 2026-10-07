@@ -57,16 +57,22 @@ export function OperationalDashboard() {
     (async () => {
       setLoading(true);
       try {
+        const permittedProfiles = await listPermittedAgentProfiles(user.id, role);
+        const permittedIds = permittedProfiles.map((p) => p.id);
+        const permittedLinks = await listRemoteOrCache<any>({
+          name: "agents",
+          remote: async () => await supabase.from("agents").select("id, profile_id").in("profile_id", permittedIds),
+          filter: (r) => permittedIds.includes(r.profile_id),
+        });
+        const visitIds = [...permittedIds, ...permittedLinks.map((r) => r.id)];
         const [profs, vs, agentLinks, cs, ws, pends] = await Promise.all([
-          listPermittedAgentProfiles(user.id, role),
+          Promise.resolve(permittedProfiles),
           listRemoteOrCache<any>({
             name: "visits",
-            remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id") as any,
+            remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id").in("agent_id", visitIds) as any,
+            filter: (r) => visitIds.includes(r.agent_id),
           }),
-          listRemoteOrCache<any>({
-            name: "agents",
-            remote: () => supabase.from("agents").select("id, profile_id") as any,
-          }),
+          Promise.resolve(permittedLinks),
           listRemoteOrCache<any>({
             name: "cycles",
             remote: () => supabase.from("cycles").select("id, name, year, number").order("year", { ascending: false }) as any,
@@ -77,8 +83,8 @@ export function OperationalDashboard() {
           }),
           listRemoteOrCache<any>({
             name: "property_pendencies",
-            remote: () => supabase.from("property_pendencies").select("id, agent_id, cycle_id, week_id, current_status, resolved_at, reason, created_at") as any,
-            filter: (r: any) => !r.resolved_at,
+            remote: () => supabase.from("property_pendencies").select("id, agent_id, cycle_id, week_id, current_status, resolved_at, reason, created_at").in("agent_id", permittedIds) as any,
+            filter: (r: any) => permittedIds.includes(r.agent_id) && !r.resolved_at,
           }),
         ]);
         const legacyAgentToProfile = new Map(
@@ -93,8 +99,7 @@ export function OperationalDashboard() {
           agent_id: legacyAgentToProfile.get(visit.agent_id) ?? visit.agent_id,
         }));
         setAgents(profs || []);
-        const permittedIds = new Set(profs.map((p) => p.id));
-        setVisits(normalizedVisits.filter((v) => permittedIds.has(v.agent_id)));
+        setVisits(normalizedVisits.filter((v) => permittedIds.includes(v.agent_id)));
         const active = await getActiveCycleForUser(user.id);
         if (active?.id) setCycleFilter(active.id);
         setCycles(cs || []);

@@ -107,7 +107,12 @@ export function SupervisionDashboard() {
       if (!profiles) {
         profiles = await listRemoteOrCache<any>({
           name: "profiles",
-          remote: () => supabase.from("profiles").select("*") as any,
+          remote: () => {
+            let query = supabase.from("profiles").select("*");
+            if (role === "supervisor") query = query.eq("supervisor_id", user?.id ?? "");
+            return query as any;
+          },
+          filter: (p) => role !== "supervisor" || p.supervisor_id === user?.id,
         });
       }
 
