@@ -15,6 +15,9 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
+import { getActiveCycleForUser } from "@/lib/active-cycle";
 
 type AgentRow = {
   id: string;
@@ -38,6 +41,7 @@ type PendencyRow = {
 
 
 export function OperationalDashboard() {
+  const { user, role } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
@@ -49,15 +53,12 @@ export function OperationalDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user?.id || !role) return;
     (async () => {
       setLoading(true);
       try {
         const [profs, vs, agentLinks, cs, ws, pends] = await Promise.all([
-          listRemoteOrCache<any>({
-            name: "profiles",
-            remote: () => supabase.from("profiles").select("id, full_name, role").eq("role", "agente") as any,
-            filter: (r) => r.role === "agente",
-          }),
+          listPermittedAgentProfiles(user.id, role),
           listRemoteOrCache<any>({
             name: "visits",
             remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id") as any,
@@ -92,7 +93,10 @@ export function OperationalDashboard() {
           agent_id: legacyAgentToProfile.get(visit.agent_id) ?? visit.agent_id,
         }));
         setAgents(profs || []);
-        setVisits(normalizedVisits);
+        const permittedIds = new Set(profs.map((p) => p.id));
+        setVisits(normalizedVisits.filter((v) => permittedIds.has(v.agent_id)));
+        const active = await getActiveCycleForUser(user.id);
+        if (active?.id) setCycleFilter(active.id);
         setCycles(cs || []);
         setWeeks(ws || []);
         const visibleAgentIds = new Set((profs || []).map((p: any) => p.id));
@@ -107,7 +111,7 @@ export function OperationalDashboard() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [user?.id, role]);
 
   const filteredVisits = useMemo(() => {
     return visits.filter((v) => {

@@ -55,6 +55,7 @@ function MapNotFound() {
 }
 
 function MapPage() {
+  const { agentId } = Route.useSearch();
   console.log("[MAP_ROUTE_MOUNT]");
   const { userRole } = useOperationalDate();
   const isManager = userRole === "supervisor" || userRole === "coordenador" || userRole === "admin_master";
@@ -95,12 +96,20 @@ function MapPage() {
         </div>
       }
     >
-      <OperationalMapView />
+      <OperationalMapView agentId={agentId} />
     </Suspense>
   );
 }
 
 export const Route = createFileRoute("/_authenticated/map")({
+  validateSearch: (search: Record<string, unknown>) => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
+  head: () => ({ meta: [
+    { title: "Mapa operacional da equipe — VetorControl" },
+    { name: "description", content: "Imóveis, focos observados e positivos e pendências por ciclo." },
+    { property: "og:title", content: "Mapa operacional da equipe — VetorControl" },
+    { property: "og:description", content: "Mapa do território autorizado por agente e ciclo." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
   component: MapPage,
   errorComponent: MapRouteErrorComponent,
   notFoundComponent: MapNotFound,

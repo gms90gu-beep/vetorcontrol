@@ -19,43 +19,40 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
 
 interface ReportsFiltersProps {
   onFilterChange: (filters: any) => void;
   className?: string;
+  initialAgent?: string;
 }
 
-export function ReportsFilters({ onFilterChange, className }: ReportsFiltersProps) {
+export function ReportsFilters({ onFilterChange, className, initialAgent }: ReportsFiltersProps) {
+  const { user, role } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
 
-  const [selectedAgent, setSelectedAgent] = useState<string>("all");
+  const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || "all");
   const [selectedCycle, setSelectedCycle] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<string>("all");
 
   useEffect(() => {
-    fetchFiltersData();
-  }, []);
+    if (user?.id && role) void fetchFiltersData();
+  }, [user?.id, role]);
 
   async function fetchFiltersData() {
     try {
       const [agentsData, cyclesData, weeksData] = await Promise.all([
         // Busca direta primeiro: caches antigos podem ter linhas de agents sem profile_id,
         // o que fazia a lista do filtro ficar vazia/insensível ao clique.
-        (async () => {
-          const { data, error } = await supabase.from("agents").select("id, name, profile_id");
-          if (!error && data?.length) return data as any[];
-          return await listRemoteOrCache<any>({
-            name: "agents",
-            remote: async () => await supabase.from("agents").select("id, name, profile_id"),
-          });
-        })(),
+        listPermittedAgentProfiles(user?.id ?? "", role ?? ""),
         listRemoteOrCache<any>({ name: "cycles", remote: async () => await supabase.from("cycles").select("id, number, name").order("number", { ascending: false }) }),
         listRemoteOrCache<any>({ name: "weeks", remote: async () => await supabase.from("weeks").select("id, number, cycle_id").order("number", { ascending: true }) }),
       ]);
 
-      if (agentsData) setAgents(agentsData);
+      if (agentsData) setAgents(agentsData.map((p) => ({ id: p.id, profile_id: p.id, name: p.full_name })));
       if (cyclesData) setCycles(cyclesData);
       if (weeksData) setWeeks(weeksData);
     } catch (error) {

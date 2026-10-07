@@ -20,14 +20,19 @@ import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 import { getReportMetrics, logDirectSource } from "@/lib/operational-metrics";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FocusAreaDashboard } from "./FocusAreaDashboard";
+import { useAuth } from "@/hooks/useAuth";
+import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
+import { useSearch } from "@tanstack/react-router";
 
 
 export function ReportsDashboard() {
+  const { user, role } = useAuth();
+  const search = useSearch({ from: "/_authenticated/reports" });
   const [isLoading, setIsLoading] = useState(true);
   const [focusDashboardOpen, setFocusDashboardOpen] = useState(false);
   const { userRole } = useOperationalDate();
   const [filters, setFilters] = useState({
-    agent: "all",
+    agent: search.agentId || "all",
     cycle: "all",
     week: "all" // week_id (weeks.id), não epi_week
   });
@@ -75,14 +80,18 @@ export function ReportsDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [filters]);
+  }, [filters, user?.id, role]);
 
   const rebuildFn = useServerFn(rebuildDailyRecords);
   const [rebuilding, setRebuilding] = useState(false);
 
   async function fetchDashboardData() {
+    if (!user?.id || !role) return;
     setIsLoading(true);
     try {
+      const permittedProfiles = await listPermittedAgentProfiles(user.id, role);
+      const permittedIds = permittedProfiles.map((p) => p.id);
+      if (filters.agent !== "all" && !permittedIds.includes(filters.agent)) throw new Error("Agente fora da sua equipe.");
       // "Todos os Ciclos" deve significar TODOS: não reaplicar o ciclo ativo aqui,
       // senão o ciclo recém-iniciado (sem produção) zera todos os indicadores.
       const cycleFilter = filters.cycle !== "all" ? filters.cycle : null;
@@ -102,12 +111,14 @@ export function ReportsDashboard() {
         name: "daily_work_records",
         remote: async () => {
           let query = supabase.from("daily_work_records").select("*");
+          query = query.in("agent_id", permittedIds);
           if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
           if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
           if (filters.week !== "all") query = query.eq("week_id", filters.week);
           return await query.order("work_date", { ascending: false });
         },
         filter: (r) =>
+          permittedIds.includes(r.agent_id) &&
           (!cycleFilter || r.cycle_id === cycleFilter) &&
           (filters.agent === "all" || r.agent_id === filters.agent) &&
           (filters.week === "all" || r.week_id === filters.week),
@@ -294,6 +305,7 @@ export function ReportsDashboard() {
           from,
           to,
           agentId: filters.agent !== "all" ? filters.agent : undefined,
+          cycleId: filters.cycle !== "all" ? filters.cycle : null,
         },
       });
       console.log("[REPORT_REBUILD_RESULT]", res);

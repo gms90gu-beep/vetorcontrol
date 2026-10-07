@@ -645,13 +645,13 @@ export function SupervisionDashboard() {
                       <DropdownMenuItem onClick={() => openAgentRG(agent)}>
                         <ClipboardList className="h-3.5 w-3.5 mr-2" /> Ver RG
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate({ to: "/reports" })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/reports", search: { agentId: agent.id } })}>
                         <FileText className="h-3.5 w-3.5 mr-2" /> Ver Relatório
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setViewingAgent(agent)}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/calendario-producao", search: { agentId: agent.id } })}>
                         <Activity className="h-3.5 w-3.5 mr-2" /> Ver Jornada
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate({ to: "/map" })}>
+                      <DropdownMenuItem onClick={() => navigate({ to: "/map", search: { agentId: agent.id } })}>
                         <MapPin className="h-3.5 w-3.5 mr-2" /> Ver Quarteirões
                       </DropdownMenuItem>
                     </DropdownMenuContent>
