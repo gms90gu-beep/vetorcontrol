@@ -1,3 +1,4 @@
+import { readAllQueryPages } from "@/lib/query-pages";
 /**
  * Wave C — Admin Master executive dashboard, pendency report,
  * heatmap aggregations. Reads exclusively from daily_work_records,
@@ -423,8 +424,7 @@ export const getHeatmapData = createServerFn({ method: "POST" })
       if (!data.cycleIds.length) return { from: data.from, to: data.to, points: [], totals: zeroHeat() };
       dwrQ = dwrQ.in("cycle_id", data.cycleIds);
     }
-    const { data: dwr, error: dwrError } = await dwrQ;
-    if (dwrError) throw dwrError;
+    const dwr = await readAllQueryPages(dwrQ.order("id"));
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
     const { data: blocks } = await supabase
@@ -441,7 +441,7 @@ export const getHeatmapData = createServerFn({ method: "POST" })
     for (const b of (boletins ?? []) as any[]) {
       if (!b.agent_id || !b.block_number) continue;
       if (!agentBlocks.has(b.agent_id)) agentBlocks.set(b.agent_id, new Set());
-      agentBlocks.get(b.agent_id)!.add(String(b.block_number));
+      agentBlocks.get(b.agent_id)?.add(String(b.block_number));
     }
 
     const byBlock = new Map<string, HeatmapPoint>();
@@ -658,10 +658,7 @@ async function scopedAgentIds(
   return (agents ?? []).map((a: any) => a.id);
 }
 
-export const getPropertyMapPoints = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
-  .handler(async ({ data, context }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> => {
+async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }, context: { supabase: any; userId: string }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
@@ -692,13 +689,14 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       .select("id, number, street_name, block_number, type, status, latitude, longitude, boletim_id")
       .not("latitude", "is", null)
       .not("longitude", "is", null)
-      .limit(5000);
+      .order("id");
     if (boletimIds) propQ = propQ.in("boletim_id", boletimIds);
 
-    const { data: props } = await propQ;
-    const propList = (props ?? []) as any[];
+    const propList = await readAllQueryPages(propQ, 5001);
+    const truncated = propList.length > 5000;
+    if (truncated) propList.length = 5000;
     console.log("[MAP_TOTAL_GEOREF]", propList.length);
-    const truncated = propList.length >= 5000;
+
     if (propList.length === 0) return { points: [], truncated: false };
 
     if (!profileIds) {
@@ -732,10 +730,9 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       let query = supabaseAdmin.from("property_pendencies").select("property_id, resolved_at").in("property_id", ids);
       if (profileIds) query = query.in("agent_id", profileIds);
       if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
-      pendResults.push(await query);
+      pendResults.push({ data: await readAllQueryPages(query.order("id")), error: null });
     }
-    const pendError = pendResults.find((result) => result.error)?.error;
-    if (pendError) throw new Error(`Falha ao carregar pendências do mapa: ${pendError.message}`);
+
     const pends = pendResults.flatMap((result) => result.data ?? []);
     const pendingByProp = new Map<string, number>();
     for (const p of pends) {
@@ -746,8 +743,8 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     const periodEnd = operationalDateBoundsUtcIso(data.to).endIso;
     let visits: any[] = [];
     if (data.cycleIds === undefined || data.cycleIds === null || data.cycleIds.length > 0) {
-      const visitResults = await Promise.all(
-        idChunks.map((ids) => {
+      const visitResults = [];
+      for (const ids of idChunks) {
           let query = supabaseAdmin
             .from("visits")
             .select("id, property_id, agent_id, has_focus, status, visit_date")
@@ -756,11 +753,9 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
             .lte("visit_date", periodEnd);
           if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
           if (profileIds) query = query.in("agent_id", profileIds);
-          return query.order("visit_date", { ascending: false });
-        }),
-      );
-      const visitError = visitResults.find((result) => result.error)?.error;
-      if (visitError) throw new Error(`Falha ao carregar visitas do mapa: ${visitError.message}`);
+          visitResults.push({ data: await readAllQueryPages(query.order("visit_date", { ascending: false }).order("id")), error: null });
+      }
+
       visits = visitResults
         .flatMap((result) => result.data ?? [])
         .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
@@ -794,13 +789,9 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
       for (let index = 0; index < visitIds.length; index += 150) {
         visitIdChunks.push(visitIds.slice(index, index + 150));
       }
-      const depResults = await Promise.all(
-        visitIdChunks.map((ids) =>
-          supabaseAdmin.from("visit_deposits").select("visit_id, is_positive").in("visit_id", ids),
-        ),
-      );
-      const depError = depResults.find((result) => result.error)?.error;
-      if (depError) throw new Error(`Falha ao carregar depósitos do mapa: ${depError.message}`);
+      const depResults = [];
+      for (const ids of visitIdChunks) depResults.push({ data: await readAllQueryPages(supabaseAdmin.from("visit_deposits").select("visit_id, is_positive").in("visit_id", ids).order("id")), error: null });
+
       const deps = depResults.flatMap((result) => result.data ?? []);
       for (const d of deps) {
         if (d.is_positive) positiveVisitIds.add(d.visit_id);
@@ -869,13 +860,18 @@ export const getPropertyMapPoints = createServerFn({ method: "POST" })
     });
 
     return { points, truncated };
-  });
+}
+
+export const getPropertyMapPoints = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
+  .handler(({ data, context }) => readPropertyMapPoints(data, context));
 
 export const getBlockRiskScores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
   .handler(async ({ data, context }): Promise<{ blocks: BlockRiskScore[] }> => {
-    const result = await (getPropertyMapPoints as any)({ data });
+    const result = await readPropertyMapPoints(data, context);
     const points = (result.points ?? []) as PropertyMapPoint[];
     const byKey = new Map<
       string,
