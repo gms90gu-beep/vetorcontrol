@@ -679,8 +679,8 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
         .select("id, agent_id, locality")
         .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
-      console.log("[MAP_SCOPE_BOLETINS]", boletimIds.length);
-      if (boletimIds.length === 0) return { points: [], truncated: false };
+      console.log("[MAP_SCOPE_BOLETINS]", boletimIds?.length ?? 0);
+      if (!boletimIds?.length) return { points: [], truncated: false };
       for (const b of boletins ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
     }
 

@@ -12,6 +12,7 @@ import { getEpiWeek } from "@/lib/cycle-week";
 import { getOperationalDate, operationalDateBoundsUtcIso, toOperationalDate } from "@/lib/operational-date";
 import { getRebuildAuthorizationError } from "@/lib/reports-reconcile-policy";
 import { readAllQueryPages } from "@/lib/query-pages";
+import { confirmedFocusVisitIds } from "@/lib/confirmed-focus";
 import { resolvePermittedAgentIds, normalizeOperationalRole } from "@/lib/team-scope";
 
 interface RebuildInput {
@@ -174,7 +175,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
       const byType: Record<string, number> = { a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0 };
       const fociByType: Record<string, number> = { a1: 0, a2: 0, b: 0, c: 0, d1: 0, d2: 0, e: 0 };
-      const positiveVisitIds = new Set(vs.filter((v) => v.has_focus).map((v) => v.id));
+      const positiveVisitIds = confirmedFocusVisitIds(deps);
       for (const d of deps) {
         const k = String(d.type_code || "").toLowerCase();
         if ((DEP_KEYS as readonly string[]).includes(k)) {
