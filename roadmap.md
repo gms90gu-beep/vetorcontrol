@@ -1,5 +1,9 @@
 # Tarefas
 
+- [ ] Validação final 0007: supervisor real, isolamento de equipe, calendário/atalhos/mapas/filtros e regressões offline/jornadas.
+- [ ] Restringir configurações gerais por RLS: master completo, gestores apenas operação, agentes sem configurações administrativas; preservar dados.
+- [ ] Reexecutar 96+ testes, conferir compilação e segurança e confirmar projeto existente antes de publicar.
+
 - [x] Auditoria 07/10: implementar equipe no servidor em relatórios/reconstruções e preservar IDs canônicos; migration 0007 instalada, sem reconstruir dados.
 - [x] Auditoria 07/10: implementar calendário da equipe, atalhos filtrados por agente e ciclo ativo inicial.
 - [x] Auditoria 07/10: implementar escopo de mapas/calor/pendências e separar foco observado de positivo, informar truncamento.
