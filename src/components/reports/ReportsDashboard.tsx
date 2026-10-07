@@ -23,6 +23,7 @@ import { FocusAreaDashboard } from "./FocusAreaDashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { listPermittedAgentProfiles } from "@/lib/permitted-agents";
 import { useSearch } from "@tanstack/react-router";
+import { readAllQueryPages } from "@/lib/query-pages";
 
 
 export function ReportsDashboard() {
@@ -115,7 +116,7 @@ export function ReportsDashboard() {
           if (cycleFilter) query = query.eq("cycle_id", cycleFilter);
           if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
           if (filters.week !== "all") query = query.eq("week_id", filters.week);
-          return await query.order("work_date", { ascending: false });
+          return { data: await readAllQueryPages(query.order("work_date", { ascending: false }).order("id")), error: null };
         },
         filter: (r) =>
           permittedIds.includes(r.agent_id) &&
