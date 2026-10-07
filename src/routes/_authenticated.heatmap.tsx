@@ -198,6 +198,17 @@ function HeatmapPage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Select value={cycleId || "all"} onValueChange={(id) => {
+            setCycleId(id === "all" ? "" : id);
+            const cycle = cycles.data?.find((c) => c.id === id);
+            if (cycle) { setFrom(cycle.start_date); setTo(cycle.end_date); }
+          }}>
+            <SelectTrigger aria-label="Ciclo epidemiológico"><SelectValue placeholder="Ciclo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os ciclos</SelectItem>
+              {(cycles.data ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">
             <label className="text-xs">
               <div className="text-muted-foreground mb-1">De</div>

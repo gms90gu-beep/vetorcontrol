@@ -11,6 +11,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { getOperationalDate, operationalDateBoundsUtcIso, toOperationalDate } from "@/lib/operational-date";
 import { getRebuildAuthorizationError } from "@/lib/reports-reconcile-policy";
+import { readAllQueryPages } from "@/lib/query-pages";
 import { resolvePermittedAgentIds, normalizeOperationalRole } from "@/lib/team-scope";
 
 interface RebuildInput {
@@ -81,8 +82,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       .lte("visit_date", toTs);
     if (permittedIds) vq = vq.in("agent_id", permittedIds);
     if (data.cycleId) vq = vq.eq("cycle_id", data.cycleId);
-    const { data: visits, error: vErr } = await vq;
-    if (vErr) throw new Error(vErr.message);
+    const visits = await readAllQueryPages(vq.order("id"));
 
     const vList = (visits ?? []) as any[];
     const allVisitIds = vList.map((v) => v.id);
@@ -91,11 +91,10 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       // Batch fetch (chunks of 500 to avoid URL limit)
       for (let i = 0; i < allVisitIds.length; i += 500) {
         const chunk = allVisitIds.slice(i, i + 500);
-        const { data: d, error: dErr } = await supabaseAdmin
+        const d = await readAllQueryPages(supabaseAdmin
           .from("visit_deposits")
           .select("visit_id, type_code, quantity, is_positive, is_treated, is_eliminated")
-          .in("visit_id", chunk);
-        if (dErr) throw new Error(dErr.message);
+          .in("visit_id", chunk).order("id"));
         depsAll = depsAll.concat(d ?? []);
       }
     }
@@ -148,6 +147,10 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     for (const [key, g] of groups) {
       if (!legacyByProfile.get(g.agent_id)) throw new Error("Agente sem vínculo cadastral; reconstrução bloqueada.");
+      const currentRow = existingMap.get(key);
+      if (data.cycleId && currentRow && currentRow.cycle_id !== data.cycleId) {
+        throw new Error("Registro diário pertence a outro ciclo; reconstrução bloqueada para preservar a produção.");
+      }
       const vs = g.visits;
       const uniqueProps = new Set(vs.map((v) => v.property_id).filter(Boolean));
       const worked = uniqueProps.size;

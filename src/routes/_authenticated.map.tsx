@@ -102,7 +102,7 @@ function MapPage() {
 }
 
 export const Route = createFileRoute("/_authenticated/map")({
-  validateSearch: (search: Record<string, unknown>) => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
+  validateSearch: (search: Record<string, unknown>): { agentId?: string } => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
   head: () => ({ meta: [
     { title: "Mapa operacional da equipe — VetorControl" },
     { name: "description", content: "Imóveis, focos observados e positivos e pendências por ciclo." },

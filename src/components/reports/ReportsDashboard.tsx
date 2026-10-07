@@ -374,7 +374,7 @@ export function ReportsDashboard() {
 
       </div>
 
-      <ReportsFilters onFilterChange={setFilters} className="reports-filters" />
+      <ReportsFilters initialAgent={search.agentId} onFilterChange={setFilters} className="reports-filters" />
 
       <OperationalKPIs data={kpiData} isLoading={isLoading} />
 

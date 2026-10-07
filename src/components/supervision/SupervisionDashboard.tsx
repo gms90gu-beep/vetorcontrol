@@ -120,6 +120,7 @@ export function SupervisionDashboard() {
       const allSupervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
 
       let team: any[] = [...allAgents];
+      if (role === "supervisor") team = team.filter((p) => p.supervisor_id === user?.id);
       let visibleSupervisors: any[] = includeSupervisors ? [...allSupervisors] : [];
 
       // Se é coordenador: filtrar supervisores vinculados + agentes desses supervisores

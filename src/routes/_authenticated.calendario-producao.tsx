@@ -21,7 +21,7 @@ import { format, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, ad
 import { ptBR } from "date-fns/locale";
 
 export const Route = createFileRoute("/_authenticated/calendario-producao")({
-  validateSearch: (search: Record<string, unknown>) => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
+  validateSearch: (search: Record<string, unknown>): { agentId?: string } => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
   head: () => ({ meta: [
     { title: "Calendário de produção — VetorControl" },
     { name: "description", content: "Calendário das jornadas e produção da equipe autorizada." },

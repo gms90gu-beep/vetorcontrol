@@ -8,7 +8,7 @@ import { getCachedUserRole } from "@/lib/offline/role-cache";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 
 export const Route = createFileRoute("/_authenticated/reports")({
-  validateSearch: (search: Record<string, unknown>) => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
+  validateSearch: (search: Record<string, unknown>): { agentId?: string } => ({ agentId: typeof search.agentId === "string" ? search.agentId : undefined }),
   head: () => ({ meta: [
     { title: "Relatórios da equipe — VetorControl" },
     { name: "description", content: "Produção diária oficial por agente, ciclo e semana." },
