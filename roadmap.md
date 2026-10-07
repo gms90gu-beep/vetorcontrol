@@ -1,5 +1,10 @@
 # Tarefas
 
+- [ ] Auditoria 07/10: validar equipe no servidor em relatórios/reconstruções e preservar IDs canônicos.
+- [ ] Auditoria 07/10: calendário da equipe, atalhos filtrados por agente e ciclo ativo inicial.
+- [ ] Auditoria 07/10: escopo de mapas/calor/pendências e separar foco observado de positivo, informar truncamento.
+- [ ] Auditoria 07/10: testar permissões, filtros, offline e regressões; publicar apenas após validação.
+
 - [x] Diagnosticar a falha de carregamento dos mapas.
 - [x] Diagnosticar fechamentos ausentes nos relatórios.
 - [x] Corrigir a inicialização e o fallback resiliente dos mapas.
