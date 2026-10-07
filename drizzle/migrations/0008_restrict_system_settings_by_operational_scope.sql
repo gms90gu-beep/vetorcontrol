@@ -1,0 +1,11 @@
+ALTER TABLE public.system_settings ADD COLUMN IF NOT EXISTS access_scope text NOT NULL DEFAULT 'administrative';
+ALTER TABLE public.system_settings ADD CONSTRAINT system_settings_access_scope_check CHECK (access_scope IN ('administrative', 'operational'));
+COMMENT ON COLUMN public.system_settings.access_scope IS 'Administrative by default. Only explicitly operational settings may be read by supervisors/coordinators; master administrators manage all settings.';
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "System settings are viewable by all authenticated users" ON public.system_settings;
+DROP POLICY IF EXISTS "System settings can be updated by managers" ON public.system_settings;
+CREATE POLICY system_settings_master_all ON public.system_settings FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin_master'::public.app_role)) WITH CHECK (public.has_role(auth.uid(), 'admin_master'::public.app_role));
+CREATE POLICY system_settings_operational_managers_read ON public.system_settings FOR SELECT TO authenticated USING (access_scope = 'operational' AND (public.has_role(auth.uid(), 'supervisor'::public.app_role) OR public.has_role(auth.uid(), 'coordenador'::public.app_role)));
+REVOKE ALL ON public.system_settings FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.system_settings TO authenticated;
+GRANT ALL ON public.system_settings TO service_role;

@@ -57,6 +57,13 @@
       "when": 1791367865940,
       "tag": "0007_scope_daily_rebuild_to_supervisor_team",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791398824633,
+      "tag": "0008_restrict_system_settings_by_operational_scope",
+      "breakpoints": true
     }
   ]
 }
