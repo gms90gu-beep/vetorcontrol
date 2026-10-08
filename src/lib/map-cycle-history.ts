@@ -1,6 +1,8 @@
+import { toOperationalDate } from "@/lib/operational-date";
+
 export interface PropertyCycleVisit {
   id: string;
-  cycle_id: string;
+  cycle_id: string | null;
   visit_date: string;
   status: string;
   has_focus: boolean;
@@ -29,6 +31,8 @@ interface CycleRow {
   number: number | null;
   year: number | null;
   status: string;
+  start_date?: string;
+  end_date?: string;
 }
 
 export function buildPropertyCycleHistory(
@@ -41,15 +45,22 @@ export function buildPropertyCycleHistory(
     .sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
   const cycleIds = new Set(yearCycles.map((cycle) => cycle.id));
   const visitsByCycle = new Map<string, PropertyCycleVisit[]>();
+  const unlinked: PropertyCycleVisit[] = [];
 
   for (const visit of visits) {
-    if (!cycleIds.has(visit.cycle_id)) continue;
-    const list = visitsByCycle.get(visit.cycle_id) ?? [];
+    const date = toOperationalDate(visit.visit_date);
+    const cycleId = visit.cycle_id ?? yearCycles.find((cycle) => date && cycle.start_date && cycle.end_date && date >= cycle.start_date && date <= cycle.end_date)?.id;
+    if (!cycleId) {
+      if (date?.startsWith(`${selectedYear}-`)) unlinked.push(visit);
+      continue;
+    }
+    if (!cycleIds.has(cycleId)) continue;
+    const list = visitsByCycle.get(cycleId) ?? [];
     list.push(visit);
-    visitsByCycle.set(visit.cycle_id, list);
+    visitsByCycle.set(cycleId, list);
   }
 
-  return yearCycles.map((cycle) => ({
+  const history: PropertyCycleHistory[] = yearCycles.map((cycle) => ({
     cycle_id: cycle.id,
     cycle_name: cycle.name,
     cycle_number: cycle.number,
@@ -59,4 +70,6 @@ export function buildPropertyCycleHistory(
       (a, b) => b.visit_date.localeCompare(a.visit_date),
     ),
   }));
+  if (unlinked.length) history.push({ cycle_id: "unlinked", cycle_name: "Sem vínculo com ciclo", cycle_number: null, year: selectedYear, status: "finished", visits: unlinked.sort((a, b) => b.visit_date.localeCompare(a.visit_date)) });
+  return history;
 }

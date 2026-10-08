@@ -1,5 +1,6 @@
 // IndexedDB local (Dexie) — espelho mínimo do Supabase para modo offline.
 import Dexie, { type Table } from "dexie";
+import { mutationDedupeKey, mergeMutationPayload } from "./mutation-dedupe";
 
 export type MutationOp = "insert" | "update" | "delete" | "upsert" | "delete_where" | "update_where" | "rpc";
 export type MutationStatus = "pending" | "syncing" | "error";
@@ -18,6 +19,7 @@ export interface Mutation {
   status: MutationStatus;
   lastError?: string;
   nextRetryAt?: number;    // backoff — não reenviar antes deste timestamp (ms)
+  dedupeKey?: string;
 }
 
 export interface CachedRow {
@@ -73,17 +75,36 @@ class VetorDB extends Dexie {
     this.version(3).stores({
       block_progress: "id, updatedAt",
     });
+    this.version(4).stores({
+      mutations: "++id, table, status, createdAt, dedupeKey",
+    }).upgrade(async tx => {
+      await tx.table("mutations").toCollection().modify((row: Mutation) => {
+        row.dedupeKey = mutationDedupeKey(row);
+      });
+    });
   }
 }
 
 export const db = new VetorDB();
 
 export async function enqueueMutation(m: Omit<Mutation, "id" | "createdAt" | "tries" | "status">) {
-  return db.mutations.add({
-    ...m,
-    createdAt: Date.now(),
-    tries: 0,
-    status: "pending",
+  const dedupeKey = mutationDedupeKey(m);
+  return db.transaction("rw", db.mutations, async () => {
+    const matches = dedupeKey ? await db.mutations.where("dedupeKey").equals(dedupeKey).toArray() : [];
+    // A syncing item is immutable. Never merge across an intervening operation.
+    const all = await db.mutations.orderBy("id").toArray();
+    const targetId = m.pk ?? m.payload.id;
+    const related = all.filter(row => row.table === m.table && (
+      targetId ? (row.pk ?? row.payload.id) === targetId || row.op.endsWith("_where") || row.op === "rpc" : row.dedupeKey === dedupeKey || row.op.endsWith("_where") || row.op === "rpc"
+    ));
+    const last = related.at(-1);
+    const pending = matches.filter(row => row.status === "pending");
+    const candidate = pending.at(-1);
+    if (candidate?.id !== undefined && last?.id === candidate.id) {
+      await db.mutations.update(candidate.id, { payload: mergeMutationPayload(candidate.payload, m.payload), tries: 0, lastError: undefined, nextRetryAt: undefined });
+      return candidate.id;
+    }
+    return db.mutations.add({ ...m, dedupeKey, createdAt: Date.now(), tries: 0, status: "pending" });
   });
 }
 

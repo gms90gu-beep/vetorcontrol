@@ -1,5 +1,11 @@
 # Tarefas
 
+- [ ] Rodada 08/10: Dexie v4 dedupe/coalescência sem substituir syncing; testes de concorrência e preservação de campos.
+- [ ] Rodada 08/10: migration de observabilidade da reconstrução, funções SQL service_role, falhas auditadas sem perder fechamento; preservar jornada pausada 01/10.
+- [ ] Rodada 08/10: tipo do imóvel em pendências/listas/exportações e resumo histórico por ciclo separado do atual.
+- [ ] Rodada 08/10: mapas incluem visitas sem ciclo por período e aviso de foco sem GPS; observado distinto de positivo.
+- [ ] Rodada 08/10: todos os testes, compilação, validação real, publicação e identificação do commit publicado; nenhum SaaS ou dado histórico alterado.
+
 - [x] Aplicar patch 11122d9 recebido na main, preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria.
 - [x] Aplicar SQL exato 20261007160000_harden_admin_master_settings.sql incluído no patch no projeto existente; ciclos só master, relatórios paginados, jornadas sem boletim e configurações reais.
 - [x] Validar: 118 testes, compilação automática OK, zero críticos no scanner, Admin Master real com auditoria e alerta de jornada sem boletim; 1.151 visitas e 61 boletins preservados.

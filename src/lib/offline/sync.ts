@@ -213,13 +213,10 @@ async function runFlushMutations(options?: { retryErroredImmediately?: boolean }
     // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
     await purgeInvalidTmpMutations();
 
-    // Reseta itens travados em "syncing" (crash/refresh) — esses NÃO consumiram
-    // tentativa. Itens em "error" só voltam a "pending" se ainda tiverem retries
+    // Syncing items belong to another active flush; never steal their claim.
+    // Itens em "error" só voltam a "pending" se ainda tiverem retries
     // disponíveis (caso contrário ficam parados, com lastError visível no modal,
     // até o operador resolver a causa raiz — evita loop infinito de retentativa).
-    await db.mutations
-      .where("status").equals("syncing")
-      .modify({ status: "pending" });
     const now = Date.now();
     await db.mutations
       .where("status").equals("error")
@@ -243,16 +240,17 @@ async function runFlushMutations(options?: { retryErroredImmediately?: boolean }
       // começado a processar esta mutação. A transação Dexie/IndexedDB serializa
       // leitura+escrita entre abas na mesma origem, então só uma aba consegue
       // marcar "syncing" com sucesso — a outra vê status !== "pending" e pula.
+      if (m.id === undefined) continue;
       const claimed = await db.transaction("rw", db.mutations, async () => {
-        const fresh = await db.mutations.get(m.id!);
+        const fresh = await db.mutations.get(m.id as number);
         if (!fresh || fresh.status !== "pending") return false;
-        await db.mutations.update(m.id!, { status: "syncing" });
-        return true;
+        await db.mutations.update(m.id as number, { status: "syncing" });
+        return fresh;
       });
       if (!claimed) continue;
 
       try {
-        await applyMutation(m);
+        await applyMutation(claimed);
         await db.mutations.delete(m.id!); // só remove após confirmação do Supabase
         ok++;
       } catch (e: any) {

@@ -15,6 +15,12 @@ const visit = (overrides: Partial<PropertyCycleVisit> & Pick<PropertyCycleVisit,
 });
 
 describe("buildPropertyCycleHistory", () => {
+  it("keeps unlinked historical focus and assigns its dated cycle for display only", () => {
+    const unlinked = visit({ id: "focus", cycle_id: null, visit_date: "2026-10-01T12:00:00Z", has_focus: true });
+    const history = buildPropertyCycleHistory([{ id: "c5", name: "Ciclo 5", number: 5, year: 2026, status: "finished", start_date: "2026-09-01", end_date: "2026-10-31" }], [unlinked], 2026);
+    expect(history[0]?.visits[0]?.id).toBe("focus");
+    expect(unlinked.cycle_id).toBeNull();
+  });
   it("starts the selected year clean while preserving the prior year's visits", () => {
     const history = buildPropertyCycleHistory(
       [

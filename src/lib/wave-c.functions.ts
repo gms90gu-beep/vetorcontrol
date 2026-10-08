@@ -1,3 +1,5 @@
+import { summarizePendencyCycles } from "@/lib/pendency-summary";
+import { mapVisitInPeriod } from "@/lib/map-visit-period";
 import { readAllQueryPages } from "@/lib/query-pages";
 import { sessionsMissingDailyRecord } from "@/lib/production-summary";
 /**
@@ -313,6 +315,7 @@ export interface PendencyRow {
   pendency_id: string;
   property_id: string;
   property_number: string | null;
+  property_type: string | null;
   street: string | null;
   block_number: string | null;
   agent_id: string | null;
@@ -340,14 +343,16 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     cycleId?: string | null;
     weekId?: string | null;
     onlyOpen?: boolean;
+    excludeCycleId?: string | null;
     limit?: number;
   }) => input)
   .handler(async ({ data, context }): Promise<PendencyReportResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
+    const profileIdsScope = await resolvePermittedAgentIds(supabase, userId, role);
     let profQ = supabase.from("profiles").select("id, full_name, supervisor_id");
-    if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
+    if (profileIdsScope) profQ = profQ.in("id", profileIdsScope);
     if (data.supervisorId) profQ = profQ.eq("supervisor_id", data.supervisorId);
     const { data: profiles } = await profQ;
     const profileIds = (profiles ?? []).map((p: any) => p.id);
@@ -367,6 +372,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
     if (data.cycleId) q = q.eq("cycle_id", data.cycleId);
+    if (data.excludeCycleId) q = q.or(`cycle_id.is.null,cycle_id.neq.${data.excludeCycleId}`);
     if (data.weekId) q = q.eq("week_id", data.weekId);
     const { data: pends, error } = await q;
     if (error) throw new Error(error.message);
@@ -377,7 +383,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     if (propIds.length > 0) {
       const { data: props } = await supabase
         .from("properties")
-        .select("id, number, street_name, block_number")
+        .select("id, number, street_name, block_number, type")
         .in("id", propIds);
       for (const p of (props ?? []) as any[]) propsById.set(p.id, p);
     }
@@ -396,6 +402,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
         pendency_id: p.id,
         property_id: p.property_id,
         property_number: prop.number ?? null,
+        property_type: prop.type ?? null,
         street: prop.street_name ?? null,
         block_number: prop.block_number ?? null,
         agent_id: p.agent_id,
@@ -411,6 +418,18 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     }
 
     return { total_open: totalOpen, total_resolved: totalResolved, rows, by_status: byStatus };
+  });
+
+export const getPendencyHistoricalSummary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { currentCycleId: string | null }) => input)
+  .handler(async ({ data, context }) => {
+    const role = await requireAdminOrSupervisor(context.supabase, context.userId);
+    const ids = await resolvePermittedAgentIds(context.supabase, context.userId, role);
+    if (ids?.length === 0) return [];
+    let query = context.supabase.from("property_pendencies").select("id, cycle_id, resolved_at").order("id");
+    if (ids) query = query.in("agent_id", ids);
+    return summarizePendencyCycles(await readAllQueryPages(query), data.currentCycleId);
   });
 
 // ─────────────────────────────────────────────────────────────
@@ -635,7 +654,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
 
     const { data: cycles, error: cycleError } = await supabase
       .from("cycles")
-      .select("id, name, number, year, status")
+      .select("id, name, number, year, status, start_date, end_date")
       .eq("year", year)
       .order("number", { ascending: true });
     if (cycleError) throw new Error(`Falha ao carregar ciclos do ano: ${cycleError.message}`);
@@ -647,7 +666,8 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
       .from("visits")
       .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
       .eq("property_id", data.propertyId)
-      .in("cycle_id", cycleIds)
+      .gte("visit_date", operationalDateBoundsUtcIso(`${year}-01-01`).startIso)
+      .lte("visit_date", operationalDateBoundsUtcIso(`${year}-12-31`).endIso)
       .order("visit_date", { ascending: false });
     if (visitError) throw new Error(`Falha ao carregar histórico de visitas: ${visitError.message}`);
 
@@ -690,7 +710,7 @@ async function scopedAgentIds(
   return (agents ?? []).map((a: any) => a.id);
 }
 
-async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }, context: { supabase: any; userId: string }): Promise<{ points: PropertyMapPoint[]; truncated: boolean }> {
+async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }, context: { supabase: any; userId: string }): Promise<{ points: PropertyMapPoint[]; truncated: boolean; focus_without_gps: number }> {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
@@ -700,7 +720,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     console.log("[MAP_SCOPE_PROFILES]", profileIds?.length ?? "all");
     if (profileIds && profileIds.length === 0) {
       console.log("[MAP_EMPTY] no profiles in scope");
-      return { points: [], truncated: false };
+      return { points: [], truncated: false, focus_without_gps: 0 };
     }
 
     let boletimIds: string[] | null = null;
@@ -712,15 +732,13 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
         .in("agent_id", profileIds);
       boletimIds = (boletins ?? []).map((b: any) => b.id);
       console.log("[MAP_SCOPE_BOLETINS]", boletimIds?.length ?? 0);
-      if (!boletimIds?.length) return { points: [], truncated: false };
+      if (!boletimIds?.length) return { points: [], truncated: false, focus_without_gps: 0 };
       for (const b of boletins ?? []) boletimAgentMap.set(b.id, { agent_id: b.agent_id, locality: b.locality });
     }
 
     let propQ = supabase
       .from("properties")
       .select("id, number, street_name, block_number, type, status, latitude, longitude, boletim_id")
-      .not("latitude", "is", null)
-      .not("longitude", "is", null)
       .order("id");
     if (boletimIds) propQ = propQ.in("boletim_id", boletimIds);
 
@@ -729,7 +747,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     if (truncated) propList.length = 5000;
     console.log("[MAP_TOTAL_GEOREF]", propList.length);
 
-    if (propList.length === 0) return { points: [], truncated: false };
+    if (propList.length === 0) return { points: [], truncated: false, focus_without_gps: 0 };
 
     if (!profileIds) {
       const ids = Array.from(new Set(propList.map((p) => p.boletim_id).filter(Boolean)));
@@ -774,22 +792,22 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     const periodStart = operationalDateBoundsUtcIso(data.from).startIso;
     const periodEnd = operationalDateBoundsUtcIso(data.to).endIso;
     let visits: any[] = [];
-    if (data.cycleIds === undefined || data.cycleIds === null || data.cycleIds.length > 0) {
+    {
       const visitResults = [];
       for (const ids of idChunks) {
           let query = supabaseAdmin
             .from("visits")
-            .select("id, property_id, agent_id, has_focus, status, visit_date")
+            .select("id, property_id, agent_id, has_focus, status, visit_date, cycle_id")
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
-          if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
           if (profileIds) query = query.in("agent_id", profileIds);
           visitResults.push({ data: await readAllQueryPages(query.order("visit_date", { ascending: false }).order("id")), error: null });
       }
 
       visits = visitResults
         .flatMap((result) => result.data ?? [])
+        .filter((visit) => mapVisitInPeriod(visit, periodStart, periodEnd, data.cycleIds))
         .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
     }
 
@@ -855,7 +873,11 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
       for (const p of profs ?? []) agentNameById.set(p.id, p.full_name ?? "Agente");
     }
 
-    const points: PropertyMapPoint[] = propList.map((p) => {
+    const focusWithoutGps = propList.filter((p) =>
+      (p.latitude == null || p.longitude == null) &&
+      ((focusFoundByProp.get(p.id) ?? 0) > 0 || (focusByProp.get(p.id) ?? 0) > 0)
+    ).length;
+    const points: PropertyMapPoint[] = propList.filter((p) => p.latitude != null && p.longitude != null).map((p) => {
       const boletim = p.boletim_id ? boletimAgentMap.get(p.boletim_id) : null;
       const agentId = lastAgentByProp.get(p.id) || boletim?.agent_id || null;
       const focusFound = focusFoundByProp.get(p.id) ?? 0;
@@ -891,7 +913,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
       };
     });
 
-    return { points, truncated };
+    return { points, truncated, focus_without_gps: focusWithoutGps };
 }
 
 export const getPropertyMapPoints = createServerFn({ method: "POST" })

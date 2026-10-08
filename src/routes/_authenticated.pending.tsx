@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import { listRemoteOrCache } from "@/lib/offline/repos";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
+import { translate } from "@/lib/translations";
 import { filterPendencies } from "@/lib/pendency-scope";
 import { saveRecoveryAttemptOffline } from "@/lib/offline/repos/recovery";
 import { useAuth } from "@/hooks/useAuth";
@@ -87,6 +88,7 @@ type Pendency = {
 };
 
 type PropertyRow = {
+  type?: string | null;
   id: string;
   number: string | null;
   street_name: string | null;
@@ -199,7 +201,7 @@ function PendingPage() {
               remote: () =>
                 supabase
                   .from("properties")
-                  .select("id, number, street_name, block_number, neighborhood, latitude, longitude")
+                  .select("id, number, street_name, block_number, neighborhood, latitude, longitude, type")
                   .in("id", propIds) as any,
               filter: (p) => propIds.includes(p.id),
             })
@@ -504,6 +506,7 @@ function PendencyCard({ p, onClick }: { p: EnrichedPendency; onClick: () => void
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-black text-lg">{p.property?.number || "—"}</span>
+            <Badge variant="outline">{translate(p.property?.type) || "Tipo não informado"}</Badge>
             <StatusBadge status={p.resolved_status ?? p.current_status} />
             {p.resolved_at && (
               <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -555,6 +558,7 @@ function DetailsPanel({
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
+          <Info label="Tipo" value={translate(pendency.property?.type) || "—"} />
           <Info label="Agente" value={pendency.agent_name || "—"} />
           <Info label="Tentativas" value={String(pendency.attempt_count)} />
           <Info label="Última tentativa" value={fmtDate(pendency.last_attempt_at)} />
@@ -813,9 +817,10 @@ function NewAttemptDialog({
 }
 
 function exportCSV(rows: EnrichedPendency[]) {
-  const header = ["Numero", "Logradouro", "Quarteirao", "Situacao", "Tentativas", "Ultima_Tentativa", "Agente", "Observacao"];
+  const header = ["Numero", "Tipo", "Logradouro", "Quarteirao", "Situacao", "Tentativas", "Ultima_Tentativa", "Agente", "Observacao"];
   const lines = rows.map((r) => [
     r.property?.number ?? "",
+    translate(r.property?.type) || "—",
     r.property?.street_name ?? "",
     r.property?.block_number ?? "",
     STATUS_META[r.resolved_status ?? r.current_status].label,

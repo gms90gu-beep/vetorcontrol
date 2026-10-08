@@ -39,4 +39,11 @@ describe("Dexie queue (offline)", () => {
     expect(r).toEqual({ ok: 0, failed: 0 });
     expect(await pendingMutationCount()).toBe(1);
   });
+  it("does not steal or overwrite an already syncing operation", async () => {
+    const id = await enqueueMutation({ table: "visits", op: "insert", payload: { id: "claimed" } });
+    await db.mutations.update(id, { status: "syncing" });
+    expect(await flushMutations()).toEqual({ ok: 0, failed: 0 });
+    expect((await db.mutations.get(id))?.status).toBe("syncing");
+    expect((await db.mutations.get(id))?.payload).toEqual({ id: "claimed" });
+  });
 });

@@ -650,6 +650,11 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
                     <span className="font-semibold tabular-nums">{visiblePoints.length}</span>
                     <span className="text-muted-foreground">de {allPoints.length} visíveis</span>
                   </div>
+                  {(props.data?.focus_without_gps ?? 0) > 0 && (
+                    <div role="alert" className="absolute bottom-16 left-3 right-3 z-[400] border bg-card text-foreground rounded-md p-2 text-xs">
+                      {props.data?.focus_without_gps} imóveis com foco encontrado ou positivo sem latitude/longitude; não aparecem no mapa.
+                    </div>
+                  )}
                   {props.data?.truncated && (
                     <div className="absolute top-3 right-3 z-[400] bg-amber-500/90 text-white backdrop-blur-xl border border-amber-300 rounded-xl px-3 py-1.5 shadow-md text-[11px] font-semibold max-w-[260px] animate-in fade-in slide-in-from-top-2">
                       Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
