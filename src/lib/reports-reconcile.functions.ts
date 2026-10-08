@@ -36,6 +36,86 @@ interface RebuildResult {
   rows: RebuildRow[];
 }
 
+export interface DailyCloseVerification {
+  agent_id: string;
+  work_date: string;
+  status: "consistent" | "missing_dwr" | "divergent";
+  dwr_id: string | null;
+  visits_count: number;
+  properties_worked: number;
+  properties_closed: number;
+  properties_refused: number;
+  positive_foci: number;
+  open_sessions: number;
+  divergences: string[];
+}
+
+/** Verifica se o fechamento remoto bate com a fonte operacional do relatório. */
+export const verifyDailyClose = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { agentId: string; workDate: string }) => {
+    if (!input?.agentId || !input?.workDate) throw new Error("Agente e data são obrigatórios.");
+    return input;
+  })
+  .handler(async ({ data, context }): Promise<DailyCloseVerification> => {
+    const { supabase, userId } = context;
+    if (data.agentId !== userId) throw new Error("Apenas o próprio agente pode confirmar este fechamento.");
+    const { startIso, endIso } = operationalDateBoundsUtcIso(data.workDate);
+    const visits = await readAllQueryPages(
+      supabase
+        .from("visits")
+        .select("id, property_id, status, has_focus")
+        .eq("agent_id", data.agentId)
+        .gte("visit_date", startIso)
+        .lte("visit_date", endIso)
+        .order("id"),
+    );
+    const [{ data: dwr, error: dwrError }, { data: sessions, error: sessionsError }] = await Promise.all([
+      supabase
+        .from("daily_work_records")
+        .select("id, properties_worked, properties_closed, properties_refused, positive_foci")
+        .eq("agent_id", data.agentId)
+        .eq("work_date", data.workDate)
+        .maybeSingle(),
+      supabase
+        .from("field_work_sessions")
+        .select("id, status")
+        .eq("user_id", data.agentId)
+        .eq("session_date", data.workDate),
+    ]);
+    if (dwrError) throw new Error(`Falha ao conferir boletim diário: ${dwrError.message}`);
+    if (sessionsError) throw new Error(`Falha ao conferir jornadas: ${sessionsError.message}`);
+
+    const visitRows = (visits ?? []) as any[];
+    const propertiesWorked = visitRows.length;
+    const propertiesClosed = visitRows.filter((visit) => visit.status === "closed").length;
+    const propertiesRefused = visitRows.filter((visit) => visit.status === "refused").length;
+    const positiveFoci = visitRows.filter((visit) => visit.has_focus).length;
+    const openSessions = (sessions ?? []).filter((session: any) => String(session.status) === "in_progress").length;
+    const divergences: string[] = [];
+    if (!dwr) {
+      divergences.push("boletim diário não encontrado");
+    } else {
+      if (Number(dwr.properties_worked || 0) !== propertiesWorked) divergences.push("imóveis trabalhados divergentes");
+      if (Number(dwr.properties_closed || 0) !== propertiesClosed) divergences.push("imóveis fechados divergentes");
+      if (Number(dwr.properties_refused || 0) !== propertiesRefused) divergences.push("recusas divergentes");
+      if (Number(dwr.positive_foci || 0) !== positiveFoci) divergences.push("focos positivos divergentes");
+    }
+    return {
+      agent_id: data.agentId,
+      work_date: data.workDate,
+      status: !dwr ? "missing_dwr" : divergences.length > 0 ? "divergent" : "consistent",
+      dwr_id: dwr?.id ?? null,
+      visits_count: visitRows.length,
+      properties_worked: propertiesWorked,
+      properties_closed: propertiesClosed,
+      properties_refused: propertiesRefused,
+      positive_foci: positiveFoci,
+      open_sessions: openSessions,
+      divergences,
+    };
+  });
+
 const DEP_KEYS = ["a1", "a2", "b", "c", "d1", "d2", "e"] as const;
 
 export const rebuildDailyRecords = createServerFn({ method: "POST" })
