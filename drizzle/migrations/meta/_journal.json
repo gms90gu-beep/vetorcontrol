@@ -78,6 +78,13 @@
       "when": 1791421720079,
       "tag": "0010_protect_last_active_master",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791426836496,
+      "tag": "0011_observe_dwr_reconciliation_failures",
+      "breakpoints": true
     }
   ]
 }
