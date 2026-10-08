@@ -124,7 +124,12 @@ serve(async (req) => {
     const body = await req.json();
     const { action, agentData, userData } = body;
 
-    const { data: callerRole } = await supabaseAdmin.rpc("get_user_role", { u_id: user.id });
+    const callerClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_ANON_KEY") ?? "", { global: { headers: { Authorization: authHeader } } });
+    const { data: roles, error: roleError } = await callerClient.from("user_roles").select("role").eq("user_id", user.id);
+    if (roleError) throw roleError;
+    const callerRole = managerRoles.slice().reverse().find(role => (roles ?? []).some((r: any) => r.role === role));
+    const callerProfile = await requireProfile(supabaseAdmin, user.id);
+    if (callerProfile.is_active === false) throw new Error("Forbidden: usuário desativado");
     if (!managerRoles.includes(callerRole)) throw new Error("Forbidden: perfil sem permissão para gerenciar usuários");
 
     // ── CREATE AGENT ─────────────────────────────────────────────────────────
@@ -252,7 +257,7 @@ serve(async (req) => {
       if (userId === user.id && is_active === false) {
         throw new Error("Você não pode desativar o próprio usuário logado.");
       }
-      if (target.role === "admin_master" && is_active === false && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
+      if (target.role === "admin_master" && (is_active === false || (role && role !== "admin_master")) && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
         throw new Error("Não é possível desativar o último Admin Master ativo.");
       }
 
@@ -337,7 +342,7 @@ serve(async (req) => {
       if (target.role === "admin_master" && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
         throw new Error("Não é possível excluir o último Admin Master ativo.");
       }
-      await writeAudit(supabaseAdmin, user, userId, "delete_user", { role: target.role });
+      await writeAudit(supabaseAdmin, user, userId, "delete_user", { role: target.role, full_name: target.full_name, email: target.email });
 
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (deleteError) throw deleteError;

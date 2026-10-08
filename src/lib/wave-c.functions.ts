@@ -1,4 +1,5 @@
 import { readAllQueryPages } from "@/lib/query-pages";
+import { sessionsMissingDailyRecord } from "@/lib/production-summary";
 /**
  * Wave C — Admin Master executive dashboard, pendency report,
  * heatmap aggregations. Reads exclusively from daily_work_records,
@@ -146,25 +147,21 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
-    const dwrResult = await fetchAllPages<any>(dwrQ);
+    const dwrResult = await fetchAllPages<any>(dwrQ.order("id"));
     const dwr = dwrResult.rows;
     const warnings: string[] = [];
     if (dwrResult.truncated) warnings.push("O relatório atingiu o limite de segurança de 50.000 diárias; refine o período.");
 
     let sessionQ = supabase
       .from("field_work_sessions")
-      .select("user_id, session_date, status")
+      .select("id, user_id, session_date, status")
       .in("user_id", scopedProfiles)
       .gte("session_date", data.from)
       .lte("session_date", data.to);
     if (data.cycleId) sessionQ = sessionQ.eq("cycle_id", data.cycleId);
-    const sessionResult = await fetchAllPages<any>(sessionQ);
-    const dwrKeys = new Set(dwr.map((r: any) => `${r.agent_id}|${r.work_date}`));
-    const missingDaily = sessionResult.rows.filter((s: any) => {
-      const status = String(s.status ?? "").toLowerCase();
-      const closed = ["completed", "complete", "closed", "encerrada", "finished"].some((v) => status.includes(v));
-      return closed && !dwrKeys.has(`${s.user_id}|${s.session_date}`);
-    });
+    const sessionResult = await fetchAllPages<any>(sessionQ.order("id"));
+    if (sessionResult.truncated) warnings.push("A consulta de jornadas atingiu 50.000 registros; refine o período.");
+    const missingDaily = sessionsMissingDailyRecord(sessionResult.rows, dwr);
     if (missingDaily.length > 0) {
       warnings.push(`${missingDaily.length} jornada(s) encerrada(s) sem boletim diário; revise a reconciliação antes de concluir o período.`);
     }

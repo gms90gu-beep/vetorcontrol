@@ -36,6 +36,8 @@ import { toast } from "sonner";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Calendar as CalendarLucide } from "lucide-react";
 import { PwaManagerSection } from "@/components/pwa/PwaManagerSection";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { settingsProductionSummary } from "@/lib/production-summary";
 
 
 
@@ -54,32 +56,27 @@ function SettingsPage() {
   }, []);
 
   async function fetchAgentProfile() {
+    try {
     const { data: { user } } = await safeGetUser();
     if (!user) return;
 
-    const { data } = await supabase
+    const { data, error: profileError } = await supabase
       .from("agents")
       .select("*")
       .eq("profile_id", user.id)
       .maybeSingle();
+    if (profileError) throw profileError;
     
     if (data) {
       setAgent(data);
-      const [{ count: visits }, { count: foci }, { count: pending }, { data: records }] = await Promise.all([
-        supabase.from("visits").select("id", { count: "exact", head: true }).eq("agent_id", data.id),
-        supabase.from("visits").select("id", { count: "exact", head: true }).eq("agent_id", data.id).eq("has_focus", true),
+      const [pendingResult, records] = await Promise.all([
         supabase.from("property_pendencies").select("id", { count: "exact", head: true }).eq("agent_id", user.id).is("resolved_at", null),
-        supabase.from("daily_work_records").select("properties_worked, properties_closed").eq("agent_id", user.id),
+        readAllQueryPages(supabase.from("daily_work_records").select("properties_worked, properties_closed, positive_foci").eq("agent_id", user.id).order("id")),
       ]);
-      const worked = (records ?? []).reduce((sum, row: any) => sum + (Number(row.properties_worked) || 0), 0);
-      const closed = (records ?? []).reduce((sum, row: any) => sum + (Number(row.properties_closed) || 0), 0);
-      setStats({
-        worked: visits ?? 0,
-        foci: foci ?? 0,
-        pending: pending ?? 0,
-        productivity: worked > 0 ? Math.round((closed / worked) * 100) : 0,
-      });
+      if (pendingResult.error) throw pendingResult.error;
+      setStats(settingsProductionSummary(records, pendingResult.count ?? 0));
     }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível consultar os indicadores."); }
   }
 
   const handleUpdateAgent = async () => {
@@ -149,7 +146,7 @@ function SettingsPage() {
 
               <div className="grid grid-cols-3 w-full gap-4 pt-4">
                 <ProfileMiniStat icon={Trophy} label="Eficiência" value={`${stats.productivity}%`} color="text-emerald-500" />
-                <ProfileMiniStat icon={Briefcase} label="Visitas" value={stats.worked} color="text-blue-500" />
+                <ProfileMiniStat icon={Briefcase} label="Trabalhados" value={stats.worked} color="text-blue-500" />
                 <ProfileMiniStat icon={AlertCircle} label="Focos" value={stats.foci} color="text-red-500" />
               </div>
             </div>

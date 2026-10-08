@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { readAllQueryPages } from "@/lib/query-pages";
 
 export interface AuditSnapshot {
   errors: string[];
@@ -44,8 +45,7 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
       const { count: c, error } = await q;
       if (error) {
         console.warn(`[audit] count(${table})`, error.message);
-        errors.push(`count(${table}): ${error.message}`);
-        return 0;
+        throw new Error(`count(${table}): ${error.message}`);
       }
       return c ?? 0;
     };
@@ -67,8 +67,8 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
       count("properties"),
       count("visits"),
       count("daily_work_records"),
-      supabase.from("daily_work_records").select("properties_worked"),
-      supabase.from("daily_work_records").select("properties_closed"),
+      readAllQueryPages(supabase.from("daily_work_records").select("properties_worked").order("id")),
+      readAllQueryPages(supabase.from("daily_work_records").select("properties_closed").order("id")),
       count("properties", (q) => q.is("block_number", null)),
       count("visits", (q) => q.is("property_id", null)),
       count("daily_work_records", (q) =>
@@ -76,23 +76,18 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
       ),
     ]);
 
-    const sumField = (rows: any) =>
-      (rows.data ?? []).reduce(
-        (acc: number, r: any) => acc + (Number(r.properties_worked ?? r.properties_closed) || 0),
+    const sumField = (rows: any[], key: string) =>
+      rows.reduce(
+        (acc: number, r: any) => acc + (Number(r[key]) || 0),
         0
       );
-    for (const [name, result] of [["daily_work_records.properties_worked", properties_worked_agg], ["daily_work_records.properties_closed", properties_closed_agg]] as const) {
-      if (result.error) errors.push(`${name}: ${result.error.message}`);
-    }
 
     // blocks sem imóveis
-    const { data: blocksAll, error: blocksError } = await supabase.from("blocks").select("id");
-    if (blocksError) errors.push(`blocks: ${blocksError.message}`);
-    const { data: propsBlocks, error: propsBlocksError } = await supabase
+    const blocksAll = await readAllQueryPages(supabase.from("blocks").select("id").order("id"));
+    const propsBlocks = await readAllQueryPages(supabase
       .from("properties")
       .select("block_id")
-      .not("block_id", "is", null);
-    if (propsBlocksError) errors.push(`properties.block_id: ${propsBlocksError.message}`);
+      .not("block_id", "is", null).order("id"));
     const blocksWithProps = new Set((propsBlocks ?? []).map((p: any) => p.block_id));
     const blocks_sem_imoveis = (blocksAll ?? []).filter(
       (b: any) => !blocksWithProps.has(b.id)
@@ -107,8 +102,8 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
         lastSync: new Date().toISOString(),
       },
       trabalho: {
-        properties_worked: sumField(properties_worked_agg),
-        properties_closed: sumField(properties_closed_agg),
+        properties_worked: sumField(properties_worked_agg, "properties_worked"),
+        properties_closed: sumField(properties_closed_agg, "properties_closed"),
         visits,
         daily_records,
       },
