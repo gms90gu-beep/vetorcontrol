@@ -151,7 +151,7 @@ export const getFocusAreaStatistics = createServerFn({ method: "POST" })
         .range(offset, offset + PAGE_SIZE - 1);
       const { data: page, error } = await query;
       if (error) throw new Error(error.message);
-      visits.push(...(page || []).filter((visit) => mapVisitInPeriod(visit, periodStart, periodEnd, cycleIds)));
+      visits.push(...(page || []).filter((visit: { cycle_id: string | null; visit_date: string }) => mapVisitInPeriod(visit, periodStart, periodEnd, cycleIds)));
       if (!page || page.length < PAGE_SIZE) break;
     }
 
