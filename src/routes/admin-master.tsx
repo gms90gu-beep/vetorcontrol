@@ -7,9 +7,9 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LogOut, ArrowLeft, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { isOwnerBypass } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/admin-master")({
+  head: () => ({ meta: [{"title": "Admin Master | VetorControl"}, {"name": "description", "content": "Gestão administrativa autorizada do VetorControl."}, {"property": "og:title", "content": "Admin Master | VetorControl"}, {"property": "og:description", "content": "Gestão administrativa autorizada do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: async () => {
     if (typeof window === "undefined") {
       console.debug("[Admin-Master Guard] SSR detectado; validação será feita no cliente.");
@@ -27,12 +27,6 @@ export const Route = createFileRoute("/admin-master")({
     }
 
     const user = verifiedUser.user;
-
-    // Acesso direto pelo e-mail do criador do sistema — sem query no banco
-    if (isOwnerBypass(user.email)) {
-      console.debug("[Admin-Master Guard] Acesso permitido via e-mail direto");
-      return;
-    }
 
     // Para outros usuários, verifica o role via cache offline-first.
     let role: string | null = null;
@@ -65,7 +59,7 @@ function AdminMasterPage() {
   const router = useRouter();
   const navigate = useNavigate();
   const { user, role, isReady, isRoleLoading, signOut } = useAuth();
-  const hasAdminAccess = isOwnerBypass(user?.email) || role === "admin_master";
+  const hasAdminAccess = role === "admin_master";
 
   useEffect(() => {
     if (!isReady || isRoleLoading) return;

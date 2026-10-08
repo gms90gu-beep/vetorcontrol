@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/auditoria")({
+  head: () => ({ meta: [{"title": "Auditoria do Sistema | VetorControl"}, {"name": "description", "content": "Consistência dos boletins e registros oficiais de produção."}, {"property": "og:title", "content": "Auditoria do Sistema | VetorControl"}, {"property": "og:description", "content": "Consistência dos boletins e registros oficiais de produção."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: AuditPage,
 });
@@ -18,10 +19,6 @@ function AuditPage() {
   const router = useRouter();
   const { role, isLoading } = useAuth();
   const fetchSnapshot = useServerFn(getAuditSnapshot);
-
-  useEffect(() => {
-    if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
-  }, [role, isLoading, router]);
 
   const { data, isFetching, refetch, error } = useQuery({
     queryKey: ["audit-snapshot"],
@@ -64,6 +61,13 @@ function AuditPage() {
 
       {data && (
         <>
+          {data.errors.length > 0 && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="pt-6 text-sm text-amber-800">
+                <strong>Leitura incompleta:</strong> {data.errors.join(" · ")}
+              </CardContent>
+            </Card>
+          )}
           <Section title="RG (Registro Geral)" icon={<Database className="h-4 w-4" />}>
             <Stat label="Boletins RG" value={data.rg.boletins} />
             <Stat label="Quarteirões" value={data.rg.blocks} />

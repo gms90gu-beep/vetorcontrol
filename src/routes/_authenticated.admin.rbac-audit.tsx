@@ -13,15 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, ShieldCheck, AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/institutional-export";
-import { requireAdminMasterGuard, isOwnerBypass } from "@/lib/role-guards";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/rbac-audit")({
+  head: () => ({ meta: [{"title": "Auditoria de Permissões | VetorControl"}, {"name": "description", "content": "Verificação de escopo e permissões operacionais."}, {"property": "og:title", "content": "Auditoria de Permissões | VetorControl"}, {"property": "og:description", "content": "Verificação de escopo e permissões operacionais."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: RbacAuditPage,
 });
 
 function statusColor(s: string) {
   if (s === "ok" || s === "pass" || s === "healthy") return "bg-emerald-500/10 text-emerald-600 border-emerald-500/30";
+  if (s === "unverified") return "bg-amber-500/10 text-amber-700 border-amber-500/30";
   if (s === "warning") return "bg-amber-500/10 text-amber-700 border-amber-500/30";
   return "bg-rose-500/10 text-rose-700 border-rose-500/30";
 }
@@ -38,7 +40,7 @@ function RbacAuditPage() {
       const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
+      setAllowed(r === "admin_master");
     })();
   }, []);
 
@@ -121,6 +123,7 @@ function RbacAuditPage() {
             <KpiCard label="Inconsistências" value={data.kpis.inconsistencies} variant={data.kpis.inconsistencies > 0 ? "critical" : "healthy"} />
             <KpiCard label="FKs inválidas" value={data.kpis.invalid_fks} variant={data.kpis.invalid_fks > 0 ? "critical" : "healthy"} />
             <KpiCard label="Escopos divergentes" value={data.kpis.scope_divergences} variant={data.kpis.scope_divergences > 0 ? "warning" : "healthy"} />
+            <KpiCard label="Testes não verificados" value={data.kpis.unverified_tests} variant={data.kpis.unverified_tests > 0 ? "warning" : "healthy"} />
             <KpiCard label="Última auditoria" value={new Date(data.kpis.last_audit).toLocaleTimeString("pt-BR")} />
           </div>
 

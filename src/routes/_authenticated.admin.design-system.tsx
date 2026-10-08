@@ -3,7 +3,6 @@ import { safeGetUser } from "@/lib/offline/safe-auth";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCachedUserRole } from "@/lib/offline/role-cache";
-import { isOwnerBypass } from "@/lib/role-guards";
 import { PageHeader } from "@/components/ui/page-header";
 import { Section } from "@/components/ui/section";
 import { KPICard } from "@/components/ui/kpi-card";
@@ -32,6 +31,7 @@ import { notify } from "@/lib/notify";
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/design-system")({
+  head: () => ({ meta: [{"title": "Padrões Visuais | VetorControl"}, {"name": "description", "content": "Padrões de interface do VetorControl."}, {"property": "og:title", "content": "Padrões Visuais | VetorControl"}, {"property": "og:description", "content": "Padrões de interface do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: DesignSystemPage,
 });
@@ -47,7 +47,7 @@ function DesignSystemPage() {
       const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
+      setAllowed(r === "admin_master");
     })();
   }, []);
 

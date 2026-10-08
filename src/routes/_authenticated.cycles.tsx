@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { requireCycleAccessGuard } from "@/lib/role-guards";
+import { finishCycle } from "@/lib/cycle-admin.functions";
 import { useState, useEffect } from "react";
 import { 
   Calendar, 
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { generateInstitutionalPDF } from "@/lib/institutional-export";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useServerFn } from "@tanstack/react-start";
 
 // Datas de ciclo vêm como coluna DATE (YYYY-MM-DD, sem hora). Parsear com
 // `new Date(str)` interpreta como UTC meia-noite e, ao formatar de volta pro
@@ -49,6 +51,7 @@ function formatCycleDate(s: string | null | undefined): string {
 }
 
 export const Route = createFileRoute("/_authenticated/cycles")({
+  head: () => ({ meta: [{"title": "Ciclos Operacionais | VetorControl"}, {"name": "description", "content": "Histórico e gestão dos ciclos de vigilância."}, {"property": "og:title", "content": "Ciclos Operacionais | VetorControl"}, {"property": "og:description", "content": "Histórico e gestão dos ciclos de vigilância."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireCycleAccessGuard,
   component: CyclesPage,
 });
@@ -56,6 +59,8 @@ export const Route = createFileRoute("/_authenticated/cycles")({
 function CyclesPage() {
   const { userRole } = useOperationalDate();
   const isManager = ["supervisor", "coordenador", "admin_master"].includes(userRole || "");
+  const canFinishCycle = userRole === "admin_master";
+  const finishCycleFn = useServerFn(finishCycle);
   const [yearFilter, setYearFilter] = useState("all");
   const [cycles, setCycles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,12 +127,7 @@ function CyclesPage() {
 
   const handleFinishCycle = async (cycleId: string) => {
     try {
-      const { error } = await supabase
-        .from("cycles")
-        .update({ status: 'finished' })
-        .eq("id", cycleId);
-
-      if (error) throw error;
+      await finishCycleFn({ data: { cycleId } });
       
       toast.success("Ciclo concluído! O próximo ciclo será iniciado automaticamente.");
       fetchCycles();
@@ -268,9 +268,11 @@ function CyclesPage() {
                       </CardHeader>
                       <CardContent className="pt-2 pb-6">
             {isManager ? (
-              <p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-600">
+              <div className="space-y-3"><p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-600">
                 Histórico de ciclos e períodos. Para consultar indicadores operacionais, use os relatórios filtrados por equipe e área.
               </p>
+              {isActive && canFinishCycle && <Button onClick={() => setCycleToFinish(cycle)}><CheckCircle2 className="mr-2 h-4 w-4" />Finalizar Ciclo Atual</Button>}
+              </div>
             ) : (
               <div className="space-y-6">
                         <div className="space-y-2">
@@ -287,7 +289,7 @@ function CyclesPage() {
                         </div>
 
                         <div className="flex flex-col gap-3">
-                          {isActive && (
+                          {isActive && canFinishCycle && (
                             <Button 
                               onClick={() => setCycleToFinish(cycle)}
                               className="w-full h-16 rounded-[1.8rem] font-black uppercase tracking-widest text-[10px] gap-2 bg-emerald-500 hover:bg-emerald-600 text-white border-none transition-all shadow-lg active:scale-95 shadow-emerald-100"

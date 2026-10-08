@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Activity, AlertTriangle, Download, Play, FileText, FileSpreadsheet } from "lucide-react";
 import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/institutional-export";
-import { requireAdminMasterGuard, isOwnerBypass } from "@/lib/role-guards";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/system-health")({
+  head: () => ({ meta: [{"title": "Saúde do Sistema | VetorControl"}, {"name": "description", "content": "Verificação da integridade operacional do VetorControl."}, {"property": "og:title", "content": "Saúde do Sistema | VetorControl"}, {"property": "og:description", "content": "Verificação da integridade operacional do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: SystemHealthPage,
 });
@@ -44,7 +45,7 @@ function SystemHealthPage() {
       const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
+      setAllowed(r === "admin_master");
     })();
   }, []);
 

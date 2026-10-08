@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { isOwnerBypass } from "@/lib/role-guards";
 
 type ProfileRow = {
   id: string;
@@ -105,7 +104,7 @@ function roleBadgeClass(role: string): string {
 export function AdminMasterDashboard() {
   const { role: currentUserRole, user: currentUser } = useAuth();
   const isAdminMaster =
-    currentUserRole === "admin_master" || isOwnerBypass(currentUser?.email);
+    currentUserRole === "admin_master";
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -157,54 +156,23 @@ export function AdminMasterDashboard() {
     e.preventDefault();
     toast.info("Processando cadastro...");
     try {
-      if (newUser.role === "admin_master") {
-        // Create as coordenador first, then promote via update_user (admin only)
-        const { error: cErr } = await supabase.functions.invoke("manage-agents", {
+      const { full_name, email, password, role } = newUser;
+      const { data, error } = await supabase.functions.invoke("manage-agents", {
+        body: { action: "create_manager", userData: { full_name, email, password, role } },
+      });
+      if (error) throw error;
+
+      // Use o id devolvido pelo servidor: não há janela de corrida nem risco
+      // de vincular o agente errado quando existem e-mails semelhantes.
+      const createdId = (data as { user?: { id?: string } } | null)?.user?.id;
+      if (role === "agente" && newUser.supervisor_id && createdId) {
+        const { error: linkErr } = await supabase.functions.invoke("manage-agents", {
           body: {
-            action: "create_manager",
-            userData: { ...newUser, role: "coordenador" },
+            action: "update_user",
+            userData: { userId: createdId, supervisor_id: newUser.supervisor_id },
           },
         });
-        if (cErr) throw cErr;
-        // Find created user id by listing
-        const { data: created } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("email", newUser.email)
-          .maybeSingle();
-        if (created?.id) {
-          const { error: pErr } = await supabase.functions.invoke("manage-agents", {
-            body: {
-              action: "update_user",
-              userData: { userId: created.id, role: "admin_master" },
-            },
-          });
-          if (pErr) throw pErr;
-        }
-      } else {
-        const { full_name, email, password, role } = newUser;
-        const { error } = await supabase.functions.invoke("manage-agents", {
-          body: { action: "create_manager", userData: { full_name, email, password, role } },
-        });
-        if (error) throw error;
-
-        // Vincula o agente ao supervisor escolhido (create_manager não herda vínculos)
-        if (role === "agente" && newUser.supervisor_id) {
-          const { data: created } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("email", email)
-            .maybeSingle();
-          if (created?.id) {
-            const { error: linkErr } = await supabase.functions.invoke("manage-agents", {
-              body: {
-                action: "update_user",
-                userData: { userId: created.id, supervisor_id: newUser.supervisor_id },
-              },
-            });
-            if (linkErr) throw linkErr;
-          }
-        }
+        if (linkErr) throw linkErr;
       }
       toast.success(`${ROLE_LABELS[newUser.role]} cadastrado com sucesso!`);
       setIsAddingUser(false);

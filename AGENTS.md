@@ -7,3 +7,5 @@
 - Team scope is projected through shared role/profile helpers for both remote and cached reads, while server functions validate the database role and team before privileged access, because UI filters alone are not authorization.
 - Bulk operational reads use sequential pagination, because Data API row limits must not silently truncate production metrics.
 - System settings default to administrative scope and use database role policies; only master administrators may classify them as operational, because managers must not gain access by changing the classification.
+- Privileged cycle mutations load the server client only inside authenticated handlers after database role validation; existing user-management functions remain server-authorized, because route gates are not security boundaries.
+- Settings indicators derive from profile-scoped official daily records, and audit query failures throw instead of returning zero, because fabricated or partial totals conceal production errors.

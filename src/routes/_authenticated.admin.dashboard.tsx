@@ -20,12 +20,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Activity, Building2, Bug, Download, FileSpreadsheet, FileText,
+  Activity, AlertTriangle, Building2, Bug, Download, FileSpreadsheet, FileText,
   Loader2, Map as MapIcon, Users,
 } from "lucide-react";
 import { requireManagerGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
+  head: () => ({ meta: [{"title": "Painel Executivo | VetorControl"}, {"name": "description", "content": "Indicadores oficiais de produção por período e equipe."}, {"property": "og:title", "content": "Painel Executivo | VetorControl"}, {"property": "og:description", "content": "Indicadores oficiais de produção por período e equipe."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireManagerGuard,
   component: ExecutiveDashboardPage,
 });
@@ -239,6 +240,14 @@ function ExecutiveDashboardPage() {
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : (
         <>
+          {data?.warnings.length ? (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="pt-5 text-sm text-amber-800 flex gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>{data.warnings.join(" ")}</div>
+              </CardContent>
+            </Card>
+          ) : null}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi icon={<Activity className="h-4 w-4" />} label="Diárias" value={k.daily_records} />
             <Kpi icon={<Users className="h-4 w-4" />} label="Agentes" value={k.agents_active} />

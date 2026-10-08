@@ -22,6 +22,7 @@ export interface RBACAuditResult {
     inconsistencies: number;
     invalid_fks: number;
     scope_divergences: number;
+    unverified_tests: number;
     last_audit: string;
   };
   identifiers: Array<{
@@ -67,7 +68,7 @@ export interface RBACAuditResult {
     status: "ok" | "warning" | "error";
     note?: string;
   }>;
-  tests: Array<{ id: string; name: string; status: "pass" | "fail" | "skip"; detail?: string }>;
+  tests: Array<{ id: string; name: string; status: "pass" | "fail" | "unverified"; detail?: string }>;
   logs: string[];
 }
 
@@ -283,22 +284,22 @@ export const runRbacAudit = createServerFn({ method: "POST" })
     const tests: RBACAuditResult["tests"] = [];
     tests.push({
       id: "T1", name: "Agente visualiza apenas seus dados",
-      status: "skip",
+      status: "unverified",
       detail: "Nao verificavel sem sessao do usuario auditado: expected/obtained vem da mesma query admin (ver rbacByRole[].note). Requer RPC server-side que aplique RLS como o usuario alvo.",
     });
     tests.push({
       id: "T2", name: "Supervisor visualiza apenas agentes vinculados",
-      status: "skip",
+      status: "unverified",
       detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
       id: "T3", name: "Coordenador visualiza apenas sua coordenacao",
-      status: "skip",
+      status: "unverified",
       detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
       id: "T4", name: "Admin Master visualiza todos os dados",
-      status: "skip",
+      status: "unverified",
       detail: "Nao verificavel sem sessao do usuario auditado - mesma limitacao de T1.",
     });
     tests.push({
@@ -321,7 +322,6 @@ export const runRbacAudit = createServerFn({ method: "POST" })
     tests.push({ id: "T10", name: "Georef Audit e Data Audit retornam os mesmos usuários", status: "pass" });
 
     // ── SCORE ───────────────────────────────────────────────────
-    const totalChecks = identifiers.length + relationships.length + queries.length + tests.length;
     const failures =
       identifiers.filter((i) => i.status === "error").length +
       relationships.filter((r) => r.status === "error").length +
@@ -331,11 +331,11 @@ export const runRbacAudit = createServerFn({ method: "POST" })
       identifiers.filter((i) => i.status === "warning").length +
       relationships.filter((r) => r.status === "warning").length +
       queries.filter((q) => q.status === "warning").length;
-    // rbacByRole agora usa status "warning" por padrao pois expected/obtained
-    // vem da mesma query admin (nao valida RLS por sessao real do usuario).
-    // Isso e uma limitacao conhecida da ferramenta, nao uma divergencia real,
-    // entao nao entra no calculo do score.
-    const score = Math.max(0, Math.round(100 - (failures * 10 + warnings * 1.5)));
+    const unverifiedTests = tests.filter((t) => t.status === "unverified").length;
+    // Testes que não puderam executar como o usuário-alvo não podem aparecer
+    // como “saudável”. Eles reduzem a confiança do score, sem serem tratados
+    // como uma violação comprovada.
+    const score = Math.max(0, Math.round(100 - (failures * 10 + warnings * 1.5 + unverifiedTests * 4)));
     const health: RBACAuditResult["health"] = score >= 95 ? "healthy" : score >= 80 ? "warning" : "critical";
 
     log("[RBAC_SCORE]", score, health);
@@ -353,6 +353,7 @@ export const runRbacAudit = createServerFn({ method: "POST" })
         inconsistencies: failures,
         invalid_fks: identifiers.filter((i) => i.status === "error").length,
         scope_divergences: rbacByRole.filter((r) => r.diff !== 0).length,
+        unverified_tests: unverifiedTests,
         last_audit: new Date().toISOString(),
       },
       identifiers,

@@ -36,10 +36,13 @@ import { toast } from "sonner";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Calendar as CalendarLucide } from "lucide-react";
 import { PwaManagerSection } from "@/components/pwa/PwaManagerSection";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { settingsProductionSummary } from "@/lib/production-summary";
 
 
 
 export const Route = createFileRoute("/_authenticated/settings")({
+  head: () => ({ meta: [{"title": "Configurações | VetorControl"}, {"name": "description", "content": "Perfil, indicadores oficiais e configurações operacionais."}, {"property": "og:title", "content": "Configurações | VetorControl"}, {"property": "og:description", "content": "Perfil, indicadores oficiais e configurações operacionais."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   component: SettingsPage,
 });
 
@@ -47,28 +50,34 @@ function SettingsPage() {
   const [agent, setAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { allowWeekend, toggleWeekendOperation, userRole } = useOperationalDate();
-  const [stats, setStats] = useState({
-    worked: 1240,
-    foci: 42,
-    pending: 15,
-    productivity: 94
-  });
+  const [stats, setStats] = useState({ worked: 0, foci: 0, pending: 0, productivity: 0 });
 
   useEffect(() => {
     fetchAgentProfile();
   }, []);
 
   async function fetchAgentProfile() {
+    try {
     const { data: { user } } = await safeGetUser();
     if (!user) return;
 
-    const { data } = await supabase
+    const { data, error: profileError } = await supabase
       .from("agents")
       .select("*")
       .eq("profile_id", user.id)
       .maybeSingle();
+    if (profileError) throw profileError;
     
-    if (data) setAgent(data);
+    if (data) {
+      setAgent(data);
+      const [pendingResult, records] = await Promise.all([
+        supabase.from("property_pendencies").select("id", { count: "exact", head: true }).eq("agent_id", user.id).is("resolved_at", null),
+        readAllQueryPages(supabase.from("daily_work_records").select("properties_worked, properties_closed, positive_foci").eq("agent_id", user.id).order("id")),
+      ]);
+      if (pendingResult.error) throw pendingResult.error;
+      setStats(settingsProductionSummary(records, pendingResult.count ?? 0));
+    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível consultar os indicadores."); }
   }
 
   const handleUpdateAgent = async () => {
@@ -138,7 +147,7 @@ function SettingsPage() {
 
               <div className="grid grid-cols-3 w-full gap-4 pt-4">
                 <ProfileMiniStat icon={Trophy} label="Eficiência" value={`${stats.productivity}%`} color="text-emerald-500" />
-                <ProfileMiniStat icon={Briefcase} label="Visitas" value={stats.worked} color="text-blue-500" />
+                <ProfileMiniStat icon={Briefcase} label="Trabalhados" value={stats.worked} color="text-blue-500" />
                 <ProfileMiniStat icon={AlertCircle} label="Focos" value={stats.foci} color="text-red-500" />
               </div>
             </div>
