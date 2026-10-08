@@ -243,16 +243,17 @@ async function runFlushMutations(options?: { retryErroredImmediately?: boolean }
       // começado a processar esta mutação. A transação Dexie/IndexedDB serializa
       // leitura+escrita entre abas na mesma origem, então só uma aba consegue
       // marcar "syncing" com sucesso — a outra vê status !== "pending" e pula.
+      if (m.id === undefined) continue;
       const claimed = await db.transaction("rw", db.mutations, async () => {
-        const fresh = await db.mutations.get(m.id!);
+        const fresh = await db.mutations.get(m.id as number);
         if (!fresh || fresh.status !== "pending") return false;
-        await db.mutations.update(m.id!, { status: "syncing" });
-        return true;
+        await db.mutations.update(m.id as number, { status: "syncing" });
+        return fresh;
       });
       if (!claimed) continue;
 
       try {
-        await applyMutation(m);
+        await applyMutation(claimed);
         await db.mutations.delete(m.id!); // só remove após confirmação do Supabase
         ok++;
       } catch (e: any) {
