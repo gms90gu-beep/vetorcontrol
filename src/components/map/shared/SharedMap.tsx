@@ -147,7 +147,15 @@ export function SharedMap({
   // Cria a instância Leaflet quando estamos em "mounting"
   useEffect(() => {
     if (!containerRef.current || phase === "loading-data" || phase === "data-error" || phase === "no-data") return;
-    if (mapRef.current) return; // já montado
+    if (mapRef.current) {
+      // A data refetch can hide a mounted map; restore it instead of staying
+      // in mounting forever when the data becomes available again.
+      if (phase === "mounting") {
+        mapRef.current.invalidateSize();
+        setPhase("ready");
+      }
+      return;
+    }
 
     try {
       const inst = L.map(containerRef.current, { center, zoom, preferCanvas: true, zoomControl: false });
@@ -219,7 +227,7 @@ export function SharedMap({
         <div
           ref={containerRef}
           className={cn(
-            "absolute inset-0 transition-opacity duration-300",
+            "leaflet-container absolute inset-0 transition-opacity duration-300",
             phase === "ready" ? "opacity-100" : "opacity-0 pointer-events-none",
           )}
           aria-hidden={phase !== "ready"}
