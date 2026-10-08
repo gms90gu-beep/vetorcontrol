@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { getPendencyReport } from "@/lib/wave-c.functions";
+import { translate } from "@/lib/translations";
+import { getPendencyReport, getPendencyHistoricalSummary } from "@/lib/wave-c.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { listRemoteOrCache } from "@/lib/offline/repos";
@@ -35,10 +36,15 @@ function PendencyReportPage() {
   const { user } = useAuth();
   const [onlyOpen, setOnlyOpen] = useState(true);
   const [cycleId, setCycleId] = useState<string>("");
+  const [currentCycleId, setCurrentCycleId] = useState<string | null>(null);
+  const [historical, setHistorical] = useState(false);
+  const [ready, setReady] = useState(false);
   const [weekId, setWeekId] = useState<string>("");
   const [cycles, setCycles] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
   const fetchPend = useServerFn(getPendencyReport);
+  const fetchSummary = useServerFn(getPendencyHistoricalSummary);
+  const summary = useQuery({ queryKey: ["pendency-history", user?.id, currentCycleId], queryFn: () => fetchSummary({ data: { currentCycleId } }), enabled: ready && historical });
 
   useEffect(() => {
     if (!user?.id) return;
@@ -56,13 +62,16 @@ function PendencyReportPage() {
       ]);
       setCycles(cycleRows || []);
       setWeeks(weekRows || []);
+      setCurrentCycleId(active?.id ?? null);
       if (active?.id) setCycleId(active.id);
+      setReady(true);
     })();
   }, [user?.id]);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["pendency-report", onlyOpen, cycleId, weekId],
+    queryKey: ["pendency-report", user?.id, onlyOpen, cycleId, weekId],
     queryFn: () => fetchPend({ data: { onlyOpen, cycleId: cycleId || null, weekId: weekId || null, limit: 1000 } }),
+    enabled: ready,
   });
 
   const exportPDF = () => {
@@ -86,7 +95,7 @@ function PendencyReportPage() {
         },
         {
           title: "Lista de Pendências",
-          head: ["Quart.", "Imóvel", "Rua", "Agente", "Status", "Tentativas", "Última"],
+          head: ["Quart.", "Imóvel", "Tipo", "Rua", "Agente", "Status", "Tentativas", "Última"],
           body: data.rows.map((r) => [
             r.block_number ?? "—",
             r.property_number ?? "—",
@@ -101,10 +110,11 @@ function PendencyReportPage() {
     );
   };
 
-  const head = ["Quart.", "Imóvel", "Rua", "Agente", "Status", "Tentativas", "Última", "Resolvida"];
+  const head = ["Quart.", "Imóvel", "Tipo", "Rua", "Agente", "Status", "Tentativas", "Última", "Resolvida"];
   const rows = (data?.rows ?? []).map((r) => [
     r.block_number ?? "",
     r.property_number ?? "",
+    translate(r.property_type) || "—",
     r.street ?? "",
     r.agent_name,
     r.current_status,
@@ -125,6 +135,10 @@ function PendencyReportPage() {
         <CardContent className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <label className="flex items-center gap-2 text-sm">
+              <Switch checked={historical} onCheckedChange={(value) => { setHistorical(value); setOnlyOpen(!value); setCycleId(value ? "" : currentCycleId ?? ""); setWeekId(""); }} />
+              Histórico
+            </label>
+            <label className="flex items-center gap-2 text-sm">
               <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
               Somente pendências abertas
             </label>
@@ -132,7 +146,7 @@ function PendencyReportPage() {
               <SelectTrigger className="h-9 w-[190px] text-xs"><SelectValue placeholder="Ciclo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os ciclos</SelectItem>
-                {cycles.map((c) => <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number ?? "—"}/${c.year ?? "—"}`}</SelectItem>)}
+                {cycles.filter((c) => historical ? c.id !== currentCycleId : c.id === currentCycleId).map((c) => <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number ?? "—"}/${c.year ?? "—"}`}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={weekId || "all"} onValueChange={(value) => setWeekId(value === "all" ? "" : value)}>
@@ -170,6 +184,14 @@ function PendencyReportPage() {
         </CardContent>
       </Card>
 
+      {historical && summary.data && (
+        <section aria-label="Resumo histórico por ciclo" className="space-y-2">
+          <h3 className="font-semibold">Histórico por ciclo</h3>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr>{["Ciclo", "Ativas", "Resolvidas", "Total"].map((h) => <th key={h} className="p-2 text-left">{h}</th>)}</tr></thead><tbody>
+            {summary.data.map((r) => <tr key={r.cycle_id ?? "unlinked"} className="border-t"><td className="p-2">{cycles.find((c) => c.id === r.cycle_id)?.name ?? "Sem vínculo com ciclo"}</td><td className="p-2">{r.active}</td><td className="p-2">{r.resolved}</td><td className="p-2">{r.total}</td></tr>)}
+          </tbody></table></div>
+        </section>
+      )}
       {isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : (

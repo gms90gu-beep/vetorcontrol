@@ -245,6 +245,11 @@ function HeatmapPage() {
             </div>
           )}
 
+          {(props.data?.focus_without_gps ?? 0) > 0 && (
+            <p role="alert" className="border bg-muted text-foreground rounded-md px-3 py-2 text-xs">
+              {props.data?.focus_without_gps} imóveis com foco encontrado ou positivo sem latitude/longitude; não aparecem no mapa.
+            </p>
+          )}
           {props.data?.truncated && (
             <p className="text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
