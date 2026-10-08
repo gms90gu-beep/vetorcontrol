@@ -33,6 +33,7 @@ import { getOperationalDate } from "@/lib/operational-date";
 const AuditMap = lazy(() => import("@/components/map/GeorefAuditMap"));
 
 export const Route = createFileRoute("/_authenticated/admin/georef-audit")({
+  head: () => ({ meta: [{"title": "Auditoria GPS | VetorControl"}, {"name": "description", "content": "Qualidade dos registros georreferenciados da operação."}, {"property": "og:title", "content": "Auditoria GPS | VetorControl"}, {"property": "og:description", "content": "Qualidade dos registros georreferenciados da operação."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireManagerGuard,
   component: GeorefAuditPage,
 });

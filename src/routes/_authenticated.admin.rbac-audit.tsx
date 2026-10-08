@@ -16,6 +16,7 @@ import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/insti
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/rbac-audit")({
+  head: () => ({ meta: [{"title": "Auditoria de Permissões | VetorControl"}, {"name": "description", "content": "Verificação de escopo e permissões operacionais."}, {"property": "og:title", "content": "Auditoria de Permissões | VetorControl"}, {"property": "og:description", "content": "Verificação de escopo e permissões operacionais."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: RbacAuditPage,
 });

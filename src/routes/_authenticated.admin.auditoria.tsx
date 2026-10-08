@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/auditoria")({
+  head: () => ({ meta: [{"title": "Auditoria do Sistema | VetorControl"}, {"name": "description", "content": "Consistência dos boletins e registros oficiais de produção."}, {"property": "og:title", "content": "Auditoria do Sistema | VetorControl"}, {"property": "og:description", "content": "Consistência dos boletins e registros oficiais de produção."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: AuditPage,
 });

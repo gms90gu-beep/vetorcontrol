@@ -1,8 +1,9 @@
 # Tarefas
 
-- [ ] Aplicar patch 11122d9 recebido na main, preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria.
-- [ ] Aplicar SQL exato 20261007160000_harden_admin_master_settings.sql incluído no patch no projeto existente; ciclos só master, relatórios paginados, jornadas sem boletim e configurações reais.
-- [ ] Validar testes/compilação/segurança e publicar a versão integrada sem alterar credenciais ou produção.
+- [x] Aplicar patch 11122d9 recebido na main, preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria.
+- [x] Aplicar SQL exato 20261007160000_harden_admin_master_settings.sql incluído no patch no projeto existente; ciclos só master, relatórios paginados, jornadas sem boletim e configurações reais.
+- [x] Validar: 118 testes, compilação automática OK, zero críticos no scanner, Admin Master real com auditoria e alerta de jornada sem boletim; 1.151 visitas e 61 boletins preservados.
+- [ ] Publicar versão integrada validada.
 
 - [x] Validação final 0007: Adenilson real, equipe restrita, três atalhos, calendário, mapas/ciclos e rejeição de reconstruções externas; pendências offline e regressões de jornadas aprovadas.
 - [x] Migration 0008: configurações administrativas exclusivas do master, gestores leem somente escopo operacional; agentes bloqueados; nenhum registro alterado pela validação.

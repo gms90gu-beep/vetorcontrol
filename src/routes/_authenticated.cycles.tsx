@@ -51,6 +51,7 @@ function formatCycleDate(s: string | null | undefined): string {
 }
 
 export const Route = createFileRoute("/_authenticated/cycles")({
+  head: () => ({ meta: [{"title": "Ciclos Operacionais | VetorControl"}, {"name": "description", "content": "Histórico e gestão dos ciclos de vigilância."}, {"property": "og:title", "content": "Ciclos Operacionais | VetorControl"}, {"property": "og:description", "content": "Histórico e gestão dos ciclos de vigilância."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireCycleAccessGuard,
   component: CyclesPage,
 });

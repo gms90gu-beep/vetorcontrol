@@ -16,6 +16,7 @@ import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/insti
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/system-health")({
+  head: () => ({ meta: [{"title": "Saúde do Sistema | VetorControl"}, {"name": "description", "content": "Verificação da integridade operacional do VetorControl."}, {"property": "og:title", "content": "Saúde do Sistema | VetorControl"}, {"property": "og:description", "content": "Verificação da integridade operacional do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: SystemHealthPage,
 });

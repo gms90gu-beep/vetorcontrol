@@ -26,6 +26,7 @@ import {
 import { requireManagerGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/dashboard")({
+  head: () => ({ meta: [{"title": "Painel Executivo | VetorControl"}, {"name": "description", "content": "Indicadores oficiais de produção por período e equipe."}, {"property": "og:title", "content": "Painel Executivo | VetorControl"}, {"property": "og:description", "content": "Indicadores oficiais de produção por período e equipe."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireManagerGuard,
   component: ExecutiveDashboardPage,
 });

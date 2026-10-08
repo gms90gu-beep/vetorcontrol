@@ -9,6 +9,7 @@ import { LogOut, ArrowLeft, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin-master")({
+  head: () => ({ meta: [{"title": "Admin Master | VetorControl"}, {"name": "description", "content": "Gestão administrativa autorizada do VetorControl."}, {"property": "og:title", "content": "Admin Master | VetorControl"}, {"property": "og:description", "content": "Gestão administrativa autorizada do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: async () => {
     if (typeof window === "undefined") {
       console.debug("[Admin-Master Guard] SSR detectado; validação será feita no cliente.");

@@ -31,6 +31,7 @@ import { notify } from "@/lib/notify";
 import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/design-system")({
+  head: () => ({ meta: [{"title": "Padrões Visuais | VetorControl"}, {"name": "description", "content": "Padrões de interface do VetorControl."}, {"property": "og:title", "content": "Padrões Visuais | VetorControl"}, {"property": "og:description", "content": "Padrões de interface do VetorControl."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   beforeLoad: requireAdminMasterGuard,
   component: DesignSystemPage,
 });

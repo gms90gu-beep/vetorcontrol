@@ -42,6 +42,7 @@ import { settingsProductionSummary } from "@/lib/production-summary";
 
 
 export const Route = createFileRoute("/_authenticated/settings")({
+  head: () => ({ meta: [{"title": "Configurações | VetorControl"}, {"name": "description", "content": "Perfil, indicadores oficiais e configurações operacionais."}, {"property": "og:title", "content": "Configurações | VetorControl"}, {"property": "og:description", "content": "Perfil, indicadores oficiais e configurações operacionais."}, {"property": "og:type", "content": "website"}, {"name": "twitter:card", "content": "summary"}] }),
   component: SettingsPage,
 });
 
