@@ -1,14 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { z } from "zod";
 
 export const finishCycle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { cycleId: string }) => input)
+  .inputValidator((input: { cycleId: string }) => z.object({ cycleId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as any;
-    const { data: role } = await supabase.rpc("get_user_role", { u_id: userId });
-    if (role !== "admin_master") throw new Error("Apenas o Admin Master pode finalizar um ciclo.");
+    const { supabase, userId } = context;
+    const { data: allowed, error: roleError } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin_master" });
+    if (roleError) throw new Error(roleError.message);
+    if (!allowed) throw new Error("Apenas o Admin Master pode finalizar um ciclo.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: cycle, error: cycleError } = await supabaseAdmin
       .from("cycles")

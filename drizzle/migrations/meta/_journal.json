@@ -64,6 +64,13 @@
       "when": 1791398824633,
       "tag": "0008_restrict_system_settings_by_operational_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791421544602,
+      "tag": "0009_harden_admin_master_settings",
+      "breakpoints": true
     }
   ]
 }
