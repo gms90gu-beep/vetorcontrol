@@ -259,28 +259,13 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         }
       }
 
-      await supabaseAdmin.from("audit_log").insert({
-        action: "rebuild_daily_work_records",
-        entity: "system",
-        actor_id: userId,
-        metadata: {
-          from: data.from,
-          to: data.to,
-          agent: data.agentId || null,
-          scanned: groups.size,
-          updated,
-          source: "rebuildDailyRecords (TS)",
-          tz: "America/Sao_Paulo",
-        },
-      });
-
       console.log("[REPORT_REBUILD_FINISH]", { scanned: groups.size, updated });
       return { scanned: groups.size, updated, rows };
 
     } catch (err: any) {
       const { supabaseAdmin: adminForAudit } = await import("@/integrations/supabase/client.server");
       console.error("[REPORT_REBUILD_ERROR]", err);
-      await adminForAudit.from("audit_log").insert({
+      const { error: auditError } = await adminForAudit.from("audit_log").insert({
         action: "dwr_reconciliation_failed",
         entity: "daily_work_records",
         actor_id: userId,
@@ -294,6 +279,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
           source: "rebuildDailyRecords (TS)",
         },
       });
+      if (auditError) console.error("[REPORT_REBUILD_AUDIT_ERROR]", auditError.message);
       throw err;
     }
   });

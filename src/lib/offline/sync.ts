@@ -304,7 +304,9 @@ export function flushMutations(options?: { retryErroredImmediately?: boolean }):
   if (activeFlush) {
     return activeFlush.then(() => flushMutations(options));
   }
-  const flush = runFlushMutations(options);
+  const flush = typeof navigator !== "undefined" && navigator.locks
+    ? navigator.locks.request("vetorcontrol-mutation-sync", () => runFlushMutations(options))
+    : runFlushMutations(options);
   const wrapped = flush.finally(() => {
     if (activeFlush === wrapped) activeFlush = null;
   });
@@ -422,7 +424,12 @@ export function bootSyncEngine() {
   const tryFlush = () => { void flushMutations(); };
   const flushAfterReload = async () => {
     try {
-      await prepareMutationsAfterReload();
+      if (navigator.locks) {
+        await navigator.locks.request("vetorcontrol-mutation-sync", () => prepareMutationsAfterReload());
+      } else {
+        // Without cross-tab locking, do not steal another tab's syncing rows.
+        await db.mutations.where("status").equals("error").and(m => (m.tries || 0) < MAX_RETRIES).modify({ status: "pending", nextRetryAt: undefined });
+      }
       await flushMutations({ retryErroredImmediately: true });
     } catch (e) {
       console.warn("[SYNC_RELOAD_RECOVERY_FAIL]", e);

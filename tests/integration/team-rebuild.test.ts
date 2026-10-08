@@ -17,6 +17,15 @@ function context(role: string) {
 }
 
 describe("server rebuild team boundary", () => {
+  it("audits an authorized reconstruction failure and preserves its real error", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    const query: any = {};
+    for (const method of ["select", "gte", "lte", "order", "in", "eq"]) query[method] = () => query;
+    query.range = async () => ({ data: null, error: new Error("reconstruction read failed") });
+    calls.admin.mockImplementation((table) => table === "audit_log" ? { insert } : query);
+    await expect((rebuildDailyRecords as any)({ data: { from: "2026-10-01", to: "2026-10-02", agentId: "own" }, context: context("supervisor") })).rejects.toThrow("reconstruction read failed");
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ action: "dwr_reconciliation_failed", actor_id: "self", target_id: "own", metadata: expect.objectContaining({ error: "reconstruction read failed" }) }));
+  });
   it("rejects a supervisor's outsider before opening privileged queries", async () => {
     calls.admin.mockClear();
     await expect((rebuildDailyRecords as any)({ data: { from: "2026-10-01", to: "2026-10-02", agentId: "other" }, context: context("supervisor") })).rejects.toThrow(/equipe/);

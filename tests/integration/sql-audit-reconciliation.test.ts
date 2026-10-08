@@ -37,13 +37,6 @@ describe("SQL Failure Audit & Preserved Closure Regression", () => {
       tries: 0
     } as any);
 
-    // 3. Mock RPC failure (returning the exact shape from migration 0011)
-    const rpcMock = vi.mocked(supabase.rpc);
-    rpcMock.mockResolvedValueOnce({
-      data: { failed: true, error: "Trigger limit reached", sqlstate: "P0001" },
-      error: null,
-    } as any);
-
     // 4. Run reconciliation with an empty server result (simulating a "missing" record on server)
     const report = await reconcile({
       module: "work",
@@ -51,6 +44,7 @@ describe("SQL Failure Audit & Preserved Closure Regression", () => {
       serverRows: [], // Server has nothing
       localStore: db.daily_work_records,
       ownerKey: "agent_id",
+      mutationTables: ["daily_work_records"],
     });
 
     // 5. Assertions
@@ -60,21 +54,4 @@ describe("SQL Failure Audit & Preserved Closure Regression", () => {
     expect(record?.data.status).toBe("completed");
   });
 
-  it("should return failure object when RPC fails, matching migration 0011 exception handler", async () => {
-    // Mock the specific failure response defined in migration 0011
-    const rpcMock = vi.mocked(supabase.rpc);
-    rpcMock.mockResolvedValueOnce({
-      data: { failed: true, error: "Division by zero", sqlstate: "22012" },
-      error: null,
-    } as any);
-
-    const { data, error } = await supabase.rpc("rebuild_daily_work_records", { _from: "2026-10-01", _to: "2026-10-02", _agent: "u1" });
-    
-    expect(error).toBeNull();
-    expect(data).toMatchObject({
-      failed: true,
-      error: "Division by zero",
-      sqlstate: "22012"
-    });
-  });
 });

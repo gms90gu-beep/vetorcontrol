@@ -9,3 +9,6 @@
 - System settings default to administrative scope and use database role policies; only master administrators may classify them as operational, because managers must not gain access by changing the classification.
 - Privileged cycle mutations load the server client only inside authenticated handlers after database role validation; existing user-management functions remain server-authorized, because route gates are not security boundaries.
 - Settings indicators derive from profile-scoped official daily records, and audit query failures throw instead of returning zero, because fabricated or partial totals conceal production errors.
+- Offline queue coalescing is transactional, preserves operation barriers, and uses cross-tab locks for claim recovery, because syncing payloads must remain immutable.
+- Map visit period filtering includes unlinked dated visits while retaining team authorization; historical cycle assignment is display-only, because missing links must not erase real focus history.
+- Reconstruction failures are audited in SQL and authenticated server handlers without rolling back session closure, because daily bulletin failures must remain observable without losing field work.
