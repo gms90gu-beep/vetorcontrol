@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { mapVisitInPeriod } from "@/lib/map-visit-period";
+import { operationalDateBoundsUtcIso } from "@/lib/operational-date";
 
-type CycleOption = { id: string; name: string; number: number | null; year: number | null };
+type CycleOption = { id: string; name: string; number: number | null; year: number | null; start_date: string; end_date: string };
 type FocusAreaRow = {
   areaId: string;
   area: string;
@@ -107,7 +109,7 @@ export const getFocusAreaStatistics = createServerFn({ method: "POST" })
 
     const { data: cycleRows, error: cyclesError } = await db
       .from("cycles")
-      .select("id, name, number, year")
+      .select("id, name, number, year, start_date, end_date")
       .order("year", { ascending: false })
       .order("number", { ascending: true });
     if (cyclesError) throw new Error(cyclesError.message);
@@ -116,7 +118,7 @@ export const getFocusAreaStatistics = createServerFn({ method: "POST" })
       new Set(cycles.map((cycle) => Number(cycle.year)).filter((year) => Number.isInteger(year) && year > 0)),
     ).sort((a, b) => b - a);
 
-    const requestedYear = Number.isInteger(data.year) && (data.year || 0) > 0 ? data.year! : null;
+    const requestedYear = Number.isInteger(data.year) && (data.year || 0) > 0 ? data.year ?? null : null;
     let selectedCycles = requestedYear
       ? cycles.filter((cycle) => Number(cycle.year) === requestedYear)
       : cycles;
@@ -134,6 +136,8 @@ export const getFocusAreaStatistics = createServerFn({ method: "POST" })
     }
 
     const cycleIds = selectedCycles.map((cycle) => cycle.id);
+    const periodStart = operationalDateBoundsUtcIso(selectedCycles.map((c) => c.start_date).sort()[0]).startIso;
+    const periodEnd = operationalDateBoundsUtcIso(selectedCycles.map((c) => c.end_date).sort().at(-1) ?? selectedCycles[0].end_date).endIso;
     const visits: any[] = [];
     const PAGE_SIZE = 1000;
     for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -141,12 +145,13 @@ export const getFocusAreaStatistics = createServerFn({ method: "POST" })
         .from("visits")
         .select("agent_id, property_id, cycle_id, visit_date, has_focus")
         .in("agent_id", agentIds)
-        .in("cycle_id", cycleIds)
+        .gte("visit_date", periodStart)
+        .lte("visit_date", periodEnd)
         .order("visit_date", { ascending: true })
         .range(offset, offset + PAGE_SIZE - 1);
       const { data: page, error } = await query;
       if (error) throw new Error(error.message);
-      visits.push(...(page || []));
+      visits.push(...(page || []).filter((visit) => mapVisitInPeriod(visit, periodStart, periodEnd, cycleIds)));
       if (!page || page.length < PAGE_SIZE) break;
     }
 
