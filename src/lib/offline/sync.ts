@@ -213,13 +213,10 @@ async function runFlushMutations(options?: { retryErroredImmediately?: boolean }
     // Limpa IDs inválidos legados (tmp_...) antes de tentar sincronizar.
     await purgeInvalidTmpMutations();
 
-    // Reseta itens travados em "syncing" (crash/refresh) — esses NÃO consumiram
-    // tentativa. Itens em "error" só voltam a "pending" se ainda tiverem retries
+    // Syncing items belong to another active flush; never steal their claim.
+    // Itens em "error" só voltam a "pending" se ainda tiverem retries
     // disponíveis (caso contrário ficam parados, com lastError visível no modal,
     // até o operador resolver a causa raiz — evita loop infinito de retentativa).
-    await db.mutations
-      .where("status").equals("syncing")
-      .modify({ status: "pending" });
     const now = Date.now();
     await db.mutations
       .where("status").equals("error")

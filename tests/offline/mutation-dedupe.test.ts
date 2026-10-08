@@ -36,4 +36,13 @@ describe("v4 queue coalescing", () => {
     await enqueueMutation({ table: "properties", op: "update", pk: "p", payload: { notes: "after" } });
     expect(await db.mutations.count()).toBe(3);
   });
+  it("coalesces updates separated by another record without losing either", async () => {
+    await enqueueMutation({ table: "properties", op: "update", pk: "p", payload: { latitude: 12 } });
+    await enqueueMutation({ table: "properties", op: "update", pk: "other", payload: { notes: "other" } });
+    await enqueueMutation({ table: "properties", op: "update", pk: "p", payload: { longitude: 13 } });
+    const rows = await db.mutations.toArray();
+    expect(rows).toHaveLength(2);
+    expect(rows.find(row => row.pk === "p")?.payload).toEqual({ latitude: 12, longitude: 13 });
+    expect(rows.find(row => row.pk === "other")?.payload).toEqual({ notes: "other" });
+  });
 });
