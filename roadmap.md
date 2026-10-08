@@ -1,6 +1,6 @@
 # Tarefas
 
-- [ ] Incorporar commit 11122d9 na main preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria. Bloqueio: GitHub retorna 422 para o commit no repositório informado.
+- [ ] Aplicar patch solicitado na main, preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria. Bloqueio: mensagem de 08/10 às 01:00 não contém patch anexado; commit 11122d9 indisponível no GitHub (422).
 - [ ] Aplicar SQL exato 20261007160000_harden_admin_master_settings.sql no projeto existente; ciclos só master, relatórios paginados, jornadas sem boletim e configurações reais. Bloqueio: arquivo ausente na main (GitHub 404); aguarda commit/arquivo correto.
 - [ ] Validar testes/compilação/segurança e publicar a versão integrada sem alterar credenciais ou produção.
 
