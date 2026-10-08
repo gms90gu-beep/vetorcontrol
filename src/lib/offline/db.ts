@@ -90,10 +90,14 @@ export const db = new VetorDB();
 export async function enqueueMutation(m: Omit<Mutation, "id" | "createdAt" | "tries" | "status">) {
   const dedupeKey = mutationDedupeKey(m);
   return db.transaction("rw", db.mutations, async () => {
-    const matches = dedupeKey ? await db.mutations.where("dedupeKey").equals(dedupeKey).sortBy("createdAt") : [];
+    const matches = dedupeKey ? await db.mutations.where("dedupeKey").equals(dedupeKey).toArray() : [];
     // A syncing item is immutable. Never merge across an intervening operation.
-    const all = await db.mutations.orderBy("createdAt").toArray();
-    const last = all.at(-1);
+    const all = await db.mutations.orderBy("id").toArray();
+    const targetId = m.pk ?? m.payload.id;
+    const related = all.filter(row => row.table === m.table && (
+      targetId ? (row.pk ?? row.payload.id) === targetId || row.op.endsWith("_where") || row.op === "rpc" : row.dedupeKey === dedupeKey || row.op.endsWith("_where") || row.op === "rpc"
+    ));
+    const last = related.at(-1);
     const pending = matches.filter(row => row.status === "pending");
     const candidate = pending.at(-1);
     if (candidate?.id !== undefined && last?.id === candidate.id) {

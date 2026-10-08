@@ -69,8 +69,8 @@ function PendencyReportPage() {
   }, [user?.id]);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["pendency-report", user?.id, onlyOpen, cycleId, weekId],
-    queryFn: () => fetchPend({ data: { onlyOpen, cycleId: cycleId || null, weekId: weekId || null, limit: 1000 } }),
+    queryKey: ["pendency-report", user?.id, historical, currentCycleId, onlyOpen, cycleId, weekId],
+    queryFn: () => fetchPend({ data: { onlyOpen, cycleId: cycleId || null, excludeCycleId: historical ? currentCycleId : null, weekId: weekId || null, limit: 1000 } }),
     enabled: ready,
   });
 
@@ -145,7 +145,7 @@ function PendencyReportPage() {
             <Select value={cycleId || "all"} onValueChange={(value) => { setCycleId(value === "all" ? "" : value); setWeekId(""); }}>
               <SelectTrigger className="h-9 w-[190px] text-xs"><SelectValue placeholder="Ciclo" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os ciclos</SelectItem>
+                {historical && <SelectItem value="all">Todos os ciclos históricos</SelectItem>}
                 {cycles.filter((c) => historical ? c.id !== currentCycleId : c.id === currentCycleId).map((c) => <SelectItem key={c.id} value={c.id}>{c.name || `Ciclo ${c.number ?? "—"}/${c.year ?? "—"}`}</SelectItem>)}
               </SelectContent>
             </Select>

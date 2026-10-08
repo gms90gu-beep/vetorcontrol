@@ -343,6 +343,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     cycleId?: string | null;
     weekId?: string | null;
     onlyOpen?: boolean;
+    excludeCycleId?: string | null;
     limit?: number;
   }) => input)
   .handler(async ({ data, context }): Promise<PendencyReportResult> => {
@@ -370,6 +371,7 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .limit(data.limit ?? 500);
     if (data.onlyOpen) q = q.is("resolved_at", null);
     if (data.cycleId) q = q.eq("cycle_id", data.cycleId);
+    if (data.excludeCycleId) q = q.or(`cycle_id.is.null,cycle_id.neq.${data.excludeCycleId}`);
     if (data.weekId) q = q.eq("week_id", data.weekId);
     const { data: pends, error } = await q;
     if (error) throw new Error(error.message);
@@ -798,7 +800,6 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
-          if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
           if (profileIds) query = query.in("agent_id", profileIds);
           visitResults.push({ data: await readAllQueryPages(query.order("visit_date", { ascending: false }).order("id")), error: null });
       }
