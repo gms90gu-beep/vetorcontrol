@@ -15,6 +15,7 @@ export default defineConfig({
       "tests/unit/**/*.test.{ts,tsx}",
       "tests/integration/**/*.test.{ts,tsx}",
       "tests/offline/**/*.test.{ts,tsx}",
+      "src/components/map/shared/__tests__/**/*.test.ts",
     ],
     exclude: ["tests/e2e/**", "tests/offline/*.spec.ts", "node_modules/**"],
     coverage: {
