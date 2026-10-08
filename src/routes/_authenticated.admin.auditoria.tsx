@@ -19,10 +19,6 @@ function AuditPage() {
   const { role, isLoading } = useAuth();
   const fetchSnapshot = useServerFn(getAuditSnapshot);
 
-  useEffect(() => {
-    if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
-  }, [role, isLoading, router]);
-
   const { data, isFetching, refetch, error } = useQuery({
     queryKey: ["audit-snapshot"],
     queryFn: () => fetchSnapshot(),

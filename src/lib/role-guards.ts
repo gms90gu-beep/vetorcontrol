@@ -141,7 +141,7 @@ export async function requireCycleAccessGuard() {
     throw redirect({ to: "/dashboard", replace: true });
   }
 
-  if (role !== "agente" && !isManagerRole(role)) {
+  if (role !== "agente" && role !== "agent" && !isManagerRole(role)) {
     throw redirect({ to: "/dashboard", replace: true });
   }
 }

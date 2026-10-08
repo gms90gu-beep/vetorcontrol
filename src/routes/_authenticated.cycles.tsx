@@ -267,9 +267,11 @@ function CyclesPage() {
                       </CardHeader>
                       <CardContent className="pt-2 pb-6">
             {isManager ? (
-              <p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-600">
+              <div className="space-y-3"><p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium leading-relaxed text-slate-600">
                 Histórico de ciclos e períodos. Para consultar indicadores operacionais, use os relatórios filtrados por equipe e área.
               </p>
+              {isActive && canFinishCycle && <Button onClick={() => setCycleToFinish(cycle)}><CheckCircle2 className="mr-2 h-4 w-4" />Finalizar Ciclo Atual</Button>}
+              </div>
             ) : (
               <div className="space-y-6">
                         <div className="space-y-2">

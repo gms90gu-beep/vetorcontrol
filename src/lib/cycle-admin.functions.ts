@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import { assertMasterRole } from "@/lib/admin-policy";
 
 export const finishCycle = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -9,7 +10,7 @@ export const finishCycle = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data: allowed, error: roleError } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin_master" });
     if (roleError) throw new Error(roleError.message);
-    if (!allowed) throw new Error("Apenas o Admin Master pode finalizar um ciclo.");
+    assertMasterRole(allowed ? "admin_master" : "");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: cycle, error: cycleError } = await supabaseAdmin
