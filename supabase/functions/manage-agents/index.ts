@@ -90,11 +90,8 @@ async function safeUpsertUserRole(supabaseAdmin: any, userId: string, role: stri
       `Não foi possível sincronizar o perfil: usuário ${userId} não existe em auth.users. Recrie o usuário ou remova o registro órfão.`,
     );
   }
-  // Clear existing roles for this user then insert the new one (single role per user)
-  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
-  if (delErr) throw delErr;
-  const { error: insErr } = await supabaseAdmin.from("user_roles").insert({ user_id: userId, role });
-  if (insErr) throw insErr;
+  const { error } = await supabaseAdmin.rpc("set_managed_user_role", { p_user_id: userId, p_role: role });
+  if (error) throw error;
 }
 
 serve(async (req) => {
@@ -297,9 +294,7 @@ serve(async (req) => {
         if (aErr) throw aErr;
       }
 
-      if (role) {
-        await safeUpsertUserRole(supabaseAdmin, userId, role);
-      }
+      if (role) await safeUpsertUserRole(supabaseAdmin, userId, role);
 
       const agentUpdate: Record<string, unknown> = {};
       if (typeof full_name === "string") agentUpdate.name = full_name;
