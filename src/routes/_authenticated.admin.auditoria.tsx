@@ -64,6 +64,13 @@ function AuditPage() {
 
       {data && (
         <>
+          {data.errors.length > 0 && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="pt-6 text-sm text-amber-800">
+                <strong>Leitura incompleta:</strong> {data.errors.join(" · ")}
+              </CardContent>
+            </Card>
+          )}
           <Section title="RG (Registro Geral)" icon={<Database className="h-4 w-4" />}>
             <Stat label="Boletins RG" value={data.rg.boletins} />
             <Stat label="Quarteirões" value={data.rg.blocks} />

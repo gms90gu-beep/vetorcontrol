@@ -18,6 +18,18 @@ function sumDepJson(j: any): number {
   );
 }
 
+async function fetchAllPages<T>(query: any, pageSize = 1000, maxRows = 50000): Promise<{ rows: T[]; truncated: boolean }> {
+  const rows: T[] = [];
+  for (let offset = 0; offset < maxRows; offset += pageSize) {
+    const { data, error } = await query.range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const page = (data ?? []) as T[];
+    rows.push(...page);
+    if (page.length < pageSize) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+}
+
 async function requireAdminOrSupervisor(supabase: any, userId: string) {
   const { data: role } = await supabase.rpc("get_user_role", { u_id: userId });
   const r = (role as string) || "";
@@ -31,6 +43,7 @@ async function requireAdminOrSupervisor(supabase: any, userId: string) {
 // EXECUTIVE DASHBOARD
 // ─────────────────────────────────────────────────────────────
 export interface ExecutiveDashboardResult {
+  warnings: string[];
   scope: string;
   filters: {
     from: string;
@@ -133,8 +146,28 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .gte("work_date", data.from)
       .lte("work_date", data.to);
     if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
-    const { data: dwr, error: de } = await dwrQ;
-    if (de) throw new Error(de.message);
+    const dwrResult = await fetchAllPages<any>(dwrQ);
+    const dwr = dwrResult.rows;
+    const warnings: string[] = [];
+    if (dwrResult.truncated) warnings.push("O relatório atingiu o limite de segurança de 50.000 diárias; refine o período.");
+
+    let sessionQ = supabase
+      .from("field_work_sessions")
+      .select("user_id, session_date, status")
+      .in("user_id", scopedProfiles)
+      .gte("session_date", data.from)
+      .lte("session_date", data.to);
+    if (data.cycleId) sessionQ = sessionQ.eq("cycle_id", data.cycleId);
+    const sessionResult = await fetchAllPages<any>(sessionQ);
+    const dwrKeys = new Set(dwr.map((r: any) => `${r.agent_id}|${r.work_date}`));
+    const missingDaily = sessionResult.rows.filter((s: any) => {
+      const status = String(s.status ?? "").toLowerCase();
+      const closed = ["completed", "complete", "closed", "encerrada", "finished"].some((v) => status.includes(v));
+      return closed && !dwrKeys.has(`${s.user_id}|${s.session_date}`);
+    });
+    if (missingDaily.length > 0) {
+      warnings.push(`${missingDaily.length} jornada(s) encerrada(s) sem boletim diário; revise a reconciliação antes de concluir o período.`);
+    }
 
     // Pendencies open (no resolved_at) — agent_id é profile_id
     let pendOpenQ = supabase
@@ -236,6 +269,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
 
     return {
       scope: role,
+      warnings,
       filters: {
         from: data.from,
         to: data.to,
@@ -256,6 +290,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
 function emptyDashboard(role: string, data: any): ExecutiveDashboardResult {
   return {
     scope: role,
+    warnings: [],
     filters: {
       from: data.from,
       to: data.to,

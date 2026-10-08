@@ -228,6 +228,15 @@ function GeorefAuditPage() {
         </div>
       </div>
 
+      {data?.warnings.length ? (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="pt-5 text-sm text-amber-800 flex gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>{data.warnings.join(" ")}</div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Filters */}
       <Card>
         <CardContent className="pt-4 grid grid-cols-2 md:grid-cols-5 gap-3">

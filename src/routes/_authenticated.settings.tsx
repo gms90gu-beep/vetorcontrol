@@ -47,12 +47,7 @@ function SettingsPage() {
   const [agent, setAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { allowWeekend, toggleWeekendOperation, userRole } = useOperationalDate();
-  const [stats, setStats] = useState({
-    worked: 1240,
-    foci: 42,
-    pending: 15,
-    productivity: 94
-  });
+  const [stats, setStats] = useState({ worked: 0, foci: 0, pending: 0, productivity: 0 });
 
   useEffect(() => {
     fetchAgentProfile();
@@ -68,7 +63,23 @@ function SettingsPage() {
       .eq("profile_id", user.id)
       .maybeSingle();
     
-    if (data) setAgent(data);
+    if (data) {
+      setAgent(data);
+      const [{ count: visits }, { count: foci }, { count: pending }, { data: records }] = await Promise.all([
+        supabase.from("visits").select("id", { count: "exact", head: true }).eq("agent_id", data.id),
+        supabase.from("visits").select("id", { count: "exact", head: true }).eq("agent_id", data.id).eq("has_focus", true),
+        supabase.from("property_pendencies").select("id", { count: "exact", head: true }).eq("agent_id", user.id).is("resolved_at", null),
+        supabase.from("daily_work_records").select("properties_worked, properties_closed").eq("agent_id", user.id),
+      ]);
+      const worked = (records ?? []).reduce((sum, row: any) => sum + (Number(row.properties_worked) || 0), 0);
+      const closed = (records ?? []).reduce((sum, row: any) => sum + (Number(row.properties_closed) || 0), 0);
+      setStats({
+        worked: visits ?? 0,
+        foci: foci ?? 0,
+        pending: pending ?? 0,
+        productivity: worked > 0 ? Math.round((closed / worked) * 100) : 0,
+      });
+    }
   }
 
   const handleUpdateAgent = async () => {

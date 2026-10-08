@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export interface AuditSnapshot {
+  errors: string[];
   rg: {
     boletins: number;
     blocks: number;
@@ -32,6 +33,8 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
     });
     if (!isAdmin) throw new Error("Forbidden: requer admin_master");
 
+    const errors: string[] = [];
+
     const count = async (
       table: string,
       filter?: (q: any) => any
@@ -41,6 +44,7 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
       const { count: c, error } = await q;
       if (error) {
         console.warn(`[audit] count(${table})`, error.message);
+        errors.push(`count(${table}): ${error.message}`);
         return 0;
       }
       return c ?? 0;
@@ -77,19 +81,25 @@ export const getAuditSnapshot = createServerFn({ method: "GET" })
         (acc: number, r: any) => acc + (Number(r.properties_worked ?? r.properties_closed) || 0),
         0
       );
+    for (const [name, result] of [["daily_work_records.properties_worked", properties_worked_agg], ["daily_work_records.properties_closed", properties_closed_agg]] as const) {
+      if (result.error) errors.push(`${name}: ${result.error.message}`);
+    }
 
     // blocks sem imóveis
-    const { data: blocksAll } = await supabase.from("blocks").select("id");
-    const { data: propsBlocks } = await supabase
+    const { data: blocksAll, error: blocksError } = await supabase.from("blocks").select("id");
+    if (blocksError) errors.push(`blocks: ${blocksError.message}`);
+    const { data: propsBlocks, error: propsBlocksError } = await supabase
       .from("properties")
       .select("block_id")
       .not("block_id", "is", null);
+    if (propsBlocksError) errors.push(`properties.block_id: ${propsBlocksError.message}`);
     const blocksWithProps = new Set((propsBlocks ?? []).map((p: any) => p.block_id));
     const blocks_sem_imoveis = (blocksAll ?? []).filter(
       (b: any) => !blocksWithProps.has(b.id)
     ).length;
 
     return {
+      errors,
       rg: {
         boletins,
         blocks,

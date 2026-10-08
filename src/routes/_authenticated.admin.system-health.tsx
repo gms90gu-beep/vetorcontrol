@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Activity, AlertTriangle, Download, Play, FileText, FileSpreadsheet } from "lucide-react";
 import { generateInstitutionalPDF, downloadCSV, downloadXLSX } from "@/lib/institutional-export";
-import { requireAdminMasterGuard, isOwnerBypass } from "@/lib/role-guards";
+import { requireAdminMasterGuard } from "@/lib/role-guards";
 
 export const Route = createFileRoute("/_authenticated/admin/system-health")({
   beforeLoad: requireAdminMasterGuard,
@@ -44,7 +44,7 @@ function SystemHealthPage() {
       const { data: u } = await safeGetUser();
       if (!u.user) { setAllowed(false); return; }
       const r = await getCachedUserRole(u.user.id);
-      setAllowed(r === "admin_master" || isOwnerBypass(u.user.email));
+      setAllowed(r === "admin_master");
     })();
   }, []);
 

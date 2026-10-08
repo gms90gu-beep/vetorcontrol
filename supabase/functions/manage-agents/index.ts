@@ -15,7 +15,7 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
-async function getOrCreateAuthUser(supabaseAdmin: any, userData: { email: string; password: string; full_name: string }) {
+async function createAuthUser(supabaseAdmin: any, userData: { email: string; password: string; full_name: string }) {
   const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: userData.email,
     password: userData.password,
@@ -26,18 +26,51 @@ async function getOrCreateAuthUser(supabaseAdmin: any, userData: { email: string
   if (!createError) return authUser.user;
 
   const message = createError.message || "";
-  if (!message.toLowerCase().includes("already") && !message.toLowerCase().includes("registered")) {
-    throw createError;
+  if (message.toLowerCase().includes("already") || message.toLowerCase().includes("registered")) {
+    throw new Error("Já existe uma conta com este e-mail. Use a edição do usuário existente ou outro e-mail.");
   }
+  throw createError;
+}
 
-  const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (listError) throw listError;
+async function requireProfile(supabaseAdmin: any, userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role, is_active, supervisor_id, coordinator_id, full_name, email")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Usuário não encontrado.");
+  return data;
+}
 
-  const existingUser = usersData.users.find((u: any) => u.email?.toLowerCase() === userData.email.toLowerCase());
-  if (!existingUser) throw createError;
+async function countActiveAdminMasters(supabaseAdmin: any) {
+  const { count, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin_master")
+    .eq("is_active", true);
+  if (error) throw error;
+  return count ?? 0;
+}
 
-  console.log("[manage-agents] E-mail já existia; sincronizando perfil e role:", userData.email);
-  return existingUser;
+async function writeAudit(supabaseAdmin: any, actor: any, targetId: string | null, action: string, metadata: Record<string, unknown> = {}) {
+  const { error } = await supabaseAdmin.from("audit_log").insert({
+    actor_id: actor.id,
+    actor_email: actor.email,
+    target_id: targetId,
+    action,
+    entity: "user",
+    metadata,
+  });
+  if (error) throw new Error(`Operação não concluída: não foi possível registrar a auditoria (${error.message}).`);
+}
+
+function generateTemporaryPassword() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const base = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("").slice(0, 12);
+  return `${base}aA1!`;
 }
 
 async function ensureAuthUserExists(supabaseAdmin: any, userId: string): Promise<boolean> {
@@ -113,7 +146,7 @@ serve(async (req) => {
         throw new Error("Todo agente deve ser vinculado a um supervisor (supervisor_id obrigatório).");
       }
 
-      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
+      const authUser = await createAuthUser(supabaseAdmin, { email, password, full_name });
 
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: authUser.id,
@@ -130,13 +163,8 @@ serve(async (req) => {
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, "agente");
 
-      await supabaseAdmin.from("audit_log").insert({
-        actor_id: user.id,
-        actor_email: user.email,
-        target_id: authUser.id,
-        action: "create_agent",
-        entity: "user",
-        metadata: { full_name, email, supervisor_id: autoSupervisorId, coordinator_id: autoCoordinatorId },
+      await writeAudit(supabaseAdmin, user, authUser.id, "create_agent", {
+        full_name, email, supervisor_id: autoSupervisorId, coordinator_id: autoCoordinatorId,
       });
 
       return jsonResponse({ success: true, user: authUser });
@@ -152,12 +180,9 @@ serve(async (req) => {
       if (!email || !password || !full_name) {
         throw new Error("Missing required fields: email, password, full_name");
       }
-      // Only admin_master may create supervisor / coordenador / admin_master
-      if (["supervisor", "coordenador", "admin_master"].includes(role) && callerRole !== "admin_master") {
-        throw new Error("Forbidden: apenas Admin Master pode criar este perfil");
-      }
+      if (callerRole !== "admin_master") throw new Error("Forbidden: apenas Admin Master pode criar usuários por este fluxo");
 
-      const authUser = await getOrCreateAuthUser(supabaseAdmin, { email, password, full_name });
+      const authUser = await createAuthUser(supabaseAdmin, { email, password, full_name });
 
       // Cadastro isolado: NÃO herda supervisor_id/coordinator_id da sessão do criador.
       // Vínculos devem ser feitos posteriormente via update_user explícito.
@@ -175,15 +200,7 @@ serve(async (req) => {
 
       await safeUpsertUserRole(supabaseAdmin, authUser.id, role);
 
-      // Audit
-      await supabaseAdmin.from("audit_log").insert({
-        actor_id: user.id,
-        actor_email: user.email,
-        target_id: authUser.id,
-        action: "create_user",
-        entity: "user",
-        metadata: { role, full_name, email },
-      });
+      await writeAudit(supabaseAdmin, user, authUser.id, "create_user", { role, full_name, email });
 
       return jsonResponse({ success: true, user: authUser });
     }
@@ -192,12 +209,21 @@ serve(async (req) => {
 
     if (action === "update_status") {
       const { userId, active } = agentData;
+      if (callerRole !== "admin_master") throw new Error("Forbidden: apenas Admin Master pode alterar status de usuários");
+      if (!userId || typeof active !== "boolean") throw new Error("userId e active são obrigatórios");
+      const target = await requireProfile(supabaseAdmin, userId);
+      if (userId === user.id && !active) throw new Error("Você não pode desativar o próprio usuário logado.");
+      if (target.role === "admin_master" && !active && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
+        throw new Error("Não é possível desativar o último Admin Master ativo.");
+      }
 
       const { error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({ is_active: active })
         .eq("id", userId);
       if (updateError) throw updateError;
+
+      await writeAudit(supabaseAdmin, user, userId, "update_status", { active });
 
       return jsonResponse({ success: true });
     }
@@ -206,19 +232,10 @@ serve(async (req) => {
     if (action === "update_user") {
       const { userId, full_name, email, phone, role, is_active, supervisor_id, coordinator_id } = body.userData ?? {};
       if (!userId) throw new Error("userId is required");
+      if (callerRole !== "admin_master") throw new Error("Forbidden: apenas Admin Master pode editar usuários");
 
-      const isAdminMaster = callerRole === "admin_master";
-
-      // Verify the auth user exists FIRST. If not, treat as stale UI state and
-      // clean up any orphan rows so the next refresh shows correct data.
       const { data: authLookup } = await supabaseAdmin.auth.admin.getUserById(userId);
-      const authUserExists = !!authLookup?.user;
-
-      if (!authUserExists) {
-        // Clean up any orphan rows tied to this id
-        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
-        await supabaseAdmin.from("agents").delete().eq("profile_id", userId);
-        await supabaseAdmin.from("profiles").delete().eq("id", userId);
+      if (!authLookup?.user) {
         return jsonResponse(
           {
             error: "Usuário não existe mais. A lista foi sincronizada — atualize a página.",
@@ -228,50 +245,54 @@ serve(async (req) => {
         );
       }
 
+      const target = await requireProfile(supabaseAdmin, userId);
+      if (userId === user.id && role && role !== "admin_master") {
+        throw new Error("Você não pode remover o próprio perfil de Admin Master.");
+      }
+      if (userId === user.id && is_active === false) {
+        throw new Error("Você não pode desativar o próprio usuário logado.");
+      }
+      if (target.role === "admin_master" && is_active === false && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
+        throw new Error("Não é possível desativar o último Admin Master ativo.");
+      }
+
       const profileUpdate: Record<string, unknown> = {};
       if (typeof full_name === "string") profileUpdate.full_name = full_name;
       if (typeof email === "string") profileUpdate.email = email;
       if (typeof is_active === "boolean") profileUpdate.is_active = is_active;
-      if (role && isAdminMaster) {
+      if (role) {
         if (!["agente", "supervisor", "coordenador", "admin_master"].includes(role)) {
           throw new Error("Invalid role: " + role);
         }
         profileUpdate.role = role;
+        if (role !== "agente") profileUpdate.supervisor_id = null;
+        if (role !== "supervisor") profileUpdate.coordinator_id = null;
       }
-      // Allow admin_master/coordenador to (re)assign supervisor; supervisor caller forces self
       if (supervisor_id !== undefined) {
-        profileUpdate.supervisor_id =
-          callerRole === "supervisor" ? user.id : (supervisor_id ?? null);
+        if (supervisor_id) {
+          const supervisor = await requireProfile(supabaseAdmin, supervisor_id);
+          if (supervisor.role !== "supervisor") throw new Error("O vínculo informado não é um Supervisor válido.");
+        }
+        profileUpdate.supervisor_id = supervisor_id ?? null;
       }
-      // coordinator_id only settable by admin_master
-      if (coordinator_id !== undefined && isAdminMaster) {
+      if (coordinator_id !== undefined) {
+        if (coordinator_id) {
+          const coordinator = await requireProfile(supabaseAdmin, coordinator_id);
+          if (coordinator.role !== "coordenador") throw new Error("O vínculo informado não é um Coordenador válido.");
+        }
         profileUpdate.coordinator_id = coordinator_id ?? null;
       }
-
-      // Audit
-      await supabaseAdmin.from("audit_log").insert({
-        actor_id: user.id,
-        actor_email: user.email,
-        target_id: userId,
-        action: "update_user",
-        entity: "user",
-        metadata: profileUpdate,
-      });
-
-
-
-
       if (Object.keys(profileUpdate).length > 0) {
         const { error: pErr } = await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", userId);
         if (pErr) throw pErr;
       }
 
-      if (typeof email === "string") {
+      if (typeof email === "string" && email !== target.email) {
         const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { email });
-        if (aErr) console.warn("[manage-agents] auth email update warning:", aErr.message);
+        if (aErr) throw aErr;
       }
 
-      if (role && isAdminMaster) {
+      if (role) {
         await safeUpsertUserRole(supabaseAdmin, userId, role);
       }
 
@@ -280,8 +301,11 @@ serve(async (req) => {
       if (typeof phone === "string") agentUpdate.phone = phone;
       if (typeof is_active === "boolean") agentUpdate.status = is_active ? "active" : "inactive";
       if (Object.keys(agentUpdate).length > 0) {
-        await supabaseAdmin.from("agents").update(agentUpdate).eq("profile_id", userId);
+        const { error: agentError } = await supabaseAdmin.from("agents").update(agentUpdate).eq("profile_id", userId);
+        if (agentError) throw agentError;
       }
+
+      await writeAudit(supabaseAdmin, user, userId, "update_user", profileUpdate);
 
       return jsonResponse({ success: true });
 
@@ -291,11 +315,14 @@ serve(async (req) => {
     if (action === "reset_password") {
       const { userId, newPassword } = body;
       if (!userId) throw new Error("userId is required");
+      if (callerRole !== "admin_master") throw new Error("Forbidden: apenas Admin Master pode redefinir senhas");
+      await requireProfile(supabaseAdmin, userId);
 
       // Generate temp password if not provided
-      const tempPassword = newPassword || (Math.random().toString(36).slice(-10) + "A1!");
+      const tempPassword = newPassword || generateTemporaryPassword();
       const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: tempPassword });
       if (pwErr) throw pwErr;
+      await writeAudit(supabaseAdmin, user, userId, "reset_password");
 
       return jsonResponse({ success: true, tempPassword });
     }
@@ -303,6 +330,14 @@ serve(async (req) => {
     // ── DELETE USER ──────────────────────────────────────────────────────────
     if (action === "delete_user") {
       const { userId } = body;
+      if (!userId) throw new Error("userId is required");
+      if (callerRole !== "admin_master") throw new Error("Forbidden: apenas Admin Master pode excluir usuários");
+      if (userId === user.id) throw new Error("Você não pode excluir o próprio usuário logado.");
+      const target = await requireProfile(supabaseAdmin, userId);
+      if (target.role === "admin_master" && (await countActiveAdminMasters(supabaseAdmin)) <= 1) {
+        throw new Error("Não é possível excluir o último Admin Master ativo.");
+      }
+      await writeAudit(supabaseAdmin, user, userId, "delete_user", { role: target.role });
 
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (deleteError) throw deleteError;

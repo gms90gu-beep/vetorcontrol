@@ -84,6 +84,7 @@ export interface WeekCoverage {
 }
 
 export interface GeorefAuditResult {
+  warnings: string[];
   generated_at: string;
   quality_score: number;
   score_breakdown: {
@@ -167,6 +168,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<GeorefAuditResult> => {
     const { supabase, userId } = context;
     const role = await requireManager(supabase, userId);
+    const warnings: string[] = [];
 
     // Profiles in scope
     let profQ = supabase
@@ -193,6 +195,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
       .limit(8000);
     if (data.agentId) propQ = propQ.eq("user_id", data.agentId);
     const { data: props } = await propQ;
+    if ((props ?? []).length === 8000) warnings.push("A consulta de imóveis atingiu o limite de 8.000 registros; refine os filtros.");
     const properties = ((props || []) as any[]).filter(
       (p: any) => !scopedAgentIds || !p.user_id || scopedAgentIds.has(p.user_id),
     );
@@ -231,6 +234,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
           .limit(20000)
       : { data: [] as any[] };
     const visits = (visitsRaw || []) as any[];
+    if (visits.length === 20000) warnings.push("A consulta de visitas atingiu o limite de 20.000 registros; refine os filtros.");
     const focusByProp = new Set<string>(
       visits.filter((v: any) => v.has_focus).map((v: any) => v.property_id),
     );
@@ -243,6 +247,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
           .limit(20000)
       : { data: [] as any[] };
     const pendencies = (pendsRaw || []) as any[];
+    if (pendencies.length === 20000) warnings.push("A consulta de pendências atingiu o limite de 20.000 registros; refine os filtros.");
     const pendByProp = new Map<string, any>();
     for (const p of pendencies) {
       if (!p.resolved_at) pendByProp.set(p.property_id, p);
@@ -643,6 +648,7 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
     const propsWithoutRg = propsWithoutBoletim;
 
     return {
+      warnings,
       generated_at: new Date().toISOString(),
       quality_score,
       score_breakdown: {
