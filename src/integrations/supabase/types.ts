@@ -2029,6 +2029,13 @@ export type Database = {
         Args: { _block_id: string; _status: string }
         Returns: undefined
       }
+      set_managed_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       sync_cycle_statuses: { Args: never; Returns: Json }
       validate_end_session: {
         Args: { p_agent_id: string; p_cycle_id: string; p_work_date: string }

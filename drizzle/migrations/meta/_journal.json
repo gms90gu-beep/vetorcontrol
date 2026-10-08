@@ -71,6 +71,13 @@
       "when": 1791421544602,
       "tag": "0009_harden_admin_master_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791421720079,
+      "tag": "0010_protect_last_active_master",
+      "breakpoints": true
     }
   ]
 }
