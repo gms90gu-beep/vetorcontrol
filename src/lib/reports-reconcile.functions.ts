@@ -65,6 +65,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
     if (permittedIds?.length === 0) return { scanned: 0, updated: 0, rows: [] };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    try {
 
     // Data operacional oficial: America/Sao_Paulo (Brasil sem DST → UTC-3 fixo).
     // Precisa bater com public.operational_date() no banco.
@@ -280,4 +281,14 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
     console.log("[REPORT_REBUILD_FINISH]", { scanned: groups.size, updated });
     return { scanned: groups.size, updated, rows };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const { error: auditError } = await supabaseAdmin.from("audit_log").insert({
+        action: "dwr_reconciliation_failed", entity: "daily_work_records", actor_id: userId,
+        target_id: data.agentId ?? null,
+        metadata: { source: "rebuildDailyRecords", from: data.from, to: data.to, cycle_id: data.cycleId ?? null, error: message },
+      });
+      if (auditError) console.error("[REPORT_REBUILD_AUDIT_ERROR]", auditError.message);
+      throw error;
+    }
   });
