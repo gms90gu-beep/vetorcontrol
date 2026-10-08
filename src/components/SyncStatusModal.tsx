@@ -5,7 +5,7 @@ import { RefreshCw, CloudUpload, CloudCheck, WifiOff, AlertTriangle, Trash2 } fr
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { cn } from "@/lib/utils";
 import {
-  listFailedMutations,
+  listErroredMutations,
   retryFailedMutations,
   discardFailedMutation,
   onSyncChange,
@@ -46,7 +46,7 @@ export function SyncStatusModal({
   useEffect(() => {
     let active = true;
     const refresh = async () => {
-      const list = await listFailedMutations();
+      const list = await listErroredMutations();
       if (active) setFailed(list);
     };
     refresh();
@@ -76,7 +76,7 @@ export function SyncStatusModal({
             {state === "synced" && !hasErrors && "Todos os registros foram enviados."}
             {state === "online" && pending > 0 && !hasErrors && "Alguns registros ainda aguardam sincronização."}
             {state === "online" && pending === 0 && !hasErrors && "Conectado. Nenhuma pendência local."}
-            {hasErrors && "Alguns registros falharam após várias tentativas. Veja o motivo abaixo."}
+            {hasErrors && "Alguns registros precisam de nova tentativa ou revisão. Veja o motivo abaixo."}
           </DialogDescription>
         </DialogHeader>
 

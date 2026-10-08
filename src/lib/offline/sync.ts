@@ -367,6 +367,19 @@ export interface FailedMutationInfo {
   createdAt: number;
 }
 
+/** Lista mutações em erro, inclusive as que ainda aguardam novas tentativas. */
+export async function listErroredMutations(): Promise<FailedMutationInfo[]> {
+  const all = await db.mutations.where("status").equals("error").toArray();
+  return all.map((m) => ({
+    id: m.id!,
+    table: m.op === "rpc" ? `rpc:${m.rpc_name}` : m.table,
+    op: m.op,
+    tries: m.tries || 0,
+    lastError: m.lastError,
+    createdAt: m.createdAt,
+  }));
+}
+
 export async function listFailedMutations(): Promise<FailedMutationInfo[]> {
   const all = await db.mutations.where("status").equals("error").toArray();
   return all

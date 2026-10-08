@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
 import {
@@ -51,6 +52,7 @@ import {
   type ShiftValidationReport,
 } from "@/lib/shift-validation";
 import { flushMutations, retryFailedMutations, listFailedMutations, discardFailedMutation, forceRetryFailedMutations, type FailedMutationInfo } from "@/lib/offline/sync";
+import { verifyDailyClose } from "@/lib/reports-reconcile.functions";
 import { AlertTriangle, RefreshCw, ShieldAlert } from "lucide-react";
 import {
   AlertDialog,
@@ -631,6 +633,7 @@ export function DailyWorkCloser({
   onReopen,
   userRole 
 }: DailyWorkCloserProps) {
+  const verifyDailyCloseFn = useServerFn(verifyDailyClose);
   const [isOpen, setIsOpen] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -2235,6 +2238,27 @@ export function DailyWorkCloser({
           sync_failed: syncResult.failed,
           error: confirmError?.message ?? null,
         });
+        if (dwrConfirmedRemotely) {
+          try {
+            const verification = await verifyDailyCloseFn({
+              data: { agentId: recordData.agent_id, workDate: recordData.work_date },
+            });
+            console.log("[DAY_CLOSE_REPORT_VERIFICATION]", verification);
+            if (verification.status !== "consistent") {
+              dwrConfirmedRemotely = false;
+              closePendingSync = true;
+              toast.warning(
+                verification.status === "missing_dwr"
+                  ? "A jornada foi encerrada, mas o boletim ainda não apareceu no relatório."
+                  : `O boletim foi salvo, mas há ${verification.divergences.length} divergência(s) nos totais.`,
+              );
+            }
+          } catch (verificationError: any) {
+            // A verificação não desfaz o fechamento confirmado; registra o caso para revisão.
+            closePendingSync = true;
+            console.warn("[DAY_CLOSE_REPORT_VERIFICATION_ERROR]", verificationError?.message || verificationError);
+          }
+        }
       }
 
       // 5) Limpeza completa do estado operacional local
