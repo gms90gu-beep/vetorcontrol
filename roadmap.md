@@ -1,5 +1,9 @@
 # Tarefas
 
+- [ ] Incorporar commit 11122d9 na main preservando correções: autorização master no servidor, sem bypass por e-mail, último master protegido, criação direta e auditoria.
+- [ ] Aplicar SQL exato 20261007160000_harden_admin_master_settings.sql no projeto existente; ciclos só master, relatórios paginados, jornadas sem boletim e configurações reais.
+- [ ] Validar testes/compilação/segurança e publicar a versão integrada sem alterar credenciais ou produção.
+
 - [x] Validação final 0007: Adenilson real, equipe restrita, três atalhos, calendário, mapas/ciclos e rejeição de reconstruções externas; pendências offline e regressões de jornadas aprovadas.
 - [x] Migration 0008: configurações administrativas exclusivas do master, gestores leem somente escopo operacional; agentes bloqueados; nenhum registro alterado pela validação.
 - [x] 105 testes gerais + 12 testes de mapas aprovados, compilação automática OK, scanner de banco sem crítico, projeto existente confirmado.
