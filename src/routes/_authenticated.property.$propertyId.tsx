@@ -1,3 +1,4 @@
+import { propertyLabel } from "@/lib/property-label";
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { 
@@ -1013,7 +1014,7 @@ function PropertyVisitPage() {
         open={geoDialogOpen}
         propertyId={(property?.id as string) || (propertyId as string)}
         actorId={userId ?? null}
-        propertyLabel={property?.number ? `Imóvel ${property.number}` : undefined}
+        propertyLabel={property ? propertyLabel(property) : undefined}
         onClose={async (saved, coords) => {
           setGeoDialogOpen(false);
           if (!saved) return;
@@ -1113,7 +1114,7 @@ function PropertyVisitPage() {
                 size="icon" 
                 onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
-                title="Imóvel anterior"
+                title={prevProperty ? `Anterior: ${propertyLabel(prevProperty)}` : "Imóvel anterior"}
               >
                 <ArrowLeft className="h-5 w-5 text-blue-500" />
               </Button>
@@ -1121,8 +1122,8 @@ function PropertyVisitPage() {
           </div>
           <div className="flex flex-col items-center">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Identificação do Imóvel</span>
-            <h2 className="text-3xl font-black tracking-tighter text-slate-900">
-              IMÓVEL {property?.number || "..."}
+            <h2 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 text-center break-words">
+              {propertyLabel(property)}
             </h2>
           </div>
           <div className="flex items-center gap-1">
@@ -1132,7 +1133,7 @@ function PropertyVisitPage() {
                 size="icon" 
                 onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${nextProperty.id}` }); }} 
                 className="rounded-2xl bg-slate-50 active:scale-95 transition-all"
-                title="Próximo imóvel"
+                title={nextProperty ? `Próximo: ${propertyLabel(nextProperty)}` : "Próximo imóvel"}
               >
                 <ArrowRight className="h-5 w-5 text-blue-500" />
               </Button>
@@ -1627,7 +1628,7 @@ function PropertyVisitPage() {
                 size="icon"
                 onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${prevProperty.id}` }); }}
                 className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-500"
-                title="Imóvel anterior"
+                title={prevProperty ? `Anterior: ${propertyLabel(prevProperty)}` : "Imóvel anterior"}
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
@@ -1635,7 +1636,7 @@ function PropertyVisitPage() {
 
             <div className="flex flex-col items-center justify-center shrink-0 px-1 leading-none">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                {nextProperty ? "Próximo" : "Fim"}
+                {nextProperty ? `Próximo: ${propertyLabel(nextProperty)}` : "Fim"}
               </span>
               <span className="text-lg font-black text-slate-900">{nextProperty?.number || "--"}</span>
             </div>
@@ -1646,7 +1647,7 @@ function PropertyVisitPage() {
                 size="icon"
                 onClick={() => { if (confirmLeaveIfDirty()) navigate({ to: `/property/${nextProperty.id}` }); }}
                 className="h-12 w-12 shrink-0 rounded-xl border-slate-200 bg-slate-50 text-slate-600"
-                title="Próximo imóvel"
+                title={nextProperty ? `Próximo: ${propertyLabel(nextProperty)}` : "Próximo imóvel"}
               >
                 <ArrowRight className="h-4 w-4" />
               </Button>

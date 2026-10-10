@@ -1,3 +1,4 @@
+import { compareBlockNumbers } from "@/lib/block-order";
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo, Component, ReactNode } from "react";
@@ -393,16 +394,7 @@ function RGPage() {
           (b.locality || "").toLowerCase().includes(q) ||
           (b.agent_name || "").toLowerCase().includes(q),
         );
-    const sorted = [...base].sort((a, b) => {
-      const na = parseInt((a.block_number || "").replace(/\D/g, ""), 10);
-      const nb = parseInt((b.block_number || "").replace(/\D/g, ""), 10);
-      const aHas = !isNaN(na);
-      const bHas = !isNaN(nb);
-      if (aHas && bHas && na !== nb) return na - nb;
-      if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
-      return (a.block_number || "").localeCompare(b.block_number || "");
-    });
+    const sorted = [...base].sort((a, b) => compareBlockNumbers(a.block_number, b.block_number));
     // Merge da contagem no momento da renderização (nunca dentro do state `boletins`).
     return sorted.map((b) => ({
       ...b,

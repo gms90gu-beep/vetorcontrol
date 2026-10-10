@@ -1,3 +1,4 @@
+import { compareBlockNumbers } from "@/lib/block-order";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
 import { useState, useEffect, useMemo } from "react";
@@ -568,7 +569,7 @@ function FieldWorkPage() {
 
       const seen = new Set<string>();
       const uniq = (blocksData || []).filter((b: any) => (seen.has(b.id) ? false : (seen.add(b.id), true)));
-      uniq.sort((a: any, b: any) => String(a.number).localeCompare(String(b.number)));
+      uniq.sort((a: any, b: any) => compareBlockNumbers(a.number, b.number));
       setBlocks(uniq);
     } finally {
       setIsLoading(false);
