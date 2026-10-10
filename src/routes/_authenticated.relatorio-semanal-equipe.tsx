@@ -1,3 +1,4 @@
+import { WEEKLY_FIELDS, weeklyTotals, weeklyLarvicide } from "@/lib/weekly-bulletin";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -54,10 +55,11 @@ function TeamWeeklyReportPage() {
   const { online } = useSyncStatus();
   const [epiWeek, setEpiWeek] = useState(now.week);
   const [epiYear, setEpiYear] = useState(now.year);
+  const [selectedAgent, setSelectedAgent] = useState("all");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
   const fetchWeekly = useServerFn(getTeamWeeklyProduction);
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch, error } = useQuery({
     queryKey: ["team-weekly-production", epiWeek, epiYear],
     queryFn: () => fetchWeekly({ data: { epiWeek, epiYear } }),
     enabled: online,
@@ -68,6 +70,38 @@ function TeamWeeklyReportPage() {
   const visibleNeighborhoods = (data?.neighborhoods ?? []).filter((row) =>
     row.neighborhood.toLocaleLowerCase("pt-BR").includes(neighborhoodFilter.trim().toLocaleLowerCase("pt-BR")),
   );
+
+  const selected = data?.agents.find((a) => a.agent_id === selectedAgent);
+  const dailyRows = (data?.daily_records ?? []).filter((r) => selectedAgent === "all" || r.agent_id === selectedAgent);
+  const detailTotals = weeklyTotals(dailyRows);
+  const detailTitle = selectedAgent === "all" ? "Toda a equipe" : selected?.full_name || "Agente selecionado";
+  const exportDetailedPdf = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+    const doc = new jsPDF({ orientation: "landscape" });
+    for (let offset = 0; offset < WEEKLY_FIELDS.length; offset += 7) {
+      if (offset) doc.addPage();
+      const fields = WEEKLY_FIELDS.slice(offset, offset + 7);
+      doc.setFontSize(12);
+      doc.text(`Boletim semanal detalhado — ${detailTitle}`, 14, 14);
+      doc.setFontSize(9);
+      doc.text(`SE ${epiWeek}/${epiYear} | ${data?.from} a ${data?.to} | ${dailyRows.length} diárias`, 14, 21);
+      autoTable(doc, { startY: 27, styles: { fontSize: 7 }, head: [["Agente", "Data", ...fields.map(([, label]) => label)]], body: [
+        ...dailyRows.map((r) => [data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name || "Agente", r.work_date.split("-").reverse().join("/"), ...fields.map(([key]) => r[key] ?? 0)]),
+        ["TOTAL", `${dailyRows.length} diárias`, ...fields.map(([key]) => detailTotals[key])],
+      ] });
+    }
+    doc.addPage();
+    doc.text(`Larvicida — SE ${epiWeek}/${epiYear} — ${detailTitle}`, 14, 14);
+    autoTable(doc, { startY: 23, head: [["Data", "Agente", "Larvicida por unidade"]], body: [...dailyRows.map((r) => [r.work_date, data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name || "Agente", weeklyLarvicide([r])]), ["TOTAL", "", weeklyLarvicide(dailyRows)]] });
+    doc.save(`boletim-semanal-detalhado-SE${epiWeek}-${epiYear}.pdf`);
+  };
+  const exportDetailed = () => {
+    downloadCsv(`boletim-detalhado-SE${epiWeek}-${epiYear}.csv`, [
+      ["Agente", "Data", "Ciclo", "Início", "Fim", ...WEEKLY_FIELDS.map(([, label]) => label), "Larvicida"],
+      ...dailyRows.map((r) => [data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name, r.work_date, r.cycle_id, r.start_time, r.end_time, ...WEEKLY_FIELDS.map(([key]) => r[key] ?? 0), weeklyLarvicide([r])]),
+      [detailTitle, "TOTAL", "", "", "", ...WEEKLY_FIELDS.map(([key]) => detailTotals[key]), weeklyLarvicide(dailyRows)],
+    ]);
+  };
 
   const exportAgents = () => {
     if (!data) return;
@@ -154,6 +188,8 @@ function TeamWeeklyReportPage() {
         </CardContent>
       </Card>
 
+      {error && <p role="alert" className="text-sm text-red-700">Não foi possível carregar o boletim. Tente atualizar novamente.</p>}
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -166,6 +202,33 @@ function TeamWeeklyReportPage() {
             <Kpi label="Quarteirões" value={data.totals.blocks_worked} />
             <Kpi label="Focos positivos" value={data.totals.positive_foci} />
           </div>
+
+          <Card className="rounded-3xl">
+            <CardHeader><CardTitle className="text-base">Boletim semanal detalhado</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <label className="block text-sm font-medium">Agente
+                <select aria-label="Agente do boletim semanal" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} className="mt-1 block w-full rounded-xl border p-2 bg-white">
+                  <option value="all">Todos os agentes</option>
+                  {data.agents.map((a) => <option key={a.agent_id} value={a.agent_id}>{a.full_name}</option>)}
+                  {selectedAgent !== "all" && !selected && <option value={selectedAgent}>Sem produção nesta semana</option>}
+                </select>
+              </label>
+              <div className="flex flex-wrap justify-between items-center gap-2">
+                <p className="text-sm"><strong>{detailTitle}</strong> · {dailyRows.length} diária(s) encerrada(s) · {data.from} a {data.to}</p>
+                <Button variant="outline" size="sm" onClick={exportDetailedPdf} disabled={!dailyRows.length}>PDF detalhado</Button>
+                <Button variant="outline" size="sm" onClick={exportDetailed} disabled={!dailyRows.length}><FileDown className="mr-1 h-4 w-4" /> CSV detalhado</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Uma linha por diária, com soma dos indicadores no TOTAL. Pendências representam a soma registrada nas diárias, não o saldo atual. Larvicida somado separadamente por unidade.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs whitespace-nowrap">
+                  <thead className="bg-muted/60"><tr><th className="p-2 text-left">Agente</th><th className="p-2">Data</th><th className="p-2">Início</th><th className="p-2">Fim</th>{WEEKLY_FIELDS.map(([key, label]) => <th key={key} className="p-2">{label}</th>)}<th className="p-2">Larvicida</th></tr></thead>
+                  <tbody>{dailyRows.map((r) => <tr key={r.id} className="border-t"><td className="p-2">{data.agents.find((a) => a.agent_id === r.agent_id)?.full_name}</td><td className="p-2">{r.work_date.split("-").reverse().join("/")}</td><td className="p-2">{r.start_time || "—"}</td><td className="p-2">{r.end_time || "—"}</td>{WEEKLY_FIELDS.map(([key]) => <td key={key} className="p-2 text-right tabular-nums">{r[key] ?? 0}</td>)}<td className="p-2">{weeklyLarvicide([r])}</td></tr>)}</tbody>
+                  <tfoot className="bg-muted font-bold"><tr><td className="p-2" colSpan={4}>TOTAL · {dailyRows.length} diárias</td>{WEEKLY_FIELDS.map(([key]) => <td key={key} className="p-2 text-right tabular-nums">{detailTotals[key]}</td>)}<td className="p-2">{weeklyLarvicide(dailyRows)}</td></tr></tfoot>
+                </table>
+              </div>
+              {!dailyRows.length && <p className="text-sm text-muted-foreground">Nenhuma diária encerrada para este agente no período.</p>}
+            </CardContent>
+          </Card>
 
           <Tabs defaultValue="agentes">
             <TabsList className="grid grid-cols-2 w-full max-w-md">
@@ -211,7 +274,7 @@ function TeamWeeklyReportPage() {
                         data.agents.map((a) => (
                           <tr key={a.agent_id} className="border-t">
                             <td className="p-2 font-medium">
-                              {a.full_name}
+                              <button className="text-blue-700 underline text-left" onClick={() => setSelectedAgent(a.agent_id)} title="Ver boletim semanal detalhado">{a.full_name}</button>
                               {a.registration ? (
                                 <span className="text-muted-foreground text-xs"> · {a.registration}</span>
                               ) : null}

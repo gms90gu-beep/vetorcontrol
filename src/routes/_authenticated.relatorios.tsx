@@ -152,8 +152,8 @@ function SupervisorReports() {
         <NavCard
           icon={<Users className="h-6 w-6" />}
           title="Relatórios por Agente"
-          description="Produção individual da equipe."
-          to="/supervision"
+          description="Boletim semanal detalhado por agente."
+          to="/relatorio-semanal-equipe"
         />
         <NavCard
           icon={<MapPin className="h-6 w-6" />}

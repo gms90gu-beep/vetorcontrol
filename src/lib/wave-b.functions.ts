@@ -1,3 +1,5 @@
+import { readAllQueryPages } from "@/lib/query-pages";
+import { WEEKLY_FIELDS } from "@/lib/weekly-bulletin";
 /**
  * Wave B — Server functions for Supervisor production ranking and
  * Weekly comparison. Reads exclusively from daily_work_records.
@@ -312,6 +314,7 @@ export interface TeamWeeklyResult {
   to: string;
   agents: TeamWeeklyAgentRow[];
   neighborhoods: TeamWeeklyNeighborhoodRow[];
+  daily_records: Record<string, any>[];
   totals: {
     records: number;
     properties_worked: number;
@@ -339,6 +342,7 @@ export const getTeamWeeklyProduction = createServerFn({ method: "POST" })
       to: end,
       agents: [],
       neighborhoods: [],
+      daily_records: [],
       totals: {
         records: 0,
         properties_worked: 0,
@@ -352,13 +356,16 @@ export const getTeamWeeklyProduction = createServerFn({ method: "POST" })
     if (profileIds.length === 0) return empty;
 
     // ── Produção por agente (fonte: daily_work_records) ──
-    const { data: dwr, error: dwrErr } = await supabase
+    const dwr = await readAllQueryPages<Record<string, any>>(supabase
       .from("daily_work_records")
-      .select("agent_id, properties_worked, properties_closed, blocks_worked, positive_foci, deposits_treated, deposits_eliminated")
+      .select(["id", "agent_id", "work_date", "cycle_id", "status", "start_time", "end_time", "larvicide_unit", "larvicide_amount", "foci_by_type", "deposits_by_type", "retroactive_reason", ...WEEKLY_FIELDS.map(([key]) => key)].join(","))
       .in("agent_id", profileIds)
       .gte("work_date", start)
-      .lte("work_date", end);
-    if (dwrErr) throw new Error(dwrErr.message);
+      .lte("work_date", end)
+      .eq("status", "completed")
+      .not("end_time", "is", null)
+      .order("work_date", { ascending: true })
+      .order("id", { ascending: true }));
 
     const byAgent = new Map<string, TeamWeeklyAgentRow>();
     const profileById = new Map<string, any>((profiles as any[]).map((p) => [p.id, p]));
@@ -455,5 +462,5 @@ export const getTeamWeeklyProduction = createServerFn({ method: "POST" })
       .map(({ _props, ...r }) => ({ ...r, properties: _props.size }))
       .sort((a, b) => b.properties - a.properties);
 
-    return { ...empty, agents, neighborhoods, totals };
+    return { ...empty, agents, neighborhoods, totals, daily_records: dwr };
   });
