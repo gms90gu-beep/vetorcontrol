@@ -1,8 +1,9 @@
 # Tarefas
 
-- [ ] Ativar somente 20261011020650_focus_sample_results.sql da versão 0b75b31 no Cloud existente; preservar dados e credenciais.
-- [ ] Validar amostras por papel/equipe, histórico, mapas/boletins e proteção offline sem produção fictícia.
-- [ ] Executar testes, conferir compilação e segurança; publicar apenas após validar e informar commit/resultado.
+- [ ] Ativar somente 20261011020650_focus_sample_results.sql da versão 0b75b31 no Cloud existente; bloqueada por incompatibilidade comprovada com tr_check_cycle_status (16 coletas em ciclos finished); aguarda migration compatível autorizada.
+- [ ] Validar fluxo real de resultados e mapas/boletins; depende da ativação compatível, sem lançar laudos fictícios nem modificar histórico.
+- [x] Verificação inicial 11/10: Cloud correto confirmado; SQL idêntico ao commit; 168 testes e 21 verificações SQL isoladas passaram; compilação automática OK; scanner sem críticos, 7 avisos e 1 informativo preexistentes.
+- [ ] Publicar ativação somente após validação real; bloqueada pela incompatibilidade comprovada no banco descartável; nenhuma migration aplicada, nenhum dado/credencial alterado.
 
 - [x] Rodada 08/10: Dexie v4 dedupe/coalescência sem substituir syncing; testes de concorrência e preservação de campos.
 - [x] Rodada 08/10: migration equivalente de observabilidade instalada, funções SQL service_role e falhas auditadas sem perder fechamento; jornada 01/10 idêntica ao baseline (base já informa closed, não paused).
