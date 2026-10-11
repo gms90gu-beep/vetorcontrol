@@ -1,3 +1,4 @@
+import { buildMapHeatData, mapHeatOptions, HEAT_LABELS, type HeatMode } from "@/lib/map-heat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -121,7 +122,6 @@ function visitStatusLabel(status: string) {
 
 type Preset = "current" | "previous" | "last4" | "custom";
 type MapPeriodMode = "year" | "cycle" | "custom";
-type HeatMode = "count" | "focus" | "pendency";
 type PanelView = "default" | "detail";
 
 function presetRange(preset: Preset, custom: { from: string; to: string }) {
@@ -1013,6 +1013,8 @@ function LayersSection({
               {([
                 { id: "count", label: "Quantidade" },
                 { id: "focus", label: "Focos e alertas" },
+                { id: "observed", label: "Encontrados" },
+                { id: "positive", label: "Positivos" },
                 { id: "pendency", label: "Pend." },
               ] as { id: HeatMode; label: string }[]).map((m) => (
                 <button
@@ -1573,32 +1575,40 @@ function FitBounds({ points }: { points: PropertyMapPoint[] }) {
 
 function HeatLayer({ points, mode }: { points: PropertyMapPoint[]; mode: HeatMode }) {
   const map = useMap();
-  const layerRef = useRef<L.Layer | null>(null);
+  const data = useMemo(() => buildMapHeatData(points, mode), [points, mode]);
   useEffect(() => {
+    if (!data.length) return;
+    let layer: (L.Layer & { setOptions: (options: unknown) => void }) | null = null;
+    const options = () => {
+      const size = map.getSize();
+      const projected = data.map(([lat, lng, weight]) => ({ ...map.latLngToContainerPoint([lat, lng]), weight }))
+        .filter(p => p.x >= -40 && p.y >= -40 && p.x <= size.x + 40 && p.y <= size.y + 40);
+      return mapHeatOptions(map.getZoom(), projected);
+    };
+    const refresh = () => layer?.setOptions(options());
     try {
-      const data: [number, number, number][] = points
-        .filter((p) => isValidCoord(p.latitude, p.longitude))
-        .map((p) => {
-          let w = 0.3;
-          if (mode === "focus") w = p.has_positive_focus ? 1 : p.has_observed_focus ? 0.7 : 0.1;
-          else if (mode === "pendency") w = p.has_pendency ? 0.9 : 0.1;
-          else w = 0.5;
-          return [p.latitude, p.longitude, w];
-        });
-      const heatFn = (L as unknown as { heatLayer?: (d: unknown, o: unknown) => L.Layer }).heatLayer;
+      const heatFn = (L as unknown as { heatLayer?: (d: unknown, o: unknown) => L.Layer & { setOptions: (options: unknown) => void } }).heatLayer;
       if (typeof heatFn !== "function") return;
-      const layer = heatFn(data, {
-        radius: 28, blur: 22, maxZoom: 17,
-        gradient: { 0.2: "#16a34a", 0.5: "#f97316", 0.9: "#dc2626" },
-      });
+      layer = heatFn(data, options());
       layer.addTo(map);
-      layerRef.current = layer;
+      map.on("moveend resize", refresh);
     } catch (err) {
       console.error("[MAP_HEATMAP_ERROR]", err);
     }
     return () => {
-      try { if (layerRef.current) map.removeLayer(layerRef.current); } catch { /* noop */ }
+      map.off("moveend resize", refresh);
+      if (layer) map.removeLayer(layer);
     };
-  }, [points, mode, map]);
-  return null;
+  }, [data, map]);
+  return (
+    <div className="absolute top-12 right-3 z-[400] max-w-[240px] rounded-xl border bg-card/95 p-3 shadow-md text-[11px] pointer-events-none" role="status">
+      <p className="font-semibold">{HEAT_LABELS[mode]}</p>
+      {data.length ? <>
+        <p>{data.length} imóveis considerados nos filtros atuais</p>
+        <div className="h-2 rounded mt-2" style={{ background: "linear-gradient(to right, #2563eb, #22c55e, #facc15, #f97316, #dc2626)" }} />
+        <div className="flex justify-between"><span>Menor concentração</span><span>Maior</span></div>
+        <p className="mt-1 text-muted-foreground">Escala relativa ao zoom e à área visível. {mode === "count" ? "Vermelho indica densidade de imóveis, não risco epidemiológico." : "Concentração de imóveis com ocorrência, não quantidade de depósitos."}</p>
+      </> : <p className="mt-1">Nenhum imóvel {mode === "pendency" ? "com pendência aberta" : mode === "positive" ? "com foco positivo" : mode === "count" ? "georreferenciado" : "com foco encontrado ou alerta"} nos filtros atuais.</p>}
+    </div>
+  );
 }
