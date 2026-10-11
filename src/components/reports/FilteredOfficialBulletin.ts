@@ -14,7 +14,7 @@ export async function generateFilteredOfficialBulletin(records: any[], title: st
   for (const record of records) {
     const { week, year } = getEpiWeek(new Date(`${record.work_date}T12:00:00`));
     const key = `${record.agent_id}:${year}:${week}`;
-    const group = groups.get(key) ?? { agentId: record.agent_id, week, year, records: [] };
+    const group = groups.get(key) ?? { agentId: record.agent_id, week, year, records: [] as any[] };
     group.records.push(record);
     groups.set(key, group);
   }

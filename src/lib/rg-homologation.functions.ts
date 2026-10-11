@@ -1,3 +1,4 @@
+import { readAllQueryPages } from "@/lib/query-pages";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -59,10 +60,10 @@ export const runRgHomologation = createServerFn({ method: "GET" })
     await assertAdmin(supabase, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: boletins }, { data: blocks }, { data: properties }] = await Promise.all([
-      supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id"),
-      supabaseAdmin.from("blocks").select("id, number, locality, total_properties"),
-      supabaseAdmin.from("properties").select("id, boletim_id, block_id, block_number, user_id, latitude, longitude"),
+    const [boletins, blocks, properties] = await Promise.all([
+      readAllQueryPages<any>(supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id").order("id")),
+      readAllQueryPages<any>(supabaseAdmin.from("blocks").select("id, number, locality, total_properties").order("id")),
+      readAllQueryPages<any>(supabaseAdmin.from("properties").select("id, boletim_id, block_id, block_number, user_id, latitude, longitude").order("id")),
     ]);
 
     const B = boletins ?? [];

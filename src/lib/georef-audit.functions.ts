@@ -1,3 +1,5 @@
+import { readManagementProfiles } from "@/lib/management-profiles";
+import { readAllQueryPages } from "@/lib/query-pages";
 /**
  * Georeferencing Audit — diagnostic only.
  * Never overwrites latitude/longitude/geocoded_at/geocoded_by.
@@ -170,14 +172,9 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
     const role = await requireManager(supabase, userId);
     const warnings: string[] = [];
 
-    // Profiles in scope
-    let profQ = supabase
-      .from("profiles")
-      .select("id, full_name, supervisor_id, role");
-    if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
-    if (data.supervisorId) profQ = profQ.eq("supervisor_id", data.supervisorId);
-    const { data: profiles } = await profQ;
-    const allProfilesList = (profiles || []) as any[];
+    const allProfilesList = (await readManagementProfiles(supabase, userId, role)).filter((p) =>
+      (!data.supervisorId || p.supervisor_id === data.supervisorId || p.id === data.supervisorId));
+    if (data.agentId && !allProfilesList.some((p) => p.id === data.agentId && ["agente", "agent"].includes(p.role))) throw new Error("Agente fora do seu acesso.");
     const profMap = new Map<string, any>(
       allProfilesList.map((p: any) => [p.id, p]),
     );
@@ -191,25 +188,17 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
       .from("properties")
       .select(
         "id, street_name, number, block_number, block_id, latitude, longitude, geocoded_at, geocoded_by, boletim_id, user_id, status, updated_at",
-      )
-      .limit(8000);
+      );
     if (data.agentId) propQ = propQ.eq("user_id", data.agentId);
-    const { data: props } = await propQ;
-    if ((props ?? []).length === 8000) warnings.push("A consulta de imóveis atingiu o limite de 8.000 registros; refine os filtros.");
-    const properties = ((props || []) as any[]).filter(
-      (p: any) => !scopedAgentIds || !p.user_id || scopedAgentIds.has(p.user_id),
-    );
+    if (scopedAgentIds) propQ = propQ.in("user_id", [...scopedAgentIds]);
+    const properties = await readAllQueryPages<any>(propQ.order("id"));
 
     // Boletins
     const boletimIds = Array.from(
       new Set(properties.map((p: any) => p.boletim_id).filter(Boolean)),
     );
-    const { data: boletins } = boletimIds.length
-      ? await supabase
-          .from("boletins_rg")
-          .select("id, locality, block_number, agent_id, updated_at")
-          .in("id", boletimIds as string[])
-      : { data: [] as any[] };
+    const boletins = boletimIds.length ? await readAllQueryPages<any>(supabase.from("boletins_rg")
+      .select("id, locality, block_number, agent_id, updated_at").in("id", boletimIds as string[]).order("id")) : [];
     const bolMap = new Map<string, any>(
       ((boletins || []) as any[]).map((b: any) => [b.id, b]),
     );
@@ -226,28 +215,9 @@ export const getGeorefAudit = createServerFn({ method: "POST" })
 
     // Visits & focos (positives) for focus/pendency annotation + agent ranking
     const propIds = scoped.map((p: any) => p.id);
-    const { data: visitsRaw } = propIds.length
-      ? await supabase
-          .from("visits")
-          .select("id, property_id, agent_id, visit_date, has_focus")
-          .in("property_id", propIds as string[])
-          .limit(20000)
-      : { data: [] as any[] };
-    const visits = (visitsRaw || []) as any[];
-    if (visits.length === 20000) warnings.push("A consulta de visitas atingiu o limite de 20.000 registros; refine os filtros.");
-    const focusByProp = new Set<string>(
-      visits.filter((v: any) => v.has_focus).map((v: any) => v.property_id),
-    );
-
-    const { data: pendsRaw } = propIds.length
-      ? await supabase
-          .from("property_pendencies")
-          .select("property_id, current_status, last_attempt_at, resolved_at")
-          .in("property_id", propIds as string[])
-          .limit(20000)
-      : { data: [] as any[] };
-    const pendencies = (pendsRaw || []) as any[];
-    if (pendencies.length === 20000) warnings.push("A consulta de pendências atingiu o limite de 20.000 registros; refine os filtros.");
+    const visits = propIds.length ? await readAllQueryPages<any>(supabase.from("visits").select("*,visit_deposits(is_positive)").in("property_id", propIds as string[]).order("id")) : [];
+    const focusByProp = new Set<string>(visits.filter((v) => v.focus_analysis_status === "positive" || (!v.focus_analysis_status && v.visit_deposits?.some((d: any) => d.is_positive))).map((v) => v.property_id));
+    const pendencies = propIds.length ? await readAllQueryPages<any>(supabase.from("property_pendencies").select("property_id, current_status, last_attempt_at, resolved_at").in("property_id", propIds as string[]).order("id")) : [];
     const pendByProp = new Map<string, any>();
     for (const p of pendencies) {
       if (!p.resolved_at) pendByProp.set(p.property_id, p);

@@ -1,3 +1,5 @@
+import { readAllQueryPages } from "@/lib/query-pages";
+import { getOperationalDate } from "@/lib/operational-date";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -73,13 +75,14 @@ function CalendarAuditPage() {
   const [cycle, setCycle] = useState<{ id: string; number: number | null; year: number | null; name: string | null; start_date?: string; end_date?: string } | null>(null);
   const [cycleWeek, setCycleWeek] = useState<{ number: number; start_date: string; end_date: string } | null>(null);
   const [counts, setCounts] = useState<{ cyc: any; wk: any } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
   }, [role, isLoading, router]);
 
-  const now = useMemo(() => new Date(), [refreshTick]);
+  const now = useMemo(() => new Date(`${getOperationalDate()}T12:00:00`), [refreshTick]);
   const se = useMemo(() => getEpiWeek(now), [now]);
   const seBR = useMemo(() => brEpiWeek(now), [now]);
   const seStart = useMemo(() => epiWeekStart(now), [now]);
@@ -89,7 +92,8 @@ function CalendarAuditPage() {
     if (role !== "admin_master") return;
     let cancelled = false;
     (async () => {
-      setLoading(true);
+      setLoading(true); setError(null);
+      try {
       const active = await getActiveCycleForUser(user?.id ?? null);
       let full: any = active;
       if (active?.id) {
@@ -110,18 +114,18 @@ function CalendarAuditPage() {
       const cycStart = full?.start_date;
       const cycEnd = full?.end_date;
       const fetchCounts = async (from: string, to: string) => {
-        const { data: dwr } = await supabase
-          .from("daily_work_records")
-          .select("properties_worked, properties_closed, properties_refused, foci_found, larvicide_used_g, blocks_completed")
-          .gte("work_date", from)
-          .lte("work_date", to);
+        let query = supabase.from("daily_work_records").select("*").gte("work_date", from).lte("work_date", to)
+          .eq("status", "completed").not("end_time", "is", null);
+        if (full?.id) query = query.eq("cycle_id", full.id);
+        const dwr = await readAllQueryPages<any>(query.order("id"));
         const sum = (k: string) => (dwr ?? []).reduce((a: number, r: any) => a + (Number(r[k]) || 0), 0);
         return {
           trabalhados: sum("properties_worked"),
           fechados: sum("properties_closed"),
           recusas: sum("properties_refused"),
-          focos: sum("foci_found"),
-          larvicida: sum("larvicide_used_g"),
+          focos_positivos: sum("positive_foci"),
+          larvicida_g: dwr.filter((r) => r.larvicide_unit === "g").reduce((n, r) => n + (Number(r.larvicide_amount) || 0), 0),
+          larvicida_ml: dwr.filter((r) => r.larvicide_unit === "ml").reduce((n, r) => n + (Number(r.larvicide_amount) || 0), 0),
           quarteiroes: sum("blocks_completed"),
           registros: (dwr ?? []).length,
         };
@@ -130,7 +134,8 @@ function CalendarAuditPage() {
       const wk = await fetchCounts(iso(seStart), iso(seEnd));
       if (cancelled) return;
       setCounts({ cyc, wk });
-      setLoading(false);
+      } catch (e: any) { if (!cancelled) { setCounts(null); setError(e.message || "Erro ao consultar indicadores"); } }
+      finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [user?.id, role, refreshTick]);
@@ -139,7 +144,7 @@ function CalendarAuditPage() {
 
   const seRows: Row[] = [
     { label: "Data atual", current: fmt(now), expected: fmt(now), ok: true },
-    { label: "SE (ISO 8601 — atual no sistema)", current: `${se.week}/${se.year}`, expected: `${seBR.week}/${seBR.year}`, ok: se.week === seBR.week && se.year === seBR.year },
+    { label: "SE epidemiológica (SINAN — aplicação)", current: `${se.week}/${se.year}`, expected: `${seBR.week}/${seBR.year}`, ok: se.week === seBR.week && se.year === seBR.year },
     { label: "Início da SE (domingo)", current: fmt(seStart), expected: fmt(seStart), ok: true },
     { label: "Fim da SE (sábado)", current: fmt(seEnd), expected: fmt(seEnd), ok: true },
   ];
@@ -171,8 +176,9 @@ function CalendarAuditPage() {
         </Button>
       </div>
 
+      {error && <p role="alert" className="text-red-700">{error}. Tente atualizar.</p>}
       <AuditCard title="1. Semana Epidemiológica (SE)" rows={seRows}
-        note="Sistema usa ISO 8601 (segunda→domingo). Padrão brasileiro SINAN usa domingo→sábado, baseado no sábado mais próximo de 1º/jan. Divergências aparecem em semanas de virada de ano." />
+        note="A aplicação utiliza domingo a sábado. Esta tela consulta pela data operacional das diárias encerradas; campos antigos de semana no banco podem seguir outro padrão." />
 
       <AuditCard title="2. Ciclo Operacional" rows={cycleRows}
         note="Origem: tabela cycles + sessão ativa do usuário (field_work_sessions.cycle_id). Semana do ciclo: tabela weeks por intervalo de datas." />

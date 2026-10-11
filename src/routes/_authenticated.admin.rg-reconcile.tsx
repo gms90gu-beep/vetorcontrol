@@ -93,7 +93,7 @@ function Page() {
     if (!isLoading && role !== "admin_master") router.navigate({ to: "/dashboard" });
   }, [role, isLoading, router]);
 
-  const { data, isFetching, refetch } = useQuery({
+  const { data, isFetching, refetch, error: previewError } = useQuery({
     queryKey: ["rg-reconcile-preview"],
     queryFn: () => fetchPreview(),
     enabled: role === "admin_master",
@@ -200,6 +200,7 @@ function Page() {
         </div>
       </div>
 
+      {previewError && <p role="alert" className="text-red-700">{(previewError as Error).message}. Atualize a consulta antes de executar reconciliação.</p>}
       {integrity && (
         <Card>
           <CardHeader>
@@ -399,10 +400,10 @@ function Page() {
             <Button
               size="sm"
               variant="destructive"
-              disabled={!selectedOrphans.size || busy}
+              disabled title="Exclusão automática desativada para preservar o histórico"
               onClick={onDeleteOrphans}
             >
-              Excluir selecionados ({selectedOrphans.size})
+              Exclusão automática desativada
             </Button>
           </CardTitle>
         </CardHeader>

@@ -1,3 +1,4 @@
+import { readAllQueryPages } from "@/lib/query-pages";
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,6 +46,7 @@ function RGPipelinePage() {
   const { user, isReady } = useAuth();
   const userId = isReady ? user?.id : undefined;
 
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [conflicts, setConflicts] = useState<ReconcileConflict[]>([]);
   const [lastCleanup, setLastCleanup] = useState<GhostReport | null>(null);
@@ -60,8 +62,7 @@ function RGPipelinePage() {
     if (!userId) return;
     setLoading(true);
     try {
-      const { data: rows } = await (supabase as any)
-        .from('boletins_rg').select('id,agent_id,block_id,updated_at').eq('agent_id', userId);
+      const rows = await readAllQueryPages<any>(supabase.from('boletins_rg').select('id,agent_id,block_id,updated_at').eq('agent_id', userId).order('id'));
       const all = await offlineDb.boletins_rg.toArray();
       const local = all
         .filter((r) => r.data?.agent_id === userId)
@@ -77,7 +78,7 @@ function RGPipelinePage() {
       setConflicts(await getReconcileConflicts());
       setLastCleanup(await getLastCleanupReport());
       setHomolog(await getLastHomologationReport());
-    } finally {
+    } catch (e: any) { setLoadError(e.message || "Falha no diagnóstico"); } finally {
       setLoading(false);
     }
   }, [userId]);
@@ -88,8 +89,8 @@ function RGPipelinePage() {
     if (!userId) return;
     setLoading(true);
     try {
-      const { data: rows } = await (supabase as any)
-        .from('boletins_rg').select('*').eq('agent_id', userId);
+      if (await appDb.syncQueue.where('status').anyOf('pending', 'processing', 'error').count()) throw new Error('Fila local preservada: sincronize as operações antigas antes de reconciliar.');
+      const rows = await readAllQueryPages<any>(supabase.from('boletins_rg').select('*').eq('agent_id', userId).order('id'));
       const report = await reconcile({
         module: 'rg', userId,
         serverRows: rows ?? [],
@@ -98,7 +99,7 @@ function RGPipelinePage() {
       });
       setLastReport(report);
       await refresh();
-    } finally { setLoading(false); }
+    } catch (e: any) { setLoadError(e.message || "Falha na operação"); } finally { setLoading(false); }
   };
 
   const runCleanup = async () => {
@@ -108,7 +109,7 @@ function RGPipelinePage() {
       const rep = await cleanupGhosts(userId);
       setLastReport(rep);
       await refresh();
-    } finally { setLoading(false); }
+    } catch (e: any) { setLoadError(e.message || "Falha na operação"); } finally { setLoading(false); }
   };
 
   const runAuditTerritory = async () => {
@@ -134,7 +135,7 @@ function RGPipelinePage() {
         }),
       );
       setOpSnapshot(results);
-    } finally { setLoading(false); }
+    } catch (e: any) { setLoadError(e.message || "Falha na operação"); } finally { setLoading(false); }
   };
 
   const runHomolog = async () => {
@@ -150,7 +151,7 @@ function RGPipelinePage() {
   const serverCount = snap?.server.length ?? 0;
   const localCount = snap?.local.length ?? 0;
   const legacy = snap?.legacy ?? 0;
-  const allMatch = snap !== null && serverCount === localCount && legacy === 0;
+  const allMatch = !loadError && snap !== null && serverCount === localCount && legacy === 0;
 
   // Group by agente
   const byAgent = new Map<string, { server: number; local: number }>();
@@ -186,6 +187,8 @@ function RGPipelinePage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {loadError && <p role="alert" className="text-red-700">{loadError}</p>}
+      <p className="text-xs text-muted-foreground">Diagnóstico da conta atual e do cache deste dispositivo. A manutenção atualiza o cache sem excluir RGs locais.</p>
       <div>
         <h1 className="text-2xl font-bold">RG Pipeline — Diagnóstico</h1>
         <p className="text-sm text-muted-foreground">userId: <code>{userId}</code></p>
@@ -205,7 +208,7 @@ function RGPipelinePage() {
       <div className="flex flex-wrap gap-2">
         <Button onClick={refresh} disabled={loading} variant="outline">Atualizar</Button>
         <Button onClick={runReconcile} disabled={loading}>Reconciliar agora</Button>
-        <Button onClick={runCleanup} disabled={loading} variant="destructive">Executar limpeza (Fase E)</Button>
+        <Button onClick={runCleanup} disabled={loading} variant="outline">Atualizar cache com preservação</Button>
         <Button onClick={async () => { await clearReconcileConflicts(); await refresh(); }} variant="ghost">
           Limpar conflitos
         </Button>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { listRemoteOrCache } from "@/lib/offline/repos";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { productionTotals, visitActivity } from "@/lib/management-metrics";
+import { downloadCSV } from "@/lib/institutional-export";
 import { filterPendencies } from "@/lib/pendency-scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,10 @@ type PendencyRow = {
 export function OperationalDashboard() {
   const { user, role } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
+  const [dailies, setDailies] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [visits, setVisits] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [weeks, setWeeks] = useState<any[]>([]);
@@ -54,69 +60,40 @@ export function OperationalDashboard() {
 
   useEffect(() => {
     if (!user?.id || !role) return;
+    let cancelled = false;
+    setLoading(true); setError(null);
     (async () => {
-      setLoading(true);
       try {
         const permittedProfiles = await listPermittedAgentProfiles(user.id, role);
         const permittedIds = permittedProfiles.map((p) => p.id);
-        const permittedLinks = await listRemoteOrCache<any>({
-          name: "agents",
-          remote: async () => await supabase.from("agents").select("id, profile_id").in("profile_id", permittedIds),
-          filter: (r) => permittedIds.includes(r.profile_id),
-        });
-        const visitIds = [...permittedIds, ...permittedLinks.map((r) => r.id)];
-        const [profs, vs, agentLinks, cs, ws, pends] = await Promise.all([
-          Promise.resolve(permittedProfiles),
-          listRemoteOrCache<any>({
-            name: "visits",
-            remote: () => supabase.from("visits").select("id, agent_id, status, has_focus, visit_date, cycle_id, week_id, property_id").in("agent_id", visitIds) as any,
-            filter: (r) => visitIds.includes(r.agent_id),
-          }),
-          Promise.resolve(permittedLinks),
-          listRemoteOrCache<any>({
-            name: "cycles",
-            remote: () => supabase.from("cycles").select("id, name, year, number").order("year", { ascending: false }) as any,
-          }),
-          listRemoteOrCache<any>({
-            name: "weeks",
-            remote: () => supabase.from("weeks").select("id, number, cycle_id, start_date, end_date") as any,
-          }),
-          listRemoteOrCache<any>({
-            name: "property_pendencies",
-            remote: () => supabase.from("property_pendencies").select("id, agent_id, cycle_id, week_id, current_status, resolved_at, reason, created_at").in("agent_id", permittedIds) as any,
-            filter: (r: any) => permittedIds.includes(r.agent_id) && !r.resolved_at,
-          }),
+        const links = permittedIds.length ? await readAllQueryPages<any>(supabase.from("agents").select("id,profile_id").in("profile_id", permittedIds).order("id")) : [];
+        const visitIds = [...permittedIds, ...links.map((r) => r.id)];
+        const [vs, records, cs, ws, pends, active] = await Promise.all([
+          visitIds.length ? readAllQueryPages<any>(supabase.from("visits").select("*,visit_deposits(is_positive)").in("agent_id", visitIds).order("id")) : [],
+          permittedIds.length ? readAllQueryPages<any>(supabase.from("daily_work_records").select("*").in("agent_id", permittedIds).order("id")) : [],
+          readAllQueryPages<any>(supabase.from("cycles").select("id,name,year,number").order("id")),
+          readAllQueryPages<any>(supabase.from("weeks").select("id,number,cycle_id,start_date,end_date").order("id")),
+          permittedIds.length ? readAllQueryPages<any>(supabase.from("property_pendencies").select("*").in("agent_id", permittedIds).is("resolved_at", null).order("id")) : [],
+          getActiveCycleForUser(user.id),
         ]);
-        const legacyAgentToProfile = new Map(
-          (agentLinks || [])
-            .filter((link: any) => link?.id && link?.profile_id)
-            .map((link: any) => [link.id, link.profile_id]),
-        );
-        const normalizedVisits = (vs || []).map((visit: any) => ({
-          ...visit,
-          // Registros antigos usavam agents.id; o relatório trabalha com
-          // profiles.id, que é a identidade atual do agente.
-          agent_id: legacyAgentToProfile.get(visit.agent_id) ?? visit.agent_id,
-        }));
-        setAgents(profs || []);
-        setVisits(normalizedVisits.filter((v) => permittedIds.includes(v.agent_id)));
-        const active = await getActiveCycleForUser(user.id);
-        if (active?.id) setCycleFilter(active.id);
-        setCycles(cs || []);
-        setWeeks(ws || []);
-        const visibleAgentIds = new Set((profs || []).map((p: any) => p.id));
-        setPendencies(filterPendencies((pends || []) as PendencyRow[], {
-          visibleAgentIds,
-          onlyOpen: true,
-        }));
-      } catch (e) {
-        console.error("[OFFLINE_ERROR] OperationalDashboard", e);
-        toast.error("Erro ao carregar dados operacionais");
-      } finally {
-        setLoading(false);
-      }
+        if (cancelled) return;
+        const legacy = new Map(links.map((r) => [r.id, r.profile_id]));
+        setAgents(permittedProfiles); setDailies(records);
+        setVisits(vs.map((v) => ({ ...v, agent_id: legacy.get(v.agent_id) ?? v.agent_id })).filter((v) => permittedIds.includes(v.agent_id)));
+        setCycles(cs); setWeeks(ws); setPendencies(pends);
+        if (!updatedAt && active?.id) { setCycleFilter(active.id); setWeekFilter("all"); }
+        setUpdatedAt(new Date().toLocaleString("pt-BR"));
+      } catch (e: any) {
+        if (!cancelled) { setError(e.message || "Erro ao carregar dados operacionais"); setVisits([]); setDailies([]); setPendencies([]); }
+      } finally { if (!cancelled) setLoading(false); }
     })();
-  }, [user?.id, role]);
+    return () => { cancelled = true; };
+  }, [user?.id, role, reload]);
+
+  const filteredDailies = useMemo(() => dailies.filter((r) =>
+    (cycleFilter === "all" || r.cycle_id === cycleFilter) &&
+    (weekFilter === "all" || r.week_id === weekFilter) &&
+    (agentFilter === "all" || r.agent_id === agentFilter)), [dailies, cycleFilter, weekFilter, agentFilter]);
 
   const filteredVisits = useMemo(() => {
     return visits.filter((v) => {
@@ -127,22 +104,14 @@ export function OperationalDashboard() {
     });
   }, [visits, cycleFilter, weekFilter, agentFilter]);
 
-  const agentRows: AgentRow[] = useMemo(() => {
-    return agents
-      .map((a) => {
-        const av = filteredVisits.filter((v) => v.agent_id === a.id);
-        return {
-          id: a.id,
-          full_name: a.full_name || "Sem nome",
-          trabalhados: av.length,
-          fechados: av.filter((v) => v.status === "closed").length,
-          recusas: av.filter((v) => v.status === "refused").length,
-          focos: av.filter((v) => v.has_focus).length,
-        };
-      })
-      .filter((r) => r.trabalhados > 0 || agentFilter === r.id)
-      .sort((a, b) => b.trabalhados - a.trabalhados);
-  }, [agents, filteredVisits, agentFilter]);
+  const agentRows: AgentRow[] = useMemo(() => agents.map((a) => {
+    const totals = productionTotals(filteredDailies.filter((r) => r.agent_id === a.id));
+    return { id: a.id, full_name: a.full_name || "Sem nome", trabalhados: totals.worked,
+      fechados: totals.closed, recusas: totals.refused, focos: totals.positive };
+  }).filter((r) => r.trabalhados || r.fechados || r.recusas || r.focos || agentFilter === r.id)
+    .sort((a, b) => b.trabalhados - a.trabalhados), [agents, filteredDailies, agentFilter]);
+  const activity = useMemo(() => visitActivity(filteredVisits), [filteredVisits]);
+  const production = useMemo(() => productionTotals(filteredDailies), [filteredDailies]);
 
   const totals = useMemo(() => {
     return agentRows.reduce(
@@ -160,21 +129,9 @@ export function OperationalDashboard() {
     return [...agentRows].slice(0, 10);
   }, [agentRows]);
 
-  const handleExportCSV = () => {
-    const rows = [
-      ["Agente", "Trabalhados", "Fechados", "Recusas", "Focos"],
-      ...agentRows.map((r) => [r.full_name, r.trabalhados, r.fechados, r.recusas, r.focos]),
-    ];
-    const csv = rows.map((r) => r.join(";")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `producao-agentes-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Exportação concluída");
-  };
+  const handleExportCSV = () => downloadCSV(`producao-oficial-${cycleFilter}-${weekFilter}.csv`,
+    ["Agente", "Trabalhados", "Fechados", "Recusas", "Focos positivos"],
+    agentRows.map((r) => [r.full_name, r.trabalhados, r.fechados, r.recusas, r.focos]));
 
   const weeksOfCycle = weeks.filter((w) => cycleFilter === "all" || w.cycle_id === cycleFilter);
 
@@ -211,7 +168,7 @@ export function OperationalDashboard() {
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filtros</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <Select value={cycleFilter} onValueChange={setCycleFilter}>
+          <Select value={cycleFilter} onValueChange={(id) => { setCycleFilter(id); setWeekFilter("all"); }}>
             <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Ciclo" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os ciclos</SelectItem>
@@ -241,12 +198,29 @@ export function OperationalDashboard() {
         </div>
       </div>
 
+      <div className="text-xs text-slate-600 space-y-2">
+        <p>Escopo: {role === "admin_master" ? "Admin Master — agentes cadastrados" : role === "coordenador" ? "Equipes vinculadas ao coordenador" : "Minha equipe"} · {cycleFilter === "all" ? "Todos os ciclos" : cycles.find((c) => c.id === cycleFilter)?.name || "Ciclo selecionado"} · {weekFilter === "all" ? "Todo o período do ciclo" : `Semana ${weeks.find((w) => w.id === weekFilter)?.number}`} · {agentFilter === "all" ? "Todos os agentes autorizados" : agents.find((a) => a.id === agentFilter)?.full_name}</p>
+        <p>Produção oficial: diárias encerradas ({production.dailyCount}). Atividade: visitas registradas, inclusive trabalho em andamento. Fonte: servidor · atualização: {updatedAt || "aguardando"}.</p>
+        <Button size="sm" variant="outline" disabled={loading} onClick={() => setReload((n) => n + 1)}>Atualizar</Button>
+        {error && <p role="alert" className="text-red-700">{error}. Tente atualizar; os totais não estão disponíveis.</p>}
+        {!!production.unfinished && <p className="text-amber-700">{production.unfinished} diária(s) aberta(s) excluída(s) da produção oficial.</p>}
+      </div>
+      {!loading && !error && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KPI label="Visitas registradas" value={activity.visits} color="#185fa5" />
+        <KPI label="Imóveis únicos nas visitas" value={activity.uniqueProperties} color="#185fa5" />
+        <KPI label="Focos encontrados" value={activity.found} color="#d97706" />
+        <KPI label="Análises pendentes" value={activity.pending} color="#d97706" />
+        <KPI label="Coletas positivas" value={activity.positive} color="#dc2626" />
+        <KPI label="Coletas negativas" value={activity.negative} color="#3b6d11" />
+        <KPI label="Inconclusivas" value={activity.inconclusive} color="#64748b" />
+      </div>}
+      <h3 className="text-sm font-bold">Produção oficial — soma das diárias encerradas</h3>
       {/* Totais */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI label="Trabalhados" value={totals.trabalhados} color="#185fa5" />
-        <KPI label="Fechados" value={totals.fechados} color="#3b6d11" />
-        <KPI label="Recusas" value={totals.recusas} color="#a32d2d" />
-        <KPI label="Focos" value={totals.focos} color="#dc2626" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3" aria-busy={loading}>
+        <KPI label="Trabalhados" value={loading || error ? "—" : totals.trabalhados} color="#185fa5" />
+        <KPI label="Fechados" value={loading || error ? "—" : totals.fechados} color="#3b6d11" />
+        <KPI label="Recusas" value={loading || error ? "—" : totals.recusas} color="#a32d2d" />
+        <KPI label="Focos positivos" value={loading || error ? "—" : totals.focos} color="#dc2626" />
       </div>
 
       <Tabs defaultValue="producao" className="w-full">
@@ -261,7 +235,7 @@ export function OperationalDashboard() {
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
               <Users className="h-3.5 w-3.5" /> Produção por agente
             </h3>
-            <Button size="sm" variant="outline" onClick={handleExportCSV} className="h-8 text-xs">
+            <Button size="sm" variant="outline" onClick={handleExportCSV} disabled={loading || !!error || !agentRows.length} className="h-8 text-xs">
               <FileDown className="h-3.5 w-3.5 mr-1" /> CSV
             </Button>
           </div>
@@ -280,7 +254,7 @@ export function OperationalDashboard() {
                     <th className="p-2 text-center">Trab.</th>
                     <th className="p-2 text-center">Fech.</th>
                     <th className="p-2 text-center">Rec.</th>
-                    <th className="p-2 text-center">Focos</th>
+                    <th className="p-2 text-center">Focos+</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,7 +286,7 @@ export function OperationalDashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{r.full_name}</p>
                   <p className="text-[10px] text-slate-400">
-                    {r.trabalhados} trabalhados · {r.focos} focos
+                    {r.trabalhados} trabalhados · {r.focos} focos positivos
                   </p>
                 </div>
                 <Badge className="bg-emerald-100 text-emerald-700 border-none text-xs font-black">
@@ -395,7 +369,7 @@ export function OperationalDashboard() {
   );
 }
 
-function KPI({ label, value, color }: { label: string; value: number; color: string }) {
+function KPI({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
     <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
       <TrendingUp className="h-4 w-4" style={{ color }} />

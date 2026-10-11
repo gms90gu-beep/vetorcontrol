@@ -1,3 +1,4 @@
+import { readAllQueryPages } from "@/lib/query-pages";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -47,12 +48,12 @@ export const getReconcilePreview = createServerFn({ method: "GET" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: boletins }, { data: blocks }, { data: properties }, { data: profiles }] =
+    const [boletins, blocks, properties, profiles] =
       await Promise.all([
-        supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id"),
-        supabaseAdmin.from("blocks").select("id, number, locality, total_properties"),
-        supabaseAdmin.from("properties").select("id, boletim_id, block_id, block_number, user_id"),
-        supabaseAdmin.from("profiles").select("id, full_name"),
+        readAllQueryPages<any>(supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id").order("id")),
+        readAllQueryPages<any>(supabaseAdmin.from("blocks").select("id, number, locality, total_properties").order("id")),
+        readAllQueryPages<any>(supabaseAdmin.from("properties").select("id, boletim_id, block_id, block_number, user_id").order("id")),
+        readAllQueryPages<any>(supabaseAdmin.from("profiles").select("id, full_name").order("id")),
       ]);
 
     const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name]));
@@ -134,9 +135,9 @@ export const executeReconcile = createServerFn({ method: "POST" })
     await assertAdmin(supabase, userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: boletins }, { data: blocks }] = await Promise.all([
-      supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id"),
-      supabaseAdmin.from("blocks").select("id, number, locality"),
+    const [boletins, blocks] = await Promise.all([
+      readAllQueryPages<any>(supabaseAdmin.from("boletins_rg").select("id, block_id, block_number, locality, agent_id").order("id")),
+      readAllQueryPages<any>(supabaseAdmin.from("blocks").select("id, number, locality").order("id")),
     ]);
 
     let blocksLinked = 0;
@@ -158,8 +159,8 @@ export const executeReconcile = createServerFn({ method: "POST" })
           .from("boletins_rg")
           .update({ block_id: blockId })
           .eq("id", b.id);
-        if (!error) blocksLinked++;
-        else continue;
+        if (error) throw error;
+        blocksLinked++;
       }
 
       const { data: updated, error: upErr } = await supabaseAdmin
@@ -169,7 +170,8 @@ export const executeReconcile = createServerFn({ method: "POST" })
         .eq("user_id", b.agent_id)
         .is("boletim_id", null)
         .select("id");
-      if (!upErr && updated) {
+      if (upErr) throw upErr;
+      if (updated) {
         propertiesLinked += updated.length;
         if (updated.length > 0)
           details.push({ boletim_id: b.id, block_id: blockId, properties: updated.length });
@@ -189,24 +191,10 @@ export const executeReconcile = createServerFn({ method: "POST" })
 export const deleteOrphanBlocks = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { ids: string[] }) => d)
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }): Promise<{ deleted: number }> => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (!data.ids?.length) return { deleted: 0 };
-    const { error, count } = await supabaseAdmin
-      .from("blocks")
-      .delete({ count: "exact" })
-      .in("id", data.ids)
-      .eq("total_properties", 0);
-    if (error) throw new Error(error.message);
-    await supabaseAdmin.from("audit_log").insert({
-      action: "rg_reconcile_delete_orphans",
-      entity: "blocks",
-      actor_id: userId,
-      metadata: { ids: data.ids, count } as any,
-    });
-    return { deleted: count ?? 0 };
+    throw new Error("Exclusão automática desativada para preservar o histórico. O contador total_properties=0 não garante ausência de boletins, jornadas ou imóveis vinculados.");
   });
 
 export type IntegrityValidation = {

@@ -1,3 +1,5 @@
+import { validateReportRange, dailyDepositTotal } from "@/lib/management-metrics";
+import { readManagementProfiles } from "@/lib/management-profiles";
 import { scopeMapPendencies, type MapPendencyScope } from "@/lib/map-pendency-scope";
 import { summarizePendencyCycles } from "@/lib/pendency-summary";
 import { mapVisitInPeriod } from "@/lib/map-visit-period";
@@ -105,21 +107,15 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       supervisorId?: string | null;
       agentId?: string | null;
       municipality?: string | null;
-    }) => input,
+    }) => validateReportRange(input),
   )
   .handler(async ({ data, context }): Promise<ExecutiveDashboardResult> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
-    // Scope profiles
-    let profQ = supabase
-      .from("profiles")
-      .select("id, full_name, city, supervisor_id, registration_number");
-    if (role === "supervisor") profQ = profQ.eq("supervisor_id", userId);
-    if (data.supervisorId) profQ = profQ.eq("supervisor_id", data.supervisorId);
-    if (data.municipality) profQ = profQ.eq("city", data.municipality);
-    const { data: profiles, error: pe } = await profQ;
-    if (pe) throw new Error(pe.message);
+    const profiles = (await readManagementProfiles(supabase, userId, role)).filter((p) =>
+      ["agente", "agent"].includes(p.role) && (!data.supervisorId || p.supervisor_id === data.supervisorId)
+      && (!data.municipality || p.city === data.municipality));
 
     const profileById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
 
@@ -148,7 +144,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .select("*")
       .in("agent_id", scopedProfiles)
       .gte("work_date", data.from)
-      .lte("work_date", data.to);
+      .lte("work_date", data.to).eq("status", "completed").not("end_time", "is", null);
     if (data.cycleId) dwrQ = dwrQ.eq("cycle_id", data.cycleId);
     const dwrResult = await fetchAllPages<any>(dwrQ.order("id"));
     const dwr = dwrResult.rows;
@@ -166,7 +162,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     if (sessionResult.truncated) warnings.push("A consulta de jornadas atingiu 50.000 registros; refine o período.");
     const missingDaily = sessionsMissingDailyRecord(sessionResult.rows, dwr);
     if (missingDaily.length > 0) {
-      warnings.push(`${missingDaily.length} jornada(s) encerrada(s) sem boletim diário; revise a reconciliação antes de concluir o período.`);
+      warnings.push(`${missingDaily.length} jornada(s) encerrada(s) sem boletim diário encerrado; revise a reconciliação antes de concluir o período.`);
     }
 
     // Pendencies open (no resolved_at) — agent_id é profile_id
@@ -176,7 +172,8 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
       .is("resolved_at", null)
       .in("agent_id", scopedProfiles);
     if (data.cycleId) pendOpenQ = pendOpenQ.eq("cycle_id", data.cycleId);
-    const { count: pendOpen } = await pendOpenQ;
+    const { count: pendOpen, error: pendError } = await pendOpenQ;
+    if (pendError) throw pendError;
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length, "pend_open", pendOpen ?? 0);
 
     const kpis = {
@@ -202,7 +199,7 @@ export const getExecutiveDashboard = createServerFn({ method: "POST" })
     const byAgent = new Map<string, ExecutiveDashboardResult["top_agents"][number]>();
 
     for (const r of (dwr ?? []) as any[]) {
-      const depTotal = sumDepJson(r.deposits_by_type);
+      const depTotal = dailyDepositTotal(r);
       kpis.daily_records++;
       kpis.properties_worked += +r.properties_worked || 0;
       kpis.properties_closed += +r.properties_closed || 0;
@@ -351,11 +348,8 @@ export const getPendencyReport = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
 
-    const profileIdsScope = await resolvePermittedAgentIds(supabase, userId, role);
-    let profQ = supabase.from("profiles").select("id, full_name, supervisor_id");
-    if (profileIdsScope) profQ = profQ.in("id", profileIdsScope);
-    if (data.supervisorId) profQ = profQ.eq("supervisor_id", data.supervisorId);
-    const { data: profiles } = await profQ;
+    const profiles = (await readManagementProfiles(supabase, userId, role)).filter((p) =>
+      ["agente", "agent"].includes(p.role) && (!data.supervisorId || p.supervisor_id === data.supervisorId));
     const profileIds = (profiles ?? []).map((p: any) => p.id);
     const nameByProfile = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name || "Sem nome"]));
 
@@ -369,23 +363,21 @@ export const getPendencyReport = createServerFn({ method: "POST" })
       .from("property_pendencies")
       .select("*")
       .in("agent_id", profileIds)
-      .order("last_attempt_at", { ascending: false })
-      .limit(data.limit ?? 500);
+      .order("last_attempt_at", { ascending: false }).order("id");
     if (data.onlyOpen) q = q.is("resolved_at", null);
     if (data.cycleId) q = q.eq("cycle_id", data.cycleId);
     if (data.excludeCycleId) q = q.or(`cycle_id.is.null,cycle_id.neq.${data.excludeCycleId}`);
     if (data.weekId) q = q.eq("week_id", data.weekId);
-    const { data: pends, error } = await q;
-    if (error) throw new Error(error.message);
+    const pends = await readAllQueryPages<any>(q);
     console.log("[RBAC_RESULT]", "pendencies", (pends ?? []).length);
 
     const propIds = Array.from(new Set((pends ?? []).map((p: any) => p.property_id).filter(Boolean)));
     const propsById = new Map<string, any>();
     if (propIds.length > 0) {
-      const { data: props } = await supabase
+      const props = await readAllQueryPages<any>(supabase
         .from("properties")
         .select("id, number, street_name, block_number, type")
-        .in("id", propIds);
+        .in("id", propIds).order("id"));
       for (const p of (props ?? []) as any[]) propsById.set(p.id, p);
     }
 
@@ -595,11 +587,6 @@ async function scopedProfileIds(
   userId: string,
   role: "admin_master" | "coordenador" | "supervisor",
 ): Promise<string[] | null> {
-  if (role === "coordenador") {
-    const { data, error } = await supabase.rpc("get_coordinator_data", { p_user_id: userId });
-    if (error) throw new Error(`Falha ao validar área do coordenador: ${error.message}`);
-    return (data ?? []).filter((p: any) => ["agente", "agent"].includes(p.role)).map((p: any) => p.id);
-  }
   return resolvePermittedAgentIds(supabase, userId, role);
 }
 

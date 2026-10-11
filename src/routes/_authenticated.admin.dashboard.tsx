@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { listRemoteOrCache } from "@/lib/offline/repos";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { readManagementProfiles } from "@/lib/management-profiles";
+import { useAuth } from "@/hooks/useAuth";
 import { getExecutiveDashboard } from "@/lib/wave-c.functions";
 import { getOperationalDate } from "@/lib/operational-date";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
@@ -42,10 +44,8 @@ function isoOffset(days: number) {
 function ExecutiveDashboardPage() {
   const { online } = useSyncStatus();
 
-  // ⛔ Bloquear acesso offline: Dashboard administrativo requer conexão
-  if (!online) {
-    return <OfflineNotAvailable feature="Dashboard Administrativo" />;
-  }
+  const { user, role } = useAuth();
+  const [filterError, setFilterError] = useState<string | null>(null);
 
   const [from, setFrom] = useState(isoOffset(-30));
   const [to, setTo] = useState(isoOffset(0));
@@ -58,31 +58,29 @@ function ExecutiveDashboardPage() {
   const [cities, setCities] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!online || !user?.id || !role) return;
+    let cancelled = false;
     (async () => {
-      const [c, s, cs] = await Promise.all([
-        listRemoteOrCache<any>({
-          name: "cycles",
-          remote: async () => await supabase.from("cycles").select("id, name, number, year").order("year", { ascending: false }),
-        }),
-        listRemoteOrCache<any>({
-          name: "profiles",
-          remote: async () => await supabase.from("profiles").select("id, full_name").in("role" as any, ["supervisor"] as any),
-          filter: (r) => r.role === "supervisor" || r.full_name != null,
-        }),
-        listRemoteOrCache<any>({
-          name: "profiles",
-          remote: async () => await supabase.from("profiles").select("city"),
-        }),
-      ]);
-      setCycles(c || []);
-      setSupervisors(s || []);
-      setCities(Array.from(new Set((cs ?? []).map((x: any) => x.city).filter(Boolean))) as string[]);
+      try {
+        const [c, profiles] = await Promise.all([
+          readAllQueryPages<any>(supabase.from("cycles").select("id,name,number,year").order("id")),
+          readManagementProfiles(supabase, user.id, role),
+        ]);
+        const supIds = new Set(profiles.map((p) => p.supervisor_id).filter(Boolean));
+        const s = supIds.size ? await readAllQueryPages<any>(supabase.from("profiles").select("id,full_name,role").in("id", [...supIds]).eq("role", "supervisor").order("id")) : [];
+        if (cancelled) return;
+        setCycles(c); setSupervisors(s);
+        setCities([...new Set(profiles.filter((p) => ["agente", "agent"].includes(p.role)).map((p) => p.city).filter(Boolean))]);
+        setFilterError(null);
+      } catch (e: any) { if (!cancelled) setFilterError(e.message || "Erro ao carregar filtros"); }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [online, user?.id, role]);
 
   const fetchDash = useServerFn(getExecutiveDashboard);
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["exec-dashboard", from, to, cycleId, supervisorId, municipality],
+  const { data, isLoading, isFetching, refetch, error } = useQuery({
+    enabled: online && !!user?.id && !!role && !!from && !!to && from <= to,
+    queryKey: ["exec-dashboard", user?.id, role, from, to, cycleId, supervisorId, municipality],
     queryFn: () =>
       fetchDash({
         data: {
@@ -94,6 +92,7 @@ function ExecutiveDashboardPage() {
       }),
   });
 
+  if (!online) return <OfflineNotAvailable feature="Dashboard Administrativo" />;
   const k = data?.kpis;
 
   const exportPDF = () => {
@@ -102,7 +101,7 @@ function ExecutiveDashboardPage() {
       `painel_executivo_${from}_${to}.pdf`,
       {
         title: "Painel Executivo — Admin Master",
-        subtitle: `Período ${from} a ${to}`,
+        subtitle: `Período ${from} a ${to} · Ciclo: ${cycleId === "all" ? "Todos" : cycles.find((c) => c.id === cycleId)?.name || cycleId} · Equipe: ${supervisorId === "all" ? "Todas autorizadas" : supervisors.find((s) => s.id === supervisorId)?.full_name || supervisorId}`,
         municipality: municipality === "all" ? "Todos os municípios" : municipality,
         issuedBy: "Admin Master",
         reference: `${data.scope.toUpperCase()} · DWR consolidado`,
@@ -125,7 +124,7 @@ function ExecutiveDashboardPage() {
             ["Tubitos utilizados", k!.tubitos_used],
             ["Larvas coletadas", k!.larvae_collected],
             ["Cargas coletadas", k!.cargas_collected],
-            ["Pendências abertas", k!.pendencies_open],
+            ["Pendências abertas atuais (agentes/ciclo selecionados)", k!.pendencies_open],
           ],
         },
         {
@@ -223,20 +222,22 @@ function ExecutiveDashboardPage() {
             </Button>
           </div>
           <div className="flex flex-wrap gap-2 pt-2 border-t">
-            <Button size="sm" variant="outline" onClick={exportPDF} disabled={!data}>
+            <Button size="sm" variant="outline" onClick={exportPDF} disabled={!data || !!error || isFetching || from > to}>
               <FileText className="h-4 w-4 mr-1" /> PDF institucional
             </Button>
-            <Button size="sm" variant="outline" onClick={exportXLSX} disabled={!data}>
+            <Button size="sm" variant="outline" onClick={exportXLSX} disabled={!data || !!error || isFetching || from > to}>
               <FileSpreadsheet className="h-4 w-4 mr-1" /> XLSX
             </Button>
-            <Button size="sm" variant="outline" onClick={exportCSV} disabled={!data}>
+            <Button size="sm" variant="outline" onClick={exportCSV} disabled={!data || !!error || isFetching || from > to}>
               <Download className="h-4 w-4 mr-1" /> CSV
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {isLoading || !k ? (
+      {(error || filterError || from > to) && <p role="alert" className="text-sm text-red-700">{from > to ? "A data inicial deve ser anterior à final." : (error as Error)?.message || filterError} Use Atualizar para tentar novamente.</p>}
+      <p className="text-xs text-muted-foreground">Produção: somente diárias encerradas no período selecionado. Pendências: estoque aberto atual dos agentes/ciclo selecionados, independentemente das datas De/Até.</p>
+      {error || from > to ? null : isLoading || !k ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : (
         <>
@@ -255,7 +256,7 @@ function ExecutiveDashboardPage() {
             <Kpi icon={<Building2 className="h-4 w-4" />} label="Fechados" value={k.properties_closed} />
             <Kpi icon={<Bug className="h-4 w-4 text-rose-500" />} label="Focos+" value={k.positive_foci} />
             <Kpi icon={<MapIcon className="h-4 w-4" />} label="Quarteirões" value={k.blocks_worked} />
-            <Kpi icon={<Activity className="h-4 w-4" />} label="Pend. abertas" value={k.pendencies_open} />
+            <Kpi icon={<Activity className="h-4 w-4" />} label="Pend. atuais" value={k.pendencies_open} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

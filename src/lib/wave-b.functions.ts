@@ -1,3 +1,5 @@
+import { validateReportRange, dailyDepositTotal } from "@/lib/management-metrics";
+import { readManagementProfiles } from "@/lib/management-profiles";
 import { readAllQueryPages } from "@/lib/query-pages";
 import { WEEKLY_FIELDS } from "@/lib/weekly-bulletin";
 /**
@@ -29,7 +31,7 @@ export interface AgentProductionRow {
 }
 
 export interface AgentProductionResult {
-  scope: "admin_master" | "supervisor";
+  scope: "admin_master" | "supervisor" | "coordenador";
   from: string;
   to: string;
   rows: AgentProductionRow[];
@@ -43,11 +45,7 @@ async function resolveScopedAgents(supabase: any, userId: string) {
     throw new Error("Forbidden: requer supervisor ou admin_master");
   }
 
-  let profileQuery = supabase.from("profiles").select("id, full_name, registration_number, supervisor_id, city, role");
-  if (role === "supervisor") profileQuery = profileQuery.eq("supervisor_id", userId);
-  const { data: profiles, error: profErr } = await profileQuery;
-  if (profErr) throw new Error(profErr.message);
-
+  const profiles = (await readManagementProfiles(supabase, userId, role)).filter((p) => ["agente", "agent"].includes(p.role));
   console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", (profiles ?? []).length);
   // profile_id é a identidade canônica; DWR.agent_id == profile_id
   return { role: role as "supervisor" | "admin_master" | "coordenador", profiles: profiles ?? [] };
@@ -81,7 +79,7 @@ function sumDepositsJson(j: any): number {
 
 export const getAgentProduction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; agentId?: string }) => input)
+  .inputValidator((input: { from: string; to: string; agentId?: string }) => validateReportRange(input))
   .handler(async ({ data, context }): Promise<AgentProductionResult> => {
     const { supabase, userId } = context;
     const { role, profiles } = await resolveScopedAgents(supabase, userId);
@@ -92,7 +90,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
 
     if (profileIds.length === 0) {
       return {
-        scope: role === "admin_master" ? "admin_master" : "supervisor",
+        scope: role,
         from: data.from,
         to: data.to,
         rows: [],
@@ -100,13 +98,13 @@ export const getAgentProduction = createServerFn({ method: "POST" })
       };
     }
 
-    const { data: dwr, error } = await supabase
+    const dwr = await readAllQueryPages<any>(supabase
       .from("daily_work_records")
       .select("*")
       .in("agent_id", profileIds)
       .gte("work_date", data.from)
-      .lte("work_date", data.to);
-    if (error) throw new Error(error.message);
+      .lte("work_date", data.to)
+      .eq("status", "completed").not("end_time", "is", null).order("work_date").order("id"));
     console.log("[RBAC_RESULT]", "dwr", (dwr ?? []).length);
 
     const byAgent = new Map<string, AgentProductionRow>();
@@ -135,7 +133,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
       row.tubitos_collected += Number(r.tubitos_collected) || 0;
       row.larvae_collected += Number(r.larvae_collected) || 0;
       row.cargas_collected += Number(r.cargas_collected) || 0;
-      row.deposits_total += sumDepositsJson(r.deposits_by_type);
+      row.deposits_total += dailyDepositTotal(r);
     }
 
     const rows = Array.from(byAgent.values())
@@ -151,7 +149,7 @@ export const getAgentProduction = createServerFn({ method: "POST" })
     void profilesById;
 
     return {
-      scope: role === "admin_master" ? "admin_master" : "supervisor",
+      scope: role,
       from: data.from,
       to: data.to,
       rows,
@@ -478,11 +476,6 @@ export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
     const { profiles, role } = await resolveScopedAgents(context.supabase, context.userId);
     const client = context.supabase;
     let permitted = (profiles as any[]).filter((p) => ["agente", "agent"].includes(p.role));
-    if (role === "coordenador") {
-      const { data: scoped, error } = await client.rpc("get_coordinator_data", { p_user_id: context.userId });
-      if (error) throw error;
-      permitted = (scoped ?? []).filter((p: any) => ["agente", "agent"].includes(p.role));
-    }
     if (data.agentId && !permitted.some((p) => p.id === data.agentId)) throw new Error("Agente fora do seu acesso.");
     const members = permitted.filter((p) => (!data.agentId || p.id === data.agentId) && (!data.supervisorId || p.supervisor_id === data.supervisorId));
     const range = epiWeekToDateRange(data.week, data.year);

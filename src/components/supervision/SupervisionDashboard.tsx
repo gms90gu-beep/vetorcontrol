@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { listRemoteOrCache, safeSupabaseRead } from "@/lib/offline/repos";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,9 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { getOperationalDate } from "@/lib/operational-date";
 import { useNavigate } from "@tanstack/react-router";
-import { getBlockProgressBatch } from "@/lib/offline/repos/blockProgress";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { readManagementProfiles } from "@/lib/management-profiles";
+import { productionTotals, sessionActivity } from "@/lib/management-metrics";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 
 type FilterKey = "all" | "supervisors" | "agents" | "active" | "inactive" | "no_session";
@@ -51,6 +53,10 @@ function initials(name?: string | null) {
 export function SupervisionDashboard() {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const sequence = useRef(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [scopeLabel, setScopeLabel] = useState("Carregando escopo");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,141 +78,39 @@ export function SupervisionDashboard() {
   useEffect(() => {
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    return () => { sequence.current += 1; };
+  }, [user?.id, role]);
 
   async function fetchAll() {
-    setIsLoading(true);
+    const request = ++sequence.current;
+    if (!user?.id || !role) return;
+    setIsLoading(true); setLoadError(null);
     try {
-      if (user?.id) {
-        const prof = await safeSupabaseRead<any>(
-          () => supabase.from("profiles").select("*").eq("id", user.id).maybeSingle() as any,
-          null,
-          "profile",
-        );
-        setProfile(prof);
-      }
-
-      // RLS já filtra por supervisor_id (para supervisores)
-      // Mas para coordenadores, precisa RPC
-      let profiles: any[] | null = null;
-      if (role === "coordenador" && user?.id) {
-        try {
-          const { data, error } = await (supabase.rpc as any)("get_coordinator_data", { p_user_id: user.id });
-          if (!error && data && data.length > 0) {
-            profiles = data as any[];
-            console.log("[SUPERVISION_RPC] ✅ Sucesso - dados via RPC", { count: data.length });
-          } else {
-            throw new Error("RPC vazio ou erro");
-          }
-        } catch (rpcError) {
-          console.log("[SUPERVISION_RPC] ⚠️ Fallback - RPC ainda não criada, usando listRemoteOrCache", { error: (rpcError as any)?.message });
-          profiles = null; // Vai carregar abaixo
-        }
-      }
-      
-      if (!profiles) {
-        profiles = await listRemoteOrCache<any>({
-          name: "profiles",
-          remote: () => {
-            let query = supabase.from("profiles").select("*");
-            if (role === "supervisor") query = query.eq("supervisor_id", user?.id ?? "");
-            return query as any;
-          },
-          filter: (p) => role !== "supervisor" || p.supervisor_id === user?.id,
-        });
-      }
-
-      // 🆕 Coordenador e Admin Master gerenciam SUPERVISORES + AGENTES
-      const includeSupervisors = role === "coordenador" || role === "admin_master";
-
-      const allAgents = (profiles || []).filter(
-        (p: any) => p.role === "agente" || p.role === "agent",
-      );
-      const allSupervisors = (profiles || []).filter((p: any) => p.role === "supervisor");
-
-      let team: any[] = [...allAgents];
-      if (role === "supervisor") team = team.filter((p) => p.supervisor_id === user?.id);
-      let visibleSupervisors: any[] = includeSupervisors ? [...allSupervisors] : [];
-
-      // Se é coordenador: filtrar supervisores vinculados + agentes desses supervisores
-      if (role === "coordenador" && user?.id) {
-        const linkedSups = allSupervisors.filter((p: any) => p.coordinator_id === user.id);
-        const scopedSups = linkedSups.length > 0 ? linkedSups : allSupervisors;
-        const supIds = new Set(scopedSups.map((s: any) => s.id));
-        visibleSupervisors = scopedSups;
-        team = team.filter((a: any) => supIds.has(a.supervisor_id));
-        console.log("[SUPERVISION_DASHBOARD_FILTER]", {
-          mode: linkedSups.length > 0 ? "RIGOROSO" : "PERMISSIVO",
-          coordId: user.id,
-          supervisors: scopedSups.length,
-          agents: team.length,
-        });
-      }
-
-      if (includeSupervisors) {
-        team = [...visibleSupervisors, ...team];
-      }
-
-
-      const todayISO = getOperationalDate();
-
-      const agentIds = team.map((a: any) => a.id).filter(Boolean);
-      const activeCycle = await getActiveCycleForUser(user?.id ?? null);
-
-      const [progressRows, sessions] = await Promise.all([
-        agentIds.length
-          ? getBlockProgressBatch({
-              cycle_id: activeCycle?.id ?? undefined,
-              agent_ids: agentIds,
-            })
-          : Promise.resolve([]),
-        listRemoteOrCache<any>({
-          name: "field_work_sessions",
-          remote: () => supabase.from("field_work_sessions").select("user_id, status, session_date").gte("session_date", todayISO) as any,
-          filter: (s) => !s.session_date || s.session_date >= todayISO,
-        }),
+      const { data: prof, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+      if (profileError) throw profileError;
+      const profiles = await readManagementProfiles(supabase, user.id, role);
+      const team = profiles.filter((p) => ["agente", "agent"].includes(p.role) || (["coordenador", "admin_master"].includes(role) && p.role === "supervisor"));
+      const ids = team.filter((p) => ["agente", "agent"].includes(p.role)).map((p) => p.id);
+      const active = await getActiveCycleForUser(user.id);
+      let dailyQuery = supabase.from("daily_work_records").select("*").in("agent_id", ids);
+      if (active?.id) dailyQuery = dailyQuery.eq("cycle_id", active.id);
+      const [records, sessions] = await Promise.all([
+        ids.length ? readAllQueryPages<any>(dailyQuery.order("id")) : [],
+        ids.length ? readAllQueryPages<any>(supabase.from("field_work_sessions").select("user_id,status,session_date").in("user_id", ids).order("id")) : [],
       ]);
-
-      // BLOCK_PROGRESS_SOURCE_OF_TRUTH — dashboards agora somam de block_progress.
-      try {
-        console.info("[BLOCK_PROGRESS_MIGRATION]", {
-          module: "SupervisionDashboard",
-          hook: "getBlockProgressBatch",
-          version: 1,
-          agents: agentIds.length,
-          rows: progressRows.length,
-        });
-      } catch {}
-
-      const withStats = team.map((agent: any) => {
-        const rows = (progressRows || []).filter((r: any) => r.agent_id === agent.id);
-        const visited = rows.reduce((s, r: any) => s + (r.visited_properties || 0), 0);
-        const closed = rows.reduce((s, r: any) => s + (r.closed_properties || 0), 0);
-        const focus = rows.reduce((s, r: any) => s + (r.positive_focus || 0), 0);
-        const todaySessions = (sessions || []).filter(
-          (s: any) => s.user_id === agent.id,
-        );
-        const hasOpenSession = todaySessions.some((s: any) => s.status === "active");
-        const hasAnyToday = todaySessions.length > 0;
-        return {
-          ...agent,
-          stats: {
-            worked: visited + closed,
-            closed,
-            focus,
-          },
-          hasOpenSession,
-          hasAnyToday,
-        };
-      });
-
-      setAgents(withStats);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar equipe");
-    } finally {
-      setIsLoading(false);
-    }
+      if (request !== sequence.current) return;
+      const today = getOperationalDate();
+      setProfile(prof);
+      setScopeLabel(`${active?.name || (active?.id ? "Ciclo ativo" : "Todos os ciclos")} · produção de diárias encerradas`);
+      setUpdatedAt(new Date().toLocaleString("pt-BR"));
+      setAgents(team.map((agent) => {
+        const totals = productionTotals(records.filter((r) => r.agent_id === agent.id));
+        return { ...agent, stats: { worked: totals.worked, closed: totals.closed, focus: totals.positive },
+          ...sessionActivity(sessions.filter((s) => s.user_id === agent.id), today) };
+      }));
+    } catch (e: any) {
+      if (request === sequence.current) { setAgents([]); setLoadError(e.message || "Erro ao carregar equipe"); toast.error(e.message || "Erro ao carregar equipe"); }
+    } finally { if (request === sequence.current) setIsLoading(false); }
   }
 
   const handleCreateAgent = async (e: React.FormEvent) => {
@@ -278,22 +182,21 @@ export function SupervisionDashboard() {
     setRgLoading(true);
     setRgBoletins([]);
     try {
-      const { data: boletins, error: bErr } = await supabase
+      const boletins = await readAllQueryPages<any>(supabase
         .from("boletins_rg")
         .select("id, block_number, locality, municipality, finalized_at, created_at")
         .eq("agent_id", agent.id)
-        .order("created_at", { ascending: false });
-      if (bErr) throw bErr;
+        .order("created_at", { ascending: false }).order("id"));
 
       const list = boletins || [];
       const ids = list.map((b: any) => b.id);
       let props: any[] = [];
       if (ids.length) {
-        const { data: pdata } = await supabase
+        const pdata = await readAllQueryPages<any>(supabase
           .from("properties")
           .select("id, boletim_id, block_number, latitude, longitude")
-          .in("boletim_id", ids);
-        props = pdata || [];
+          .in("boletim_id", ids).order("id"));
+        props = pdata;
       }
 
       const enriched = list.map((b: any) => {
@@ -315,9 +218,9 @@ export function SupervisionDashboard() {
   const canSeeSupervisors = role === "coordenador" || role === "admin_master";
 
   const totals = useMemo(() => {
-    const active = agents.filter((a) => a.is_active).length;
-    const inactive = agents.filter((a) => !a.is_active).length;
-    return { total: agents.length, active, inactive };
+    const fieldAgents = agents.filter((a) => ["agente", "agent"].includes(a.role));
+    const active = fieldAgents.filter((a) => a.is_active !== false).length;
+    return { total: fieldAgents.length, active, inactive: fieldAgents.length - active };
   }, [agents]);
 
   const filteredAgents = useMemo(() => {
@@ -328,9 +231,9 @@ export function SupervisionDashboard() {
       if (!m) return false;
       if (filter === "supervisors") return a.role === "supervisor";
       if (filter === "agents") return a.role === "agente" || a.role === "agent";
-      if (filter === "active") return a.is_active;
-      if (filter === "inactive") return !a.is_active;
-      if (filter === "no_session") return !a.hasAnyToday;
+      if (filter === "active") return a.is_active !== false;
+      if (filter === "inactive") return !a.is_active !== false;
+      if (filter === "no_session") return ["agente", "agent"].includes(a.role) && a.is_active !== false && !a.hasAnyToday;
       return true;
     });
   }, [agents, searchTerm, filter]);
@@ -338,8 +241,8 @@ export function SupervisionDashboard() {
   const totalWorked = agents.reduce((s, a) => s + (a.stats?.worked || 0), 0);
   const totalClosed = agents.reduce((s, a) => s + (a.stats?.closed || 0), 0);
   const totalFocus = agents.reduce((s, a) => s + (a.stats?.focus || 0), 0);
-  const alertsNoActivity = agents.filter((a) => a.is_active && !a.hasAnyToday).length;
-  const progressPct = totalWorked > 0 ? Math.round((totalClosed / Math.max(totalWorked, 1)) * 100) : 0;
+  const alertsNoActivity = agents.filter((a) => ["agente", "agent"].includes(a.role) && a.is_active !== false && !a.hasAnyToday).length;
+  const progressPct = totalWorked + totalClosed > 0 ? Math.round((totalClosed / (totalWorked + totalClosed)) * 100) : 0;
   const roleLabel =
     role === "admin_master"
       ? "ADMIN MASTER"
@@ -424,7 +327,7 @@ export function SupervisionDashboard() {
         <div className="mt-3 grid grid-cols-3 gap-2">
           <OpCard label="Trabalhados" value={totalWorked} color="text-white" />
           <OpCard label="Fechados" value={totalClosed} color="text-white" />
-          <OpCard label="Focos" value={totalFocus} color="text-[#f87171]" />
+          <OpCard label="Focos+" value={totalFocus} color="text-[#f87171]" />
         </div>
       </div>
 
@@ -500,10 +403,16 @@ export function SupervisionDashboard() {
           </Dialog>
         </div>
 
-        {/* Métricas */}
+        <div className="rounded-xl bg-white p-3 text-xs text-slate-600 space-y-2">
+        <p>{scopeLabel} · {role === "admin_master" ? "Todos os agentes e supervisores cadastrados" : "Equipe vinculada"} · Fonte: servidor · {updatedAt || "aguardando atualização"}</p>
+        <p>{agents.filter((a) => a.role === "supervisor").length} supervisor(es). Atividade de hoje considera somente a data de hoje; jornadas pausadas e antigas abertas aparecem como jornada em aberto.</p>
+        <Button size="sm" variant="outline" onClick={fetchAll} disabled={isLoading}>Atualizar equipe</Button>
+        {loadError && <p role="alert" className="text-red-700">{loadError}. Os indicadores estão indisponíveis.</p>}
+      </div>
+      {/* Métricas */}
         <div className="grid grid-cols-3 gap-3">
           <MetricCard
-            label="Total"
+            label="Agentes"
             value={totals.total}
             icon={Users}
             color="#185fa5"
@@ -622,13 +531,14 @@ export function SupervisionDashboard() {
                     <div className="flex items-center gap-4 mt-2">
                       <MiniStat label="Trab" value={agent.stats?.worked || 0} />
                       <MiniStat label="Fech" value={agent.stats?.closed || 0} />
-                      <MiniStat label="Focos" value={agent.stats?.focus || 0} danger />
+                      <MiniStat label="Focos+" value={agent.stats?.focus || 0} danger />
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-50">
-                  {!agent.hasAnyToday && agent.is_active && (
+                  {agent.hasFuture && <span className="text-[10px] text-blue-700 mr-2">Jornada futura registrada</span>}
+                  {!agent.hasAnyToday && agent.is_active !== false && ["agente", "agent"].includes(agent.role) && (
                     <span className="mr-auto inline-flex items-center gap-1 text-[10px] font-bold text-amber-600">
                       <AlertTriangle className="h-3 w-3" /> Sem sessão hoje
                     </span>
@@ -688,7 +598,7 @@ export function SupervisionDashboard() {
               <div className="grid grid-cols-3 gap-2">
                 <StatBox label="Trabalhados" value={viewingAgent.stats?.worked || 0} />
                 <StatBox label="Fechados" value={viewingAgent.stats?.closed || 0} />
-                <StatBox label="Focos" value={viewingAgent.stats?.focus || 0} danger />
+                <StatBox label="Focos+" value={viewingAgent.stats?.focus || 0} danger />
               </div>
             </div>
           )}

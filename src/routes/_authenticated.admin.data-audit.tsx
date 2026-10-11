@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
 import { db } from "@/db/database";
+import { db as operationalDb } from "@/lib/offline/db";
+import { requeueAdminSyncErrors } from "@/lib/admin-sync-retry";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -112,7 +114,8 @@ function downloadCSV(rows: Record<string, any>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function ModuleScoreRow({ name, score }: { name: string; score: number }) {
+function ModuleScoreRow({ name, score }: { name: string; score?: number }) {
+  if (score == null) return <div className="text-sm text-muted-foreground">{name}: indisponível</div>;
   const c = scoreColor(score);
   return (
     <div className="grid grid-cols-[100px_1fr_60px] items-center gap-3 py-1.5">
@@ -139,6 +142,8 @@ function ExecCard({ icon: Icon, label, value, hint, cls }: { icon: any; label: s
 }
 
 function DataAuditPage() {
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [offlineError, setOfflineError] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [offline, setOffline] = useState<{ pending: number; errors: number; last?: number }>({ pending: 0, errors: 0 });
   const [loading, setLoading] = useState(true);
@@ -148,11 +153,11 @@ function DataAuditPage() {
 
   async function loadOffline() {
     try {
-      const pending = await db.syncQueue.where("status").equals("pending").count();
-      const errors = await db.syncQueue.where("status").equals("error").count();
-      const last = await db.syncQueue.orderBy("processedAt").last();
-      setOffline({ pending, errors, last: last?.processedAt });
-    } catch { setOffline({ pending: 0, errors: 0 }); }
+      const pending = await db.syncQueue.where("status").anyOf("pending", "processing").count() + await operationalDb.mutations.where("status").anyOf("pending", "syncing").count();
+      const errors = await db.syncQueue.where("status").equals("error").count() + await operationalDb.mutations.where("status").equals("error").count();
+      const last = await db.syncQueue.orderBy("createdAt").reverse().filter((r) => !!r.processedAt).first();
+      setOffline({ pending, errors, last: last?.processedAt }); setOfflineError(null);
+    } catch (e: any) { setOfflineError(e.message || "Fila local indisponível"); }
   }
 
   async function load() {
@@ -166,8 +171,8 @@ function DataAuditPage() {
       async () => null,
       { label: "data_audit_report" },
     );
-    if (data) setReport(data);
-    else if (!isOnline()) toast.message("Relatório indisponível offline");
+    setReport(data);
+    setLoadError(data ? null : "Relatório indisponível. Verifique a conexão e tente atualizar.");
     await loadOffline();
     setLoading(false);
   }
@@ -194,20 +199,23 @@ function DataAuditPage() {
   }, [report]);
 
   async function saveSnapshot(actionsCount = 0) {
+    if (!report || offlineError) return;
     try {
-      await supabase.rpc("save_data_audit_snapshot", {
+      const { error } = await supabase.rpc("save_data_audit_snapshot", {
         _score: overall, _module_scores: scores as any,
         _alerts_count: alerts.length, _actions_count: actionsCount,
       } as any);
-    } catch { /* silencioso */ }
+      if (error) throw error;
+    } catch (e) { console.warn("[AUDIT_SNAPSHOT]", e); }
   }
 
   async function runAction(name: string, fn: () => Promise<any>) {
     setBusy(name);
     try {
       const res = await fn();
-      toast.success(`${name} executado.`);
-      await supabase.from("audit_log").insert({ action: name, entity: "data_audit", metadata: res ?? {} } as any);
+      const { error } = await supabase.from("audit_log").insert({ action: name, entity: "data_audit", metadata: res ?? {} } as any);
+      if (error) toast.warning(`Ação executada, mas o log não foi salvo: ${error.message}`);
+      else toast.success(`${name} executado.`);
       await load();
     } catch (e: any) { toast.error(`${name}: ${e?.message || e}`); }
     finally { setBusy(null); }
@@ -217,15 +225,18 @@ function DataAuditPage() {
     setBusy("fix_all");
     const result: Record<string, any> = {};
     try {
-      result.sync_cycles = (await supabase.rpc("sync_cycle_statuses")).data;
+      const { data, error } = await supabase.rpc("sync_cycle_statuses");
+      if (error) throw error;
+      result.sync_cycles = data;
     } catch (e: any) { result.sync_cycles = { error: e?.message }; }
     try {
-      result.agent_integrity = (await supabase.rpc("agent_integrity_check", { _fix: true })).data;
+      const { data, error } = await supabase.rpc("agent_integrity_check", { _fix: true });
+      if (error) throw error;
+      result.agent_integrity = data;
     } catch (e: any) { result.agent_integrity = { error: e?.message }; }
     try {
-      const removed = await db.syncQueue.where("status").equals("error").delete();
-      result.offline_errors_cleared = removed;
-    } catch (e: any) { result.offline_errors_cleared = { error: e?.message }; }
+      result.offline_errors_requeued = await requeueAdminSyncErrors();
+    } catch (e: any) { result.offline_errors_requeued = { error: e?.message }; }
     try {
       await supabase.from("audit_log").insert({
         action: "fix_all", entity: "data_audit", metadata: result,
@@ -233,7 +244,8 @@ function DataAuditPage() {
     } catch { /* ignore */ }
     setFixAllResult(result);
     setBusy(null);
-    toast.success("Correção em lote concluída.");
+    if (Object.values(result).some((r) => r?.error)) toast.warning("Lote concluído com falhas. Consulte o resultado antes de repetir.");
+    else toast.success("Correções concluídas. Itens offline preservados para nova tentativa.");
     await load();
     await saveSnapshot(Object.keys(result).length);
   }
@@ -276,16 +288,16 @@ function DataAuditPage() {
 
       {/* SEÇÃO 10 — Dashboard Executivo */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <ExecCard icon={ShieldCheck} label="Saúde geral" value={`${overall}%`}
+        <ExecCard icon={ShieldCheck} label="Saúde geral" value={report && !offlineError ? `${overall}%` : "Indisponível"}
           cls={overallColor.cls} hint={overallColor.dot} />
-        <ExecCard icon={MapPin} label="Cobertura GPS" value={`${pct(r.gps?.geocoded || 0, r.gps?.total || 0)}%`}
+        <ExecCard icon={MapPin} label="Cobertura GPS" value={report ? `${pct(r.gps?.geocoded || 0, r.gps?.total || 0)}%` : "Indisponível"}
           hint={`${r.gps?.geocoded || 0}/${r.gps?.total || 0}`} />
         <ExecCard icon={Layers} label="Cobertura Territorial" value={`${territorial.cobertura}%`}
           hint={`${territorial.ativos}/${territorial.total} quarteirões`} />
-        <ExecCard icon={Wifi} label="Sincronização" value={offline.errors > 0 ? "Erro" : offline.pending > 0 ? "Pendente" : "OK"}
+        <ExecCard icon={Wifi} label="Sincronização" value={offlineError ? "Indisponível" : offline.errors > 0 ? "Erro" : offline.pending > 0 ? "Pendente" : "OK"}
           cls={offline.errors ? "text-red-600" : offline.pending ? "text-amber-600" : "text-emerald-600"}
           hint={`${offline.pending} pendentes · ${offline.errors} falhas`} />
-        <ExecCard icon={CheckCircle2} label="Qualidade dos dados" value={`${scores.properties}%`}
+        <ExecCard icon={CheckCircle2} label="Qualidade dos dados" value={report ? `${scores.properties}%` : "Indisponível"}
           cls={scoreColor(scores.properties).cls} />
         <ExecCard icon={AlertTriangle} label="Alertas críticos" value={criticalCount}
           cls={criticalCount ? "text-red-600" : "text-emerald-600"}
@@ -301,7 +313,7 @@ function DataAuditPage() {
         </CardHeader>
         <CardContent>
           {(Object.keys(scores) as ModuleKey[]).map((k) => (
-            <ModuleScoreRow key={k} name={MODULE_LABEL[k]} score={scores[k]} />
+            <ModuleScoreRow key={k} name={MODULE_LABEL[k]} score={report && !(k === "offline" && offlineError) ? scores[k] : undefined} />
           ))}
         </CardContent>
       </Card>
@@ -354,6 +366,8 @@ function DataAuditPage() {
         </CardContent>
       </Card>
 
+      {(loadError || offlineError) && <p role="alert" className="text-amber-700">{loadError || offlineError} As pontuações não representam uma validação completa.</p>}
+
       {/* Ações corretivas individuais (mantido da Fase 1) */}
       <Card>
         <CardHeader className="pb-2">
@@ -363,22 +377,18 @@ function DataAuditPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button disabled={busy !== null} onClick={() => runAction("sync_cycle_statuses",
-            async () => (await supabase.rpc("sync_cycle_statuses")).data)} variant="outline" className="gap-2">
+            async () => { const { data, error } = await supabase.rpc("sync_cycle_statuses"); if (error) throw error; return data; })} variant="outline" className="gap-2">
             <RefreshCw className="h-4 w-4" /> Sincronizar Ciclos
           </Button>
           <Button disabled={busy !== null} onClick={() => runAction("agent_integrity_check",
-            async () => (await supabase.rpc("agent_integrity_check", { _fix: true })).data)} variant="outline" className="gap-2">
+            async () => { const { data, error } = await supabase.rpc("agent_integrity_check", { _fix: true }); if (error) throw error; return data; })} variant="outline" className="gap-2">
             <RefreshCw className="h-4 w-4" /> Corrigir Vínculos de Agente
           </Button>
           <Button disabled={busy !== null} variant="outline" className="gap-2"
             onClick={() => {
-              if (!window.confirm("Isso apaga permanentemente as mutações offline com erro (edições que nao foram sincronizadas). Continuar?")) return;
-              runAction("clear_offline_errors", async () => {
-                const c = await db.syncQueue.where("status").equals("error").delete();
-                return { removed: c };
-              });
+              runAction("requeue_offline_errors", () => requeueAdminSyncErrors());
             }}>
-            <RefreshCw className="h-4 w-4" /> Limpar Pendências Offline
+            <RefreshCw className="h-4 w-4" /> Preparar nova tentativa offline
           </Button>
         </CardContent>
       </Card>
@@ -396,7 +406,7 @@ function DataAuditPage() {
             <ul className="text-sm space-y-1.5 list-disc pl-5">
               <li>Sincronizar status dos ciclos por data</li>
               <li>Recriar vínculos faltantes de agentes</li>
-              <li>Limpar pendências offline com erro</li>
+              <li>Reenfileirar itens com erro deste dispositivo, preservando todos os dados</li>
               <li>Registrar tudo no log de auditoria</li>
               <li>Salvar snapshot de saúde</li>
             </ul>

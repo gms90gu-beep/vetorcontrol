@@ -1,3 +1,5 @@
+import { readAllQueryPages } from "@/lib/query-pages";
+import { reconcileIssueCount } from "@/lib/management-metrics";
 /**
  * System Health — Centro de Operações VetorControl.
  * Read-only aggregator that consolidates every audit module score into a
@@ -60,6 +62,7 @@ async function safe<T>(label: string, fn: () => Promise<T>, logs: string[]): Pro
   const t0 = Date.now();
   try {
     const value = await fn();
+    if (value == null) throw new Error("Consulta não retornou um diagnóstico válido");
     const ms = Date.now() - t0;
     logs.push(`[SYSTEM_HEALTH_MODULE] ${label} ok in ${ms}ms`);
     return { value, err: null, ms };
@@ -83,12 +86,12 @@ export const runSystemHealth = createServerFn({ method: "POST" })
 
     // ── Run every audit module in parallel ─────────────────────
     const [dataAudit, georef, rbac, rgHomo, rgRecon, cycles] = await Promise.all([
-      safe("data_audit", async () => (await supabase.rpc("data_audit_report")).data, logs),
+      safe("data_audit", async () => { const { data, error } = await supabase.rpc("data_audit_report"); if (error) throw error; return data; }, logs),
       safe("georef_audit", () => getGeorefAudit({ data: {} } as any), logs),
       safe("rbac_audit", () => runRbacAudit({} as any), logs),
       safe("rg_homologation", () => runRgHomologation({} as any), logs),
       safe("rg_reconcile", () => getReconcilePreview({} as any), logs),
-      safe("cycle_audit", async () => (await supabase.from("cycles").select("*")).data, logs),
+      safe("cycle_audit", () => readAllQueryPages<any>(supabase.from("cycles").select("*").order("id")), logs),
     ]);
 
     // ── Compute per-module scores ──────────────────────────────
@@ -96,7 +99,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
 
     // Data Audit — use embedded scores if present; otherwise heuristic
     const da = dataAudit.value as any;
-    let dataScore = 100;
+    let dataScore = da ? 100 : 0;
     if (da) {
       const rg = da.rg || {}; const props = da.properties || {}; const v = da.visits || {};
       const totalIssues = (rg.orphans || 0) + (props.without_block || 0) + (v.orphan || 0) + (v.without_cycle || 0);
@@ -127,8 +130,8 @@ export const runSystemHealth = createServerFn({ method: "POST" })
 
     // RG Pipeline — synthesized from reconcile preview
     const rp = rgRecon.value as any;
-    const pendingFix = (rp?.boletinsWithoutBlock || 0) + (rp?.propertiesWithoutBlock || 0) + (rp?.orphanBlocks || 0);
-    const pipeScore = Math.max(0, 100 - Math.min(50, pendingFix));
+    const pendingFix = reconcileIssueCount(rp);
+    const pipeScore = rp ? Math.max(0, 100 - Math.min(50, pendingFix)) : 0;
     modules.push({
       key: "rg_pipeline", label: "RG Pipeline", score: pipeScore,
       status: statusFromScore(pipeScore), lastRun: now(), lastError: rgRecon.err,
@@ -159,7 +162,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
     const today = getOperationalDate();
     const expired = cs.filter((c) => c.status === "in_progress" && c.end_date < today);
     const cycleIssues = (inProgress.length > 1 ? 1 : 0) + expired.length;
-    const cycleScore = Math.max(0, 100 - cycleIssues * 20);
+    const cycleScore = cycles.value ? Math.max(0, 100 - cycleIssues * 20) : 0;
     modules.push({
       key: "cycle_audit", label: "Cycle Audit", score: cycleScore,
       status: statusFromScore(cycleScore), lastRun: now(), lastError: cycles.err,
@@ -172,21 +175,28 @@ export const runSystemHealth = createServerFn({ method: "POST" })
     logs.push(`[SYSTEM_HEALTH_SCORE] global=${globalScore} status=${status}`);
 
     // ── Executive cards ────────────────────────────────────────
-    const { count: totalProps } = await supabase.from("properties").select("id", { count: "exact", head: true });
-    const { count: geoProps } = await supabase.from("properties").select("id", { count: "exact", head: true })
-      .not("latitude", "is", null).not("longitude", "is", null);
-    const { count: totalBoletins } = await supabase.from("boletins_rg").select("id", { count: "exact", head: true });
-    const { count: totalVisits } = await supabase.from("visits").select("id", { count: "exact", head: true });
-    const { count: totalDwr } = await supabase.from("daily_work_records").select("id", { count: "exact", head: true });
-    const { count: totalBlocks } = await supabase.from("blocks").select("id", { count: "exact", head: true });
-    const { count: pendingOff } = await supabase.from("pending_records").select("id", { count: "exact", head: true });
+    const checkedCount = async (query: any) => {
+      const { count, error } = await query;
+      if (error) throw error;
+      if (count == null) throw new Error("Contagem indisponível no diagnóstico");
+      return count;
+    };
+    const [totalProps, geoProps, totalBoletins, totalVisits, totalDwr, totalBlocks, pendingOff] = await Promise.all([
+      checkedCount(supabase.from("properties").select("id", { count: "exact", head: true })),
+      checkedCount(supabase.from("properties").select("id", { count: "exact", head: true }).not("latitude", "is", null).not("longitude", "is", null)),
+      checkedCount(supabase.from("boletins_rg").select("id", { count: "exact", head: true })),
+      checkedCount(supabase.from("visits").select("id", { count: "exact", head: true })),
+      checkedCount(supabase.from("daily_work_records").select("id", { count: "exact", head: true })),
+      checkedCount(supabase.from("blocks").select("id", { count: "exact", head: true })),
+      checkedCount(supabase.from("pending_records").select("id", { count: "exact", head: true })),
+    ]);
     const gpsPct = totalProps ? Math.round(((geoProps || 0) / totalProps) * 100) : 0;
 
     const cards: SystemHealthResult["cards"] = [
       { key: "saude", label: "Saúde Geral", value: globalScore, status, suffix: "%" },
       { key: "banco", label: "Banco", value: dataScore, status: statusFromScore(dataScore), suffix: "%" },
-      { key: "offline", label: "Offline", value: pendingOff || 0, status: (pendingOff || 0) > 50 ? "warning" : "healthy" },
-      { key: "sync", label: "Sincronização", value: (pendingOff || 0) === 0 ? "OK" : "Pendente", status: (pendingOff || 0) === 0 ? "healthy" : "warning" },
+      { key: "offline", label: "Registros de pendências (servidor)", value: pendingOff || 0, status: (pendingOff || 0) > 50 ? "warning" : "healthy" },
+      { key: "sync", label: "Fila offline dos dispositivos", value: "Não aferida", status: "warning" },
       { key: "rbac", label: "RBAC", value: rb?.score ?? 0, status: statusFromScore(rb?.score ?? 0), suffix: "%" },
       { key: "rg", label: "RG", value: totalBoletins || 0, status: "healthy" },
       { key: "mapa", label: "Mapa", value: geoProps || 0, status: "healthy" },
@@ -196,7 +206,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
       { key: "pdf", label: "PDF", value: "OK", status: "healthy" },
       { key: "cache", label: "Cache", value: "OK", status: "healthy" },
       { key: "gps", label: "GPS", value: gpsPct, status: statusFromScore(gpsPct), suffix: "%" },
-      { key: "fila", label: "Fila Offline", value: pendingOff || 0, status: (pendingOff || 0) > 50 ? "warning" : "healthy" },
+      { key: "fila", label: "Fila deste dispositivo", value: "Consultar diagnóstico local", status: "warning" },
       { key: "quarteirones", label: "Quarteirões", value: totalBlocks || 0, status: "healthy" },
       { key: "boletins", label: "Boletins", value: totalBoletins || 0, status: "healthy" },
       { key: "visitas", label: "Visitas", value: totalVisits || 0, status: "healthy" },
@@ -232,7 +242,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
       if (!count) push("warning", "rbac", "Supervisor sem equipe", s.full_name || s.id, 1);
     }
     // Offline
-    if ((pendingOff || 0) > 0) push("warning", "offline", "Pendências Offline", "Registros aguardando sincronização", pendingOff || 0);
+    if ((pendingOff || 0) > 0) push("warning", "offline", "Registros de pendências no servidor", "Esta contagem não mede a fila offline dos dispositivos", pendingOff || 0);
     // Heatmap vazio
     if ((geoProps || 0) === 0) push("warning", "mapa", "Heatmap vazio", "Nenhum imóvel georreferenciado");
 
@@ -244,7 +254,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
     // ── Timeline (audit_log) ───────────────────────────────────
     const { data: alog } = await supabase
       .from("audit_log")
-      .select("created_at, action, entity, metadata, user_id")
+      .select("created_at, action, entity, metadata, actor_id")
       .order("created_at", { ascending: false })
       .limit(30);
     const timeline = (alog || []).map((l: any) => ({
@@ -252,7 +262,7 @@ export const runSystemHealth = createServerFn({ method: "POST" })
       module: l.entity || "—",
       event: l.action || "—",
       result: l.metadata?.status || l.metadata?.result || "ok",
-      user: l.user_id || "—",
+      user: l.actor_id || "—",
       origin: l.metadata?.origin || "web",
     }));
 

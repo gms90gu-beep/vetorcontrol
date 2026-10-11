@@ -305,7 +305,7 @@ export function flushMutations(options?: { retryErroredImmediately?: boolean }):
     return activeFlush.then(() => flushMutations(options));
   }
   const flush = typeof navigator !== "undefined" && navigator.locks
-    ? navigator.locks.request("vetorcontrol-mutation-sync", () => runFlushMutations(options))
+    ? Promise.resolve(navigator.locks.request("vetorcontrol-mutation-sync", () => runFlushMutations(options)))
     : runFlushMutations(options);
   const wrapped = flush.finally(() => {
     if (activeFlush === wrapped) activeFlush = null;

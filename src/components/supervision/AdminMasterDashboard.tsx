@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch, isOnline } from "@/lib/offline/safe-fetch";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { readAllQueryPages } from "@/lib/query-pages";
+import { productionTotals } from "@/lib/management-metrics";
 
 type ProfileRow = {
   id: string;
@@ -50,6 +52,7 @@ type ProfileRow = {
   is_active: boolean | null;
   created_at: string;
   supervisor_id: string | null;
+  coordinator_id: string | null;
 };
 
 type EditState = {
@@ -59,11 +62,13 @@ type EditState = {
   role: string;
   is_active: boolean;
   supervisor_id: string | null;
+  coordinator_id: string | null;
 };
 
 type HistoryStats = {
   visits: number;
-  blocks: number;
+  worked: number;
+  completedBlocks: number;
   lastActivity: string | null;
 };
 
@@ -106,6 +111,7 @@ export function AdminMasterDashboard() {
   const isAdminMaster =
     currentUserRole === "admin_master";
 
+  const detailSequence = useRef(0);
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -133,11 +139,7 @@ export function AdminMasterDashboard() {
   async function fetchUsers() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
+      const data = await readAllQueryPages<any>(supabase.from("profiles").select("*").order("created_at", { ascending: false }).order("id"));
       setUsers((data as ProfileRow[]) ?? []);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -185,6 +187,7 @@ export function AdminMasterDashboard() {
   };
 
   const openDetails = useCallback(async (u: ProfileRow) => {
+    const request = ++detailSequence.current;
     setSelected(u);
     setEdit({
       full_name: u.full_name ?? "",
@@ -193,55 +196,53 @@ export function AdminMasterDashboard() {
       role: u.role,
       is_active: u.is_active ?? true,
       supervisor_id: u.supervisor_id ?? null,
+      coordinator_id: u.coordinator_id ?? null,
     });
     setHistory(null);
 
     setHistoryLoading(true);
     try {
-      const { data: agent } = await supabase
+      const { data: agent, error: agentError } = await supabase
         .from("agents")
         .select("phone")
         .eq("profile_id", u.id)
         .maybeSingle();
 
+      if (agentError) throw agentError;
+      if (request !== detailSequence.current) return;
       if (agent?.phone) {
         setEdit((prev) => (prev ? { ...prev, phone: agent.phone ?? "" } : prev));
       }
 
       let visitCount = 0;
-      let blockCount = 0;
       let lastActivity: string | null = null;
 
       // visits.agent_id e daily_work_records.agent_id armazenam profile_id
-      const { count: vc } = await supabase
+      const { count: vc, error: visitError } = await supabase
         .from("visits")
         .select("*", { count: "exact", head: true })
         .eq("agent_id", u.id);
+      if (visitError) throw visitError;
       visitCount = vc ?? 0;
 
-      const { data: lastVisit } = await supabase
+      const { data: lastVisit, error: lastVisitError } = await supabase
         .from("visits")
         .select("visit_date")
         .eq("agent_id", u.id)
         .order("visit_date", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (lastVisitError) throw lastVisitError;
       lastActivity = lastVisit?.visit_date ?? null;
 
-      const { data: dailyRecs } = await supabase
-        .from("daily_work_records")
-        .select("properties_worked")
-        .eq("agent_id", u.id);
-      blockCount = (dailyRecs ?? []).reduce(
-        (acc, r: any) => acc + (r.properties_worked ?? 0),
-        0,
-      );
-
-      setHistory({ visits: visitCount, blocks: blockCount, lastActivity });
+      const dailyRecs = await readAllQueryPages<any>(supabase.from("daily_work_records").select("*").eq("agent_id", u.id).order("id"));
+      const totals = productionTotals(dailyRecs);
+      if (request !== detailSequence.current) return;
+      setHistory({ visits: visitCount, worked: totals.worked, completedBlocks: totals.blocksCompleted, lastActivity });
     } catch (e) {
       console.error("[Admin] Erro carregando histórico:", e);
     } finally {
-      setHistoryLoading(false);
+      if (request === detailSequence.current) setHistoryLoading(false);
     }
   }, []);
 
@@ -249,7 +250,7 @@ export function AdminMasterDashboard() {
     if (!selected || !edit) return;
     setSaving(true);
     try {
-      const { error } = await supabase.functions.invoke("manage-agents", {
+      const { data, error } = await supabase.functions.invoke("manage-agents", {
         body: {
           action: "update_user",
           userData: {
@@ -260,10 +261,11 @@ export function AdminMasterDashboard() {
             role: isAdminMaster ? edit.role : undefined,
             is_active: edit.is_active,
             supervisor_id: edit.role === "agente" ? edit.supervisor_id : null,
+            coordinator_id: edit.role === "supervisor" ? edit.coordinator_id : null,
           },
         },
       });
-      if (error) throw error;
+      if (error || data?.error) throw error || new Error(data.error);
       toast.success("Alterações salvas");
       await fetchUsers();
       setSelected(null);
@@ -316,7 +318,7 @@ export function AdminMasterDashboard() {
     }
     if (!confirm(`Deseja realmente excluir ${selected.full_name}?`)) return;
     try {
-      const { error } = await supabase.functions.invoke("manage-agents", {
+      const { data, error } = await supabase.functions.invoke("manage-agents", {
         body: { action: "delete_user", userId: selected.id },
       });
       if (error) throw error;
@@ -691,6 +693,15 @@ export function AdminMasterDashboard() {
                   </Field>
                 )}
 
+                {edit.role === "supervisor" && <Field label="Coordenador responsável">
+                  <select value={edit.coordinator_id || ""} onChange={(e) => setEdit({ ...edit, coordinator_id: e.target.value || null })}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl h-11 px-3 text-sm text-white">
+                    <option value="">— Sem coordenador —</option>
+                    {users.filter((p) => p.role === "coordenador" && p.is_active !== false).map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">Este vínculo define a equipe visível ao coordenador. Não redistribui produção histórica.</p>
+                </Field>}
+
                 <Field label="Status">
                   <div className="flex items-center gap-3">
                     <Badge className={edit.is_active ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}>
@@ -716,10 +727,11 @@ export function AdminMasterDashboard() {
                     <div className="flex items-center gap-2 text-slate-400 text-sm">
                       <Loader2 className="h-4 w-4 animate-spin" /> Carregando histórico...
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                  ) : !history ? <p className="text-sm text-amber-400">Histórico indisponível; reabra o detalhe para tentar novamente.</p> : (
+                    <div className="grid grid-cols-2 gap-3">
                       <Stat label="Visitas" value={history?.visits ?? 0} />
-                      <Stat label="Imóveis" value={history?.blocks ?? 0} />
+                      <Stat label="Imóveis trabalhados" value={history?.worked ?? 0} />
+                      <Stat label="Quart. encerrados" value={history?.completedBlocks ?? 0} />
                       <Stat
                         label="Última atividade"
                         value={

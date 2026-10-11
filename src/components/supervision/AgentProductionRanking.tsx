@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Trophy, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { downloadCSV } from "@/lib/institutional-export";
 import { getOperationalDate } from "@/lib/operational-date";
 import { getEpiWeek, epiWeekToDateRange } from "@/lib/cycle-week";
 
@@ -23,13 +25,15 @@ function currentEpiWeekRange(base = new Date()): { start: string; end: string } 
 }
 
 export function AgentProductionRanking() {
+  const { user, role } = useAuth();
   const defaultRange = currentEpiWeekRange();
   const [from, setFrom] = useState(defaultRange.start);
   const [to, setTo] = useState(defaultRange.end);
   const fetchProduction = useServerFn(getAgentProduction);
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["agent-production", from, to],
+  const { data, isLoading, refetch, isFetching, error } = useQuery({
+    queryKey: ["agent-production", user?.id, role, from, to],
+    enabled: !!user?.id && !!from && !!to && from <= to,
     queryFn: () => fetchProduction({ data: { from, to } }),
   });
 
@@ -49,11 +53,7 @@ export function AgentProductionRanking() {
       r.deposits_eliminated, r.positive_foci, r.tubitos_used, r.tubitos_collected,
       r.larvae_collected, r.cargas_collected,
     ]);
-    const csv = [header, ...body].map((l) => l.join(";")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = `producao_agentes_${from}_${to}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    downloadCSV(`producao_agentes_${from}_${to}.csv`, header, body);
     toast.success("CSV exportado");
   };
 
@@ -81,20 +81,21 @@ export function AgentProductionRanking() {
             <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
               {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
             </Button>
-            <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows.length}>
+            <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows.length || !!error || isFetching || from > to}>
               <Download className="h-4 w-4 mr-1" /> CSV
             </Button>
           </div>
           {data && (
             <p className="text-xs text-muted-foreground">
-              Escopo: <strong>{data.scope === "admin_master" ? "Admin Master (global)" : "Supervisor (equipe)"}</strong>
+              Escopo: <strong>{data.scope === "admin_master" ? "Admin Master (global)" : data.scope === "coordenador" ? "Coordenador (equipes vinculadas)" : "Supervisor (equipe)"}</strong>
               {" · "}Fonte: <code>daily_work_records</code>
             </p>
           )}
         </CardContent>
       </Card>
 
-      {isLoading ? (
+      {(error || from > to) && <p role="alert" className="text-red-700">{from > to ? "Período inválido." : (error as Error)?.message} Tente atualizar.</p>}
+      {error || from > to ? null : isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
