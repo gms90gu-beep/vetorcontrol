@@ -246,12 +246,12 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
   }, [cycleOptionsQuery.isLoading, cycleOptions, years]);
 
   const props = useQuery({
-    queryKey: ["op-map-points", from, to, filterCycleIds, agentId],
-    queryFn: () => fetchProps({ data: { from, to, cycleIds: filterCycleIds, agentId } }),
+    queryKey: ["op-map-points", from, to, filterCycleIds, agentId, "all_open"],
+    queryFn: () => fetchProps({ data: { from, to, cycleIds: filterCycleIds, agentId, pendencyScope: "all_open" } }),
   });
   const blocks = useQuery({
-    queryKey: ["op-map-blocks", from, to, filterCycleIds, agentId],
-    queryFn: () => fetchBlocks({ data: { from, to, cycleIds: filterCycleIds, agentId } }),
+    queryKey: ["op-map-blocks", from, to, filterCycleIds, agentId, "all_open"],
+    queryFn: () => fetchBlocks({ data: { from, to, cycleIds: filterCycleIds, agentId, pendencyScope: "all_open" } }),
     enabled: showBlocks,
   });
   const coverage = useQuery({

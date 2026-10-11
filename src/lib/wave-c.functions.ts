@@ -1,3 +1,4 @@
+import { scopeMapPendencies, type MapPendencyScope } from "@/lib/map-pendency-scope";
 import { summarizePendencyCycles } from "@/lib/pendency-summary";
 import { mapVisitInPeriod } from "@/lib/map-visit-period";
 import { readAllQueryPages } from "@/lib/query-pages";
@@ -715,7 +716,7 @@ async function scopedAgentIds(
   return (agents ?? []).map((a: any) => a.id);
 }
 
-async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }, context: { supabase: any; userId: string }): Promise<{ points: PropertyMapPoint[]; truncated: boolean; focus_without_gps: number }> {
+async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null; pendencyScope?: MapPendencyScope }, context: { supabase: any; userId: string }): Promise<{ points: PropertyMapPoint[]; truncated: boolean; focus_without_gps: number }> {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
@@ -785,7 +786,11 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = [];
     for (const ids of idChunks) {
-      let query = supabaseAdmin.from("property_pendencies").select("property_id, resolved_at").in("property_id", ids);
+      let query = scopeMapPendencies(
+        supabaseAdmin.from("property_pendencies").select("property_id, resolved_at").in("property_id", ids).is("resolved_at", null),
+        data.cycleIds, data.pendencyScope,
+      );
+      if (!query) continue;
       if (profileIds) query = query.in("agent_id", profileIds);
       pendResults.push({ data: await readAllQueryPages(query.order("id")), error: null });
     }
@@ -925,12 +930,12 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
 
 export const getPropertyMapPoints = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null; pendencyScope?: MapPendencyScope }) => input)
   .handler(({ data, context }) => readPropertyMapPoints(data, context));
 
 export const getBlockRiskScores = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null }) => input)
+  .inputValidator((input: { from: string; to: string; cycleIds?: string[] | null; agentId?: string | null; pendencyScope?: MapPendencyScope }) => input)
   .handler(async ({ data, context }): Promise<{ blocks: BlockRiskScore[] }> => {
     const result = await readPropertyMapPoints(data, context);
     const points = (result.points ?? []) as PropertyMapPoint[];

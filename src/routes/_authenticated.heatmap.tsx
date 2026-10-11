@@ -92,8 +92,8 @@ function HeatmapPage() {
   });
 
   const props = useQuery({
-    queryKey: ["heatmap-props", from, to, cycleId],
-    queryFn: () => fetchProps({ data: { from, to, cycleIds: cycleId ? [cycleId] : null } }),
+    queryKey: ["heatmap-props", from, to, cycleId, "selected_cycles"],
+    queryFn: () => fetchProps({ data: { from, to, cycleIds: cycleId ? [cycleId] : null, pendencyScope: "selected_cycles" } }),
     enabled: cyclesReady,
   });
 
@@ -234,7 +234,7 @@ function HeatmapPage() {
             <Stat label="Focos identificados · alerta" value={counts.focus_found} />
             <Stat label="Focos positivos" value={counts.focus} />
             <Stat label="Fechadas/Recusadas" value={counts.closed + counts.refused} />
-            <Stat label="Pendências" value={counts.pendency} />
+            <Stat label={cycleId ? "Pendências do ciclo" : "Pendências abertas · todos os ciclos"} value={counts.pendency} />
           </div>
           {blocks.data && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
