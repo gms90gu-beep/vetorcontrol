@@ -33,9 +33,11 @@ export async function fetchFocusObservations(
   startDate: string,
   endDate: string,
   client?: any,
+  visitIds?: string[],
 ): Promise<FocusObservation[]> {
   try {
-    const query = (client ?? supabase)
+    if (visitIds && !visitIds.length) return [];
+    let query = (client ?? supabase)
       .from("visits")
       .select(
         `
@@ -49,6 +51,7 @@ export async function fetchFocusObservations(
       .gte("visit_date", `${startDate}T00:00:00-03:00`)
       .lt("visit_date", `${endDate}T23:59:59.999-03:00`)
       .order("visit_date", { ascending: true }).order("id");
+    if (visitIds) query = query.in("id", visitIds);
     const { data, error } = client ? { data: await readAllQueryPages<any>(query), error: null } : await query;
 
     if (error) {

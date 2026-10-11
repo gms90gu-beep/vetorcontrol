@@ -16,7 +16,7 @@ export async function generatePcfadWeeklyPDF(params: {
   agentAuthId: string;
   week: number;
   year: number;
-  suppliedData?: { rows: PcfadRow[]; total: PcfadRow; range: { start: string; end: string }; observations: import("@/lib/focus-observations").FocusObservation[]; title: string };
+  suppliedData?: { rows: PcfadRow[]; total: PcfadRow; range: { start: string; end: string }; observations: import("@/lib/focus-observations").FocusObservation[]; title: string; periodLabel?: string; cycleLabel?: string; fileName?: string };
 }) {
   const { agentAuthId, week, year } = params;
   try {
@@ -58,11 +58,11 @@ export async function generatePcfadWeeklyPDF(params: {
 
     pdf.setFontSize(8);
     pdf.setTextColor(80, 80, 80);
-    const cycleLabel = cycle?.number
+    const cycleLabel = params.suppliedData?.cycleLabel ?? (cycle?.number
       ? `Ciclo ${cycle.number}${cycle.year ? `/${cycle.year}` : ""}`
-      : "Ciclo —";
+      : "Ciclo —");
     pdf.text(
-      `${municipality} · ${agentName} · Matrícula ${registration} · SE ${String(week).padStart(2, "0")}/${year} (${f(range.start)}–${f(range.end)}) · ${cycleLabel}`,
+      `${municipality} · ${agentName} · Matrícula ${registration} · ${params.suppliedData?.periodLabel ?? `SE ${String(week).padStart(2, "0")}/${year} (${f(range.start)}–${f(range.end)})`} · ${cycleLabel}`,
       pageW / 2,
       17.5,
       { align: "center" },
@@ -285,7 +285,7 @@ export async function generatePcfadWeeklyPDF(params: {
     pdf.setFontSize(6.5);
     pdf.setTextColor(120, 120, 120);
     pdf.text(
-      'IIP = imóveis positivos ÷ imóveis inspecionados × 100. Campos sem dado no sistema exibem "—". Fonte: relatórios diários (daily_work_records) da SE.',
+      'IIP = imóveis positivos ÷ imóveis inspecionados × 100. Campos sem dado no sistema exibem "—". Fonte: relatórios diários (daily_work_records) do período indicado.',
       6,
       finalY,
     );
@@ -300,7 +300,7 @@ export async function generatePcfadWeeklyPDF(params: {
       align: "right",
     });
 
-    const fileName = `PCFAD_Semanal_SE${String(week).padStart(2, "0")}_${year}_${String(registration).slice(0, 12)}.pdf`;
+    const fileName = params.suppliedData?.fileName ?? `PCFAD_Semanal_SE${String(week).padStart(2, "0")}_${year}_${String(registration).slice(0, 12)}.pdf`;
     return { pdf, fileName, week, year, blob: pdf.output("blob") };
   } catch (error: any) {
     console.error("[PCFAD PDF] erro:", error);

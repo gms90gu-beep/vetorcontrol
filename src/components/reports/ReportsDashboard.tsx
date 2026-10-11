@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch } from "@/lib/offline/safe-fetch";
@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { generateOperationalPDF } from "./PDFReportGenerator";
 import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { Badge } from "@/components/ui/badge";
-import { generateWeeklyReportPDF, openWhatsAppShare } from "./WeeklyReportGenerator";
+import { generateFilteredOfficialBulletin } from "./FilteredOfficialBulletin";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
@@ -39,6 +39,9 @@ export function ReportsDashboard() {
   });
   const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
   const [dailies, setDailies] = useState<any[]>([]);
+  const requestSequence = useRef(0);
+  const [loadedFilters, setLoadedFilters] = useState<string | null>(null);
+  const filterKey = JSON.stringify([user?.id, role, filters]);
 
   const [kpiData, setKpiData] = useState({
     worked: 0,
@@ -87,6 +90,7 @@ export function ReportsDashboard() {
   const [rebuilding, setRebuilding] = useState(false);
 
   async function fetchDashboardData() {
+    const requestId = ++requestSequence.current;
     if (!user?.id || !role) return;
     setIsLoading(true);
     try {
@@ -124,7 +128,9 @@ export function ReportsDashboard() {
           (filters.agent === "all" || r.agent_id === filters.agent) &&
           (filters.week === "all" || r.week_id === filters.week),
       });
+      if (requestId !== requestSequence.current) return;
       const rows = records || [];
+      setLoadedFilters(filterKey);
       console.log("[REPORT_SOURCE]", {
         table: "daily_work_records",
         fn: "listRemoteOrCache",
@@ -235,10 +241,13 @@ export function ReportsDashboard() {
         pendencies: [],
       });
     } catch (error) {
+      if (requestId !== requestSequence.current) return;
+      setLoadedFilters(null);
+      setDailies([]);
       console.error("Error fetching dashboard data:", error);
       toast.error("Erro ao carregar dados do dashboard");
     } finally {
-      setIsLoading(false);
+      if (requestId === requestSequence.current) setIsLoading(false);
     }
   }
 
@@ -254,38 +263,44 @@ export function ReportsDashboard() {
   };
 
 
-  const handleWeeklyReport = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-
-    toast.info("Gerando Boletim Semanal...");
-    const result = await generateWeeklyReportPDF(session.user.id, new Date());
-
-    if (result) {
-      toast.success(
-        `Boletim Semanal SE ${result.epiWeek}/${result.epiYear} gerado — consolidado de ${result.dailyCount} relatório${result.dailyCount === 1 ? "" : "s"} diário${result.dailyCount === 1 ? "" : "s"}.`
-      );
-      result.pdf.save(result.fileName);
-    }
-  };
-
-  const handleShareWhatsApp = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-
-    const profile = await safeFetch<{ full_name: string | null } | null>(
-      async () => {
-        const { data, error } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+  const [generatingBulletin, setGeneratingBulletin] = useState(false);
+  const handleOfficialBulletin = async (share = false) => {
+    if (isLoading || generatingBulletin || loadedFilters !== filterKey) return;
+    setGeneratingBulletin(true);
+    try {
+      const permitted = await listPermittedAgentProfiles(user?.id ?? "", role ?? "");
+      const allowed = new Set(permitted.map((p) => p.id));
+      if (filters.agent !== "all" && !allowed.has(filters.agent)) throw new Error("Agente fora do seu acesso.");
+      if (!allowed.size) throw new Error("Nenhum agente disponível neste escopo.");
+      // Official files use a fresh server read, never an offline cache snapshot.
+      let query = supabase.from("daily_work_records").select("*").in("agent_id", [...allowed]);
+      if (filters.agent !== "all") query = query.eq("agent_id", filters.agent);
+      if (filters.cycle !== "all") query = query.eq("cycle_id", filters.cycle);
+      if (filters.week !== "all") query = query.eq("week_id", filters.week);
+      const exportRecords = await readAllQueryPages<any>(query.order("work_date").order("id"));
+      const title = filters.agent === "all" ? "Agentes autorizados — consolidado" : permitted.find((p) => p.id === filters.agent)?.full_name || "Agente selecionado";
+      let cycleLabel = "Todos os ciclos selecionados";
+      if (filters.cycle !== "all") {
+        const { data, error } = await supabase.from("cycles").select("name,number,year").eq("id", filters.cycle).single();
         if (error) throw error;
-        return data;
-      },
-      async () => null,
-      { label: "profile.full_name" },
-    );
-
-    const result = await generateWeeklyReportPDF(session.user.id, new Date());
-    if (result) {
-      openWhatsAppShare(result.fileName, profile?.full_name || "Agente");
+        cycleLabel = data.name || `Ciclo ${data.number}/${data.year}`;
+      }
+      const result = await generateFilteredOfficialBulletin(exportRecords, title, cycleLabel, new Map(permitted.map((p) => [p.id, p.full_name || "Agente"])));
+      if (!result) return;
+      result.pdf.save(result.fileName);
+      toast.success(`Boletim gerado com ${exportRecords.length} diária(s), conforme os filtros aplicados.`);
+      if (share) {
+        if (navigator.share && navigator.canShare?.({ files: [new File([result.blob], result.fileName, { type: "application/pdf" })] })) {
+          await navigator.share({ title: "Boletim Oficial — VetorControl", files: [new File([result.blob], result.fileName, { type: "application/pdf" })] });
+        } else {
+          toast.info("PDF baixado. Anexe o arquivo à conversa no WhatsApp.");
+          window.open(`https://wa.me/?text=${encodeURIComponent(`Boletim oficial: ${title}. Arquivo para anexar: ${result.fileName}`)}`, "_blank", "noopener,noreferrer");
+        }
+      }
+    } catch (error: any) {
+      if (error?.name !== "AbortError") toast.error(error?.message || "Erro ao gerar boletim oficial.");
+    } finally {
+      setGeneratingBulletin(false);
     }
   };
 
@@ -375,7 +390,7 @@ export function ReportsDashboard() {
 
       </div>
 
-      <ReportsFilters initialAgent={search.agentId} onFilterChange={setFilters} className="reports-filters" />
+      <ReportsFilters initialAgent={search.agentId} appliedFilters={filters} onFilterChange={setFilters} className="reports-filters" />
 
       <OperationalKPIs data={kpiData} isLoading={isLoading} />
 
@@ -523,16 +538,16 @@ export function ReportsDashboard() {
             <div className="relative z-10">
               <Badge className="bg-white/20 backdrop-blur-md mb-6 font-black uppercase tracking-widest text-[9px]">Geração de Documentos</Badge>
               <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 leading-none">Boletins Oficiais<br/>Automáticos</h3>
-              <p className="text-blue-100 text-sm mb-8 max-w-xs font-medium leading-relaxed">Gere boletins semanais e consolidados de ciclo seguindo as normas oficiais do Ministério da Saúde com um clique.</p>
+              <p className="text-blue-100 text-sm mb-8 max-w-xs font-medium leading-relaxed">Gere o resumo P.C.F.A.D. das diárias encerradas dos agentes, conforme os filtros aplicados de agente, ciclo e semana.</p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
-                  onClick={handleWeeklyReport}
+                  disabled={isLoading || generatingBulletin || loadedFilters !== filterKey} onClick={() => handleOfficialBulletin()}
                   className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm border border-white/20 rounded-[1.25rem] h-14 px-8 font-black uppercase tracking-widest text-xs transition-all active:scale-95"
                 >
                   <Download className="mr-2 h-4 w-4" /> Baixar PDF
                 </Button>
                 <Button 
-                  onClick={handleShareWhatsApp}
+                  disabled={isLoading || generatingBulletin || loadedFilters !== filterKey} onClick={() => handleOfficialBulletin(true)}
                   className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 backdrop-blur-sm border border-emerald-500/20 rounded-[1.25rem] h-14 px-8 font-black uppercase tracking-widest text-xs transition-all active:scale-95"
                 >
                   <Share2 className="mr-2 h-4 w-4" /> WhatsApp

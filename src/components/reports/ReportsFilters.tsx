@@ -26,9 +26,10 @@ interface ReportsFiltersProps {
   onFilterChange: (filters: any) => void;
   className?: string;
   initialAgent?: string;
+  appliedFilters?: { agent: string; cycle: string; week: string };
 }
 
-export function ReportsFilters({ onFilterChange, className, initialAgent }: ReportsFiltersProps) {
+export function ReportsFilters({ onFilterChange, className, initialAgent, appliedFilters }: ReportsFiltersProps) {
   const { user, role } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
@@ -37,6 +38,13 @@ export function ReportsFilters({ onFilterChange, className, initialAgent }: Repo
   const [selectedAgent, setSelectedAgent] = useState<string>(initialAgent || "all");
   const [selectedCycle, setSelectedCycle] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<string>("all");
+
+  useEffect(() => {
+    if (!appliedFilters) return;
+    setSelectedAgent(appliedFilters.agent);
+    setSelectedCycle(appliedFilters.cycle);
+    setSelectedWeek(appliedFilters.week);
+  }, [appliedFilters?.agent, appliedFilters?.cycle, appliedFilters?.week]);
 
   useEffect(() => {
     if (user?.id && role) void fetchFiltersData();
