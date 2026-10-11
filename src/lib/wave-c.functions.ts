@@ -670,7 +670,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
     const cycleIds = yearCycles.map((cycle: any) => cycle.id);
     const { data: visits, error: visitError } = await supabase
       .from("visits")
-      .select("id, cycle_id, visit_date, status, has_focus, activity_type, notes, treatment_amount, elimination_amount, treated_deposits, sample_collected, is_recovered")
+      .select("*")
       .eq("property_id", data.propertyId)
       .gte("visit_date", operationalDateBoundsUtcIso(`${year}-01-01`).startIso)
       .lte("visit_date", operationalDateBoundsUtcIso(`${year}-12-31`).endIso)
@@ -689,7 +689,7 @@ export const getPropertyCycleHistory = createServerFn({ method: "POST" })
         visit_date: visit.visit_date,
         status: String(visit.status ?? ""),
         has_focus: Boolean(visit.has_focus),
-        focus_analysis_status: historyPositiveIds.has(visit.id) ? "positive" : null,
+        focus_analysis_status: visit.focus_analysis_status ?? (historyPositiveIds.has(visit.id) ? "positive" : visit.sample_collected ? "pending" : null),
         activity_type: String(visit.activity_type ?? ""),
         notes: visit.notes ?? null,
         treatment_amount: visit.treatment_amount ?? null,
@@ -809,7 +809,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
       for (const ids of idChunks) {
           let query = supabaseAdmin
             .from("visits")
-            .select("id, property_id, agent_id, has_focus, status, visit_date, cycle_id")
+            .select("*")
             .in("property_id", ids)
             .gte("visit_date", periodStart)
             .lte("visit_date", periodEnd);
@@ -834,7 +834,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
-      if (v.has_focus) {
+      if (v.has_focus && v.focus_analysis_status !== "negative") {
         focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
       }
 

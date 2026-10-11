@@ -586,9 +586,7 @@ function PropertyVisitPage() {
             setSurveyData({
               hasFocus: existingVisit.has_focus || false,
               sampleCollected: existingVisit.sample_collected || false,
-              focusAnalysisStatus: existingVisit.has_focus
-                ? (existingVisit.sample_collected ? "pending" : null)
-                : null,
+              focusAnalysisStatus: existingVisit.focus_analysis_status ?? (existingVisit.sample_collected ? "pending" : null),
               tubitosColetados: existingVisit.tubitos_coletados || 0,
               treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
               treatmentAmount: existingVisit.activity_type === 'infestation_survey' ? (Number(existingVisit.treatment_amount) || 0) : 0,
@@ -614,6 +612,9 @@ function PropertyVisitPage() {
 
             
             if (existingDeposits) {
+              if (!existingVisit.focus_analysis_status && existingDeposits.some(d => d.is_positive)) {
+                setSurveyData(prev => ({ ...prev, focusAnalysisStatus: "positive" }));
+              }
               const dbDeposits = existingDeposits.map(d => ({
                 id: d.id,
                 type: d.type_code,
@@ -1427,8 +1428,7 @@ function PropertyVisitPage() {
                               </td>
                               <td className="p-4 text-center">
                                 <button
-                                  onClick={() => updateDeposit(deposit.id, 'positive', !deposit.positive)}
-                                  disabled={!deposit.selected}
+                                  disabled title="Positividade confirmada pelo supervisor em Amostras e resultados"
                                   className={`h-8 w-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
                                     deposit.positive ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'bg-slate-100 text-slate-400'
                                   }`}
@@ -1491,7 +1491,7 @@ function PropertyVisitPage() {
                     {(surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected && (
                       <div className="space-y-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700">Resultado da análise</Label>
-                        <select aria-label="Resultado da análise do foco"
+                        <select disabled aria-label="Resultado da análise do foco"
                           value={surveyData.focusAnalysisStatus || "pending"}
                           onChange={(e) => setSurveyData(prev => ({ ...prev, focusAnalysisStatus: e.target.value }))}
                           className="h-11 w-full rounded-xl border border-blue-200 bg-white px-3 text-sm font-semibold text-slate-800">
@@ -1500,7 +1500,7 @@ function PropertyVisitPage() {
                           <option value="negative">Negativo</option>
                           <option value="inconclusive">Inconclusivo</option>
                         </select>
-                        <p className="text-xs text-blue-800">Marque o resultado somente quando a análise estiver concluída.</p>
+                        <p className="text-xs text-blue-800">O supervisor confirma o resultado em Amostras e resultados após receber a análise do laboratório.</p>
                       </div>
                     )}
 

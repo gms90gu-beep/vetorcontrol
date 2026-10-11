@@ -80,6 +80,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
       { key: "mgr-weekly", label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison", group: "operacao", badge: "weekly" },
       { key: "mgr-intel", label: "Intelligence", icon: BarChart3, to: "/reports", group: "operacao" },
       { key: "mgr-map", label: "Mapa", icon: MapIcon, to: "/map", group: "operacao", primary: true },
+      { key: "mgr-samples", label: "Amostras e resultados", icon: FileText, to: "/amostras", group: "operacao" },
       { key: "mgr-heatmap", label: "Mapa Epidemiológico", icon: MapPin, to: "/heatmap", group: "operacao" },
       { key: "mgr-pendencias", label: "Pendências", icon: AlertTriangle, to: "/admin/pendencias", group: "operacao", badge: "pendencias", primary: true },
 
@@ -124,6 +125,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
     { key: "agt-my-sessions", label: "Minhas Jornadas", icon: CalendarDays, to: "/minhas-jornadas", group: "operacao" },
     { key: "agt-rg", label: "RG", icon: MapPin, to: "/rg", group: "operacao", primary: true },
     { key: "agt-pendencias", label: "Pendências", icon: AlertTriangle, to: "/pending", group: "operacao", badge: "pendencias" },
+    { key: "agt-samples", label: "Minhas amostras", icon: FileText, to: "/amostras", group: "operacao" },
     { key: "agt-weekly", label: "Boletim Semanal", icon: BarChart3, to: "/weekly-comparison", group: "operacao", badge: "weekly" },
 
     // ── Administração ─────────────────────────────────────────────

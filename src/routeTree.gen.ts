@@ -9,78 +9,60 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AdminMasterRouteImport } from './routes/admin-master'
-import { Route as ComandoRouteImport } from './routes/comando'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SetupRouteImport } from './routes/setup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ComandoRouteImport } from './routes/comando'
+import { Route as AdminMasterRouteImport } from './routes/admin-master'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
-import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
-import { Route as AuthenticatedCalendarioProducaoRouteImport } from './routes/_authenticated.calendario-producao'
-import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
-import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenticated.coordenacao'
-import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
-import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
-import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
-import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authenticated.field-work-list'
-import { Route as AuthenticatedHeatmapRouteImport } from './routes/_authenticated.heatmap'
-import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
-import { Route as AuthenticatedMinhasJornadasRouteImport } from './routes/_authenticated.minhas-jornadas'
-import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
-import { Route as AuthenticatedRelatorioSemanalEquipeRouteImport } from './routes/_authenticated.relatorio-semanal-equipe'
-import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
-import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
-import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
-import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenticated.supervision'
-import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated.supervisor'
-import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated.sync-status'
-import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
 import { Route as AuthenticatedWeeklyComparisonRouteImport } from './routes/_authenticated.weekly-comparison'
-import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated.admin.auditoria'
-import { Route as AuthenticatedAdminCalendarAuditRouteImport } from './routes/_authenticated.admin.calendar-audit'
-import { Route as AuthenticatedAdminCycleAuditRouteImport } from './routes/_authenticated.admin.cycle-audit'
-import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
-import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
-import { Route as AuthenticatedAdminDesignSystemRouteImport } from './routes/_authenticated.admin.design-system'
-import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
-import { Route as AuthenticatedAdminOfflineAuditRouteImport } from './routes/_authenticated.admin.offline-audit'
-import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
-import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
-import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
-import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_authenticated.admin.rg-reconcile'
-import { Route as AuthenticatedAdminSystemHealthRouteImport } from './routes/_authenticated.admin.system-health'
-import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
-import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
+import { Route as AuthenticatedVehiclesRouteImport } from './routes/_authenticated.vehicles'
+import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated.sync-status'
+import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated.supervisor'
+import { Route as AuthenticatedSupervisionRouteImport } from './routes/_authenticated.supervision'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated.settings'
+import { Route as AuthenticatedRgRouteImport } from './routes/_authenticated.rg'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
+import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated.relatorios'
+import { Route as AuthenticatedRelatorioSemanalEquipeRouteImport } from './routes/_authenticated.relatorio-semanal-equipe'
+import { Route as AuthenticatedPendingRouteImport } from './routes/_authenticated.pending'
+import { Route as AuthenticatedMinhasJornadasRouteImport } from './routes/_authenticated.minhas-jornadas'
+import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated.map'
+import { Route as AuthenticatedHeatmapRouteImport } from './routes/_authenticated.heatmap'
+import { Route as AuthenticatedFieldWorkListRouteImport } from './routes/_authenticated.field-work-list'
+import { Route as AuthenticatedFieldWorkRouteImport } from './routes/_authenticated.field-work'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
+import { Route as AuthenticatedCyclesRouteImport } from './routes/_authenticated.cycles'
+import { Route as AuthenticatedCoordenadorRouteImport } from './routes/_authenticated.coordenador'
+import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenticated.coordenacao'
+import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
+import { Route as AuthenticatedCalendarioProducaoRouteImport } from './routes/_authenticated.calendario-producao'
+import { Route as AuthenticatedAmostrasRouteImport } from './routes/_authenticated.amostras'
+import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as ApiPublicAuthLoginRouteImport } from './routes/api/public/auth-login'
-import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
+import { Route as AuthenticatedPropertyPropertyIdRouteImport } from './routes/_authenticated.property.$propertyId'
+import { Route as AuthenticatedDailyBulletinIdRouteImport } from './routes/_authenticated.daily-bulletin.$id'
+import { Route as AuthenticatedAdminSystemHealthRouteImport } from './routes/_authenticated.admin.system-health'
+import { Route as AuthenticatedAdminRgReconcileRouteImport } from './routes/_authenticated.admin.rg-reconcile'
+import { Route as AuthenticatedAdminRgPipelineRouteImport } from './routes/_authenticated.admin.rg-pipeline'
+import { Route as AuthenticatedAdminRbacAuditRouteImport } from './routes/_authenticated.admin.rbac-audit'
+import { Route as AuthenticatedAdminPendenciasRouteImport } from './routes/_authenticated.admin.pendencias'
+import { Route as AuthenticatedAdminOfflineAuditRouteImport } from './routes/_authenticated.admin.offline-audit'
+import { Route as AuthenticatedAdminGeorefAuditRouteImport } from './routes/_authenticated.admin.georef-audit'
+import { Route as AuthenticatedAdminDesignSystemRouteImport } from './routes/_authenticated.admin.design-system'
+import { Route as AuthenticatedAdminDataAuditRouteImport } from './routes/_authenticated.admin.data-audit'
+import { Route as AuthenticatedAdminDashboardRouteImport } from './routes/_authenticated.admin.dashboard'
+import { Route as AuthenticatedAdminCycleAuditRouteImport } from './routes/_authenticated.admin.cycle-audit'
+import { Route as AuthenticatedAdminCalendarAuditRouteImport } from './routes/_authenticated.admin.calendar-audit'
+import { Route as AuthenticatedAdminAuditoriaRouteImport } from './routes/_authenticated.admin.auditoria'
 import { Route as AuthenticatedRgEditarIdRouteImport } from './routes/_authenticated.rg.editar.$id'
+import { Route as AuthenticatedRgBoletimIdRouteImport } from './routes/_authenticated.rg.boletim.$id'
 
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminMasterRoute = AdminMasterRouteImport.update({
-  id: '/admin-master',
-  path: '/admin-master',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ComandoRoute = ComandoRouteImport.update({
-  id: '/comando',
-  path: '/comando',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SetupRoute = SetupRouteImport.update({
@@ -88,131 +70,33 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComandoRoute = ComandoRouteImport.update({
+  id: '/comando',
+  path: '/comando',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMasterRoute = AdminMasterRouteImport.update({
+  id: '/admin-master',
+  path: '/admin-master',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
-  id: '/agente',
-  path: '/agente',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCalendarioProducaoRoute =
-  AuthenticatedCalendarioProducaoRouteImport.update({
-    id: '/calendario-producao',
-    path: '/calendario-producao',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCampoRoute = AuthenticatedCampoRouteImport.update({
-  id: '/campo',
-  path: '/campo',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCoordenacaoRoute =
-  AuthenticatedCoordenacaoRouteImport.update({
-    id: '/coordenacao',
-    path: '/coordenacao',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCoordenadorRoute =
-  AuthenticatedCoordenadorRouteImport.update({
-    id: '/coordenador',
-    path: '/coordenador',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCyclesRoute = AuthenticatedCyclesRouteImport.update({
-  id: '/cycles',
-  path: '/cycles',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFieldWorkRoute = AuthenticatedFieldWorkRouteImport.update({
-  id: '/field-work',
-  path: '/field-work',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFieldWorkListRoute =
-  AuthenticatedFieldWorkListRouteImport.update({
-    id: '/field-work-list',
-    path: '/field-work-list',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedHeatmapRoute = AuthenticatedHeatmapRouteImport.update({
-  id: '/heatmap',
-  path: '/heatmap',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
-  id: '/map',
-  path: '/map',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMinhasJornadasRoute =
-  AuthenticatedMinhasJornadasRouteImport.update({
-    id: '/minhas-jornadas',
-    path: '/minhas-jornadas',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
-  id: '/pending',
-  path: '/pending',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedRelatorioSemanalEquipeRoute =
-  AuthenticatedRelatorioSemanalEquipeRouteImport.update({
-    id: '/relatorio-semanal-equipe',
-    path: '/relatorio-semanal-equipe',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
-  id: '/relatorios',
-  path: '/relatorios',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedRgRoute = AuthenticatedRgRouteImport.update({
-  id: '/rg',
-  path: '/rg',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSupervisionRoute =
-  AuthenticatedSupervisionRouteImport.update({
-    id: '/supervision',
-    path: '/supervision',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSupervisorRoute = AuthenticatedSupervisorRouteImport.update({
-  id: '/supervisor',
-  path: '/supervisor',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
-  id: '/sync-status',
-  path: '/sync-status',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
-  id: '/vehicles',
-  path: '/vehicles',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedWeeklyComparisonRoute =
@@ -221,82 +105,137 @@ const AuthenticatedWeeklyComparisonRoute =
     path: '/weekly-comparison',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminAuditoriaRoute =
-  AuthenticatedAdminAuditoriaRouteImport.update({
-    id: '/admin/auditoria',
-    path: '/admin/auditoria',
+const AuthenticatedVehiclesRoute = AuthenticatedVehiclesRouteImport.update({
+  id: '/vehicles',
+  path: '/vehicles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
+  id: '/sync-status',
+  path: '/sync-status',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupervisorRoute = AuthenticatedSupervisorRouteImport.update({
+  id: '/supervisor',
+  path: '/supervisor',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSupervisionRoute =
+  AuthenticatedSupervisionRouteImport.update({
+    id: '/supervision',
+    path: '/supervision',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminCalendarAuditRoute =
-  AuthenticatedAdminCalendarAuditRouteImport.update({
-    id: '/admin/calendar-audit',
-    path: '/admin/calendar-audit',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRgRoute = AuthenticatedRgRouteImport.update({
+  id: '/rg',
+  path: '/rg',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRelatorioSemanalEquipeRoute =
+  AuthenticatedRelatorioSemanalEquipeRouteImport.update({
+    id: '/relatorio-semanal-equipe',
+    path: '/relatorio-semanal-equipe',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminCycleAuditRoute =
-  AuthenticatedAdminCycleAuditRouteImport.update({
-    id: '/admin/cycle-audit',
-    path: '/admin/cycle-audit',
+const AuthenticatedPendingRoute = AuthenticatedPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMinhasJornadasRoute =
+  AuthenticatedMinhasJornadasRouteImport.update({
+    id: '/minhas-jornadas',
+    path: '/minhas-jornadas',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminDashboardRoute =
-  AuthenticatedAdminDashboardRouteImport.update({
-    id: '/admin/dashboard',
-    path: '/admin/dashboard',
+const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHeatmapRoute = AuthenticatedHeatmapRouteImport.update({
+  id: '/heatmap',
+  path: '/heatmap',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFieldWorkListRoute =
+  AuthenticatedFieldWorkListRouteImport.update({
+    id: '/field-work-list',
+    path: '/field-work-list',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminDataAuditRoute =
-  AuthenticatedAdminDataAuditRouteImport.update({
-    id: '/admin/data-audit',
-    path: '/admin/data-audit',
+const AuthenticatedFieldWorkRoute = AuthenticatedFieldWorkRouteImport.update({
+  id: '/field-work',
+  path: '/field-work',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCyclesRoute = AuthenticatedCyclesRouteImport.update({
+  id: '/cycles',
+  path: '/cycles',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCoordenadorRoute =
+  AuthenticatedCoordenadorRouteImport.update({
+    id: '/coordenador',
+    path: '/coordenador',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminDesignSystemRoute =
-  AuthenticatedAdminDesignSystemRouteImport.update({
-    id: '/admin/design-system',
-    path: '/admin/design-system',
+const AuthenticatedCoordenacaoRoute =
+  AuthenticatedCoordenacaoRouteImport.update({
+    id: '/coordenacao',
+    path: '/coordenacao',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminGeorefAuditRoute =
-  AuthenticatedAdminGeorefAuditRouteImport.update({
-    id: '/admin/georef-audit',
-    path: '/admin/georef-audit',
+const AuthenticatedCampoRoute = AuthenticatedCampoRouteImport.update({
+  id: '/campo',
+  path: '/campo',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCalendarioProducaoRoute =
+  AuthenticatedCalendarioProducaoRouteImport.update({
+    id: '/calendario-producao',
+    path: '/calendario-producao',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAdminOfflineAuditRoute =
-  AuthenticatedAdminOfflineAuditRouteImport.update({
-    id: '/admin/offline-audit',
-    path: '/admin/offline-audit',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminPendenciasRoute =
-  AuthenticatedAdminPendenciasRouteImport.update({
-    id: '/admin/pendencias',
-    path: '/admin/pendencias',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminRbacAuditRoute =
-  AuthenticatedAdminRbacAuditRouteImport.update({
-    id: '/admin/rbac-audit',
-    path: '/admin/rbac-audit',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminRgPipelineRoute =
-  AuthenticatedAdminRgPipelineRouteImport.update({
-    id: '/admin/rg-pipeline',
-    path: '/admin/rg-pipeline',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminRgReconcileRoute =
-  AuthenticatedAdminRgReconcileRouteImport.update({
-    id: '/admin/rg-reconcile',
-    path: '/admin/rg-reconcile',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminSystemHealthRoute =
-  AuthenticatedAdminSystemHealthRouteImport.update({
-    id: '/admin/system-health',
-    path: '/admin/system-health',
+const AuthenticatedAmostrasRoute = AuthenticatedAmostrasRouteImport.update({
+  id: '/amostras',
+  path: '/amostras',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
+  id: '/agente',
+  path: '/agente',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const ApiPublicAuthLoginRoute = ApiPublicAuthLoginRouteImport.update({
+  id: '/api/public/auth-login',
+  path: '/api/public/auth-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPropertyPropertyIdRoute =
+  AuthenticatedPropertyPropertyIdRouteImport.update({
+    id: '/property/$propertyId',
+    path: '/property/$propertyId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedDailyBulletinIdRoute =
@@ -305,16 +244,88 @@ const AuthenticatedDailyBulletinIdRoute =
     path: '/daily-bulletin/$id',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedPropertyPropertyIdRoute =
-  AuthenticatedPropertyPropertyIdRouteImport.update({
-    id: '/property/$propertyId',
-    path: '/property/$propertyId',
+const AuthenticatedAdminSystemHealthRoute =
+  AuthenticatedAdminSystemHealthRouteImport.update({
+    id: '/admin/system-health',
+    path: '/admin/system-health',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const ApiPublicAuthLoginRoute = ApiPublicAuthLoginRouteImport.update({
-  id: '/api/public/auth-login',
-  path: '/api/public/auth-login',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedAdminRgReconcileRoute =
+  AuthenticatedAdminRgReconcileRouteImport.update({
+    id: '/admin/rg-reconcile',
+    path: '/admin/rg-reconcile',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminRgPipelineRoute =
+  AuthenticatedAdminRgPipelineRouteImport.update({
+    id: '/admin/rg-pipeline',
+    path: '/admin/rg-pipeline',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminRbacAuditRoute =
+  AuthenticatedAdminRbacAuditRouteImport.update({
+    id: '/admin/rbac-audit',
+    path: '/admin/rbac-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminPendenciasRoute =
+  AuthenticatedAdminPendenciasRouteImport.update({
+    id: '/admin/pendencias',
+    path: '/admin/pendencias',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminOfflineAuditRoute =
+  AuthenticatedAdminOfflineAuditRouteImport.update({
+    id: '/admin/offline-audit',
+    path: '/admin/offline-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminGeorefAuditRoute =
+  AuthenticatedAdminGeorefAuditRouteImport.update({
+    id: '/admin/georef-audit',
+    path: '/admin/georef-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminDesignSystemRoute =
+  AuthenticatedAdminDesignSystemRouteImport.update({
+    id: '/admin/design-system',
+    path: '/admin/design-system',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminDataAuditRoute =
+  AuthenticatedAdminDataAuditRouteImport.update({
+    id: '/admin/data-audit',
+    path: '/admin/data-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminDashboardRoute =
+  AuthenticatedAdminDashboardRouteImport.update({
+    id: '/admin/dashboard',
+    path: '/admin/dashboard',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminCycleAuditRoute =
+  AuthenticatedAdminCycleAuditRouteImport.update({
+    id: '/admin/cycle-audit',
+    path: '/admin/cycle-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminCalendarAuditRoute =
+  AuthenticatedAdminCalendarAuditRouteImport.update({
+    id: '/admin/calendar-audit',
+    path: '/admin/calendar-audit',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminAuditoriaRoute =
+  AuthenticatedAdminAuditoriaRouteImport.update({
+    id: '/admin/auditoria',
+    path: '/admin/auditoria',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedRgEditarIdRoute = AuthenticatedRgEditarIdRouteImport.update({
+  id: '/editar/$id',
+  path: '/editar/$id',
+  getParentRoute: () => AuthenticatedRgRoute,
 } as any)
 const AuthenticatedRgBoletimIdRoute =
   AuthenticatedRgBoletimIdRouteImport.update({
@@ -322,11 +333,6 @@ const AuthenticatedRgBoletimIdRoute =
     path: '/boletim/$id',
     getParentRoute: () => AuthenticatedRgRoute,
   } as any)
-const AuthenticatedRgEditarIdRoute = AuthenticatedRgEditarIdRouteImport.update({
-  id: '/editar/$id',
-  path: '/editar/$id',
-  getParentRoute: () => AuthenticatedRgRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -337,6 +343,7 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/amostras': typeof AuthenticatedAmostrasRoute
   '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -386,6 +393,7 @@ export interface FileRoutesByTo {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
+  '/amostras': typeof AuthenticatedAmostrasRoute
   '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -438,6 +446,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/signup': typeof SignupRoute
   '/_authenticated/agente': typeof AuthenticatedAgenteRoute
+  '/_authenticated/amostras': typeof AuthenticatedAmostrasRoute
   '/_authenticated/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/_authenticated/campo': typeof AuthenticatedCampoRoute
   '/_authenticated/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -491,6 +500,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/amostras'
     | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
@@ -540,6 +550,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/agente'
+    | '/amostras'
     | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
@@ -591,6 +602,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/signup'
     | '/_authenticated/agente'
+    | '/_authenticated/amostras'
     | '/_authenticated/calendario-producao'
     | '/_authenticated/campo'
     | '/_authenticated/coordenacao'
@@ -647,39 +659,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin-master': {
-      id: '/admin-master'
-      path: '/admin-master'
-      fullPath: '/admin-master'
-      preLoaderRoute: typeof AdminMasterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/comando': {
-      id: '/comando'
-      path: '/comando'
-      fullPath: '/comando'
-      preLoaderRoute: typeof ComandoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/setup': {
@@ -689,11 +673,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/comando': {
+      id: '/comando'
+      path: '/comando'
+      fullPath: '/comando'
+      preLoaderRoute: typeof ComandoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-master': {
+      id: '/admin-master'
+      path: '/admin-master'
+      fullPath: '/admin-master'
+      preLoaderRoute: typeof AdminMasterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -703,151 +715,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/agente': {
-      id: '/_authenticated/agente'
-      path: '/agente'
-      fullPath: '/agente'
-      preLoaderRoute: typeof AuthenticatedAgenteRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/calendario-producao': {
-      id: '/_authenticated/calendario-producao'
-      path: '/calendario-producao'
-      fullPath: '/calendario-producao'
-      preLoaderRoute: typeof AuthenticatedCalendarioProducaoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/campo': {
-      id: '/_authenticated/campo'
-      path: '/campo'
-      fullPath: '/campo'
-      preLoaderRoute: typeof AuthenticatedCampoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/coordenacao': {
-      id: '/_authenticated/coordenacao'
-      path: '/coordenacao'
-      fullPath: '/coordenacao'
-      preLoaderRoute: typeof AuthenticatedCoordenacaoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/coordenador': {
-      id: '/_authenticated/coordenador'
-      path: '/coordenador'
-      fullPath: '/coordenador'
-      preLoaderRoute: typeof AuthenticatedCoordenadorRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/cycles': {
-      id: '/_authenticated/cycles'
-      path: '/cycles'
-      fullPath: '/cycles'
-      preLoaderRoute: typeof AuthenticatedCyclesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/field-work': {
-      id: '/_authenticated/field-work'
-      path: '/field-work'
-      fullPath: '/field-work'
-      preLoaderRoute: typeof AuthenticatedFieldWorkRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/field-work-list': {
-      id: '/_authenticated/field-work-list'
-      path: '/field-work-list'
-      fullPath: '/field-work-list'
-      preLoaderRoute: typeof AuthenticatedFieldWorkListRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/heatmap': {
-      id: '/_authenticated/heatmap'
-      path: '/heatmap'
-      fullPath: '/heatmap'
-      preLoaderRoute: typeof AuthenticatedHeatmapRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/map': {
-      id: '/_authenticated/map'
-      path: '/map'
-      fullPath: '/map'
-      preLoaderRoute: typeof AuthenticatedMapRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/minhas-jornadas': {
-      id: '/_authenticated/minhas-jornadas'
-      path: '/minhas-jornadas'
-      fullPath: '/minhas-jornadas'
-      preLoaderRoute: typeof AuthenticatedMinhasJornadasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/pending': {
-      id: '/_authenticated/pending'
-      path: '/pending'
-      fullPath: '/pending'
-      preLoaderRoute: typeof AuthenticatedPendingRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/relatorio-semanal-equipe': {
-      id: '/_authenticated/relatorio-semanal-equipe'
-      path: '/relatorio-semanal-equipe'
-      fullPath: '/relatorio-semanal-equipe'
-      preLoaderRoute: typeof AuthenticatedRelatorioSemanalEquipeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/relatorios': {
-      id: '/_authenticated/relatorios'
-      path: '/relatorios'
-      fullPath: '/relatorios'
-      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/reports': {
-      id: '/_authenticated/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AuthenticatedReportsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/rg': {
-      id: '/_authenticated/rg'
-      path: '/rg'
-      fullPath: '/rg'
-      preLoaderRoute: typeof AuthenticatedRgRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/supervision': {
-      id: '/_authenticated/supervision'
-      path: '/supervision'
-      fullPath: '/supervision'
-      preLoaderRoute: typeof AuthenticatedSupervisionRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/supervisor': {
-      id: '/_authenticated/supervisor'
-      path: '/supervisor'
-      fullPath: '/supervisor'
-      preLoaderRoute: typeof AuthenticatedSupervisorRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/sync-status': {
-      id: '/_authenticated/sync-status'
-      path: '/sync-status'
-      fullPath: '/sync-status'
-      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
+    '/_authenticated/weekly-comparison': {
+      id: '/_authenticated/weekly-comparison'
+      path: '/weekly-comparison'
+      fullPath: '/weekly-comparison'
+      preLoaderRoute: typeof AuthenticatedWeeklyComparisonRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/vehicles': {
@@ -857,116 +729,158 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVehiclesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/weekly-comparison': {
-      id: '/_authenticated/weekly-comparison'
-      path: '/weekly-comparison'
-      fullPath: '/weekly-comparison'
-      preLoaderRoute: typeof AuthenticatedWeeklyComparisonRouteImport
+    '/_authenticated/sync-status': {
+      id: '/_authenticated/sync-status'
+      path: '/sync-status'
+      fullPath: '/sync-status'
+      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/auditoria': {
-      id: '/_authenticated/admin/auditoria'
-      path: '/admin/auditoria'
-      fullPath: '/admin/auditoria'
-      preLoaderRoute: typeof AuthenticatedAdminAuditoriaRouteImport
+    '/_authenticated/supervisor': {
+      id: '/_authenticated/supervisor'
+      path: '/supervisor'
+      fullPath: '/supervisor'
+      preLoaderRoute: typeof AuthenticatedSupervisorRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/calendar-audit': {
-      id: '/_authenticated/admin/calendar-audit'
-      path: '/admin/calendar-audit'
-      fullPath: '/admin/calendar-audit'
-      preLoaderRoute: typeof AuthenticatedAdminCalendarAuditRouteImport
+    '/_authenticated/supervision': {
+      id: '/_authenticated/supervision'
+      path: '/supervision'
+      fullPath: '/supervision'
+      preLoaderRoute: typeof AuthenticatedSupervisionRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/cycle-audit': {
-      id: '/_authenticated/admin/cycle-audit'
-      path: '/admin/cycle-audit'
-      fullPath: '/admin/cycle-audit'
-      preLoaderRoute: typeof AuthenticatedAdminCycleAuditRouteImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/dashboard': {
-      id: '/_authenticated/admin/dashboard'
-      path: '/admin/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+    '/_authenticated/rg': {
+      id: '/_authenticated/rg'
+      path: '/rg'
+      fullPath: '/rg'
+      preLoaderRoute: typeof AuthenticatedRgRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/data-audit': {
-      id: '/_authenticated/admin/data-audit'
-      path: '/admin/data-audit'
-      fullPath: '/admin/data-audit'
-      preLoaderRoute: typeof AuthenticatedAdminDataAuditRouteImport
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/design-system': {
-      id: '/_authenticated/admin/design-system'
-      path: '/admin/design-system'
-      fullPath: '/admin/design-system'
-      preLoaderRoute: typeof AuthenticatedAdminDesignSystemRouteImport
+    '/_authenticated/relatorios': {
+      id: '/_authenticated/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/georef-audit': {
-      id: '/_authenticated/admin/georef-audit'
-      path: '/admin/georef-audit'
-      fullPath: '/admin/georef-audit'
-      preLoaderRoute: typeof AuthenticatedAdminGeorefAuditRouteImport
+    '/_authenticated/relatorio-semanal-equipe': {
+      id: '/_authenticated/relatorio-semanal-equipe'
+      path: '/relatorio-semanal-equipe'
+      fullPath: '/relatorio-semanal-equipe'
+      preLoaderRoute: typeof AuthenticatedRelatorioSemanalEquipeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/offline-audit': {
-      id: '/_authenticated/admin/offline-audit'
-      path: '/admin/offline-audit'
-      fullPath: '/admin/offline-audit'
-      preLoaderRoute: typeof AuthenticatedAdminOfflineAuditRouteImport
+    '/_authenticated/pending': {
+      id: '/_authenticated/pending'
+      path: '/pending'
+      fullPath: '/pending'
+      preLoaderRoute: typeof AuthenticatedPendingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/pendencias': {
-      id: '/_authenticated/admin/pendencias'
-      path: '/admin/pendencias'
-      fullPath: '/admin/pendencias'
-      preLoaderRoute: typeof AuthenticatedAdminPendenciasRouteImport
+    '/_authenticated/minhas-jornadas': {
+      id: '/_authenticated/minhas-jornadas'
+      path: '/minhas-jornadas'
+      fullPath: '/minhas-jornadas'
+      preLoaderRoute: typeof AuthenticatedMinhasJornadasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/rbac-audit': {
-      id: '/_authenticated/admin/rbac-audit'
-      path: '/admin/rbac-audit'
-      fullPath: '/admin/rbac-audit'
-      preLoaderRoute: typeof AuthenticatedAdminRbacAuditRouteImport
+    '/_authenticated/map': {
+      id: '/_authenticated/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof AuthenticatedMapRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/rg-pipeline': {
-      id: '/_authenticated/admin/rg-pipeline'
-      path: '/admin/rg-pipeline'
-      fullPath: '/admin/rg-pipeline'
-      preLoaderRoute: typeof AuthenticatedAdminRgPipelineRouteImport
+    '/_authenticated/heatmap': {
+      id: '/_authenticated/heatmap'
+      path: '/heatmap'
+      fullPath: '/heatmap'
+      preLoaderRoute: typeof AuthenticatedHeatmapRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/rg-reconcile': {
-      id: '/_authenticated/admin/rg-reconcile'
-      path: '/admin/rg-reconcile'
-      fullPath: '/admin/rg-reconcile'
-      preLoaderRoute: typeof AuthenticatedAdminRgReconcileRouteImport
+    '/_authenticated/field-work-list': {
+      id: '/_authenticated/field-work-list'
+      path: '/field-work-list'
+      fullPath: '/field-work-list'
+      preLoaderRoute: typeof AuthenticatedFieldWorkListRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin/system-health': {
-      id: '/_authenticated/admin/system-health'
-      path: '/admin/system-health'
-      fullPath: '/admin/system-health'
-      preLoaderRoute: typeof AuthenticatedAdminSystemHealthRouteImport
+    '/_authenticated/field-work': {
+      id: '/_authenticated/field-work'
+      path: '/field-work'
+      fullPath: '/field-work'
+      preLoaderRoute: typeof AuthenticatedFieldWorkRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/daily-bulletin/$id': {
-      id: '/_authenticated/daily-bulletin/$id'
-      path: '/daily-bulletin/$id'
-      fullPath: '/daily-bulletin/$id'
-      preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/property/$propertyId': {
-      id: '/_authenticated/property/$propertyId'
-      path: '/property/$propertyId'
-      fullPath: '/property/$propertyId'
-      preLoaderRoute: typeof AuthenticatedPropertyPropertyIdRouteImport
+    '/_authenticated/cycles': {
+      id: '/_authenticated/cycles'
+      path: '/cycles'
+      fullPath: '/cycles'
+      preLoaderRoute: typeof AuthenticatedCyclesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/coordenador': {
+      id: '/_authenticated/coordenador'
+      path: '/coordenador'
+      fullPath: '/coordenador'
+      preLoaderRoute: typeof AuthenticatedCoordenadorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/coordenacao': {
+      id: '/_authenticated/coordenacao'
+      path: '/coordenacao'
+      fullPath: '/coordenacao'
+      preLoaderRoute: typeof AuthenticatedCoordenacaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/campo': {
+      id: '/_authenticated/campo'
+      path: '/campo'
+      fullPath: '/campo'
+      preLoaderRoute: typeof AuthenticatedCampoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/calendario-producao': {
+      id: '/_authenticated/calendario-producao'
+      path: '/calendario-producao'
+      fullPath: '/calendario-producao'
+      preLoaderRoute: typeof AuthenticatedCalendarioProducaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/amostras': {
+      id: '/_authenticated/amostras'
+      path: '/amostras'
+      fullPath: '/amostras'
+      preLoaderRoute: typeof AuthenticatedAmostrasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/agente': {
+      id: '/_authenticated/agente'
+      path: '/agente'
+      fullPath: '/agente'
+      preLoaderRoute: typeof AuthenticatedAgenteRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/api/public/auth-login': {
@@ -976,18 +890,123 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/rg/boletim/$id': {
-      id: '/_authenticated/rg/boletim/$id'
-      path: '/boletim/$id'
-      fullPath: '/rg/boletim/$id'
-      preLoaderRoute: typeof AuthenticatedRgBoletimIdRouteImport
-      parentRoute: typeof AuthenticatedRgRoute
+    '/_authenticated/property/$propertyId': {
+      id: '/_authenticated/property/$propertyId'
+      path: '/property/$propertyId'
+      fullPath: '/property/$propertyId'
+      preLoaderRoute: typeof AuthenticatedPropertyPropertyIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/daily-bulletin/$id': {
+      id: '/_authenticated/daily-bulletin/$id'
+      path: '/daily-bulletin/$id'
+      fullPath: '/daily-bulletin/$id'
+      preLoaderRoute: typeof AuthenticatedDailyBulletinIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/system-health': {
+      id: '/_authenticated/admin/system-health'
+      path: '/admin/system-health'
+      fullPath: '/admin/system-health'
+      preLoaderRoute: typeof AuthenticatedAdminSystemHealthRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/rg-reconcile': {
+      id: '/_authenticated/admin/rg-reconcile'
+      path: '/admin/rg-reconcile'
+      fullPath: '/admin/rg-reconcile'
+      preLoaderRoute: typeof AuthenticatedAdminRgReconcileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/rg-pipeline': {
+      id: '/_authenticated/admin/rg-pipeline'
+      path: '/admin/rg-pipeline'
+      fullPath: '/admin/rg-pipeline'
+      preLoaderRoute: typeof AuthenticatedAdminRgPipelineRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/rbac-audit': {
+      id: '/_authenticated/admin/rbac-audit'
+      path: '/admin/rbac-audit'
+      fullPath: '/admin/rbac-audit'
+      preLoaderRoute: typeof AuthenticatedAdminRbacAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/pendencias': {
+      id: '/_authenticated/admin/pendencias'
+      path: '/admin/pendencias'
+      fullPath: '/admin/pendencias'
+      preLoaderRoute: typeof AuthenticatedAdminPendenciasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/offline-audit': {
+      id: '/_authenticated/admin/offline-audit'
+      path: '/admin/offline-audit'
+      fullPath: '/admin/offline-audit'
+      preLoaderRoute: typeof AuthenticatedAdminOfflineAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/georef-audit': {
+      id: '/_authenticated/admin/georef-audit'
+      path: '/admin/georef-audit'
+      fullPath: '/admin/georef-audit'
+      preLoaderRoute: typeof AuthenticatedAdminGeorefAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/design-system': {
+      id: '/_authenticated/admin/design-system'
+      path: '/admin/design-system'
+      fullPath: '/admin/design-system'
+      preLoaderRoute: typeof AuthenticatedAdminDesignSystemRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/data-audit': {
+      id: '/_authenticated/admin/data-audit'
+      path: '/admin/data-audit'
+      fullPath: '/admin/data-audit'
+      preLoaderRoute: typeof AuthenticatedAdminDataAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/dashboard': {
+      id: '/_authenticated/admin/dashboard'
+      path: '/admin/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AuthenticatedAdminDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/cycle-audit': {
+      id: '/_authenticated/admin/cycle-audit'
+      path: '/admin/cycle-audit'
+      fullPath: '/admin/cycle-audit'
+      preLoaderRoute: typeof AuthenticatedAdminCycleAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/calendar-audit': {
+      id: '/_authenticated/admin/calendar-audit'
+      path: '/admin/calendar-audit'
+      fullPath: '/admin/calendar-audit'
+      preLoaderRoute: typeof AuthenticatedAdminCalendarAuditRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/auditoria': {
+      id: '/_authenticated/admin/auditoria'
+      path: '/admin/auditoria'
+      fullPath: '/admin/auditoria'
+      preLoaderRoute: typeof AuthenticatedAdminAuditoriaRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/rg/editar/$id': {
       id: '/_authenticated/rg/editar/$id'
       path: '/editar/$id'
       fullPath: '/rg/editar/$id'
       preLoaderRoute: typeof AuthenticatedRgEditarIdRouteImport
+      parentRoute: typeof AuthenticatedRgRoute
+    }
+    '/_authenticated/rg/boletim/$id': {
+      id: '/_authenticated/rg/boletim/$id'
+      path: '/boletim/$id'
+      fullPath: '/rg/boletim/$id'
+      preLoaderRoute: typeof AuthenticatedRgBoletimIdRouteImport
       parentRoute: typeof AuthenticatedRgRoute
     }
   }
@@ -1009,6 +1028,7 @@ const AuthenticatedRgRouteWithChildren = AuthenticatedRgRoute._addFileChildren(
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
+  AuthenticatedAmostrasRoute: typeof AuthenticatedAmostrasRoute
   AuthenticatedCalendarioProducaoRoute: typeof AuthenticatedCalendarioProducaoRoute
   AuthenticatedCampoRoute: typeof AuthenticatedCampoRoute
   AuthenticatedCoordenacaoRoute: typeof AuthenticatedCoordenacaoRoute
@@ -1051,6 +1071,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
+  AuthenticatedAmostrasRoute: AuthenticatedAmostrasRoute,
   AuthenticatedCalendarioProducaoRoute: AuthenticatedCalendarioProducaoRoute,
   AuthenticatedCampoRoute: AuthenticatedCampoRoute,
   AuthenticatedCoordenacaoRoute: AuthenticatedCoordenacaoRoute,
