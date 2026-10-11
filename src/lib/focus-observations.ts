@@ -1,6 +1,9 @@
+import { getOperationalDate } from "@/lib/operational-date";
+import { readAllQueryPages } from "@/lib/query-pages";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface FocusObservation {
+  agente?: string;
   quarteirao: string;
   numeroImovel: string;
   endereco: string;
@@ -20,7 +23,7 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
 
 function formatCollectionDate(value: string | null | undefined): string {
   if (!value) return "—";
-  const dateKey = String(value).slice(0, 10);
+  const dateKey = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : getOperationalDate(new Date(value));
   const date = new Date(`${dateKey}T12:00:00`);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("pt-BR");
 }
@@ -29,9 +32,10 @@ export async function fetchFocusObservations(
   agentId: string,
   startDate: string,
   endDate: string,
+  client?: any,
 ): Promise<FocusObservation[]> {
   try {
-    const { data, error } = await supabase
+    const query = (client ?? supabase)
       .from("visits")
       .select(
         `
@@ -42,11 +46,13 @@ export async function fetchFocusObservations(
       `,
       )
       .eq("agent_id", agentId)
-      .gte("visit_date", startDate)
-      .lt("visit_date", `${endDate}T23:59:59.999Z`)
-      .order("visit_date", { ascending: true });
+      .gte("visit_date", `${startDate}T00:00:00-03:00`)
+      .lt("visit_date", `${endDate}T23:59:59.999-03:00`)
+      .order("visit_date", { ascending: true }).order("id");
+    const { data, error } = client ? { data: await readAllQueryPages<any>(query), error: null } : await query;
 
     if (error) {
+      if (client) throw error;
       console.error("[FOCUS_OBSERVATIONS] Erro ao buscar focos:", error);
       return [];
     }
@@ -91,6 +97,7 @@ export async function fetchFocusObservations(
 
     return observations;
   } catch (err) {
+    if (client) throw err;
     console.error("[FOCUS_OBSERVATIONS] Erro:", err);
     return [];
   }

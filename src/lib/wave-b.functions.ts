@@ -43,7 +43,7 @@ async function resolveScopedAgents(supabase: any, userId: string) {
     throw new Error("Forbidden: requer supervisor ou admin_master");
   }
 
-  let profileQuery = supabase.from("profiles").select("id, full_name, registration_number, supervisor_id");
+  let profileQuery = supabase.from("profiles").select("id, full_name, registration_number, supervisor_id, city, role");
   if (role === "supervisor") profileQuery = profileQuery.eq("supervisor_id", userId);
   const { data: profiles, error: profErr } = await profileQuery;
   if (profErr) throw new Error(profErr.message);
@@ -463,4 +463,57 @@ export const getTeamWeeklyProduction = createServerFn({ method: "POST" })
       .sort((a, b) => b.properties - a.properties);
 
     return { ...empty, agents, neighborhoods, totals, daily_records: dwr };
+  });
+
+/** Uses the authenticated client's RLS and the same PCFAD calculations as the agent. */
+export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { week: number; year: number; agentId?: string; supervisorId?: string; areaId?: string }) => {
+    if (!Number.isInteger(input.week) || input.week < 1 || input.week > 53 || !Number.isInteger(input.year)) throw new Error("Período inválido.");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { buildPcfadWeekData, groupPcfadDays, sumPcfadRows } = await import("@/lib/pcfad-week");
+    const { fetchFocusObservations } = await import("@/lib/focus-observations");
+    const { profiles, role } = await resolveScopedAgents(context.supabase, context.userId);
+    const client = context.supabase;
+    let permitted = (profiles as any[]).filter((p) => ["agente", "agent"].includes(p.role));
+    if (role === "coordenador") {
+      const { data: scoped, error } = await client.rpc("get_coordinator_data", { p_user_id: context.userId });
+      if (error) throw error;
+      permitted = (scoped ?? []).filter((p: any) => ["agente", "agent"].includes(p.role));
+    }
+    if (data.agentId && !permitted.some((p) => p.id === data.agentId)) throw new Error("Agente fora do seu acesso.");
+    const members = permitted.filter((p) => (!data.agentId || p.id === data.agentId) && (!data.supervisorId || p.supervisor_id === data.supervisorId));
+    const range = epiWeekToDateRange(data.week, data.year);
+    const areaRows = await readAllQueryPages<any>(client.from("areas").select("id,name").order("name"));
+    if (data.areaId && !areaRows.some((a) => a.id === data.areaId)) throw new Error("Área fora do seu acesso.");
+    const rows: import("@/lib/pcfad-week").PcfadRow[] = [];
+    const observations: import("@/lib/focus-observations").FocusObservation[] = [];
+    for (const member of members) {
+      let records = await readAllQueryPages<any>(client.from("daily_work_records").select("*").eq("agent_id", member.id).gte("work_date", range.start).lte("work_date", range.end).eq("status", "completed").not("end_time", "is", null).order("work_date").order("id"));
+      if (data.areaId) {
+        const selected = [];
+        for (const record of records) {
+          const visits = await readAllQueryPages<any>(client.from("visits").select("id,properties(blocks(subareas(localities(area_id))))").eq("agent_id", member.id).eq("cycle_id", record.cycle_id).gte("visit_date", `${record.work_date}T00:00:00-03:00`).lte("visit_date", `${record.work_date}T23:59:59.999-03:00`).order("id"));
+          const areas = new Set(visits.map((v) => v.properties?.blocks?.subareas?.localities?.area_id ?? null));
+          if (!visits.length && Number(record.properties_worked)) throw new Error(`Não foi possível identificar a área da diária de ${member.full_name} em ${record.work_date}.`);
+          if (areas.has(null)) throw new Error(`Há imóveis sem vínculo territorial na diária de ${member.full_name} em ${record.work_date}. Corrija o cadastro para consultar por área.`);
+          if (areas.has(data.areaId) && areas.size > 1) throw new Error(`A diária de ${member.full_name} em ${record.work_date} abrange mais de uma área. Seus indicadores não podem ser atribuídos integralmente a uma única área.`);
+          if (areas.has(data.areaId)) selected.push(record);
+        }
+        records = selected;
+      }
+      const bulletin = await buildPcfadWeekData({ agentAuthId: member.id, week: data.week, year: data.year, client, records });
+      rows.push(...bulletin.rows);
+      for (const date of [...new Set(records.map((r) => String(r.work_date)))]) {
+        const focos = await fetchFocusObservations(member.id, date, date, client);
+        observations.push(...focos.map((f) => ({ ...f, agente: member.full_name })));
+      }
+    }
+    const supervisorIds = [...new Set(permitted.map((p) => p.supervisor_id).filter(Boolean))];
+    const supervisorProfiles = supervisorIds.length ? await readAllQueryPages<any>(client.from("profiles").select("id,full_name").in("id", supervisorIds).order("id")) : [];
+    const supervisors = supervisorIds.map((id) => ({ id, name: supervisorProfiles.find((p) => p.id === id)?.full_name || `Equipe ${String(id).slice(0, 8)}` }));
+    const grouped = groupPcfadDays(rows);
+    return { rows: grouped, total: sumPcfadRows(grouped), observations, range, week: data.week, year: data.year, agents: permitted.map((p) => ({ id: p.id, name: p.full_name, registration: p.registration_number, municipality: p.city })), teams: supervisors, areas: areaRows, dailyCount: rows.length };
   });

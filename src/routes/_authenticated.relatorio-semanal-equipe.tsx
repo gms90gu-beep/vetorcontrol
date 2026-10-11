@@ -1,9 +1,10 @@
-import { WEEKLY_FIELDS, weeklyTotals, weeklyLarvicide } from "@/lib/weekly-bulletin";
+import { PcfadWeeklyLandscape } from "@/components/agent/PcfadWeeklyLandscape";
+import { generatePcfadWeeklyPDF } from "@/components/reports/PcfadWeeklyPdfGenerator";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { getTeamWeeklyProduction } from "@/lib/wave-b.functions";
+import { getTeamWeeklyProduction, getTeamPcfadWeekly } from "@/lib/wave-b.functions";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ function TeamWeeklyReportPage() {
   const { online } = useSyncStatus();
   const [epiWeek, setEpiWeek] = useState(now.week);
   const [epiYear, setEpiYear] = useState(now.year);
+  const [selectedTeam, setSelectedTeam] = useState("all");
+  const [selectedArea, setSelectedArea] = useState("all");
   const [selectedAgent, setSelectedAgent] = useState("all");
   const [neighborhoodFilter, setNeighborhoodFilter] = useState("");
   const fetchWeekly = useServerFn(getTeamWeeklyProduction);
@@ -65,6 +68,13 @@ function TeamWeeklyReportPage() {
     enabled: online,
   });
 
+  const fetchPcfad = useServerFn(getTeamPcfadWeekly);
+  const pcfadQuery = useQuery({
+    queryKey: ["team-pcfad", epiWeek, epiYear, selectedAgent, selectedTeam, selectedArea],
+    queryFn: () => fetchPcfad({ data: { week: epiWeek, year: epiYear, agentId: selectedAgent === "all" ? undefined : selectedAgent, supervisorId: selectedTeam === "all" ? undefined : selectedTeam, areaId: selectedArea === "all" ? undefined : selectedArea } }),
+    enabled: online,
+  });
+
   if (!online) return <OfflineNotAvailable feature="Relatório Semanal da Equipe" />;
 
   const visibleNeighborhoods = (data?.neighborhoods ?? []).filter((row) =>
@@ -72,35 +82,12 @@ function TeamWeeklyReportPage() {
   );
 
   const selected = data?.agents.find((a) => a.agent_id === selectedAgent);
-  const dailyRows = (data?.daily_records ?? []).filter((r) => selectedAgent === "all" || r.agent_id === selectedAgent);
-  const detailTotals = weeklyTotals(dailyRows);
-  const detailTitle = selectedAgent === "all" ? "Toda a equipe" : selected?.full_name || "Agente selecionado";
+  const scopeTitle = selectedAgent !== "all" ? pcfadQuery.data?.agents.find((a) => a.id === selectedAgent)?.name || "Agente selecionado" : selectedTeam !== "all" ? pcfadQuery.data?.teams.find((t) => t.id === selectedTeam)?.name || "Equipe selecionada" : "Equipes autorizadas";
+  const detailTitle = scopeTitle + (selectedArea !== "all" ? ` · Área ${pcfadQuery.data?.areas.find((a) => a.id === selectedArea)?.name || "selecionada"}` : "");
   const exportDetailedPdf = async () => {
-    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-    const doc = new jsPDF({ orientation: "landscape" });
-    for (let offset = 0; offset < WEEKLY_FIELDS.length; offset += 7) {
-      if (offset) doc.addPage();
-      const fields = WEEKLY_FIELDS.slice(offset, offset + 7);
-      doc.setFontSize(12);
-      doc.text(`Boletim semanal detalhado — ${detailTitle}`, 14, 14);
-      doc.setFontSize(9);
-      doc.text(`SE ${epiWeek}/${epiYear} | ${data?.from} a ${data?.to} | ${dailyRows.length} diárias`, 14, 21);
-      autoTable(doc, { startY: 27, styles: { fontSize: 7 }, head: [["Agente", "Data", ...fields.map(([, label]) => label)]], body: [
-        ...dailyRows.map((r) => [data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name || "Agente", r.work_date.split("-").reverse().join("/"), ...fields.map(([key]) => r[key] ?? 0)]),
-        ["TOTAL", `${dailyRows.length} diárias`, ...fields.map(([key]) => detailTotals[key])],
-      ] });
-    }
-    doc.addPage();
-    doc.text(`Larvicida — SE ${epiWeek}/${epiYear} — ${detailTitle}`, 14, 14);
-    autoTable(doc, { startY: 23, head: [["Data", "Agente", "Larvicida por unidade"]], body: [...dailyRows.map((r) => [r.work_date, data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name || "Agente", weeklyLarvicide([r])]), ["TOTAL", "", weeklyLarvicide(dailyRows)]] });
-    doc.save(`boletim-semanal-detalhado-SE${epiWeek}-${epiYear}.pdf`);
-  };
-  const exportDetailed = () => {
-    downloadCsv(`boletim-detalhado-SE${epiWeek}-${epiYear}.csv`, [
-      ["Agente", "Data", "Ciclo", "Início", "Fim", ...WEEKLY_FIELDS.map(([, label]) => label), "Larvicida"],
-      ...dailyRows.map((r) => [data?.agents.find((a) => a.agent_id === r.agent_id)?.full_name, r.work_date, r.cycle_id, r.start_time, r.end_time, ...WEEKLY_FIELDS.map(([key]) => r[key] ?? 0), weeklyLarvicide([r])]),
-      [detailTitle, "TOTAL", "", "", "", ...WEEKLY_FIELDS.map(([key]) => detailTotals[key]), weeklyLarvicide(dailyRows)],
-    ]);
+    if (!pcfadQuery.data) return;
+    const result = await generatePcfadWeeklyPDF({ agentAuthId: selectedAgent === "all" ? "" : selectedAgent, week: epiWeek, year: epiYear, suppliedData: { ...pcfadQuery.data, title: detailTitle } });
+    result?.pdf.save(result.fileName);
   };
 
   const exportAgents = () => {
@@ -175,7 +162,7 @@ function TeamWeeklyReportPage() {
                 onChange={(e) => setEpiYear(Number(e.target.value))}
               />
             </label>
-            <Button size="sm" onClick={() => refetch()} disabled={isFetching}>
+            <Button size="sm" onClick={() => { refetch(); pcfadQuery.refetch(); }} disabled={isFetching}>
               {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
             </Button>
           </div>
@@ -204,29 +191,18 @@ function TeamWeeklyReportPage() {
           </div>
 
           <Card className="rounded-3xl">
-            <CardHeader><CardTitle className="text-base">Boletim semanal detalhado</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Boletim semanal — Resumo dos Trabalhos de Campo</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <label className="block text-sm font-medium">Agente
-                <select aria-label="Agente do boletim semanal" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)} className="mt-1 block w-full rounded-xl border p-2 bg-white">
-                  <option value="all">Todos os agentes</option>
-                  {data.agents.map((a) => <option key={a.agent_id} value={a.agent_id}>{a.full_name}</option>)}
-                  {selectedAgent !== "all" && !selected && <option value={selectedAgent}>Sem produção nesta semana</option>}
-                </select>
-              </label>
-              <div className="flex flex-wrap justify-between items-center gap-2">
-                <p className="text-sm"><strong>{detailTitle}</strong> · {dailyRows.length} diária(s) encerrada(s) · {data.from} a {data.to}</p>
-                <Button variant="outline" size="sm" onClick={exportDetailedPdf} disabled={!dailyRows.length}>PDF detalhado</Button>
-                <Button variant="outline" size="sm" onClick={exportDetailed} disabled={!dailyRows.length}><FileDown className="mr-1 h-4 w-4" /> CSV detalhado</Button>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="text-sm">Agente<select aria-label="Agente do boletim" className="block w-full border rounded-xl p-2" value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)}><option value="all">Todos os agentes</option>{pcfadQuery.data?.agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+                <label className="text-sm">Equipe<select aria-label="Equipe do boletim" className="block w-full border rounded-xl p-2" value={selectedTeam} onChange={(e) => { setSelectedTeam(e.target.value); setSelectedAgent("all"); }}><option value="all">Todas as equipes autorizadas</option>{pcfadQuery.data?.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+                <label className="text-sm">Área<select aria-label="Área do boletim" className="block w-full border rounded-xl p-2" value={selectedArea} onChange={(e) => setSelectedArea(e.target.value)}><option value="all">Todas as áreas</option>{pcfadQuery.data?.areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
               </div>
-              <p className="text-xs text-muted-foreground">Uma linha por diária, com soma dos indicadores no TOTAL. Pendências representam a soma registrada nas diárias, não o saldo atual. Larvicida somado separadamente por unidade.</p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs whitespace-nowrap">
-                  <thead className="bg-muted/60"><tr><th className="p-2 text-left">Agente</th><th className="p-2">Data</th><th className="p-2">Início</th><th className="p-2">Fim</th>{WEEKLY_FIELDS.map(([key, label]) => <th key={key} className="p-2">{label}</th>)}<th className="p-2">Larvicida</th></tr></thead>
-                  <tbody>{dailyRows.map((r) => <tr key={r.id} className="border-t"><td className="p-2">{data.agents.find((a) => a.agent_id === r.agent_id)?.full_name}</td><td className="p-2">{r.work_date.split("-").reverse().join("/")}</td><td className="p-2">{r.start_time || "—"}</td><td className="p-2">{r.end_time || "—"}</td>{WEEKLY_FIELDS.map(([key]) => <td key={key} className="p-2 text-right tabular-nums">{r[key] ?? 0}</td>)}<td className="p-2">{weeklyLarvicide([r])}</td></tr>)}</tbody>
-                  <tfoot className="bg-muted font-bold"><tr><td className="p-2" colSpan={4}>TOTAL · {dailyRows.length} diárias</td>{WEEKLY_FIELDS.map(([key]) => <td key={key} className="p-2 text-right tabular-nums">{detailTotals[key]}</td>)}<td className="p-2">{weeklyLarvicide(dailyRows)}</td></tr></tfoot>
-                </table>
-              </div>
-              {!dailyRows.length && <p className="text-sm text-muted-foreground">Nenhuma diária encerrada para este agente no período.</p>}
+              <Button variant="outline" onClick={exportDetailedPdf} disabled={!pcfadQuery.data || pcfadQuery.isFetching || !pcfadQuery.data.rows.length}>PDF do boletim PCFAD</Button>
+              {pcfadQuery.isFetching ? <p>Carregando boletim PCFAD…</p> : pcfadQuery.error ? <p role="alert" className="text-red-700">{pcfadQuery.error.message}</p> : pcfadQuery.data ? <>
+                <p className="text-xs text-muted-foreground">{pcfadQuery.data.dailyCount} diária(s) encerrada(s). Equipe e área consolidam os indicadores por dia. Valores de larvicida separados por unidade.</p>
+                <PcfadWeeklyLandscape agentAuthId={selectedAgent} week={epiWeek} year={epiYear} agentName={detailTitle} registration={selected?.registration || "—"} municipality={selectedArea === "all" ? (pcfadQuery.data.agents.find((a) => a.id === selectedAgent)?.municipality || "") : pcfadQuery.data.areas.find((a) => a.id === selectedArea)?.name || ""} suppliedData={pcfadQuery.data} />
+              </> : null}
             </CardContent>
           </Card>
 

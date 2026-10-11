@@ -1,3 +1,4 @@
+import { readAllQueryPages } from "@/lib/query-pages";
 import { supabase } from "@/integrations/supabase/client";
 import { safeFetch } from "@/lib/offline/safe-fetch";
 import { listLocal } from "@/lib/offline/repos";
@@ -36,6 +37,7 @@ function emptyPropTypes(): PropertyTypeComposition {
  * boletim diário nunca teve essa distribuição por não fazer essa consulta.
  */
 export async function computePropertyTypeComposition(params: {
+  client?: any;
   agentAuthId: string;
   workDates: string[];
   cycleId?: string | null;
@@ -56,7 +58,7 @@ export async function computePropertyTypeComposition(params: {
   const startIso = `${minDate}T00:00:00-03:00`;
   const endIso = `${maxDate}T23:59:59.999-03:00`;
 
-  let vq = supabase
+  let vq = (params.client ?? supabase)
     .from("visits")
     // ATENÇÃO: não incluir `visit_type` nem `created_at` aqui — essas colunas não
     // existem em `visits`. Colunas reais: id, property_id, agent_id, cycle_id, status,
@@ -74,7 +76,7 @@ export async function computePropertyTypeComposition(params: {
   if (params.onlyTreated) vq = vq.eq("treatment_applied", true);
 
   // Offline: reconstrói o join visits→properties a partir do cache Dexie.
-  const data = await safeFetch<any[]>(
+  const data = params.client ? await readAllQueryPages<any>(vq.order("id")) : await safeFetch<any[]>(
     async () => {
       const { data: rows, error } = await vq;
       if (error) throw error;

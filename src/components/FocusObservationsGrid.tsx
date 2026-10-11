@@ -7,6 +7,7 @@ interface FocusObservationsGridProps {
 export function FocusObservationsGrid({ focos }: FocusObservationsGridProps) {
   if (!focos || focos.length === 0) return null;
 
+  const showAgent = focos.some((f) => f.agente);
   return (
     <div className="mt-6 mb-4">
       <h3 className="mb-2 text-center text-[11px] font-black uppercase tracking-widest text-slate-800">
@@ -17,6 +18,7 @@ export function FocusObservationsGrid({ focos }: FocusObservationsGridProps) {
         <table className="w-full border-collapse text-[10px]">
           <thead>
             <tr>
+              {showAgent && <th className="border border-slate-300 bg-slate-100 px-2 py-1 text-left">Agente</th>}
               <th className="border border-slate-300 bg-slate-100 px-2 py-1 text-left">
                 Nº imóvel
               </th>
@@ -39,6 +41,7 @@ export function FocusObservationsGrid({ focos }: FocusObservationsGridProps) {
           <tbody>
             {focos.map((foco, idx) => (
               <tr key={`${foco.numeroImovel}-${foco.dataColeta}-${foco.tipoDeposito}-${idx}`}>
+                {showAgent && <td className="border border-slate-200 px-2 py-1">{foco.agente}</td>}
                 <td className="border border-slate-200 px-2 py-1 font-bold">{foco.numeroImovel}</td>
                 <td className="border border-slate-200 px-2 py-1">{foco.endereco}</td>
                 <td className="border border-slate-200 px-2 py-1">{foco.tipoDeposito}</td>

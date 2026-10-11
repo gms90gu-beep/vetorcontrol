@@ -28,6 +28,7 @@ export type PcfadRow = {
   depInspected: number;
   depTreated: number;
   depEliminated: number;
+  larvicideByUnit?: Record<string, number>;
   larvicideUnit: string;
   larvicideAmount: number;
   worked: number;
@@ -71,6 +72,20 @@ function emptyTotal(): PcfadRow {
   };
 }
 
+function mergeLarvicide(a: Record<string, number>, b: Record<string, number>) {
+  const result = { ...a };
+  for (const [unit, amount] of Object.entries(b)) result[unit] = (result[unit] || 0) + amount;
+  return result;
+}
+export function pcfadLarvicide(r: PcfadRow): string {
+  return Object.entries(r.larvicideByUnit ?? { [r.larvicideUnit]: r.larvicideAmount }).filter(([, n]) => n).map(([unit, amount]) => `${amount} ${unit}`).join(" · ") || "0";
+}
+export function groupPcfadDays(rows: PcfadRow[]): PcfadRow[] {
+  const groups = new Map<string, PcfadRow[]>();
+  for (const row of rows) groups.set(row.work_date, [...(groups.get(row.work_date) ?? []), row]);
+  return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([date, rows]) => ({ ...sumPcfadRows(rows), work_date: date }));
+}
+
 export function sumPcfadRows(rows: PcfadRow[]): PcfadRow {
   return rows.reduce<PcfadRow>((a, r) => ({
     ...a,
@@ -98,6 +113,7 @@ export function sumPcfadRows(rows: PcfadRow[]): PcfadRow {
     depInspected: a.depInspected + r.depInspected,
     depTreated: a.depTreated + r.depTreated,
     depEliminated: a.depEliminated + r.depEliminated,
+    larvicideByUnit: mergeLarvicide(a.larvicideByUnit ?? {}, r.larvicideByUnit ?? { [r.larvicideUnit]: r.larvicideAmount }),
     larvicideUnit: r.larvicideUnit || a.larvicideUnit,
     larvicideAmount: a.larvicideAmount + r.larvicideAmount,
     worked: a.worked + r.worked,
@@ -112,20 +128,22 @@ export async function buildPcfadWeekData(params: {
   agentAuthId: string;
   week: number;
   year: number;
+  client?: any;
+  records?: any[];
 }): Promise<PcfadWeekData> {
   const { agentAuthId, week, year } = params;
   const range = epiWeekToDateRange(week, year);
 
-  const { data, error } = await supabase
+  const { data, error } = params.records ? { data: params.records, error: null } : await (params.client ?? supabase)
     .from("daily_work_records")
     .select("*")
     .eq("agent_id", agentAuthId)
     .gte("work_date", range.start)
     .lte("work_date", range.end)
     .order("work_date", { ascending: true });
-  if (error) console.warn("[PCFAD_WEEK_QUERY_ERROR]", error);
+  if (error) throw error;
 
-  const dwr = ((data as any[]) || []).filter((r) => r.work_date);
+  const dwr = ((data as any[]) || []).filter((r) => r.work_date && r.status === "completed" && r.end_time);
   const rows: PcfadRow[] = [];
 
   for (const r of dwr) {
@@ -133,6 +151,7 @@ export async function buildPcfadWeekData(params: {
     let treatedTotal = 0;
     try {
       const comp = await computePropertyTypeComposition({
+        client: params.client,
         agentAuthId,
         workDates: [r.work_date],
         cycleId: r.cycle_id ?? null,
@@ -141,6 +160,7 @@ export async function buildPcfadWeekData(params: {
       treated = comp.propTypes;
       treatedTotal = comp.uniquePropertiesCount;
     } catch (e) {
+      if (params.client) throw e;
       console.warn("[PCFAD_TREATED_ERROR]", e);
     }
     // Nº de imóveis TRABALHADOS por tipo (todas as visitas do dia, sem filtro de tratamento)
@@ -148,6 +168,7 @@ export async function buildPcfadWeekData(params: {
     let propertiesByTypeTotal = 0;
     try {
       const compAll = await computePropertyTypeComposition({
+        client: params.client,
         agentAuthId,
         workDates: [r.work_date],
         cycleId: r.cycle_id ?? null,
@@ -155,6 +176,7 @@ export async function buildPcfadWeekData(params: {
       propertiesByType = compAll.propTypes;
       propertiesByTypeTotal = compAll.uniquePropertiesCount;
     } catch (e) {
+      if (params.client) throw e;
       console.warn("[PCFAD_WORKED_TYPES_ERROR]", e);
     }
     const a1 = n(r.deposits_a1), a2 = n(r.deposits_a2), b = n(r.deposits_b);

@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveCycleForUser } from "@/lib/active-cycle";
-import { buildPcfadWeekData, pcfadIip, PCFAD_DASH, type PcfadRow } from "@/lib/pcfad-week";
+import { buildPcfadWeekData, pcfadIip, pcfadLarvicide, PCFAD_DASH, type PcfadRow } from "@/lib/pcfad-week";
 import { fetchFocusObservations } from "@/lib/focus-observations";
 
 /**
@@ -16,10 +16,11 @@ export async function generatePcfadWeeklyPDF(params: {
   agentAuthId: string;
   week: number;
   year: number;
+  suppliedData?: { rows: PcfadRow[]; total: PcfadRow; range: { start: string; end: string }; observations: import("@/lib/focus-observations").FocusObservation[]; title: string };
 }) {
   const { agentAuthId, week, year } = params;
   try {
-    const [{ data: profile }, { data: agentRow }, cycle] = await Promise.all([
+    const [{ data: profile }, { data: agentRow }, cycle] = params.suppliedData ? [{ data: { full_name: params.suppliedData.title } }, { data: null }, null] : await Promise.all([
       supabase
         .from("profiles")
         .select("full_name, registration_number, city")
@@ -38,8 +39,8 @@ export async function generatePcfadWeeklyPDF(params: {
       (profile as any)?.registration_number || (agentRow as any)?.registration_id || "—";
     const municipality = (agentRow as any)?.municipality || (profile as any)?.city || "—";
 
-    const { rows, total, range } = await buildPcfadWeekData({ agentAuthId, week, year });
-    const focusObservations = await fetchFocusObservations(agentAuthId, range.start, range.end);
+    const { rows, total, range } = params.suppliedData ?? await buildPcfadWeekData({ agentAuthId, week, year });
+    const focusObservations = params.suppliedData?.observations ?? await fetchFocusObservations(agentAuthId, range.start, range.end);
 
     const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
     const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
@@ -95,8 +96,8 @@ export async function generatePcfadWeeklyPDF(params: {
         r.depInspected,
         r.depTreated,
         r.depEliminated,
-        r.larvicideUnit,
-        r.larvicideAmount,
+        r.larvicideByUnit && Object.keys(r.larvicideByUnit).length > 1 ? "Por unidade" : r.larvicideUnit,
+        pcfadLarvicide(r),
         PCFAD_DASH,
         PCFAD_DASH,
         r.worked,
@@ -225,6 +226,7 @@ export async function generatePcfadWeeklyPDF(params: {
         startY: observationsTitleY + 2,
         head: [
           [
+            "Agente",
             "Nº imóvel",
             "Depósito positivo",
             "Qtd.",
@@ -235,6 +237,7 @@ export async function generatePcfadWeeklyPDF(params: {
           ],
         ],
         body: focusObservations.map((observation) => [
+          observation.agente || agentName,
           observation.numeroImovel,
           observation.tipoDeposito,
           observation.quantidade ?? PCFAD_DASH,
@@ -292,7 +295,7 @@ export async function generatePcfadWeeklyPDF(params: {
     pdf.line(6, sigY, 76, sigY);
     pdf.setFontSize(7);
     pdf.setTextColor(80, 80, 80);
-    pdf.text("ASSINATURA DO AGENTE", 41, sigY + 4, { align: "center" });
+    pdf.text(params.suppliedData ? "ASSINATURA DO RESPONSÁVEL" : "ASSINATURA DO AGENTE", 41, sigY + 4, { align: "center" });
     pdf.text(`Emissão: ${new Date().toLocaleString("pt-BR")}`, pageW - 6, sigY + 4, {
       align: "right",
     });

@@ -4,6 +4,7 @@ import { epiWeekToDateRange } from "@/lib/cycle-week";
 import {
   buildPcfadWeekData,
   pcfadIip,
+  pcfadLarvicide,
   sumPcfadRows,
   PCFAD_DASH,
   type PcfadRow,
@@ -28,6 +29,7 @@ export function PcfadWeeklyLandscape({
   agentName,
   registration,
   municipality,
+  suppliedData,
 }: {
   agentAuthId: string;
   week: number;
@@ -35,6 +37,7 @@ export function PcfadWeeklyLandscape({
   agentName: string;
   registration: string;
   municipality: string;
+  suppliedData?: { rows: PcfadRow[]; observations: FocusObservation[] };
 }) {
   const isLandscape = useOrientation();
   const [rows, setRows] = useState<PcfadRow[]>([]);
@@ -44,6 +47,7 @@ export function PcfadWeeklyLandscape({
   const range = useMemo(() => epiWeekToDateRange(week, year), [week, year]);
 
   useEffect(() => {
+    if (suppliedData) { setRows(suppliedData.rows); setFocusObservations(suppliedData.observations); return; }
     if (!isLandscape || !agentAuthId) return;
     let cancelled = false;
     (async () => {
@@ -59,11 +63,11 @@ export function PcfadWeeklyLandscape({
     return () => {
       cancelled = true;
     };
-  }, [isLandscape, agentAuthId, week, year, range.start, range.end]);
+  }, [isLandscape, agentAuthId, week, year, range.start, range.end, suppliedData]);
 
   const total = useMemo(() => sumPcfadRows(rows), [rows]);
 
-  if (!isLandscape) return null;
+  if (!isLandscape && !suppliedData) return null;
 
   const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
   const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
@@ -207,8 +211,8 @@ export function PcfadWeeklyLandscape({
                   <td className={td}>{r.depInspected}</td>
                   <td className={td}>{r.depTreated}</td>
                   <td className={td}>{r.depEliminated}</td>
-                  <td className={td}>{r.larvicideUnit}</td>
-                  <td className={td}>{r.larvicideAmount}</td>
+                  <td className={td}>{r.larvicideByUnit && Object.keys(r.larvicideByUnit).length > 1 ? "Por unidade" : r.larvicideUnit}</td>
+                  <td className={td}>{pcfadLarvicide(r)}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{r.worked}</td>
@@ -249,8 +253,8 @@ export function PcfadWeeklyLandscape({
                   <td className={td}>{total.depInspected}</td>
                   <td className={td}>{total.depTreated}</td>
                   <td className={td}>{total.depEliminated}</td>
-                  <td className={td}>{total.larvicideUnit}</td>
-                  <td className={td}>{total.larvicideAmount}</td>
+                  <td className={td}>{total.larvicideByUnit && Object.keys(total.larvicideByUnit).length > 1 ? "Por unidade" : total.larvicideUnit}</td>
+                  <td className={td}>{pcfadLarvicide(total)}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{DASH}</td>
                   <td className={td}>{total.worked}</td>
