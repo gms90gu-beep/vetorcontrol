@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyMapPoint } from "@/lib/map-point-status";
+import { countMapIndicators, classifyMapPoint } from "@/lib/map-point-status";
 
 describe("map point status", () => {
   it("separates observed focus alerts from confirmed positive focus", () => {
@@ -39,3 +39,11 @@ describe("map point status", () => {
     expect(classifyMapPoint({})).toBe("unvisited");
   });
 });
+
+ describe("independent map indicators", () => {
+  it("retains closure and pending return while the map uses one color", () => {
+    const points = [{ has_pendency: true, last_visit_status: "closed" }, { has_observed_focus: true, has_positive_focus: true }];
+    expect(countMapIndicators(points)).toEqual({ pending: 1, closed: 1, observed: 1, positive: 1 });
+    expect(points.map(classifyMapPoint)).toEqual(["pendency", "focus"]);
+  });
+ });

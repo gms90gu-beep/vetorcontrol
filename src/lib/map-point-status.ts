@@ -43,3 +43,13 @@ export function classifyMapPoint(point: MapPointClassificationInput): MapPointCa
   if (visitStatus === "visited") return "clean";
   return "unvisited";
 }
+
+/** Independent property counts: a closed property with a pending return belongs to both. */
+export function countMapIndicators(points: MapPointClassificationInput[]) {
+  return points.reduce((totals, point) => ({
+    pending: totals.pending + Number(Boolean(point.has_pendency)),
+    closed: totals.closed + Number(point.last_visit_status === "closed"),
+    observed: totals.observed + Number(Boolean(point.has_observed_focus)),
+    positive: totals.positive + Number(Boolean(point.has_positive_focus)),
+  }), { pending: 0, closed: 0, observed: 0, positive: 0 });
+}

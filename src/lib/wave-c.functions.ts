@@ -594,6 +594,11 @@ async function scopedProfileIds(
   userId: string,
   role: "admin_master" | "coordenador" | "supervisor",
 ): Promise<string[] | null> {
+  if (role === "coordenador") {
+    const { data, error } = await supabase.rpc("get_coordinator_data", { p_user_id: userId });
+    if (error) throw new Error(`Falha ao validar área do coordenador: ${error.message}`);
+    return (data ?? []).filter((p: any) => ["agente", "agent"].includes(p.role)).map((p: any) => p.id);
+  }
   return resolvePermittedAgentIds(supabase, userId, role);
 }
 
@@ -714,7 +719,11 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
     // boletins_rg.agent_id armazena profile_id → escopo por profile_ids
-    const profileIds = await resolvePermittedAgentIds(supabase, userId, role, data.agentId);
+    let profileIds = await scopedProfileIds(supabase, userId, role);
+    if (data.agentId) {
+      if (profileIds !== null && !profileIds.includes(data.agentId)) throw new Error("Agente fora do seu acesso.");
+      profileIds = [data.agentId];
+    }
     console.log("[MAP_ROLE]", role);
     console.log("[MAP_USER]", userId);
     console.log("[MAP_SCOPE_PROFILES]", profileIds?.length ?? "all");
@@ -776,10 +785,8 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const pendResults = [];
     for (const ids of idChunks) {
-      if (data.cycleIds?.length === 0) continue;
       let query = supabaseAdmin.from("property_pendencies").select("property_id, resolved_at").in("property_id", ids);
       if (profileIds) query = query.in("agent_id", profileIds);
-      if (data.cycleIds) query = query.in("cycle_id", data.cycleIds);
       pendResults.push({ data: await readAllQueryPages(query.order("id")), error: null });
     }
 
@@ -977,11 +984,15 @@ export const getBlockRiskScores = createServerFn({ method: "POST" })
 
 export const getGpsCoverage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((_input: Record<string, never>) => ({}))
-  .handler(async ({ context }): Promise<GpsCoverage> => {
+  .inputValidator((input: { agentId?: string }) => input)
+  .handler(async ({ data, context }): Promise<GpsCoverage> => {
     const { supabase, userId } = context;
     const role = await requireAdminOrSupervisor(supabase, userId);
-    const profileIds = await scopedProfileIds(supabase, userId, role);
+    let profileIds = await scopedProfileIds(supabase, userId, role);
+    if (data.agentId) {
+      if (profileIds !== null && !profileIds.includes(data.agentId)) throw new Error("Agente fora do seu acesso.");
+      profileIds = [data.agentId];
+    }
     console.log("[RBAC_ROLE]", role, "[RBAC_PROFILE]", userId, "[RBAC_SCOPE]", profileIds?.length ?? "all");
 
     let boletimIds: string[] | null = null;
@@ -999,8 +1010,7 @@ export const getGpsCoverage = createServerFn({ method: "POST" })
 
     let q = supabase.from("properties").select("id, latitude, longitude, block_number");
     if (boletimIds) q = q.in("boletim_id", boletimIds);
-    const { data: props } = await q.limit(50000);
-    const list = (props ?? []) as any[];
+    const list = await readAllQueryPages<any>(q.order("id"));
 
     const blocksTotal = new Set<string>();
     const blocksGeo = new Set<string>();

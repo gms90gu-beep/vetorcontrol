@@ -24,7 +24,8 @@ import {
   type MapCycleOption,
 } from "@/lib/wave-c.functions";
 import type { PropertyCycleHistory } from "@/lib/map-cycle-history";
-import { classifyMapPoint, type MapPointCategory } from "@/lib/map-point-status";
+import { countMapIndicators, classifyMapPoint, type MapPointCategory } from "@/lib/map-point-status";
+import { useOperationalDate } from "@/hooks/useOperationalDate";
 import { getOperationalDate } from "@/lib/operational-date";
 import { downloadCSV, downloadXLSX } from "@/lib/institutional-export";
 import {
@@ -152,6 +153,7 @@ const BASE_LAYERS: Record<BaseLayerId, { name: string }> = {
 };
 
 export default function OperationalMapView({ agentId }: { agentId?: string }) {
+  const { userRole } = useOperationalDate();
   console.log("[MAP_COMPONENT_MOUNT]");
 
   // A SE atual costuma ter pouca ou nenhuma produção lançada (o mapa abria
@@ -253,8 +255,8 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
     enabled: showBlocks,
   });
   const coverage = useQuery({
-    queryKey: ["op-map-coverage"],
-    queryFn: () => fetchCoverage({ data: {} }),
+    queryKey: ["op-map-coverage", agentId],
+    queryFn: () => fetchCoverage({ data: { agentId } }),
   });
 
   const allPoints = useMemo(() => {
@@ -281,6 +283,8 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
     for (const p of allPoints) c[classify(p)]++;
     return c;
   }, [allPoints]);
+
+  const independentCounts = useMemo(() => countMapIndicators(allPoints), [allPoints]);
 
   const territorialCounts = useMemo(() => {
     const blocksSet = new Set<string>();
@@ -439,7 +443,7 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
     active?: boolean;
     suffix?: string;
   }> = [
-    { id: "total", label: "Total imóveis", value: allPoints.length, accent: "from-slate-500/15 to-slate-500/0", onClick: () => setFilter("all"), active: filter === "all" },
+    { id: "total", label: "Imóveis no mapa", value: allPoints.length, accent: "from-slate-500/15 to-slate-500/0", onClick: () => setFilter("all"), active: filter === "all" },
     { id: "clean", label: "Visitados sem foco", value: counts.clean, accent: "from-emerald-500/25 to-emerald-500/0", onClick: () => setFilter("clean"), active: filter === "clean" },
     { id: "unvisited", label: "Sem visita", value: counts.unvisited, accent: "from-slate-500/20 to-slate-500/0", onClick: () => setFilter("unvisited"), active: filter === "unvisited" },
     { id: "pendency", label: "Pendências", value: counts.pendency, accent: "from-orange-500/25 to-orange-500/0", onClick: () => setFilter("pendency"), active: filter === "pendency" },
@@ -449,14 +453,21 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
     { id: "focus_found", label: "Alertas de foco", value: counts.focus_found, accent: "from-amber-500/25 to-amber-500/0", onClick: () => setFilter("focus_found"), active: filter === "focus_found" },
     { id: "focus", label: "Focos positivos", value: counts.focus, accent: "from-rose-500/25 to-rose-500/0", onClick: () => setFilter("focus"), active: filter === "focus" },
     { id: "strategic", label: "PE", value: counts.strategic, accent: "from-blue-500/25 to-blue-500/0", onClick: () => setFilter("strategic"), active: filter === "strategic" },
-    { id: "nocoord", label: "Sem coordenadas", value: withoutCoords, accent: "from-amber-500/20 to-amber-500/0" },
-    { id: "gps", label: "Cobertura GPS", value: cov?.coverage_pct ?? 0, suffix: "%", accent: "from-violet-500/25 to-violet-500/0" },
+    { id: "nocoord", label: "Cadastro sem GPS", value: withoutCoords, accent: "from-amber-500/20 to-amber-500/0" },
+    { id: "gps", label: "GPS do cadastro", value: cov?.coverage_pct ?? 0, suffix: "%", accent: "from-violet-500/25 to-violet-500/0" },
     { id: "blocks", label: "Quarteirões", value: territorialCounts.blocks, accent: "from-indigo-500/20 to-indigo-500/0" },
     { id: "loc", label: "Localidades", value: territorialCounts.localities, accent: "from-teal-500/20 to-teal-500/0" },
   ];
 
   const PanelDefault = (
     <div className="space-y-4 animate-in fade-in-50 duration-300">
+      <div className="rounded-xl border p-3 text-xs space-y-2">
+        <p className="font-semibold">Cadastro autorizado: {cov?.properties_total?.toLocaleString("pt-BR") ?? "—"} imóveis · no mapa: {allPoints.length.toLocaleString("pt-BR")}</p>
+        <p>Indicadores independentes · podem incluir o mesmo imóvel:</p>
+        <p>Pendência aberta: {independentCounts.pending} · Última visita fechada: {independentCounts.closed}</p>
+        <p>Foco encontrado: {independentCounts.observed} · Foco positivo: {independentCounts.positive}</p>
+        <p className="text-muted-foreground">Abaixo, cada imóvel aparece em uma única categoria de cor. Contagens de imóveis, não de visitas ou depósitos. Imóveis sem GPS ficam fora das categorias do mapa.</p>
+      </div>
       <SummarySection counts={counts} total={allPoints.length} />
       <DistributionsSection
         statusCounts={counts}
@@ -530,16 +541,16 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
                 Centro de Inteligência Territorial
               </h1>
               <p className="text-[11px] text-muted-foreground leading-tight">
-                Visão territorial por ciclo/ano · pendências abertas permanecem até serem resolvidas
+                {agentId ? "Agente selecionado" : userRole === "supervisor" ? "Minha equipe" : userRole === "coordenador" ? "Agentes sob minha coordenação" : "Todos os agentes autorizados"} · {mapPeriodMode === "cycle" ? (selectedCycle ? `Ciclo ${selectedCycle.number ?? selectedCycle.name}` : "Carregando ciclo") : mapPeriodMode === "year" ? `Ano ${selectedYear}` : "Período personalizado"} · {from.split("-").reverse().join("/")} a {to.split("-").reverse().join("/")}
               </p>
               <p className="text-[10px] text-muted-foreground/80 leading-tight">
-                Última sincronização: {lastSync}
+                Última atualização dos pontos: {lastSync} · Pendências abertas de todos os ciclos
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 ml-auto">
-            <Button size="sm" variant="outline" onClick={() => props.refetch()} disabled={props.isFetching}>
+            <Button size="sm" variant="outline" onClick={() => { void props.refetch(); void coverage.refetch(); if (showBlocks) void blocks.refetch(); }} disabled={props.isFetching || coverage.isFetching || blocks.isFetching}>
               {props.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span className="hidden sm:inline ml-1.5">Atualizar</span>
             </Button>
@@ -657,7 +668,7 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
                   )}
                   {props.data?.truncated && (
                     <div className="absolute top-3 right-3 z-[400] bg-amber-500/90 text-white backdrop-blur-xl border border-amber-300 rounded-xl px-3 py-1.5 shadow-md text-[11px] font-semibold max-w-[260px] animate-in fade-in slide-in-from-top-2">
-                      Limite de 5.000 imóveis atingido — resultado truncado. Reduza o período pra ver todos.
+                      Limite de 5.000 imóveis atingido — resultado truncado. Selecione um agente para reduzir o cadastro consultado.
                     </div>
                   )}
                 </>
@@ -883,7 +894,7 @@ function SummarySection({
   counts, total,
 }: { counts: Record<Category, number>; total: number }) {
   const items = [
-    { label: "Total", value: total, color: "from-slate-500/15 to-slate-500/5", text: "text-slate-700 dark:text-slate-200", icon: <Building2 className="h-4 w-4" /> },
+    { label: "No mapa", value: total, color: "from-slate-500/15 to-slate-500/5", text: "text-slate-700 dark:text-slate-200", icon: <Building2 className="h-4 w-4" /> },
     { label: "Regular.", value: counts.clean, color: "from-emerald-500/20 to-emerald-500/5", text: "text-emerald-700 dark:text-emerald-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> },
     { label: "Pendências", value: counts.pendency, color: "from-orange-500/20 to-orange-500/5", text: "text-orange-700 dark:text-orange-300", icon: <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> },
     { label: "Alertas", value: counts.focus_found, color: "from-amber-500/20 to-amber-500/5", text: "text-amber-700 dark:text-amber-300", icon: <Flame className="h-4 w-4" /> },

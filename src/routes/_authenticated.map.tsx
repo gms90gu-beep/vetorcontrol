@@ -40,7 +40,10 @@ function MapRouteErrorComponent({ error, reset }: ErrorComponentProps) {
 {routeError.stack}
         </pre>
         <button
-          onClick={() => reset()}
+          onClick={() => {
+            if (/dynamically imported|Loading chunk|Importing a module script/i.test(routeError.message)) window.location.reload();
+            else reset();
+          }}
           className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground"
         >
           Tentar novamente
