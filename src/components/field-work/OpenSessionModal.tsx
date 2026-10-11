@@ -1,3 +1,7 @@
+import { safeGetUser } from "@/lib/offline/safe-auth";
+import { blockProductionCounts } from "@/lib/block-production-counts";
+import { listLocal } from "@/lib/offline/repos";
+import { flushMutations } from "@/lib/offline/sync";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -214,6 +218,8 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
 
   const handleConfirmClose = async () => {
     setWorking(true);
+    let closureConfirmed = false;
+    let closureQueued = false;
     try {
       console.log("[SESSION_CLOSE]", { id: session.id });
       console.log("[SESSION_SUMMARY]", { id: session.id, stats });
@@ -228,14 +234,52 @@ export function OpenSessionModal({ open, session, cycleLabel, weekLabel, onConti
         status: "closed",
         updated_at: new Date().toISOString(),
       });
+      closureQueued = true;
+      const { data: { user } } = await safeGetUser();
+      if (user) {
+        let sessions = await listLocal<any>("field_work_sessions", (s) => s.user_id === user.id && s.session_date === session.session_date && s.cycle_id === session.cycle_id);
+        if (isOnline()) {
+          await flushMutations();
+          const { data, error } = await supabase.from("field_work_sessions").select("*").eq("user_id", user.id).eq("session_date", session.session_date);
+          if (error) throw error;
+          const merged = new Map((data ?? []).map((s) => [s.id, s]));
+          for (const s of sessions) merged.set(s.id, s);
+          sessions = [...merged.values()].filter((s) => s.cycle_id === session.cycle_id);
+        }
+        const counts = blockProductionCounts(sessions);
+        let records = await listLocal<any>("daily_work_records", (r) => r.agent_id === user.id && r.work_date === session.session_date);
+        if (isOnline()) {
+          const { data, error } = await supabase.from("daily_work_records").select("*").eq("agent_id", user.id).eq("work_date", session.session_date);
+          if (error) throw error;
+          records = data ?? [];
+        }
+        for (const record of records.filter((r) => !session.cycle_id || r.cycle_id === session.cycle_id)) await updateOffline("daily_work_records", record.id, {
+          blocks_completed: Math.max(Number(record.blocks_completed) || 0, counts.blocksCompleted),
+          blocks_worked: Math.max(Number(record.blocks_worked) || 0, counts.blocksWorked),
+          updated_at: new Date().toISOString(),
+        });
+        if (isOnline()) {
+          await flushMutations();
+          const { data: remote, error } = await supabase.from("field_work_sessions").select("id,status").eq("id", session.id).maybeSingle();
+          if (error) throw error;
+          closureConfirmed = remote?.status === "closed";
+          for (const record of records.filter((r) => !session.cycle_id || r.cycle_id === session.cycle_id)) {
+            const { data: daily, error: readError } = await supabase.from("daily_work_records").select("blocks_completed").eq("id", record.id).maybeSingle();
+            if (readError) throw readError;
+            if (!daily || Number(daily.blocks_completed) < counts.blocksCompleted) closureConfirmed = false;
+          }
+        }
+      }
       console.log("[SESSION_FINISHED]", { id: session.id });
       try { (window as any).__vcSetJourneyActive?.(false); } catch {}
-      toast.success("Jornada encerrada com sucesso.");
+      if (closureConfirmed) toast.success("Quarteirão encerrado e contagem sincronizada.");
+      else toast.warning("Encerramento salvo no aparelho; confirmação e contagem aguardam sincronização.");
       console.log("[SESSION_NEW_ALLOWED]");
       onFinished();
     } catch (e: any) {
       console.warn("[SESSION_FINISHED] erro", e);
-      toast.error("Erro ao encerrar jornada: " + (e?.message || e));
+      if (closureQueued) toast.warning("Encerramento salvo; atualização do boletim pendente: " + (e?.message || e));
+      else toast.error("Erro ao encerrar jornada: " + (e?.message || e));
     } finally {
       setWorking(false);
     }

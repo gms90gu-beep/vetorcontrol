@@ -134,7 +134,7 @@ export async function generatePcfadWeeklyPDF(params: {
           { content: "Depósitos inspecionados por tipo", colSpan: 7 },
           { content: "Total dep.", rowSpan: 2 },
           { content: "Amostras", rowSpan: 2 },
-          { content: "Quart.", rowSpan: 2 },
+          { content: "Quart. concluídos", rowSpan: 2 },
           { content: "Imóveis tratados por tipo", colSpan: 6 },
           { content: "Depósitos", colSpan: 3 },
           { content: "Larvicida", colSpan: 2 },

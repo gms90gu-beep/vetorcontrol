@@ -1,3 +1,4 @@
+import { blockProductionCounts } from "@/lib/block-production-counts";
 /**
  * reports-reconcile.functions.ts
  * Reconstrói totais consolidados em daily_work_records a partir de visits
@@ -75,7 +76,7 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
 
       let vq = supabaseAdmin
         .from("visits")
-        .select("id, agent_id, property_id, visit_date, status, has_focus, treatment_amount, elimination_amount, sample_collected, tubitos_coletados, treated_deposits, is_recovered, cycle_id, week_id")
+        .select("id, agent_id, property_id, field_work_session_id, block_id, visit_date, status, has_focus, treatment_amount, elimination_amount, sample_collected, tubitos_coletados, treated_deposits, is_recovered, cycle_id, week_id")
         .gte("visit_date", fromTs)
         .lte("visit_date", toTs);
       if (permittedIds) vq = vq.in("agent_id", permittedIds);
@@ -137,6 +138,13 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
       const existingMap = new Map<string, any>();
       for (const r of existing) existingMap.set(`${r.agent_id}__${r.work_date}`, r);
 
+      let blockSessions: any[] = [];
+      if (agentIds.length) {
+        let query = supabaseAdmin.from("field_work_sessions").select("id,user_id,session_date,cycle_id,block_id,block_number,status")
+          .in("user_id", agentIds).gte("session_date", data.from).lte("session_date", data.to);
+        if (data.cycleId) query = query.eq("cycle_id", data.cycleId);
+        blockSessions = await readAllQueryPages(query.order("id"));
+      }
       const rows: RebuildRow[] = [];
       let updated = 0;
 
@@ -179,7 +187,10 @@ export const rebuildDailyRecords = createServerFn({ method: "POST" })
         }
         const positiveFoci = Object.values(fociByType).reduce((a, b) => a + b, 0) || positiveVisitIds.size;
 
+        const blockCounts = blockProductionCounts(blockSessions.filter((s) => s.user_id === g.agent_id && s.session_date === g.work_date && (!g.cycle_id || s.cycle_id === g.cycle_id)), vs);
         const payload: any = {
+          blocks_worked: blockCounts.blocksWorked,
+          blocks_completed: blockCounts.blocksCompleted,
           properties_worked: worked,
           properties_closed: closed,
           properties_refused: refused,

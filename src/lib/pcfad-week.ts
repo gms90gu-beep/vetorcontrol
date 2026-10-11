@@ -1,3 +1,5 @@
+import { blockProductionCounts } from "@/lib/block-production-counts";
+import { readAllQueryPages } from "@/lib/query-pages";
 import { supabase } from "@/integrations/supabase/client";
 import { epiWeekToDateRange } from "@/lib/cycle-week";
 import {
@@ -144,6 +146,9 @@ export async function buildPcfadWeekData(params: {
   if (error) throw error;
 
   const dwr = ((data as any[]) || []).filter((r) => r.work_date && r.status === "completed" && r.end_time);
+  const sessions = await readAllQueryPages<any>((params.client ?? supabase).from("field_work_sessions")
+    .select("id,block_id,block_number,cycle_id,session_date,status")
+    .eq("user_id", agentAuthId).gte("session_date", range.start).lte("session_date", range.end).order("id"));
   const rows: PcfadRow[] = [];
 
   for (const r of dwr) {
@@ -189,7 +194,7 @@ export async function buildPcfadWeekData(params: {
       a1, a2, b, c, d1, d2, e,
       depTotal: a1 + a2 + b + c + d1 + d2 + e,
       samples: n(r.samples_collected),
-      blocks: n(r.blocks_worked),
+      blocks: Math.max(n(r.blocks_completed), blockProductionCounts(sessions.filter((session) => session.session_date === r.work_date && (!r.cycle_id || session.cycle_id === r.cycle_id))).blocksCompleted),
       treated,
       treatedTotal,
       depInspected: n(r.deposits_inspected),

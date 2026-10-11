@@ -1,3 +1,4 @@
+import { blockProductionCounts } from "@/lib/block-production-counts";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { safeGetUser } from "@/lib/offline/safe-auth";
@@ -304,14 +305,9 @@ async function buildDailySnapshot(
     "field_work_sessions",
     (s) => s.user_id === userId && s.session_date === opDateStr,
   );
-  // 🔧 FIX: Contar apenas quarteirões FINALIZADOS (status === "completed")
-  // Antes: contava todos os quarteirões, inclusive os em progresso
-  snap.blocksWorked = new Set(
-    daySessions.filter((s) => s.status === "completed").map((s) => s.block_number)
-  ).size;
-  snap.blocksCompleted = new Set(
-    daySessions.filter((s) => s.status === "completed").map((s) => s.block_number),
-  ).size;
+  const blockCounts = blockProductionCounts(daySessions, allVisits);
+  snap.blocksWorked = blockCounts.blocksWorked;
+  snap.blocksCompleted = blockCounts.blocksCompleted;
   snap.blocksInProgress = new Set(
     daySessions.filter((s) => s.status === "in_progress").map((s) => s.block_number),
   ).size;
@@ -2200,6 +2196,17 @@ export function DailyWorkCloser({
           console.log("[JOURNEY_PAUSED]", logPayload);
         }
       }
+      // Persist after the final status decisions: the snapshot preceded those transitions.
+      const finalSessions = await listLocal<any>("field_work_sessions", (s) => dayAllSessionIds.includes(s.id));
+      const finalVisits = await listLocal<any>("visits", (v) => v.agent_id === user.id && toOperationalDate(v.visit_date) === operationalWorkDate);
+      const finalBlockCounts = blockProductionCounts(finalSessions.filter((s) => !__cycleIdForClose || s.cycle_id === __cycleIdForClose), finalVisits);
+      if (savedDaily?.id) await updateOffline("daily_work_records", savedDaily.id, {
+        blocks_worked: finalBlockCounts.blocksWorked,
+        blocks_completed: finalBlockCounts.blocksCompleted,
+        updated_at: new Date().toISOString(),
+      });
+      snap.blocksWorked = finalBlockCounts.blocksWorked;
+      snap.blocksCompleted = finalBlockCounts.blocksCompleted;
       const closedSessionId = activeSessionForClose?.id ?? null;
       const closedBlockId = (activeSessionForClose as any)?.block_id ?? activeSessionForClose?.block_number ?? null;
       console.log("[SESSION_END]", { session_id: closedSessionId, block_id: closedBlockId });

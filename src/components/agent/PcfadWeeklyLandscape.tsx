@@ -114,7 +114,7 @@ export function PcfadWeeklyLandscape({
                   Amostras
                 </th>
                 <th className={th} rowSpan={2}>
-                  Quart.
+                  Quart. concluídos
                 </th>
                 <th className={th} colSpan={6}>
                   Imóveis tratados por tipo
