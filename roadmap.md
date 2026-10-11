@@ -1,5 +1,9 @@
 # Tarefas
 
+- [ ] Ativar somente 20261011020650_focus_sample_results.sql da versão 0b75b31 no Cloud existente; preservar dados e credenciais.
+- [ ] Validar amostras por papel/equipe, histórico, mapas/boletins e proteção offline sem produção fictícia.
+- [ ] Executar testes, conferir compilação e segurança; publicar apenas após validar e informar commit/resultado.
+
 - [x] Rodada 08/10: Dexie v4 dedupe/coalescência sem substituir syncing; testes de concorrência e preservação de campos.
 - [x] Rodada 08/10: migration equivalente de observabilidade instalada, funções SQL service_role e falhas auditadas sem perder fechamento; jornada 01/10 idêntica ao baseline (base já informa closed, não paused).
 - [x] Rodada 08/10: tipo do imóvel em pendências/listas/exportações e resumo histórico por ciclo separado do atual.
