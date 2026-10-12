@@ -1,0 +1,13 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readCopyBackend, COPY_PROJECT_ID} from "./copy-backend.mjs";
+const url = `https://${COPY_PROJECT_ID}.supabase.co`;
+const jwt = claims => `test.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.test`;
+const valid = {VITE_SUPABASE_URL:url,VITE_SUPABASE_PUBLISHABLE_KEY:jwt({ref:COPY_PROJECT_ID,role:"anon"})};
+test("missing configuration never falls back to production",()=>assert.throws(()=>readCopyBackend({})));
+test("production URL rejected",()=>assert.throws(()=>readCopyBackend({...valid,VITE_SUPABASE_URL:"https://ttjzgszxrnmcsygtzfcu.supabase.co"})));
+test("foreign project key rejected",()=>assert.throws(()=>readCopyBackend({...valid,VITE_SUPABASE_PUBLISHABLE_KEY:jwt({ref:"ttjzgszxrnmcsygtzfcu",role:"anon"})})));
+test("service role cannot enter client build",()=>assert.throws(()=>readCopyBackend({...valid,VITE_SUPABASE_PUBLISHABLE_KEY:jwt({ref:COPY_PROJECT_ID,role:"service_role"})})));
+test("private VITE variable rejected",()=>assert.throws(()=>readCopyBackend({...valid,VITE_SUPABASE_SERVICE_ROLE_KEY:"secret"})));
+test("conflicting server backend rejected",()=>assert.throws(()=>readCopyBackend({...valid,SUPABASE_URL:"https://ttjzgszxrnmcsygtzfcu.supabase.co"})));
+test("destination public key accepted",()=>assert.deepEqual(readCopyBackend(valid),{url,key:valid.VITE_SUPABASE_PUBLISHABLE_KEY,projectId:COPY_PROJECT_ID}));
