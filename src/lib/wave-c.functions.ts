@@ -542,6 +542,9 @@ export interface PropertyMapPoint {
   has_pendency: boolean;
   has_observed_focus: boolean;
   has_positive_focus: boolean;
+  sample_pending_count?: number;
+  sample_negative_count?: number;
+  sample_inconclusive_count?: number;
   is_strategic: boolean;
 
   boletim_id: string | null;
@@ -810,6 +813,7 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
         .sort((a, b) => String(b.visit_date).localeCompare(String(a.visit_date)));
     }
 
+    const sampleStatesByProp = new Map<string, { pending: number; negative: number; inconclusive: number }>();
     const focusFoundByProp = new Map<string, number>();
     const focusByProp = new Map<string, number>();
     const lastVisitByProp = new Map<string, string>();
@@ -824,6 +828,11 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
       // Collection/focus occurrence remains historical even when the laboratory result is negative.
       if (v.has_focus || v.sample_collected) {
         focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
+        const states = sampleStatesByProp.get(v.property_id) ?? { pending: 0, negative: 0, inconclusive: 0 };
+        if (v.focus_analysis_status === "negative") states.negative++;
+        else if (v.focus_analysis_status === "inconclusive") states.inconclusive++;
+        else if (v.focus_analysis_status !== "positive") states.pending++;
+        sampleStatesByProp.set(v.property_id, states);
       }
 
       if (!lastVisitByProp.has(v.property_id)) {
@@ -850,6 +859,11 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
       }
     }
 
+    for (const v of visits) {
+      if (positiveVisitIds.has(v.id) && !v.focus_analysis_status && (v.has_focus || v.sample_collected)) {
+        const states = sampleStatesByProp.get(v.property_id); if (states) states.pending = Math.max(0, states.pending - 1);
+      }
+    }
     for (const visitId of positiveVisitIds) {
       const propertyId = visitToProp.get(visitId);
       if (propertyId) focusByProp.set(propertyId, (focusByProp.get(propertyId) ?? 0) + 1);
@@ -899,6 +913,9 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
         has_pendency: pend > 0,
         has_observed_focus: focusFound > 0,
         has_positive_focus: foci > 0,
+        sample_pending_count: sampleStatesByProp.get(p.id)?.pending ?? 0,
+        sample_negative_count: sampleStatesByProp.get(p.id)?.negative ?? 0,
+        sample_inconclusive_count: sampleStatesByProp.get(p.id)?.inconclusive ?? 0,
         is_strategic: isPe,
         boletim_id: p.boletim_id ?? null,
         agent_name: agentId ? agentNameById.get(agentId) ?? null : null,

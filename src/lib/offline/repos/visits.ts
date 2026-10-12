@@ -55,6 +55,8 @@ export async function saveVisitOffline(
   visit: VisitPayload,
   deposits: DepositPayload[],
 ) {
+  // Domain rule: finding focus already means material was collected. Preserve laboratory status.
+  if (visit.has_focus) visit = { ...visit, sample_collected: true };
   console.log("[SAVE_VISIT_ENTER]", { existingId, visit, depositsCount: deposits.length });
   try {
     let visitId = existingId;

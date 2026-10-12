@@ -13,7 +13,7 @@ CREATE TABLE cycles(id uuid PRIMARY KEY,name text);
 CREATE TABLE properties(id uuid PRIMARY KEY,number text,street_name text,block_number text);
 CREATE TABLE visits(id uuid PRIMARY KEY,agent_id uuid,property_id uuid,cycle_id uuid,visit_date timestamptz,sample_collected boolean,tubitos_coletados integer,has_focus boolean,status text);
 CREATE TABLE visit_deposits(id uuid PRIMARY KEY,visit_id uuid,type_code text,quantity integer,is_positive boolean);
-CREATE TABLE daily_work_records(id uuid PRIMARY KEY,agent_id uuid,cycle_id uuid,work_date date,properties_positive integer,positive_foci integer,foci_by_type jsonb);
+CREATE TABLE daily_work_records(id uuid PRIMARY KEY,agent_id uuid,cycle_id uuid,work_date date,properties_positive integer,positive_foci integer,foci_by_type jsonb,samples_collected integer DEFAULT 0);
 GRANT ALL ON visits,visit_deposits,daily_work_records TO authenticated;
 GRANT SELECT ON profiles,cycles,properties TO authenticated;
 INSERT INTO profiles(id,full_name,role,supervisor_id,coordinator_id) VALUES('${id(1)}','agent','agente','${id(2)}',null),('${id(2)}','supervisor','supervisor',null,'${id(4)}'),('${id(3)}','other','supervisor',null,null),('${id(4)}','coord','coordenador',null,null),('${id(5)}','master','admin_master',null,null);
@@ -21,9 +21,10 @@ INSERT INTO cycles VALUES('${id(10)}','Ciclo 5');
 INSERT INTO properties VALUES('${id(11)}','2','Rua A','4');
 INSERT INTO visits VALUES('${id(12)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',true,1,true,'visited');
 INSERT INTO visit_deposits VALUES('${id(13)}','${id(12)}','B',2,false);
-INSERT INTO daily_work_records VALUES('${id(14)}','${id(1)}','${id(10)}','2026-10-01',0,0,'{}');`);
+INSERT INTO daily_work_records(id,agent_id,cycle_id,work_date,properties_positive,positive_foci,foci_by_type) VALUES('${id(14)}','${id(1)}','${id(10)}','2026-10-01',0,0,'{}');`);
 await db.exec(sql);
 await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012004450_improve_focus_samples_management.sql',import.meta.url),'utf8'));
+await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012030148_focus_implies_sample_collection.sql',import.meta.url),'utf8'));
 let checks=0;
 async function actor(n){await db.exec(`RESET ROLE; SELECT set_config('app.user','${id(n)}',false); SET ROLE authenticated;`);}
 async function fails(q,pattern){try{await db.exec(q);assert.fail('expected rejection');}catch(e){assert.match(e.message,pattern);}checks++;}
@@ -67,5 +68,16 @@ list=(await db.query('SELECT list_focus_samples_v2(p_offset=>50) result')).rows[
 await db.exec('RESET ROLE');await db.exec(`UPDATE profiles SET is_active=false WHERE id='${id(5)}'`);await actor(5);
 await fails('SELECT list_focus_samples_v2()',/desativada/);
 await fails(call('negative',3,23,"'{}'::uuid[]",'Revisão necessária'),/consulta|equipe/);
+await db.exec('RESET ROLE');
+await db.exec(`UPDATE profiles SET is_active=true WHERE id='${id(5)}'`);
+// Older focus flag without a collection flag remains listable; no backfill required.
+await db.exec(`ALTER TABLE visits DISABLE TRIGGER a_mark_focus_collection; INSERT INTO visits(id,agent_id,property_id,cycle_id,visit_date,sample_collected,tubitos_coletados,has_focus,status) VALUES('${id(190)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',false,1,true,'visited'); ALTER TABLE visits ENABLE TRIGGER a_mark_focus_collection;`);
+await actor(5);
+list=(await db.query('SELECT list_focus_samples_v2() result')).rows[0].result;assert.equal(list.total,53);checks++;
+await db.exec(`INSERT INTO visits(id,agent_id,property_id,cycle_id,visit_date,sample_collected,tubitos_coletados,has_focus,status) VALUES('${id(191)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',false,1,true,'visited')`);
+assert.equal((await db.query(`SELECT sample_collected FROM visits WHERE id='${id(191)}'`)).rows[0].sample_collected,true);checks++;
+await db.exec(`SELECT record_focus_result('${id(190)}','negative','{}'::uuid[],'Laudo legado','2026-10-02','',0,'${id(192)}')`);
+assert.equal((await db.query(`SELECT sample_collected,focus_analysis_status FROM visits WHERE id='${id(190)}'`)).rows[0].sample_collected,true);checks++;
+assert.equal((await db.query('SELECT samples_collected FROM daily_work_records')).rows[0].samples_collected,54);checks++;
 console.log(`${checks} database checks passed (disposable database; production untouched)`);
 await db.close();

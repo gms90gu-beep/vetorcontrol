@@ -584,8 +584,8 @@ function PropertyVisitPage() {
             });
             
             setSurveyData({
-              hasFocus: existingVisit.has_focus || false,
-              sampleCollected: existingVisit.sample_collected || false,
+              hasFocus: existingVisit.has_focus || existingVisit.sample_collected || false,
+              sampleCollected: existingVisit.sample_collected || existingVisit.has_focus || false,
               focusAnalysisStatus: existingVisit.focus_analysis_status ?? (existingVisit.sample_collected ? "pending" : null),
               tubitosColetados: existingVisit.tubitos_coletados || 0,
               treatment: existingVisit.activity_type === 'infestation_survey' ? (existingVisit.treatment_applied || false) : false,
@@ -832,7 +832,7 @@ function PropertyVisitPage() {
         has_focus: (status === 'visited' && activity === 'survey')
           ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)
           : false,
-        sample_collected: (status === 'visited' && activity === 'survey') ? surveyData.sampleCollected : false,
+        sample_collected: (status === 'visited' && activity === 'survey') ? (surveyData.hasFocus || surveyData.sampleCollected || deposits.some((deposit) => deposit.selected && deposit.positive)) : false,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
         treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
@@ -1476,18 +1476,9 @@ function PropertyVisitPage() {
                     <BooleanButton 
                       label="Foco identificado na visita?" 
                       value={surveyData.hasFocus} 
-                      onChange={(v) => setSurveyData({...surveyData, hasFocus: v})} 
+                      onChange={(v) => setSurveyData(prev => ({...prev, hasFocus: v, sampleCollected: v, focusAnalysisStatus: v ? (prev.focusAnalysisStatus || "pending") : null}))}
                     />
-                    <BooleanButton 
-                      label="Coleta realizada?" 
-                      value={surveyData.sampleCollected} 
-                      onChange={(v) => setSurveyData(prev => ({
-                        ...prev,
-                        sampleCollected: v,
-                        focusAnalysisStatus: v ? (prev.focusAnalysisStatus || "pending") : null,
-                        tubitosColetados: v && prev.tubitosColetados === 0 ? 1 : prev.tubitosColetados,
-                      }))} 
-                    />
+                    <p className="text-xs text-blue-800">Foco encontrado significa coleta realizada. Ao salvar, ficará aguardando resultado em Minhas amostras e, após sincronizar, para o supervisor.</p>
                     {(surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected && (
                       <div className="space-y-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700">Resultado da análise</Label>

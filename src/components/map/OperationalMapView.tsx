@@ -67,7 +67,7 @@ type Category = MapPointCategory;
 
 const CATEGORY_META: Record<Category, { color: string; label: string; emoji: string }> = {
   focus: { color: "#dc2626", label: "Foco positivo", emoji: "🔴" },
-  focus_found: { color: "#eab308", label: "Foco encontrado · alerta", emoji: "🟡" },
+  focus_found: { color: "#ea580c", label: "Foco coletado · não confirmado positivo", emoji: "🟠" },
   pendency: { color: "#f97316", label: "Pendência aberta", emoji: "🟠" },
   closed: { color: "#f97316", label: "Fechada", emoji: "🟠" },
   refused: { color: "#f97316", label: "Recusa", emoji: "🟠" },
@@ -755,6 +755,7 @@ function PropertyDetailPanel({
           </div>
 
           <div className="space-y-1.5 text-xs">
+            {point.has_observed_focus && <DetailRow label="Análises no período" value={`${point.sample_pending_count ?? 0} pendentes · ${point.sample_negative_count ?? 0} negativas · ${point.sample_inconclusive_count ?? 0} inconclusivas`} />}
             <DetailRow label="Agente" value={point.agent_name ?? "—"} />
             <DetailRow label="Última visita" value={point.last_visit_at ?? "—"} />
             <DetailRow

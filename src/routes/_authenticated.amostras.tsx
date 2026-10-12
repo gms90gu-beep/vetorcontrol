@@ -3,7 +3,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { getFocusSamples, getFocusSampleCycles, recordFocusResult, type FocusSample } from "@/lib/focus-results.functions";
-import { getOperationalDate } from "@/lib/operational-date";
+import { readLocalFocusSamples } from "@/lib/focus-local-samples";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { toOperationalDate, getOperationalDate } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,9 +18,11 @@ function date(value: string) { return value.includes("T") ? new Date(value).toLo
 function SamplesPage() {
   const { user, role } = useAuth();
   const cache = useQueryClient();
+  const online = useOnlineStatus();
+  const localQuery = useQuery({ queryKey: ["focus-local-samples", user?.id], enabled: !!user?.id && role === "agente", queryFn: () => readLocalFocusSamples(user!.id), refetchInterval: 5000 });
   const fetchSamples = useServerFn(getFocusSamples);
   const fetchCycles = useServerFn(getFocusSampleCycles);
-  const cycleQuery = useQuery({ queryKey: ["focus-sample-cycles", user?.id, role], enabled: !!user?.id && !!role, queryFn: () => fetchCycles() });
+  const cycleQuery = useQuery({ queryKey: ["focus-sample-cycles", user?.id, role], enabled: online && !!user?.id && !!role, queryFn: () => fetchCycles() });
   const [cycleId, setCycle] = useState("");
   const [status, setStatus] = useState<"" | "pending" | "positive" | "negative" | "inconclusive">("pending");
   const [agentId, setAgent] = useState("");
@@ -28,23 +32,31 @@ function SamplesPage() {
   const [draftSearch, setDraftSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<FocusSample | null>(null);
-  const query = useQuery({ queryKey: ["focus-samples", user?.id, role, cycleId, status, agentId, from, to, search, page], enabled: !!user?.id && !!role && !(from && to && from > to), queryFn: () => fetchSamples({ data: { cycleId: cycleId || undefined, status: status || undefined, agentId: agentId || undefined, from: from || undefined, to: to || undefined, search: search || undefined, page } }) });
+  const query = useQuery({ queryKey: ["focus-samples", user?.id, role, cycleId, status, agentId, from, to, search, page], enabled: online && !!user?.id && !!role && !(from && to && from > to), queryFn: () => fetchSamples({ data: { cycleId: cycleId || undefined, status: status || undefined, agentId: agentId || undefined, from: from || undefined, to: to || undefined, search: search || undefined, page } }) });
   useEffect(() => {
     setSelected(null); setPage(0);
     const owner = user?.id;
-    return () => { cache.removeQueries({ queryKey: ["focus-samples", owner] }); cache.removeQueries({ queryKey: ["focus-sample-cycles", owner] }); };
+    return () => { cache.removeQueries({ queryKey: ["focus-samples", owner] }); cache.removeQueries({ queryKey: ["focus-sample-cycles", owner] }); cache.removeQueries({ queryKey: ["focus-local-samples", owner] }); };
   }, [user?.id, role, cache]);
+  const localSamples = (role === "agente" ? localQuery.data?.samples ?? [] : []).filter(sample => {
+    const day = toOperationalDate(sample.visit_date) ?? "";
+    return (!status || status === "pending") && (!cycleId || sample.cycle_id === cycleId) && (!agentId || sample.agent_id === agentId)
+      && (!from || day >= from) && (!to || day <= to)
+      && (!search || `${sample.property_number} ${sample.street} ${sample.block_number}`.toLowerCase().includes(search.toLowerCase()))
+      && !(query.data?.samples ?? []).some(remote => remote.id === sample.id);
+  });
+  const availableCycles = cycleQuery.data ?? (role === "agente" ? localQuery.data?.cycles : []) ?? [];
   const resetPage = () => { setPage(0); setSelected(null); };
   return <div className="container mx-auto p-4 space-y-4">
     <h1 className="text-xl font-bold">Amostras e resultados</h1>
     <p className="text-sm text-muted-foreground">Agentes acompanham suas coletas; supervisores registram o resultado do laboratório para sua equipe. Coordenadores e administradores podem corrigir com justificativa.</p>
-    <p className="text-xs text-muted-foreground">Somente coletas sincronizadas aparecem aqui. O resultado é lançado online na visita original, mesmo com a jornada encerrada.</p>
+    <p className="text-xs text-muted-foreground">Foco encontrado significa coleta realizada e aguardando análise. Coletas locais aguardam sincronização para aparecer ao supervisor. O resultado é lançado online na visita original, mesmo com a jornada encerrada.</p>
     <p className="text-sm">Escopo: {role === "admin_master" ? "todos os agentes" : role === "coordenador" ? "sua área vinculada" : role === "supervisor" ? "sua equipe" : "suas coletas"}. Resultado por coleta/visita; tubitos não possuem resultados individuais neste cadastro.</p>
     {query.data && !query.error && <div className="flex flex-wrap gap-3">{Object.entries(labels).map(([key,label]) => <Button key={key} variant={status === key ? "default" : "outline"} onClick={() => { setStatus(key as typeof status); resetPage(); }}>{label}: {query.data.counts?.[key] ?? 0}</Button>)}</div>}
     {cycleQuery.error && <div role="alert" className="text-destructive text-sm">Falha ao carregar ciclos: {cycleQuery.error.message}<Button variant="outline" onClick={() => void cycleQuery.refetch()}>Tentar novamente</Button></div>}
     <p className="text-xs text-muted-foreground">Contadores respeitam ciclo, agente, período e busca; cada cartão seleciona um resultado.</p>
     <div className="flex flex-wrap gap-3">
-      <label className="text-sm">Ciclo <select className="border rounded p-2" value={cycleId} disabled={cycleQuery.isLoading} onChange={e => { setCycle(e.target.value); setPage(0); setSelected(null); }}><option value="">Todos os ciclos</option>{cycleQuery.data?.map(c => <option key={c.id} value={c.id}>{c.name} · {c.year}</option>)}</select></label>
+      <label className="text-sm">Ciclo <select className="border rounded p-2" value={cycleId} disabled={cycleQuery.isLoading} onChange={e => { setCycle(e.target.value); setPage(0); setSelected(null); }}><option value="">Todos os ciclos</option>{availableCycles.map(c => <option key={c.id} value={c.id}>{c.name} · {c.year}</option>)}</select></label>
       <label className="text-sm">Resultado <select className="border rounded p-2" value={status} onChange={e => { setStatus(e.target.value as typeof status); setPage(0); setSelected(null); }}><option value="">Todos</option>{Object.entries(labels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label className="text-sm">Agente<select className="block border rounded p-2" value={agentId} onChange={e => { setAgent(e.target.value); resetPage(); }}><option value="">Todos no seu escopo</option>{query.data?.agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
       <label className="text-sm">Coleta de<Input type="date" value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></label>
@@ -54,8 +66,11 @@ function SamplesPage() {
       <Button variant="outline" onClick={() => { setSelected(null); void query.refetch(); }} disabled={query.isFetching}>Atualizar</Button>
     </div>
     {from && to && from > to && <p role="alert" className="text-destructive">A data inicial deve ser anterior ou igual à final.</p>}
-    {query.isLoading ? <p>Carregando coletas…</p> : query.error ? <p role="alert" className="text-destructive">{query.error.message}</p> : <>
-      {!query.data?.samples.length && <p>Nenhuma coleta encontrada nos filtros selecionados.</p>}
+    {!online && <p className="text-sm">Sem conexão. Exibindo registros locais deste dispositivo; o supervisor receberá após sincronizar.</p>}
+    {localQuery.error && <p role="alert" className="text-destructive">Não foi possível consultar as coletas locais. Seus dados não foram alterados.</p>}
+    {localSamples.length > 0 && <section className="space-y-2"><h2 className="font-semibold">Coletas aguardando sincronização ({localSamples.length})</h2>{localSamples.map(sample => <Card key={sample.id}><CardContent className="p-4"><p>Imóvel {sample.property_number} · Quart. {sample.block_number} · {sample.street}</p><p>Coleta: {date(sample.visit_date)} · Aguardando resultado e sincronização</p>{sample.sync_error && <p className="text-destructive">Falha de envio: {sample.sync_error}</p>}<p className="text-xs text-muted-foreground">Registro preservado na fila. Não é necessário coletar ou cadastrar novamente.</p></CardContent></Card>)}</section>}
+    {online && query.isLoading ? <p>Carregando coletas…</p> : query.error ? <p role="alert" className="text-destructive">{query.error.message}</p> : <>
+      {online && !query.data?.samples.length && !localSamples.length && <p>Nenhuma coleta sincronizada encontrada nos filtros selecionados.</p>}
       <div className="grid gap-3 md:grid-cols-2">{query.data?.samples.map(sample => <Card key={sample.id}><CardContent className="p-4 space-y-2">
         <p className="font-semibold">Imóvel {sample.property_number} · Quart. {sample.block_number}</p>
         <p className="text-sm">{sample.street} · {sample.agent_name}</p>

@@ -147,6 +147,7 @@ function HeatmapPage() {
               <div style="font-weight:600">${p.street ?? "Imóvel"} ${p.number ?? ""}</div>
               <div>Quarteirão: <b>${p.block_number ?? "—"}</b></div>
               <div>Localidade: ${p.locality ?? "—"}</div>
+              <div>Análises: ${p.sample_pending_count ?? 0} pendentes · ${p.sample_negative_count ?? 0} negativas · ${p.sample_inconclusive_count ?? 0} inconclusivas</div>
               <div style="margin-top:4px">
                 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c.color};margin-right:4px"></span>
                 <b>${c.label}</b>

@@ -101,3 +101,31 @@ em positivos. A classificação de risco pode utilizar ocorrências históricas 
 Nenhuma nova migration é necessária para este ajuste de código; a migration de gestão anterior
 continua necessária para ativar a lista filtrada. Localizar a amostra ausente requer leitura do banco
 real e da fila do dispositivo: não se deve recriar visita nem modificar sample_collected por suposição.
+
+## Foco encontrado implica coleta (12/10/2026)
+
+Regra confirmada pelo usuário: marcar foco encontrado já pressupõe coleta. O botão separado de
+coleta foi removido do levantamento de índice. O payload e o repositório offline gravam
+sample_collected=true sem inventar laudo nem quantidade de tubitos. A visita original permanece
+com seu ID, dia e ciclo. A análise continua somente pelo gestor autorizado, online.
+
+Aplicar `20261012030148_focus_implies_sample_collection.sql` depois das duas migrations anteriores.
+A migration normaliza novos inserts/updates de foco ainda não confirmado e compatibiliza listagens
+antigas e atuais com `sample_collected OR has_focus`. Não há UPDATE em lote, criação de amostras ou
+reconstrução de boletins. Ao confirmar um resultado real, a RPC também confirma a coleta e atualiza
+sua contagem no boletim diário existente. Escritas confirmadas continuam protegidas.
+
+Minhas amostras também apresenta visitas próprias ainda na fila local (pendentes/sincronizando/erro),
+com identificação do imóvel e indicação de sincronização, sem somar esses itens aos contadores do
+servidor e sem expor filas de outros agentes. Não é um segundo cadastro. A visualização não altera
+mutations. O supervisor só consegue ver uma visita após ela ser sincronizada com o servidor.
+
+Mapas operacional/epidemiológico mantêm vermelho para positivo e usam laranja forte (#ea580c)
+para foco coletado sem confirmação positiva, incluindo resultado negativo/inconclusivo. Detalhes
+mostram contagens de pendentes, negativos e inconclusivos do período/ciclo selecionado; os históricos
+não são apagados por laudo negativo. A classificação de risco ainda considera ocorrências históricas
+como indicador operacional e não substitui interpretação laboratorial.
+
+Validação: SQL em Postgres descartável, preservação/isolamento da fila em IndexedDB, TypeScript e
+build. Não houve acesso ou alteração dos registros reais do projeto Lovable. Depois da ativação,
+conferir a amostra já existente de Gustavo, sem registrar outra coleta e sem preencher laudo fictício.

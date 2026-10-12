@@ -11,7 +11,7 @@ export type MapPointCategory =
 
 export const MAP_POINT_CATEGORY_META: Record<MapPointCategory, { color: string; label: string }> = {
   focus: { color: "#dc2626", label: "Foco positivo" },
-  focus_found: { color: "#eab308", label: "Foco encontrado · alerta" },
+  focus_found: { color: "#ea580c", label: "Foco coletado · não confirmado positivo" },
   pendency: { color: "#f97316", label: "Pendência aberta" },
   closed: { color: "#f97316", label: "Fechada" },
   refused: { color: "#f97316", label: "Recusa" },
