@@ -46,6 +46,7 @@ export interface DepositPayload {
   description?: string | null;
   quantity: number;
   is_positive?: boolean;
+  focus_found?: boolean;
   is_treated?: boolean;
   is_eliminated?: boolean;
 }

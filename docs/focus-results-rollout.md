@@ -129,3 +129,35 @@ como indicador operacional e não substitui interpretação laboratorial.
 Validação: SQL em Postgres descartável, preservação/isolamento da fila em IndexedDB, TypeScript e
 build. Não houve acesso ou alteração dos registros reais do projeto Lovable. Depois da ativação,
 conferir a amostra já existente de Gustavo, sem registrar outra coleta e sem preencher laudo fictício.
+
+## Depósitos coletados e resultados após encerramento do ciclo
+
+Nova migration: `20261012134017_focus_deposit_selection_and_closed_cycle_results.sql`, depois das anteriores.
+
+- O campo nullable visit_deposits.focus_found separa depósito com coleta de depósito apenas inspecionado.
+  Na visita o agente marca a coluna Foco; marcar foco exige ao menos um depósito coletado com quantidade
+  válida. Cada depósito é salvo com a marca na mesma fila/cache, independentemente de is_positive.
+- A lista e o formulário de resultado retornam somente depósitos marcados com coleta. Para laudo positivo,
+  o servidor rejeita IDs de depósitos apenas inspecionados, mesmo que pertençam à visita. Se houver dois
+  depósitos coletados, ambos podem ser confirmados. Não são gerados depósitos ou laudos fictícios.
+- Registros antigos sem indicação do depósito não recebem inferência automática. A tela oferece identificação
+  explícita pelo agente dono ou gestor do escopo, com justificativa e trilha em focus_deposit_selection_history.
+  Não altera quantidade, data, ciclo, jornada ou resultado. A seleção é protegida após confirmação.
+- Positivos legados já confirmados são evidência da coleta e permanecem elegíveis. Ao corrigir um laudo real,
+  essa associação conhecida é preservada para que um resultado negativo não apague o vínculo do depósito.
+- O gatilho histórico check_cycle_status_for_visit bloqueava todo UPDATE em ciclo finished. A exceção nova
+  requer execução privilegiada da RPC autorizada, contexto temporário da visita, incremento de versão e
+  igualdade das demais colunas. Usuário autenticado não pode usar o contexto para bypass direto. Novas visitas
+  e mudanças na produção continuam bloqueadas; ciclo e jornadas não são reabertos. O contexto é restaurado.
+- Supervisor pode lançar primeiro resultado apenas da própria equipe, inclusive em ciclo terminado. Correção
+  de resultado confirmado continua somente para coordenador da área/Admin Master, com justificativa.
+- Resultado é por visita/coleta. No laudo positivo, depósitos coletados não selecionados ficam não positivos;
+  depósitos apenas inspecionados não são candidatos. Esta versão não cria resultado individual por tubito nem
+  inventa quantas unidades, dentro de uma linha agregada de tipo, foram fisicamente coletadas.
+
+Validação local: testes SQL com três tipos inspecionados e um/dois coletados, rejeição do tipo não coletado,
+primeiro laudo em ciclo encerrado, correção autorizada, bloqueio de novas visitas e da troca de data; teste
+IndexedDB confirma foco/coleta e tags preservados na fila sem antecipar positividade. Banco real não acessado.
+Ativação exige aplicar somente a nova migration pendente no Lovable Cloud, repetir Advisor, validar as
+identidades reais e a coleta existente de Gustavo. Se a seleção antiga for desconhecida, o responsável deve
+informá-la; não converter todos os depósitos inspecionados em coletas. Depois publicar a main atualizada.

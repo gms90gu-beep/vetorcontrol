@@ -621,6 +621,7 @@ function PropertyVisitPage() {
                 description: d.description,
                 quantity: d.quantity,
                 positive: d.is_positive,
+                focusFound: d.focus_found === true || (d.focus_found == null && d.is_positive),
                 treated: d.is_treated,
                 eliminated: d.is_eliminated,
                 selected: true
@@ -636,6 +637,7 @@ function PropertyVisitPage() {
                   description: type.name,
                   quantity: 0,
                   positive: false,
+                  focusFound: false,
                   treated: false,
                   eliminated: false,
                   selected: false
@@ -782,6 +784,10 @@ function PropertyVisitPage() {
       return;
     }
 
+    if (status === 'visited' && activity === 'survey' && (surveyData.hasFocus || surveyData.sampleCollected)) {
+      const collected = deposits.filter(d => d.selected && d.focusFound);
+      if (!collected.length || collected.some(d => Number(d.quantity) <= 0)) { toast.error("Marque na coluna Foco os depósitos onde houve coleta e informe sua quantidade."); return; }
+    }
     if (status === 'visited' && activity === 'routine' && routineData.treatment) {
       if (routineData.treatmentAmount <= 0) {
         toast.error("Informe a quantidade de larvicida utilizada.");
@@ -830,9 +836,9 @@ function PropertyVisitPage() {
         visit_date: operationalVisitDate,
 
         has_focus: (status === 'visited' && activity === 'survey')
-          ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)
+          ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && (deposit.focusFound || deposit.positive))
           : false,
-        sample_collected: (status === 'visited' && activity === 'survey') ? (surveyData.hasFocus || surveyData.sampleCollected || deposits.some((deposit) => deposit.selected && deposit.positive)) : false,
+        sample_collected: (status === 'visited' && activity === 'survey') ? (surveyData.hasFocus || surveyData.sampleCollected || deposits.some((deposit) => deposit.selected && (deposit.focusFound || deposit.positive))) : false,
         tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
         treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
@@ -852,6 +858,7 @@ function PropertyVisitPage() {
             description: d.description,
             quantity: d.quantity,
             is_positive: d.positive,
+            focus_found: !!d.focusFound,
             is_treated: d.treated,
             is_eliminated: d.eliminated,
           }))
@@ -907,6 +914,7 @@ function PropertyVisitPage() {
         description: type.name,
         quantity: 0,
         positive: false,
+                  focusFound: false,
         treated: false,
         eliminated: false,
         selected: false
@@ -915,13 +923,15 @@ function PropertyVisitPage() {
     }
   }, [activity, deposits.length]);
 
-  const updateDeposit = (id: number, field: string, value: any) => {
+  const updateDeposit = (id: string | number, field: string, value: any) => {
+    if (field === 'focusFound' && value) setSurveyData(prev => ({...prev, hasFocus: true, sampleCollected: true, focusAnalysisStatus: prev.focusAnalysisStatus || 'pending'}));
     setDeposits(deposits.map(d => {
       if (d.id === id) {
         const updated = { ...d, [field]: value };
+        if (field === 'selected' && !value) updated.focusFound = false;
         // Auto-select if quantity > 0 or any action is checked
         if (field === 'quantity' && Number(value) > 0) updated.selected = true;
-        if (['positive', 'treated', 'eliminated'].includes(field) && value === true) updated.selected = true;
+        if (['focusFound', 'positive', 'treated', 'eliminated'].includes(field) && value === true) updated.selected = true;
         return updated;
       }
       return d;
@@ -1428,12 +1438,14 @@ function PropertyVisitPage() {
                               </td>
                               <td className="p-4 text-center">
                                 <button
-                                  disabled title="Positividade confirmada pelo supervisor em Amostras e resultados"
+                                  type="button" disabled={!!surveyData.focusAnalysisStatus && surveyData.focusAnalysisStatus !== "pending"}
+                                  title="Marcar depósito onde o agente encontrou foco e coletou material"
+                                  onClick={() => updateDeposit(deposit.id, 'focusFound', !deposit.focusFound)}
                                   className={`h-8 w-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
-                                    deposit.positive ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'bg-slate-100 text-slate-400'
+                                    deposit.focusFound ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 'bg-slate-100 text-slate-400'
                                   }`}
                                 >
-                                  {deposit.positive && <CheckCircle2 className="h-4 w-4" />}
+                                  {deposit.focusFound && <CheckCircle2 className="h-4 w-4" />}
                                 </button>
                               </td>
                               <td className="p-4 text-center">
@@ -1476,10 +1488,10 @@ function PropertyVisitPage() {
                     <BooleanButton 
                       label="Foco identificado na visita?" 
                       value={surveyData.hasFocus} 
-                      onChange={(v) => setSurveyData(prev => ({...prev, hasFocus: v, sampleCollected: v, focusAnalysisStatus: v ? (prev.focusAnalysisStatus || "pending") : null}))}
+                      onChange={(v) => { setSurveyData(prev => ({...prev, hasFocus: v, sampleCollected: v, focusAnalysisStatus: v ? (prev.focusAnalysisStatus || "pending") : null})); if (!v) setDeposits(prev => prev.map(d => ({...d,focusFound:false}))); }}
                     />
-                    <p className="text-xs text-blue-800">Foco encontrado significa coleta realizada. Ao salvar, ficará aguardando resultado em Minhas amostras e, após sincronizar, para o supervisor.</p>
-                    {(surveyData.hasFocus || deposits.some((deposit) => deposit.selected && deposit.positive)) && surveyData.sampleCollected && (
+                    <p className="text-xs text-blue-800">Foco encontrado significa coleta realizada. Marque também a coluna Foco nos depósitos coletados. Ao salvar, ficará aguardando resultado em Minhas amostras e, após sincronizar, para o supervisor.</p>
+                    {(surveyData.hasFocus || deposits.some((deposit) => deposit.selected && (deposit.focusFound || deposit.positive))) && surveyData.sampleCollected && (
                       <div className="space-y-2 rounded-2xl border border-blue-100 bg-blue-50 p-4">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700">Resultado da análise</Label>
                         <select disabled aria-label="Resultado da análise do foco"

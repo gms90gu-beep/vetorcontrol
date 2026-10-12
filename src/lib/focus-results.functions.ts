@@ -36,6 +36,8 @@ export interface FocusSample {
   property_number: string; street: string; block_number: string; tubes: number; version: number;
   status: "pending" | "positive" | "negative" | "inconclusive";
   can_record: boolean; can_correct: boolean;
+  needs_focus_identification?: boolean;
+  inspected_deposits?: { id: string; type_code: string; quantity: number }[];
   deposits: { id: string; type_code: string; quantity: number; positive: boolean }[];
   history: { status: string; analysis_date: string; reference: string; reason: string; actor: string; recorded_at: string; positive_deposit_ids?: string[] }[];
 }
@@ -62,4 +64,13 @@ export const recordFocusResult = createServerFn({ method: "POST" })
       const { count, error: dailyError } = await query;
       return { version, bulletinState: dailyError ? "unknown" as const : count > 0 ? "present" as const : "missing" as const };
     } catch { return { version, bulletinState: "unknown" as const }; }
+  });
+
+export const identifyFocusDeposits = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ visitId: z.string().uuid(), depositIds: z.array(z.string().uuid()).min(1).max(100), reason: z.string().trim().min(5).max(2000) }))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).rpc("identify_focus_deposits", { p_visit: data.visitId, p_deposits: data.depositIds, p_reason: data.reason });
+    if (error) throw new Error(error.message);
+    return { saved: true };
   });

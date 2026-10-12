@@ -9,7 +9,7 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current
 GRANT USAGE ON SCHEMA auth TO authenticated; GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
 CREATE TABLE profiles(id uuid PRIMARY KEY,full_name text,role text,supervisor_id uuid,coordinator_id uuid,is_active boolean DEFAULT true);
 CREATE FUNCTION public.get_user_role(u_id uuid) RETURNS text LANGUAGE sql SECURITY DEFINER AS $$ SELECT role FROM public.profiles WHERE id=u_id $$;
-CREATE TABLE cycles(id uuid PRIMARY KEY,name text);
+CREATE TABLE cycles(id uuid PRIMARY KEY,name text,status text DEFAULT 'in_progress');
 CREATE TABLE properties(id uuid PRIMARY KEY,number text,street_name text,block_number text);
 CREATE TABLE visits(id uuid PRIMARY KEY,agent_id uuid,property_id uuid,cycle_id uuid,visit_date timestamptz,sample_collected boolean,tubitos_coletados integer,has_focus boolean,status text);
 CREATE TABLE visit_deposits(id uuid PRIMARY KEY,visit_id uuid,type_code text,quantity integer,is_positive boolean);
@@ -17,7 +17,7 @@ CREATE TABLE daily_work_records(id uuid PRIMARY KEY,agent_id uuid,cycle_id uuid,
 GRANT ALL ON visits,visit_deposits,daily_work_records TO authenticated;
 GRANT SELECT ON profiles,cycles,properties TO authenticated;
 INSERT INTO profiles(id,full_name,role,supervisor_id,coordinator_id) VALUES('${id(1)}','agent','agente','${id(2)}',null),('${id(2)}','supervisor','supervisor',null,'${id(4)}'),('${id(3)}','other','supervisor',null,null),('${id(4)}','coord','coordenador',null,null),('${id(5)}','master','admin_master',null,null);
-INSERT INTO cycles VALUES('${id(10)}','Ciclo 5');
+INSERT INTO cycles(id,name) VALUES('${id(10)}','Ciclo 5');
 INSERT INTO properties VALUES('${id(11)}','2','Rua A','4');
 INSERT INTO visits VALUES('${id(12)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',true,1,true,'visited');
 INSERT INTO visit_deposits VALUES('${id(13)}','${id(12)}','B',2,false);
@@ -25,6 +25,9 @@ INSERT INTO daily_work_records(id,agent_id,cycle_id,work_date,properties_positiv
 await db.exec(sql);
 await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012004450_improve_focus_samples_management.sql',import.meta.url),'utf8'));
 await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012030148_focus_implies_sample_collection.sql',import.meta.url),'utf8'));
+await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012134017_focus_deposit_selection_and_closed_cycle_results.sql',import.meta.url),'utf8'));
+await db.exec("CREATE TRIGGER tr_check_cycle_status BEFORE INSERT OR UPDATE ON visits FOR EACH ROW EXECUTE FUNCTION public.check_cycle_status_for_visit();");
+await db.exec(`UPDATE visit_deposits SET focus_found=true WHERE id='${id(13)}'`);
 let checks=0;
 async function actor(n){await db.exec(`RESET ROLE; SELECT set_config('app.user','${id(n)}',false); SET ROLE authenticated;`);}
 async function fails(q,pattern){try{await db.exec(q);assert.fail('expected rejection');}catch(e){assert.match(e.message,pattern);}checks++;}
@@ -76,8 +79,28 @@ await actor(5);
 list=(await db.query('SELECT list_focus_samples_v2() result')).rows[0].result;assert.equal(list.total,53);checks++;
 await db.exec(`INSERT INTO visits(id,agent_id,property_id,cycle_id,visit_date,sample_collected,tubitos_coletados,has_focus,status) VALUES('${id(191)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',false,1,true,'visited')`);
 assert.equal((await db.query(`SELECT sample_collected FROM visits WHERE id='${id(191)}'`)).rows[0].sample_collected,true);checks++;
+await db.exec('RESET ROLE');await db.exec(`INSERT INTO visit_deposits(id,visit_id,type_code,quantity,is_positive) VALUES('${id(193)}','${id(190)}','C',1,false)`);await actor(5);
+await db.exec(`SELECT identify_focus_deposits('${id(190)}',ARRAY['${id(193)}'::uuid],'Confirmado pelo agente')`);
 await db.exec(`SELECT record_focus_result('${id(190)}','negative','{}'::uuid[],'Laudo legado','2026-10-02','',0,'${id(192)}')`);
 assert.equal((await db.query(`SELECT sample_collected,focus_analysis_status FROM visits WHERE id='${id(190)}'`)).rows[0].sample_collected,true);checks++;
 assert.equal((await db.query('SELECT samples_collected FROM daily_work_records')).rows[0].samples_collected,54);checks++;
+// Mixed inspected deposits: only the row marked with focus is a lab candidate.
+await db.exec('RESET ROLE');
+await db.exec(`INSERT INTO visit_deposits(id,visit_id,type_code,quantity,is_positive,focus_found) VALUES('${id(194)}','${id(191)}','C',1,false,true),('${id(195)}','${id(191)}','A1',1,false,false),('${id(196)}','${id(191)}','D1',2,false,false)`);
+await db.exec(`INSERT INTO visit_deposits(id,visit_id,type_code,quantity,is_positive,focus_found) VALUES('${id(200)}','${id(150)}','C',1,false,true),('${id(201)}','${id(150)}','A1',1,false,true),('${id(202)}','${id(150)}','D1',2,false,false)`);
+await db.exec(`UPDATE cycles SET status='finished' WHERE id='${id(10)}'`);await actor(2);
+list=(await db.query(`SELECT list_focus_samples_v2(p_search=>'2',p_offset=>50) result`)).rows[0].result;
+const multi=list.samples.find(x=>x.id===id(150));assert.deepEqual(multi.deposits.map(x=>x.id).sort(),[id(200),id(201)].sort());checks++;
+const specimen=list.samples.find(x=>x.id===id(191));assert.deepEqual(specimen.deposits.map(x=>x.id),[id(194)]);checks++;
+await fails(`SELECT record_focus_result('${id(191)}','positive',ARRAY['${id(195)}'::uuid],'Laudo ciclo fechado','2026-10-02','',0,'${id(197)}')`,/coleta marcada/);
+await db.exec(`SELECT record_focus_result('${id(191)}','positive',ARRAY['${id(194)}'::uuid],'Laudo ciclo fechado','2026-10-02','',0,'${id(197)}')`);
+assert.equal((await db.query(`SELECT focus_analysis_status FROM visits WHERE id='${id(191)}'`)).rows[0].focus_analysis_status,'positive');checks++;
+await db.exec(`SELECT record_focus_result('${id(150)}','positive',ARRAY['${id(200)}'::uuid,'${id(201)}'::uuid],'Laudo dois depósitos','2026-10-02','',0,'${id(203)}')`);assert.equal((await db.query(`SELECT count(*) count FROM visit_deposits WHERE visit_id='${id(150)}' AND is_positive`)).rows[0].count,2);checks++;
+await fails(`UPDATE visits SET visit_date='2026-10-02T12:00Z' WHERE id='${id(191)}'`,/protegidos|concluído/);
+await fails(`INSERT INTO visits(id,agent_id,cycle_id,visit_date) VALUES('${id(198)}','${id(1)}','${id(10)}','2026-10-01T12:00Z')`,/concluído/);
+await fails(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','Laudo revisto',1,'${id(199)}')`,/Correção/);
+await actor(4);await db.exec(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','Laudo revisto',1,'${id(199)}')`);checks++;
+await actor(3);await fails(`SELECT identify_focus_deposits('${id(150)}',ARRAY['${id(193)}'::uuid],'Identificar coleta')`,/escopo/);
+await actor(1);await fails(`UPDATE visit_deposits SET focus_found=false WHERE id='${id(194)}'`,/protegida/);
 console.log(`${checks} database checks passed (disposable database; production untouched)`);
 await db.close();

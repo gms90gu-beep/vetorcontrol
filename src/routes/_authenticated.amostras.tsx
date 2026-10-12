@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getFocusSamples, getFocusSampleCycles, recordFocusResult, type FocusSample } from "@/lib/focus-results.functions";
+import { getFocusSamples, getFocusSampleCycles, recordFocusResult, identifyFocusDeposits, type FocusSample } from "@/lib/focus-results.functions";
 import { readLocalFocusSamples } from "@/lib/focus-local-samples";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { toOperationalDate, getOperationalDate } from "@/lib/operational-date";
@@ -88,7 +88,7 @@ function SamplesPage() {
         <p className="font-semibold">Imóvel {sample.property_number} · Quart. {sample.block_number}</p>
         <p className="text-sm">{sample.street} · {sample.agent_name}</p>
         <p className="text-sm">Coleta: {date(sample.visit_date)} · {sample.cycle_name} · {sample.tubes || 0} tubito(s)</p>
-        <p className="text-sm">Depósitos: {sample.deposits.map(d => `${d.type_code} (${d.quantity})`).join(", ") || "Nenhum registrado"}</p>
+        <p className="text-sm">Depósitos com foco/coleta: {sample.deposits.map(d => `${d.type_code} (${d.quantity})`).join(", ") || "Nenhum registrado"}</p>
         <p className="font-semibold">{labels[sample.status]}</p>
         <Button variant="outline" onClick={() => setSelected(sample)}>{sample.can_record && sample.status === "pending" ? "Lançar resultado" : "Ver resultado e histórico"}</Button>
       </CardContent></Card>)}</div>
@@ -126,9 +126,11 @@ function ResultForm({ sample, onClose }: { sample: FocusSample; onClose: () => v
   }
   return <Card id="focus-result-detail"><CardContent className="p-4 space-y-4">
     <h2 className="font-semibold">Resultado · Imóvel {sample.property_number} · coleta de {date(sample.visit_date)}</h2>
-    {editable ? <form onSubmit={submit} className="space-y-3">
+    {sample.needs_focus_identification && sample.status === "pending" && <IdentifyDeposits sample={sample} onSaved={onClose} />}
+    {editable && !sample.needs_focus_identification ? <form onSubmit={submit} className="space-y-3">
+      <p className="text-sm">Somente depósitos marcados pelo agente como foco/coleta: {sample.deposits.map(d => `${d.type_code} (${d.quantity})`).join(", ")}</p>
       <label className="block text-sm">Resultado<select className="block border rounded p-2" value={status} onChange={e => { setStatus(e.target.value as typeof status); change(); }}>{["positive","negative","inconclusive"].map(s => <option key={s} value={s}>{labels[s]}</option>)}</select></label>
-      {status === "positive" && <fieldset className="border rounded p-3"><legend>Depósitos confirmados como positivos pelo laboratório</legend>{sample.deposits.map(d => <label key={d.id} className="block text-sm"><input type="checkbox" checked={positiveIds.includes(d.id)} onChange={e => { setPositive(e.target.checked ? [...positiveIds,d.id] : positiveIds.filter(id => id !== d.id)); change(); }} /> {d.type_code} · quantidade registrada: {d.quantity}</label>)}{!sample.deposits.length && <p className="text-destructive">Não há depósitos vinculados. Confira o registro original antes de confirmar positivo.</p>}</fieldset>}
+      {status === "positive" && <fieldset className="border rounded p-3"><legend>Marque os depósitos positivos no laudo</legend><p className="text-xs text-muted-foreground">Apenas depósitos coletados aparecem. Os não marcados serão registrados como não positivos neste resultado.</p>{sample.deposits.map(d => <label key={d.id} className="block text-sm"><input type="checkbox" checked={positiveIds.includes(d.id)} onChange={e => { setPositive(e.target.checked ? [...positiveIds,d.id] : positiveIds.filter(id => id !== d.id)); change(); }} /> {d.type_code} · quantidade registrada: {d.quantity}</label>)}{!sample.deposits.length && <p className="text-destructive">Não há depósitos vinculados. Confira o registro original antes de confirmar positivo.</p>}</fieldset>}
       <label className="block text-sm">Referência do laudo/laboratório<Input required minLength={2} maxLength={200} value={reference} onChange={e => { setReference(e.target.value); change(); }} /></label>
       <label className="block text-sm">Data da análise<Input type="date" required min={getOperationalDate(new Date(sample.visit_date))} max={getOperationalDate()} value={analysisDate} onChange={e => { setDate(e.target.value); change(); }} /></label>
       <label className="block text-sm">{sample.status === "pending" ? "Observação (opcional)" : "Justificativa da correção"}<textarea className="block w-full border rounded p-2" required={sample.status !== "pending"} minLength={sample.status === "pending" ? 0 : 5} maxLength={2000} value={reason} onChange={e => { setReason(e.target.value); change(); }} /></label>
@@ -140,4 +142,26 @@ function ResultForm({ sample, onClose }: { sample: FocusSample; onClose: () => v
     {sample.history.map((h,i) => <div key={i} className="border rounded p-3 text-sm"><p>{labels[h.status]} · análise {date(h.analysis_date)} · {h.reference}</p><p>Registrado por {h.actor} em {new Date(h.recorded_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</p>{h.positive_deposit_ids && <p>Depósitos positivos: {h.positive_deposit_ids.map(id => { const d = sample.deposits.find(d => d.id === id); return d ? `${d.type_code} (${d.quantity})` : id; }).join(", ") || "Nenhum"}</p>}{h.reason && <p>{h.reason}</p>}</div>)}
     <Button variant="outline" disabled={busy} onClick={onClose}>Fechar</Button>
   </CardContent></Card>;
+}
+
+function IdentifyDeposits({ sample, onSaved }: { sample: FocusSample; onSaved: () => void }) {
+  const identify = useServerFn(identifyFocusDeposits);
+  const cache = useQueryClient();
+  const [ids, setIds] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); if (busy || !navigator.onLine) { toast.error("Conecte-se para identificar os depósitos."); return; }
+    setBusy(true);
+    try { await identify({ data: { visitId: sample.id, depositIds: ids, reason } }); toast.success("Depósitos da coleta identificados. Nenhum laudo foi lançado."); void cache.invalidateQueries(); onSaved(); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível identificar os depósitos."); }
+    finally { setBusy(false); }
+  }
+  return <form onSubmit={submit} className="space-y-3 rounded border border-orange-200 p-3">
+    <p className="text-sm">Registro antigo sem identificação de onde houve foco. Confirme apenas os depósitos realmente coletados; os demais continuam inspecionados. Esta ação é registrada com seu usuário e justificativa.</p>
+    {(sample.inspected_deposits ?? []).map(d => <label key={d.id} className="block text-sm"><input type="checkbox" disabled={busy || d.quantity <= 0} checked={ids.includes(d.id)} onChange={e => setIds(e.target.checked ? [...ids,d.id] : ids.filter(id => id !== d.id))} /> {d.type_code} · {d.quantity} inspecionado(s)</label>)}
+    {!sample.inspected_deposits?.length && <p className="text-destructive">Não há depósitos registrados nesta visita. Solicite conferência do registro original; nenhum depósito será inventado.</p>}
+    <label className="block text-sm">Justificativa da identificação<textarea required minLength={5} maxLength={2000} disabled={busy} className="block w-full rounded border p-2" value={reason} onChange={e => setReason(e.target.value)} /></label>
+    <Button disabled={busy || !ids.length}>{busy ? "Confirmando…" : "Identificar depósitos da coleta"}</Button>
+  </form>;
 }
