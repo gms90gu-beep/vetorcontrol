@@ -1,8 +1,10 @@
 # Tarefas
 
-- [ ] Rodada 12/10: conferir main cff72c0 e histórico, aplicar somente três migrations de amostras pendentes na ordem autorizada.
-- [ ] Rodada 12/10: validar foco implica coleta pendente, Gustavo e supervisor, permissões e cores/ciclo dos mapas sem laudos fictícios ou alteração de filas.
-- [ ] Rodada 12/10: executar testes, conferir compilação/segurança e publicar somente após validação.
+- [x] Rodada 12/10: main cff72c0 confirmada; três migrations pendentes aplicadas byte-for-byte na ordem autorizada (Drizzle 0012, 0013, 0014).
+- [x] Rodada 12/10: coleta 938798d0 de Gustavo, imóvel 59 Praça da Bandeira, 06/10 Ciclo 5, exibida em contas reais de Gustavo (somente consulta) e Adenilson (formulário autorizado, sem salvar); mapa real: 1 positivo e 1 foco não confirmado; 1.207 visitas, 64 boletins e zero laudos novos preservados.
+- [x] Rodada 12/10: 198 testes e 36 verificações SQL descartáveis aprovados; teste antigo de equipe atualizado para paginação atual; compilação OK; segurança 7 avisos e 1 informativo preexistentes, zero críticos.
+- [ ] Rodada 12/10: solicitar publicação da ativação validada no Ciclo 5; registrar resultado.
+- [ ] Compatibilidade histórica: gatilho atual ainda impede laudos em ciclos finished; depende de autorização para migration adicional, fora das três autorizadas.
 
 - [ ] Ativar somente 20261011020650_focus_sample_results.sql da versão 0b75b31 no Cloud existente; bloqueada por incompatibilidade comprovada com tr_check_cycle_status (16 coletas em ciclos finished); aguarda migration compatível autorizada.
 - [ ] Validar fluxo real de resultados e mapas/boletins; depende da ativação compatível, sem lançar laudos fictícios nem modificar histórico.
