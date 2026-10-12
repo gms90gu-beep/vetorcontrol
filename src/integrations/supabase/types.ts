@@ -718,6 +718,66 @@ export type Database = {
           },
         ]
       }
+      focus_result_history: {
+        Row: {
+          actor_id: string
+          analysis_date: string
+          id: string
+          laboratory_reference: string
+          positive_deposit_ids: string[]
+          previous_status: string | null
+          reason: string
+          recorded_at: string
+          request_id: string
+          result_status: string
+          version: number
+          visit_id: string
+        }
+        Insert: {
+          actor_id: string
+          analysis_date: string
+          id?: string
+          laboratory_reference: string
+          positive_deposit_ids?: string[]
+          previous_status?: string | null
+          reason: string
+          recorded_at?: string
+          request_id: string
+          result_status: string
+          version: number
+          visit_id: string
+        }
+        Update: {
+          actor_id?: string
+          analysis_date?: string
+          id?: string
+          laboratory_reference?: string
+          positive_deposit_ids?: string[]
+          previous_status?: string | null
+          reason?: string
+          recorded_at?: string
+          request_id?: string
+          result_status?: string
+          version?: number
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_result_history_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_result_history_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       localities: {
         Row: {
           area_id: string
@@ -1389,6 +1449,8 @@ export type Database = {
           elimination_amount: number | null
           elimination_done: boolean | null
           field_work_session_id: string | null
+          focus_analysis_status: string | null
+          focus_result_version: number
           guidance_given: boolean | null
           has_focus: boolean | null
           id: string
@@ -1415,6 +1477,8 @@ export type Database = {
           elimination_amount?: number | null
           elimination_done?: boolean | null
           field_work_session_id?: string | null
+          focus_analysis_status?: string | null
+          focus_result_version?: number
           guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
@@ -1441,6 +1505,8 @@ export type Database = {
           elimination_amount?: number | null
           elimination_done?: boolean | null
           field_work_session_id?: string | null
+          focus_analysis_status?: string | null
+          focus_result_version?: number
           guidance_given?: boolean | null
           has_focus?: boolean | null
           id?: string
@@ -1897,6 +1963,8 @@ export type Database = {
           elimination_amount: number | null
           elimination_done: boolean | null
           field_work_session_id: string | null
+          focus_analysis_status: string | null
+          focus_result_version: number
           guidance_given: boolean | null
           has_focus: boolean | null
           id: string
@@ -1940,6 +2008,10 @@ export type Database = {
         }[]
       }
       is_territory_manager: { Args: { _user_id: string }; Returns: boolean }
+      list_focus_samples: {
+        Args: { p_cycle?: string; p_offset?: number; p_status?: string }
+        Returns: Json
+      }
       log_activity: {
         Args: { source_type: string }
         Returns: {
@@ -1986,6 +2058,19 @@ export type Database = {
         }
       }
       reconcile_rg_integrity: { Args: never; Returns: Json }
+      record_focus_result: {
+        Args: {
+          p_analysis_date: string
+          p_positive: string[]
+          p_reason: string
+          p_reference: string
+          p_request: string
+          p_status: string
+          p_version: number
+          p_visit: string
+        }
+        Returns: number
+      }
       recover_session_visits: { Args: { _session_id: string }; Returns: Json }
       regenerate_cycle_weeks: {
         Args: { _cycle_id: string }
