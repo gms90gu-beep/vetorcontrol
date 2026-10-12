@@ -1,5 +1,10 @@
 # Tarefas
 
+- [x] Rodada 12/10 13:56: commit c163602 sincronizado; migration 20261012134017 pendente confirmada; Gustavo já tem resultado positivo versão 1 antes desta rodada, preservar sem alteração.
+- [ ] Aplicar somente migration 20261012134017 após revisão e testes descartáveis.
+- [ ] Validar candidatos, equipe/correções e bloqueios de produção em ciclo encerrado; conferir coleta real sem gravar identificação ou laudo.
+- [ ] Repetir testes, compilação e segurança; publicar após validação e informar situação real.
+
 - [x] Rodada 12/10: main cff72c0 confirmada; três migrations pendentes aplicadas byte-for-byte na ordem autorizada (Drizzle 0012, 0013, 0014).
 - [x] Rodada 12/10: coleta 938798d0 de Gustavo, imóvel 59 Praça da Bandeira, 06/10 Ciclo 5, exibida em contas reais de Gustavo (somente consulta) e Adenilson (formulário autorizado, sem salvar); mapa real: 1 positivo e 1 foco não confirmado; 1.207 visitas, 64 boletins e zero laudos novos preservados.
 - [x] Rodada 12/10: 198 testes e 36 verificações SQL descartáveis aprovados; teste antigo de equipe atualizado para paginação atual; compilação OK; segurança 7 avisos e 1 informativo preexistentes, zero críticos.

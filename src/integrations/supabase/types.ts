@@ -718,6 +718,48 @@ export type Database = {
           },
         ]
       }
+      focus_deposit_selection_history: {
+        Row: {
+          actor_id: string
+          deposit_ids: string[]
+          id: string
+          reason: string
+          recorded_at: string
+          visit_id: string
+        }
+        Insert: {
+          actor_id: string
+          deposit_ids: string[]
+          id?: string
+          reason: string
+          recorded_at?: string
+          visit_id: string
+        }
+        Update: {
+          actor_id?: string
+          deposit_ids?: string[]
+          id?: string
+          reason?: string
+          recorded_at?: string
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_deposit_selection_history_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_deposit_selection_history_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: true
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       focus_result_history: {
         Row: {
           actor_id: string
@@ -1402,6 +1444,7 @@ export type Database = {
       visit_deposits: {
         Row: {
           description: string | null
+          focus_found: boolean | null
           id: string
           is_eliminated: boolean | null
           is_positive: boolean | null
@@ -1412,6 +1455,7 @@ export type Database = {
         }
         Insert: {
           description?: string | null
+          focus_found?: boolean | null
           id?: string
           is_eliminated?: boolean | null
           is_positive?: boolean | null
@@ -1422,6 +1466,7 @@ export type Database = {
         }
         Update: {
           description?: string | null
+          focus_found?: boolean | null
           id?: string
           is_eliminated?: boolean | null
           is_positive?: boolean | null
@@ -2006,6 +2051,10 @@ export type Database = {
           keep_alive_recorded: boolean
           status: string
         }[]
+      }
+      identify_focus_deposits: {
+        Args: { p_deposits: string[]; p_reason: string; p_visit: string }
+        Returns: undefined
       }
       is_territory_manager: { Args: { _user_id: string }; Returns: boolean }
       list_focus_samples: {
