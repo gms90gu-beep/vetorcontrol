@@ -12,3 +12,4 @@
 - Offline queue coalescing is transactional, preserves operation barriers, and uses cross-tab locks for claim recovery, because syncing payloads must remain immutable.
 - Map visit period filtering includes unlinked dated visits while retaining team authorization; historical cycle assignment is display-only, because missing links must not erase real focus history.
 - Reconstruction failures are audited in SQL and authenticated server handlers without rolling back session closure, because daily bulletin failures must remain observable without losing field work.
+- Closed-cycle laboratory updates use a narrowly constrained security-definer transaction marker and immutable production-field comparison; collected-deposit identification has separate scoped audit history, because laboratory corrections must not reopen field production or guess legacy collections.
