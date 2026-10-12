@@ -7,7 +7,7 @@ const sql=fs.readFileSync(new URL('../../supabase/migrations/20261011020650_focu
 await db.exec(`CREATE ROLE authenticated; CREATE ROLE anon; CREATE ROLE service_role; CREATE SCHEMA auth;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('app.user',true),'')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO authenticated; GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
-CREATE TABLE profiles(id uuid PRIMARY KEY,full_name text,role text,supervisor_id uuid,coordinator_id uuid);
+CREATE TABLE profiles(id uuid PRIMARY KEY,full_name text,role text,supervisor_id uuid,coordinator_id uuid,is_active boolean DEFAULT true);
 CREATE FUNCTION public.get_user_role(u_id uuid) RETURNS text LANGUAGE sql SECURITY DEFINER AS $$ SELECT role FROM public.profiles WHERE id=u_id $$;
 CREATE TABLE cycles(id uuid PRIMARY KEY,name text);
 CREATE TABLE properties(id uuid PRIMARY KEY,number text,street_name text,block_number text);
@@ -16,13 +16,14 @@ CREATE TABLE visit_deposits(id uuid PRIMARY KEY,visit_id uuid,type_code text,qua
 CREATE TABLE daily_work_records(id uuid PRIMARY KEY,agent_id uuid,cycle_id uuid,work_date date,properties_positive integer,positive_foci integer,foci_by_type jsonb);
 GRANT ALL ON visits,visit_deposits,daily_work_records TO authenticated;
 GRANT SELECT ON profiles,cycles,properties TO authenticated;
-INSERT INTO profiles VALUES('${id(1)}','agent','agente','${id(2)}',null),('${id(2)}','supervisor','supervisor',null,'${id(4)}'),('${id(3)}','other','supervisor',null,null),('${id(4)}','coord','coordenador',null,null),('${id(5)}','master','admin_master',null,null);
+INSERT INTO profiles(id,full_name,role,supervisor_id,coordinator_id) VALUES('${id(1)}','agent','agente','${id(2)}',null),('${id(2)}','supervisor','supervisor',null,'${id(4)}'),('${id(3)}','other','supervisor',null,null),('${id(4)}','coord','coordenador',null,null),('${id(5)}','master','admin_master',null,null);
 INSERT INTO cycles VALUES('${id(10)}','Ciclo 5');
 INSERT INTO properties VALUES('${id(11)}','2','Rua A','4');
 INSERT INTO visits VALUES('${id(12)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',true,1,true,'visited');
 INSERT INTO visit_deposits VALUES('${id(13)}','${id(12)}','B',2,false);
 INSERT INTO daily_work_records VALUES('${id(14)}','${id(1)}','${id(10)}','2026-10-01',0,0,'{}');`);
 await db.exec(sql);
+await db.exec(fs.readFileSync(new URL('../../supabase/migrations/20261012004450_improve_focus_samples_management.sql',import.meta.url),'utf8'));
 let checks=0;
 async function actor(n){await db.exec(`RESET ROLE; SELECT set_config('app.user','${id(n)}',false); SET ROLE authenticated;`);}
 async function fails(q,pattern){try{await db.exec(q);assert.fail('expected rejection');}catch(e){assert.match(e.message,pattern);}checks++;}
@@ -48,5 +49,23 @@ assert.equal((await db.query('SELECT * FROM daily_work_records')).rows[0].proper
 assert.equal((await db.query('SELECT * FROM focus_result_history')).rows.length,2);checks++;
 await actor(5);await db.exec(call('inconclusive',2,22,"'{}'::uuid[]",'Nova análise necessária'));checks++;
 await db.exec('RESET ROLE');await db.exec(`SELECT set_config('app.user','',false); SET ROLE anon;`);await fails('SELECT list_focus_samples()',/permission denied/);
+await actor(5);
+let list=(await db.query("SELECT list_focus_samples_v2() result")).rows[0].result;
+assert.equal(list.total,1);assert.equal(list.counts.inconclusive,1);assert.equal(list.samples[0].history.length,3);assert.deepEqual(list.samples[0].history[2].positive_deposit_ids,[id(13)]);checks++;
+assert.equal((await db.query("SELECT list_focus_samples_v2(p_status=>'pending') result")).rows[0].result.total,0);checks++;
+assert.equal((await db.query("SELECT list_focus_samples_v2(p_search=>'Laudo 123') result")).rows[0].result.total,1);checks++;
+assert.equal((await db.query("SELECT list_focus_samples_v2(p_search=>'notfound') result")).rows[0].result.total,0);checks++;
+assert.equal((await db.query("SELECT list_focus_samples_v2(p_from=>'2026-10-02') result")).rows[0].result.total,0);checks++;
+await fails("SELECT list_focus_samples_v2(p_from=>'2026-10-02',p_to=>'2026-10-01')",/Filtros/);
+await actor(3);assert.equal((await db.query('SELECT list_focus_samples_v2() result')).rows[0].result.total,0);checks++;
+await db.exec('RESET ROLE');
+await db.exec('INSERT INTO visits(id,agent_id,property_id,cycle_id,visit_date,sample_collected,tubitos_coletados,has_focus,status) VALUES '+Array.from({length:51},(_,i)=>`('${id(100+i)}','${id(1)}','${id(11)}','${id(10)}','2026-10-01T12:00Z',true,1,true,'visited')`).join(','));
+await actor(5);
+list=(await db.query('SELECT list_focus_samples_v2() result')).rows[0].result;
+assert.equal(list.total,52);assert.equal(list.samples.length,50);assert.equal(list.counts.pending,51);checks++;
+list=(await db.query('SELECT list_focus_samples_v2(p_offset=>50) result')).rows[0].result;assert.equal(list.total,52);assert.equal(list.samples.length,2);checks++;
+await db.exec('RESET ROLE');await db.exec(`UPDATE profiles SET is_active=false WHERE id='${id(5)}'`);await actor(5);
+await fails('SELECT list_focus_samples_v2()',/desativada/);
+await fails(call('negative',3,23,"'{}'::uuid[]",'Revisão necessária'),/consulta|equipe/);
 console.log(`${checks} database checks passed (disposable database; production untouched)`);
 await db.close();

@@ -7,27 +7,50 @@ import { getOperationalDate } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/amostras")({ component: SamplesPage });
 const labels: Record<string, string> = { pending: "Aguardando análise", positive: "Positivo", negative: "Negativo", inconclusive: "Inconclusivo" };
 function date(value: string) { return value.includes("T") ? new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : value.split("-").reverse().join("/"); }
 function SamplesPage() {
+  const { user, role } = useAuth();
+  const cache = useQueryClient();
   const fetchSamples = useServerFn(getFocusSamples);
   const [cycleId, setCycle] = useState("");
   const [status, setStatus] = useState<"" | "pending" | "positive" | "negative" | "inconclusive">("pending");
+  const [agentId, setAgent] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [draftSearch, setDraftSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<FocusSample | null>(null);
-  const query = useQuery({ queryKey: ["focus-samples", cycleId, status, page], queryFn: () => fetchSamples({ data: { cycleId: cycleId || undefined, status: status || undefined, page } }) });
+  const query = useQuery({ queryKey: ["focus-samples", user?.id, role, cycleId, status, agentId, from, to, search, page], enabled: !!user?.id && !!role && !(from && to && from > to), queryFn: () => fetchSamples({ data: { cycleId: cycleId || undefined, status: status || undefined, agentId: agentId || undefined, from: from || undefined, to: to || undefined, search: search || undefined, page } }) });
+  useEffect(() => {
+    setSelected(null); setPage(0);
+    const owner = user?.id;
+    return () => { cache.removeQueries({ queryKey: ["focus-samples", owner] }); };
+  }, [user?.id, role, cache]);
+  const resetPage = () => { setPage(0); setSelected(null); };
   return <div className="container mx-auto p-4 space-y-4">
     <h1 className="text-xl font-bold">Amostras e resultados</h1>
     <p className="text-sm text-muted-foreground">Agentes acompanham suas coletas; supervisores registram o resultado do laboratório para sua equipe. Coordenadores e administradores podem corrigir com justificativa.</p>
     <p className="text-xs text-muted-foreground">Somente coletas sincronizadas aparecem aqui. O resultado é lançado online na visita original, mesmo com a jornada encerrada.</p>
+    <p className="text-sm">Escopo: {role === "admin_master" ? "todos os agentes" : role === "coordenador" ? "sua área vinculada" : role === "supervisor" ? "sua equipe" : "suas coletas"}. Resultado por coleta/visita; tubitos não possuem resultados individuais neste cadastro.</p>
+    {query.data && !query.error && <div className="flex flex-wrap gap-3">{Object.entries(labels).map(([key,label]) => <Button key={key} variant={status === key ? "default" : "outline"} onClick={() => { setStatus(key as typeof status); resetPage(); }}>{label}: {query.data.counts?.[key] ?? 0}</Button>)}</div>}
+    <p className="text-xs text-muted-foreground">Contadores respeitam ciclo, agente, período e busca; cada cartão seleciona um resultado.</p>
     <div className="flex flex-wrap gap-3">
       <label className="text-sm">Ciclo <select className="border rounded p-2" value={cycleId} onChange={e => { setCycle(e.target.value); setPage(0); setSelected(null); }}><option value="">Todos os ciclos</option>{query.data?.cycles.map(c => <option key={c.id} value={c.id}>{c.name} · {c.year}</option>)}</select></label>
       <label className="text-sm">Resultado <select className="border rounded p-2" value={status} onChange={e => { setStatus(e.target.value as typeof status); setPage(0); setSelected(null); }}><option value="">Todos</option>{Object.entries(labels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <label className="text-sm">Agente<select className="block border rounded p-2" value={agentId} onChange={e => { setAgent(e.target.value); resetPage(); }}><option value="">Todos no seu escopo</option>{query.data?.agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+      <label className="text-sm">Coleta de<Input type="date" value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></label>
+      <label className="text-sm">Até<Input type="date" value={to} onChange={e => { setTo(e.target.value); resetPage(); }} /></label>
+      <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); setSearch(draftSearch.trim()); resetPage(); }}><label className="text-sm">Agente, imóvel, rua, quarteirão ou laudo<Input maxLength={200} value={draftSearch} onChange={e => setDraftSearch(e.target.value)} /></label><Button type="submit" variant="outline">Buscar</Button></form>
+      <Button variant="outline" onClick={() => { setCycle(""); setStatus("pending"); setAgent(""); setFrom(""); setTo(""); setSearch(""); setDraftSearch(""); resetPage(); }}>Limpar filtros</Button>
       <Button variant="outline" onClick={() => { setSelected(null); void query.refetch(); }} disabled={query.isFetching}>Atualizar</Button>
     </div>
+    {from && to && from > to && <p role="alert" className="text-destructive">A data inicial deve ser anterior ou igual à final.</p>}
     {query.isLoading ? <p>Carregando coletas…</p> : query.error ? <p role="alert" className="text-destructive">{query.error.message}</p> : <>
       {!query.data?.samples.length && <p>Nenhuma coleta encontrada nos filtros selecionados.</p>}
       <div className="grid gap-3 md:grid-cols-2">{query.data?.samples.map(sample => <Card key={sample.id}><CardContent className="p-4 space-y-2">
@@ -38,7 +61,7 @@ function SamplesPage() {
         <p className="font-semibold">{labels[sample.status]}</p>
         <Button variant="outline" onClick={() => setSelected(sample)}>{sample.can_record && sample.status === "pending" ? "Lançar resultado" : "Ver resultado e histórico"}</Button>
       </CardContent></Card>)}</div>
-      <div className="flex items-center gap-3"><Button variant="outline" disabled={page === 0} onClick={() => { setPage(page - 1); setSelected(null); }}>Anterior</Button><span>Página {page + 1}</span><Button variant="outline" disabled={(query.data?.samples.length ?? 0) < 50} onClick={() => { setPage(page + 1); setSelected(null); }}>Próxima</Button></div>
+      <div className="flex items-center gap-3"><Button variant="outline" disabled={page === 0} onClick={() => { setPage(page - 1); setSelected(null); }}>Anterior</Button><span>Página {page + 1} · {query.data?.total ?? 0} coleta(s) nos filtros</span><Button variant="outline" disabled={query.isFetching || (page + 1) * 50 >= (query.data?.total ?? 0)} onClick={() => { setPage(page + 1); setSelected(null); }}>Próxima</Button></div>
     </>}
     {selected && <ResultForm key={`${selected.id}:${selected.version}`} sample={selected} onClose={() => { setSelected(null); void query.refetch(); }} />}
   </div>;
@@ -48,8 +71,9 @@ function ResultForm({ sample, onClose }: { sample: FocusSample; onClose: () => v
   const cache = useQueryClient();
   const [status, setStatus] = useState<"positive" | "negative" | "inconclusive">(sample.status === "pending" ? "positive" : sample.status);
   const [positiveIds, setPositive] = useState(sample.deposits.filter(d => d.positive).map(d => d.id));
-  const [reference, setReference] = useState("");
-  const [analysisDate, setDate] = useState(getOperationalDate());
+  const latest = sample.history[0];
+  const [reference, setReference] = useState(latest?.reference ?? "");
+  const [analysisDate, setDate] = useState(latest?.analysis_date ?? getOperationalDate());
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [requestId, setRequest] = useState(() => crypto.randomUUID());
@@ -61,8 +85,10 @@ function ResultForm({ sample, onClose }: { sample: FocusSample; onClose: () => v
     if (!navigator.onLine) { toast.error("Conecte-se para confirmar o resultado. Nenhum dado foi enviado."); return; }
     setBusy(true);
     try {
-      await save({ data: { visitId: sample.id, status, positiveDepositIds: status === "positive" ? positiveIds : [], reference, analysisDate, reason, version: sample.version, requestId } });
-      toast.success("Resultado confirmado e indicadores diários atualizados.");
+      const result = await save({ data: { visitId: sample.id, status, positiveDepositIds: status === "positive" ? positiveIds : [], reference, analysisDate, reason, version: sample.version, requestId } });
+      if (result.bulletinState === "missing") toast.warning("Resultado salvo. Não existe boletim diário para esta coleta; confira o fechamento da produção.");
+      else if (result.bulletinState === "unknown") toast.warning("Resultado salvo. Não foi possível conferir o boletim diário; atualize os relatórios.");
+      else toast.success("Resultado confirmado e indicadores diários atualizados.");
       void cache.invalidateQueries(); onClose();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível confirmar. Atualize a lista antes de tentar novamente."); }
     finally { setBusy(false); }
@@ -80,7 +106,7 @@ function ResultForm({ sample, onClose }: { sample: FocusSample; onClose: () => v
     </form> : <p className="text-sm">{sample.can_record ? "Resultado confirmado. Correções devem ser feitas pelo coordenador ou administrador." : "Consulta do resultado. O lançamento é feito pelo supervisor da equipe."}</p>}
     <h3 className="font-semibold">Histórico</h3>
     {!sample.history.length && <p className="text-sm">Nenhum lançamento de laboratório registrado nesta área.{sample.status !== "pending" ? " A marcação existente foi preservada." : ""}</p>}
-    {sample.history.map((h,i) => <div key={i} className="border rounded p-3 text-sm"><p>{labels[h.status]} · análise {date(h.analysis_date)} · {h.reference}</p><p>Registrado por {h.actor} em {new Date(h.recorded_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</p>{h.reason && <p>{h.reason}</p>}</div>)}
+    {sample.history.map((h,i) => <div key={i} className="border rounded p-3 text-sm"><p>{labels[h.status]} · análise {date(h.analysis_date)} · {h.reference}</p><p>Registrado por {h.actor} em {new Date(h.recorded_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</p>{h.positive_deposit_ids && <p>Depósitos positivos: {h.positive_deposit_ids.map(id => { const d = sample.deposits.find(d => d.id === id); return d ? `${d.type_code} (${d.quantity})` : id; }).join(", ") || "Nenhum"}</p>}{h.reason && <p>{h.reason}</p>}</div>)}
     <Button variant="outline" disabled={busy} onClick={onClose}>Fechar</Button>
   </CardContent></Card>;
 }

@@ -62,3 +62,31 @@ recontagem de indicadores e proteção contra escritas offline antigas.
 6. Verificar positivos/negativos no mapa e nos boletins diário/semanal após atualizar.
 7. Conferir sincronização com registros pendentes sem limpar o armazenamento do dispositivo.
 8. Publicar somente após essas validações.
+
+## Atualização de gestão de amostras (12/10/2026 UTC)
+
+Aplicar depois da migration inicial: `supabase/migrations/20261012004450_improve_focus_samples_management.sql`.
+A migration somente substitui autorização e adiciona a leitura filtrada `list_focus_samples_v2`:
+nenhuma amostra, laudo, visita, jornada ou boletim é criado/apagado/preenchido automaticamente.
+Contas desativadas não podem ler nem lançar pelas funções de amostras; o escopo de equipe continua obrigatório.
+
+A tela compartilhada oferece agente, período operacional, ciclo, resultado e busca literal por agente,
+imóvel, rua, quarteirão ou referência de laudo. Contadores abrangem todos os registros desses filtros,
+independentemente da página e do cartão de resultado selecionado. Paginação usa total exato.
+O cache inclui usuário/cargo e é removido ao sair da tela ou mudar de identidade.
+Correções preenchem laudo e data do último resultado, mas sempre exigem nova justificativa.
+O histórico mostra os depósitos positivos de cada versão.
+
+Após salvar, uma leitura separada confere a existência do boletim diário. Ausência ou falha dessa leitura
+mostra aviso sem desfazer o resultado nem induzir novo lançamento. O aviso não reconstrói produção ausente.
+A positividade permanece por coleta/visita: não foram inventados identificadores nem laudos individuais
+para tubitos antigos. Um módulo individual por tubito exige cadastro e rastreabilidade próprios.
+
+Validação desta atualização: testes locais de SQL em Postgres descartável (incluindo filtros, contagens,
+permissões e conta desativada) e testes das funções de confirmação (boletim presente/ausente, leitura com
+falha após gravação e bloqueio antes da RPC). Nenhum teste acessa produção.
+
+Para ativar no Lovable: sincronizar main, verificar se a migration inicial já foi aplicada e aplicar
+somente a nova pendente no projeto `ttjzgszxrnmcsygtzfcu`, conferir Advisor e permissões reais, depois publicar.
+Validar usando a amostra pendente existente de Gustavo sem criar outra ou informar laudo fictício.
+A ausência da RPC nova mantém aviso de ativação pendente e não oferece fallback com escopo permissivo.
