@@ -4,6 +4,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { readAllQueryPages } from "@/lib/query-pages";
 import { z } from "zod";
 
+export const getFocusSampleCycles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const client = context.supabase as any;
+    const { data: actor, error } = await client.from("profiles").select("is_active").eq("id", context.userId).single();
+    if (error || actor?.is_active !== true) throw new Error("Conta desativada ou acesso indisponível");
+    // Independent of laboratory RPC activation and selected result filters.
+    return await readAllQueryPages(client.from("cycles").select("id,name,year,number").order("year", { ascending: false }).order("number", { ascending: false }).order("id")) as { id: string; name: string; year: number; number: number }[];
+  });
+
 export const getFocusSamples = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ cycleId: z.string().uuid().optional(), status: z.enum(["pending", "positive", "negative", "inconclusive"]).optional(), agentId: z.string().uuid().optional(), from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), search: z.string().trim().max(200).optional(), page: z.number().int().min(0).max(2000) }))
@@ -17,8 +27,7 @@ export const getFocusSamples = createServerFn({ method: "POST" })
       if (["PGRST202", "42883", "42P01"].includes(error.code)) throw new Error("A área de resultados ainda aguarda ativação no banco. Suas coletas permanecem preservadas.");
       throw new Error(`Não foi possível carregar as coletas: ${error.message}`);
     }
-    const cycles = await readAllQueryPages(client.from("cycles").select("id,name,year,number").order("year", { ascending: false }).order("number", { ascending: false }).order("id"));
-    return { samples: (result?.samples ?? []) as FocusSample[], total: Number(result?.total ?? 0), counts: result?.counts as Record<string, number>, agents: (result?.agents ?? []) as { id: string; name: string }[], cycles: cycles as { id: string; name: string; year: number; number: number }[] };
+    return { samples: (result?.samples ?? []) as FocusSample[], total: Number(result?.total ?? 0), counts: result?.counts as Record<string, number>, agents: (result?.agents ?? []) as { id: string; name: string }[] };
 
   });
 

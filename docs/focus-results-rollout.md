@@ -90,3 +90,14 @@ Para ativar no Lovable: sincronizar main, verificar se a migration inicial já f
 somente a nova pendente no projeto `ttjzgszxrnmcsygtzfcu`, conferir Advisor e permissões reais, depois publicar.
 Validar usando a amostra pendente existente de Gustavo sem criar outra ou informar laudo fictício.
 A ausência da RPC nova mantém aviso de ativação pendente e não oferece fallback com escopo permissivo.
+
+### Correção adicional de ciclos e ocorrência
+
+A seleção de ciclos agora consulta o servidor independentemente da RPC de amostras, com erro e nova
+tentativa próprios; ausência da migration de laboratório não apaga opções de ciclos autorizados.
+A contagem de foco encontrado/coleta no mapa preserva a ocorrência mesmo após laudo negativo.
+Positividade permanece baseada nos depósitos confirmados, sem transformar pendentes ou negativos
+em positivos. A classificação de risco pode utilizar ocorrências históricas e não é um laudo.
+Nenhuma nova migration é necessária para este ajuste de código; a migration de gestão anterior
+continua necessária para ativar a lista filtrada. Localizar a amostra ausente requer leitura do banco
+real e da fila do dispositivo: não se deve recriar visita nem modificar sample_collected por suposição.

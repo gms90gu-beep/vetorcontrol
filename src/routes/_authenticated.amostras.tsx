@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { getFocusSamples, recordFocusResult, type FocusSample } from "@/lib/focus-results.functions";
+import { getFocusSamples, getFocusSampleCycles, recordFocusResult, type FocusSample } from "@/lib/focus-results.functions";
 import { getOperationalDate } from "@/lib/operational-date";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ function SamplesPage() {
   const { user, role } = useAuth();
   const cache = useQueryClient();
   const fetchSamples = useServerFn(getFocusSamples);
+  const fetchCycles = useServerFn(getFocusSampleCycles);
+  const cycleQuery = useQuery({ queryKey: ["focus-sample-cycles", user?.id, role], enabled: !!user?.id && !!role, queryFn: () => fetchCycles() });
   const [cycleId, setCycle] = useState("");
   const [status, setStatus] = useState<"" | "pending" | "positive" | "negative" | "inconclusive">("pending");
   const [agentId, setAgent] = useState("");
@@ -30,7 +32,7 @@ function SamplesPage() {
   useEffect(() => {
     setSelected(null); setPage(0);
     const owner = user?.id;
-    return () => { cache.removeQueries({ queryKey: ["focus-samples", owner] }); };
+    return () => { cache.removeQueries({ queryKey: ["focus-samples", owner] }); cache.removeQueries({ queryKey: ["focus-sample-cycles", owner] }); };
   }, [user?.id, role, cache]);
   const resetPage = () => { setPage(0); setSelected(null); };
   return <div className="container mx-auto p-4 space-y-4">
@@ -39,9 +41,10 @@ function SamplesPage() {
     <p className="text-xs text-muted-foreground">Somente coletas sincronizadas aparecem aqui. O resultado é lançado online na visita original, mesmo com a jornada encerrada.</p>
     <p className="text-sm">Escopo: {role === "admin_master" ? "todos os agentes" : role === "coordenador" ? "sua área vinculada" : role === "supervisor" ? "sua equipe" : "suas coletas"}. Resultado por coleta/visita; tubitos não possuem resultados individuais neste cadastro.</p>
     {query.data && !query.error && <div className="flex flex-wrap gap-3">{Object.entries(labels).map(([key,label]) => <Button key={key} variant={status === key ? "default" : "outline"} onClick={() => { setStatus(key as typeof status); resetPage(); }}>{label}: {query.data.counts?.[key] ?? 0}</Button>)}</div>}
+    {cycleQuery.error && <div role="alert" className="text-destructive text-sm">Falha ao carregar ciclos: {cycleQuery.error.message}<Button variant="outline" onClick={() => void cycleQuery.refetch()}>Tentar novamente</Button></div>}
     <p className="text-xs text-muted-foreground">Contadores respeitam ciclo, agente, período e busca; cada cartão seleciona um resultado.</p>
     <div className="flex flex-wrap gap-3">
-      <label className="text-sm">Ciclo <select className="border rounded p-2" value={cycleId} onChange={e => { setCycle(e.target.value); setPage(0); setSelected(null); }}><option value="">Todos os ciclos</option>{query.data?.cycles.map(c => <option key={c.id} value={c.id}>{c.name} · {c.year}</option>)}</select></label>
+      <label className="text-sm">Ciclo <select className="border rounded p-2" value={cycleId} disabled={cycleQuery.isLoading} onChange={e => { setCycle(e.target.value); setPage(0); setSelected(null); }}><option value="">Todos os ciclos</option>{cycleQuery.data?.map(c => <option key={c.id} value={c.id}>{c.name} · {c.year}</option>)}</select></label>
       <label className="text-sm">Resultado <select className="border rounded p-2" value={status} onChange={e => { setStatus(e.target.value as typeof status); setPage(0); setSelected(null); }}><option value="">Todos</option>{Object.entries(labels).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label className="text-sm">Agente<select className="block border rounded p-2" value={agentId} onChange={e => { setAgent(e.target.value); resetPage(); }}><option value="">Todos no seu escopo</option>{query.data?.agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
       <label className="text-sm">Coleta de<Input type="date" value={from} onChange={e => { setFrom(e.target.value); resetPage(); }} /></label>

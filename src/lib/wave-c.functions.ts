@@ -821,7 +821,8 @@ async function readPropertyMapPoints(data: { from: string; to: string; cycleIds?
     for (const v of visits) {
       visitIds.push(v.id);
       visitToProp.set(v.id, v.property_id);
-      if (v.has_focus && v.focus_analysis_status !== "negative") {
+      // Collection/focus occurrence remains historical even when the laboratory result is negative.
+      if (v.has_focus || v.sample_collected) {
         focusFoundByProp.set(v.property_id, (focusFoundByProp.get(v.property_id) ?? 0) + 1);
       }
 

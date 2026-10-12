@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 vi.mock("@tanstack/react-start", () => ({ createServerFn: () => { const builder: any = { middleware: () => builder, inputValidator: () => builder, handler: (fn: any) => fn }; return builder; } }));
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
-import { recordFocusResult } from "@/lib/focus-results.functions";
+import { recordFocusResult, getFocusSampleCycles } from "@/lib/focus-results.functions";
 const input = { visitId: "v", status: "negative", positiveDepositIds: [], reference: "L", analysisDate: "2026-10-01", reason: "", version: 0, requestId: "r" };
 function client(active: boolean, count: number, error: any = null) {
   const rpc = vi.fn().mockResolvedValue({ data: 1, error: null });
@@ -24,5 +24,22 @@ describe("confirmed sample and bulletin follow-up", () => {
   it("rejects inactive user before RPC", async () => {
     const db = client(false, 0);
     await expect((recordFocusResult as any)({ data: input, context: { supabase: db, userId: "u" } })).rejects.toThrow("desativada"); expect(db.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("sample cycles independent from result RPC", () => {
+  it("loads cycles without requesting samples or laboratory functions", async () => {
+    const db = client(true, 0);
+    const original = db.from;
+    const cycles = [{ id: "c", name: "Ciclo 5", year: 2026, number: 5 }];
+    db.from = (table: string): any => {
+      if (table !== "cycles") return original(table);
+      const q: any = { select: () => q, order: () => q, range: () => Promise.resolve({ data: cycles, error: null }) }; return q;
+    };
+    expect(await (getFocusSampleCycles as any)({ context: { supabase: db, userId: "u" } })).toEqual(cycles);
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("blocks inactive identity before reading cycles", async () => {
+    await expect((getFocusSampleCycles as any)({ context: { supabase: client(false, 0), userId: "u" } })).rejects.toThrow("desativada");
   });
 });
