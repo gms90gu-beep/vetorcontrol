@@ -98,7 +98,16 @@ assert.equal((await db.query(`SELECT focus_analysis_status FROM visits WHERE id=
 await db.exec(`SELECT record_focus_result('${id(150)}','positive',ARRAY['${id(200)}'::uuid,'${id(201)}'::uuid],'Laudo dois depósitos','2026-10-02','',0,'${id(203)}')`);assert.equal((await db.query(`SELECT count(*) count FROM visit_deposits WHERE visit_id='${id(150)}' AND is_positive`)).rows[0].count,2);checks++;
 await fails(`UPDATE visits SET visit_date='2026-10-02T12:00Z' WHERE id='${id(191)}'`,/protegidos|concluído/);
 await fails(`INSERT INTO visits(id,agent_id,cycle_id,visit_date) VALUES('${id(198)}','${id(1)}','${id(10)}','2026-10-01T12:00Z')`,/concluído/);
+// A signed-in caller cannot spoof the transaction marker to edit closed-cycle production.
+await db.exec(`SELECT set_config('vetor.focus_result_visit','${id(149)}',false)`);
+await fails(`UPDATE visits SET status='closed',focus_result_version=focus_result_version+1 WHERE id='${id(149)}'`,/Amostras|concluído/);
+await db.exec(`SELECT set_config('vetor.focus_result_visit','',false)`);
+await actor(3);await fails(`SELECT record_focus_result('${id(149)}','negative','{}'::uuid[],'Laboratório','2026-10-02','',0,'${id(204)}')`,/equipe|consulta/);
+await actor(2);
 await fails(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','Laudo revisto',1,'${id(199)}')`,/Correção/);
+await actor(4);await fails(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','',1,'${id(199)}')`,/justificativa/);
+await db.exec('RESET ROLE');await db.exec(`INSERT INTO profiles(id,full_name,role,is_active) VALUES('${id(6)}','outside coordinator','coordenador',true)`);
+await actor(6);await fails(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','Laudo revisto',1,'${id(199)}')`,/equipe|consulta/);
 await actor(4);await db.exec(`SELECT record_focus_result('${id(191)}','negative','{}'::uuid[],'Correção','2026-10-02','Laudo revisto',1,'${id(199)}')`);checks++;
 await actor(3);await fails(`SELECT identify_focus_deposits('${id(150)}',ARRAY['${id(193)}'::uuid],'Identificar coleta')`,/escopo/);
 await actor(1);await fails(`UPDATE visit_deposits SET focus_found=false WHERE id='${id(194)}'`,/protegida/);
