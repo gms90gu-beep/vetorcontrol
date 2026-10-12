@@ -10,9 +10,13 @@ vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from:
 import { rebuildDailyRecords } from "@/lib/reports-reconcile.functions";
 
 function context(role: string) {
+  const profiles = [{ id: "own", role: "agente", supervisor_id: "self", coordinator_id: "self" }];
+  const query: any = {};
+  for (const method of ["select", "eq", "order"]) query[method] = () => query;
+  query.range = async () => ({ data: profiles, error: null });
   return { userId: "self", supabase: {
-    rpc: async () => ({ data: role, error: null }),
-    from: () => ({ select: () => ({ eq: async () => ({ data: [{ id: "own" }], error: null }) }) }),
+    rpc: async (name: string) => ({ data: name === "get_coordinator_data" ? profiles : role, error: null }),
+    from: () => query,
   } };
 }
 
@@ -44,7 +48,7 @@ describe("server rebuild team boundary", () => {
     query.eq = (column: string, id: string) => { calls.filters.push([column, id]); return query; };
     query.range = async () => ({ data: [], error: null });
     calls.admin.mockImplementation(() => query);
-    const agentId = role === "supervisor" ? "own" : "selected";
+    const agentId = role === "admin_master" ? "selected" : "own";
     const result = await (rebuildDailyRecords as any)({ data: { from: "2026-10-01", to: "2026-10-02", agentId, cycleId: "cycle" }, context: context(role) });
     expect(calls.filters).toContainEqual([agentId]);
     expect(calls.filters).toContainEqual(["cycle_id", "cycle"]);
