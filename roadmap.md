@@ -4,7 +4,7 @@
 - [x] Migration 20261012134017 aplicada como Drizzle 0015; erro de transcrição na projeção de histórico corrigido em 0016, restaurando a função exata autorizada, sem writes de dados.
 - [x] 51 verificações SQL descartáveis: candidatos com foco, supervisor de equipe em ciclo encerrado, correções com motivo/área, inserts/produção bloqueados e marcador falsificado rejeitado. Adenilson real consulta Gustavo (C positivo, versão 1), sem correção; identificação pendente inicia vazia, exige justificativa, nenhuma submissão real.
 - [x] 199 testes aprovados, compilação OK, segurança repetida sem críticos (7 avisos e 1 informativo preexistentes); 1.207 visitas, 64 boletins, 1 resultado e zero identificações preservados.
-- [ ] Solicitar publicação e conferir conclusão, se disponível; não afirmar implantação concluída sem verificar.
+- [x] Publicação autorizada solicitada nesta rodada após validação; conclusão da implantação depende do serviço e deve ser informada sem promessa de disponibilidade.
 
 - [x] Rodada 12/10: main cff72c0 confirmada; três migrations pendentes aplicadas byte-for-byte na ordem autorizada (Drizzle 0012, 0013, 0014).
 - [x] Rodada 12/10: coleta 938798d0 de Gustavo, imóvel 59 Praça da Bandeira, 06/10 Ciclo 5, exibida em contas reais de Gustavo (somente consulta) e Adenilson (formulário autorizado, sem salvar); mapa real: 1 positivo e 1 foco não confirmado; 1.207 visitas, 64 boletins e zero laudos novos preservados.
