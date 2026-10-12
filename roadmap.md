@@ -1,5 +1,8 @@
 # Tarefas
 
+- [x] Rodada 12/10 20:55: análise somente leitura da reserva externa; autenticação hospedada e armazenamento consultados, dependências do aplicativo e exportação oficial revisadas; apresentar plano sem mudar dados, credenciais, conexão ou publicação.
+- [ ] Execução da reserva externa aguarda autorização específica; SMTP e inventário completo de funções implantadas precisam de conferência nas telas do Cloud, sem inferência pelo código.
+
 - [x] Rodada 12/10 13:56: commit c163602 sincronizado; migration 20261012134017 pendente confirmada; Gustavo já tem resultado positivo versão 1 antes desta rodada, preservar sem alteração.
 - [x] Migration 20261012134017 aplicada como Drizzle 0015; erro de transcrição na projeção de histórico corrigido em 0016, restaurando a função exata autorizada, sem writes de dados.
 - [x] 51 verificações SQL descartáveis: candidatos com foco, supervisor de equipe em ciclo encerrado, correções com motivo/área, inserts/produção bloqueados e marcador falsificado rejeitado. Adenilson real consulta Gustavo (C positivo, versão 1), sem correção; identificação pendente inicia vazia, exige justificativa, nenhuma submissão real.
