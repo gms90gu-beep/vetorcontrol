@@ -7,26 +7,9 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Conexão pública do backend (URL + chave publicável/anon). São valores
-// públicos por definição — a chave privada (service role) NUNCA aparece aqui.
-// Servem como fallback determinístico quando o ambiente de build (produção)
-// não injeta as variáveis VITE_*, o que deixava o app publicado sem backend
-// ("Supabase não configurado" no console e login falhando).
-const SUPABASE_PROJECT_ID = "ttjzgszxrnmcsygtzfcu";
-const SUPABASE_URL_FALLBACK = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
-const SUPABASE_PUBLISHABLE_FALLBACK =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0anpnc3p4cm5tY3N5Z3R6ZmN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTkyMDMsImV4cCI6MjA5NDQzNTIwM30.cP_-LNb9jIfeXFjUSZSh7Lf7JWQm2o9D7oYRrDweBsw";
-
-const supabaseUrl =
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || SUPABASE_URL_FALLBACK;
-const supabaseKey =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_PUBLISHABLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  SUPABASE_PUBLISHABLE_FALLBACK;
-const supabaseProjectId =
-  process.env.VITE_SUPABASE_PROJECT_ID || process.env.SUPABASE_PROJECT_ID || SUPABASE_PROJECT_ID;
+// Variante exclusiva de homologação: configuração ausente ou da origem bloqueia o build.
+import { readCopyBackend } from "./scripts/copy-backend.mjs";
+const { url: supabaseUrl, key: supabaseKey, projectId: supabaseProjectId } = readCopyBackend();
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
@@ -58,13 +41,13 @@ export default defineConfig({
         filename: "sw.js",
         devOptions: { enabled: false },
         manifest: false, // usamos public/manifest.webmanifest
-        // Build do TanStack Start/Nitro publica em dist/client/.
+        // Esta variante TanStack Start/Nitro publica os assets em .output/public/.
         // Sem isto, o Workbox escaneia dist/ e gera URLs precache com
         // prefixo "client/assets/..." que não existem em produção.
-        outDir: "dist/client",
+        outDir: ".output/public",
         workbox: {
           // Escaneia o diretório PÚBLICO real, não dist/.
-          globDirectory: "dist/client",
+          globDirectory: ".output/public",
           globPatterns: ["**/*.{js,css,svg,png,ico,woff2}"],
           // Sem index.html (SSR). navegações usam NetworkFirst abaixo.
           navigateFallback: null,
