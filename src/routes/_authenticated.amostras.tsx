@@ -12,14 +12,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/amostras")({ component: SamplesPage });
+export const Route = createFileRoute("/_authenticated/amostras")({
+  component: SamplesPage,
+  head: () => ({ meta: [
+    { title: "Amostras e resultados | Vetor Control" },
+    { name: "description", content: "Coletas e resultados laboratoriais da equipe no Vetor Control." },
+    { property: "og:title", content: "Amostras e resultados | Vetor Control" },
+    { property: "og:description", content: "Coletas e resultados laboratoriais da equipe no Vetor Control." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
+});
 const labels: Record<string, string> = { pending: "Aguardando análise", positive: "Positivo", negative: "Negativo", inconclusive: "Inconclusivo" };
 function date(value: string) { return value.includes("T") ? new Date(value).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : value.split("-").reverse().join("/"); }
 function SamplesPage() {
   const { user, role } = useAuth();
   const cache = useQueryClient();
   const online = useOnlineStatus();
-  const localQuery = useQuery({ queryKey: ["focus-local-samples", user?.id], enabled: !!user?.id && role === "agente", queryFn: () => readLocalFocusSamples(user!.id), refetchInterval: 5000 });
+  const localQuery = useQuery({ queryKey: ["focus-local-samples", user?.id], enabled: !!user?.id && role === "agente", queryFn: () => {
+    if (!user?.id) throw new Error("Autenticação necessária");
+    return readLocalFocusSamples(user.id);
+  }, refetchInterval: 5000 });
   const fetchSamples = useServerFn(getFocusSamples);
   const fetchCycles = useServerFn(getFocusSampleCycles);
   const cycleQuery = useQuery({ queryKey: ["focus-sample-cycles", user?.id, role], enabled: online && !!user?.id && !!role, queryFn: () => fetchCycles() });
