@@ -92,6 +92,13 @@
       "when": 1791775230487,
       "tag": "0012_focus_sample_results",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791775267271,
+      "tag": "0013_improve_focus_samples_management",
+      "breakpoints": true
     }
   ]
 }

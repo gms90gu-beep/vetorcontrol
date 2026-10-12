@@ -2012,6 +2012,18 @@ export type Database = {
         Args: { p_cycle?: string; p_offset?: number; p_status?: string }
         Returns: Json
       }
+      list_focus_samples_v2: {
+        Args: {
+          p_agent?: string
+          p_cycle?: string
+          p_from?: string
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+          p_to?: string
+        }
+        Returns: Json
+      }
       log_activity: {
         Args: { source_type: string }
         Returns: {
