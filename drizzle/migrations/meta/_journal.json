@@ -113,6 +113,13 @@
       "when": 1791813538347,
       "tag": "0015_focus_deposit_selection_and_closed_cycle_results",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791813585470,
+      "tag": "0016_restore_exact_focus_history_projection",
+      "breakpoints": true
     }
   ]
 }
