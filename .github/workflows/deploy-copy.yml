@@ -66,6 +66,24 @@ jobs:
           }
           inspect('.output');
           NODE
+      - name: Register test hosting address if account has none
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoint = 'https://api.cloudflare.com/client/v4/accounts/' + process.env.CLOUDFLARE_ACCOUNT_ID + '/workers/subdomain';
+          const headers = {Authorization:'Bearer ' + process.env.CLOUDFLARE_API_TOKEN, 'Content-Type':'application/json'};
+          const response = await fetch(endpoint,{headers});
+          const current = await response.json();
+          if (response.ok && current.success && current.result?.subdomain) {
+            console.log('Existing workers.dev subdomain preserved: ' + current.result.subdomain);
+          } else if (response.status === 404) {
+            const created = await fetch(endpoint,{method:'PUT',headers,body:JSON.stringify({subdomain:'vetorcontrol-reserva-gms90gu'})});
+            const result = await created.json();
+            if (!created.ok || !result.success) throw new Error('Could not register test address; HTTP ' + created.status + '; codes ' + (result.errors || []).map(x=>x.code).join(','));
+            console.log('Registered workers.dev subdomain: ' + result.result.subdomain);
+          } else {
+            throw new Error('Could not check account subdomain; HTTP ' + response.status + '; codes ' + (current.errors || []).map(x=>x.code).join(','));
+          }
+          NODE
       - name: Deploy Worker and server secret together
         env:
           COPY_SERVER_KEY: ${{ secrets.VETOR_COPY_SUPABASE_SERVICE_ROLE_KEY }}
