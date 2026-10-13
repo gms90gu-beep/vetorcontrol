@@ -44,6 +44,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Use the locally validated npm version
+        run: npm install --global npm@11.9.0
       - run: npm ci
       - run: node --test scripts/copy-backend.test.mjs
       - run: npm run build
