@@ -33,6 +33,11 @@ try {
   if (await error.isVisible()) throw new Error('Authenticated platform list failed');
   await page.getByRole('cell',{name:'Euclides da Cunha',exact:true}).waitFor({timeout:15000});
   console.log('Authenticated browser: municipality row displayed successfully');
+  await page.route('**/*',route=>route.request().url().includes('_serverFn') ? route.abort() : route.continue());
+  await page.reload({waitUntil:'networkidle',timeout:60000});
+  await page.getByRole('cell',{name:'Euclides da Cunha',exact:true}).waitFor({timeout:15000});
+  if (await error.isVisible()) throw new Error('RLS fallback failed');
+  console.log('Authenticated browser: read recovered with server-function transport blocked');
   await context.close();
 } finally {
   await browser.close();
