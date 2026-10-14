@@ -122,9 +122,3 @@ jobs:
           }
           NODE
 
-      - name: Temporary authenticated platform diagnostic
-        env:
-          COPY_SERVER_KEY: ${{ secrets.VETOR_COPY_SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          npx --no-install playwright install --with-deps chromium
-          node scripts/platform-browser-smoke.mjs
