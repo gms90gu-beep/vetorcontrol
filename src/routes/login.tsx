@@ -190,10 +190,17 @@ function LoginPage() {
       }
       mark("AGENT_LOAD", { role });
 
+      // Platform access is a separate server-controlled grant, never a municipal role.
+      const { data: platformAccess } = await withTimeout(
+        (supabase as any).from('platform_administrators').select('is_active').eq('user_id', data.user.id).maybeSingle(),
+        3000, 'platform_access',
+      ).catch(() => ({ data: null }));
+
       toast.success("Login realizado com sucesso!");
 
       const target =
-        role === "admin_master" ? "/admin/dashboard"
+        platformAccess?.is_active === true ? "/platform"
+        : role === "admin_master" ? "/admin/dashboard"
         : role === "coordenador" ? "/coordenador"
         : role === "supervisor" ? "/supervisor"
         : role === "agente" ? "/agente"
