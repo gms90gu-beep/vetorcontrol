@@ -47,7 +47,7 @@ jobs:
         with:
           bun-version: '1.4.3'
       - run: bun install --frozen-lockfile
-      - run: node --test scripts/copy-backend.test.mjs
+      - run: node --test scripts/copy-backend.test.mjs scripts/platform-policy.test.mjs
       - run: npm run build
       - name: Verify isolated deployment artifact
         run: |
