@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { assertPlatformAdministrator } from '@/lib/platform-policy.mjs';
 
 export const Route = createFileRoute('/platform')({
   beforeLoad: async () => {
@@ -28,7 +29,24 @@ function PlatformPage() {
   const [slug, setSlug] = useState('');
   async function load() {
     setLoading(true); setError('');
-    try { setMunicipalities(await getPlatformMunicipalities()); }
+    try {
+      try {
+        setMunicipalities(await getPlatformMunicipalities());
+      } catch {
+        // An old PWA bundle or unavailable server-function transport must not
+        // hide a registry that the same authenticated user can read with RLS.
+        const { data: session, error: sessionError } = await supabase.auth.getUser();
+        if (sessionError || !session.user) throw new Error('Sessão indisponível.');
+        const { data: access, error: accessError } = await (supabase as any)
+          .from('platform_administrators').select('is_active').eq('user_id', session.user.id).maybeSingle();
+        if (accessError) throw new Error('Acesso indisponível.');
+        assertPlatformAdministrator(access);
+        const { data: rows, error: queryError } = await (supabase as any)
+          .from('municipalities').select('id,name,state_code,slug,state,created_at').order('name');
+        if (queryError) throw new Error('Consulta indisponível.');
+        setMunicipalities(rows || []);
+      }
+    }
     catch { setError('Não foi possível carregar os municípios. Tente novamente.'); }
     finally { setLoading(false); }
   }
