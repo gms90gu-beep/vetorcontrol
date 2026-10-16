@@ -5,7 +5,7 @@ export function assertPlatformAdministrator(record) {
 }
 
 export function normalizeMunicipalityDraft(input) {
-  const name = String(input?.name ?? '').trim().replace(/\\s+/g, ' ');
+  const name = String(input?.name ?? '').trim().replace(/\s+/g, ' ');
   const stateCode = String(input?.stateCode ?? '').trim().toUpperCase();
   const slug = String(input?.slug ?? '').trim().toLowerCase();
   if (name.length < 3 || name.length > 120) throw new Error('Informe o nome do município.');
@@ -21,7 +21,7 @@ export function normalizeMunicipalAdministrator(input) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(municipalityId)) {
     throw new Error('Selecione um município válido.');
   }
-  if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Informe um e-mail válido para o Admin Master.');
   }
   return { municipalityId, email };
