@@ -40,6 +40,7 @@ import { OperationalPanel } from "@/components/field-work/OperationalPanel";
 import { getOperationalBlockStatus, logBlockStatusShared } from "@/lib/operational-block-status";
 import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
+import { isDailyWorkRecordClosed } from "@/lib/session-resume-policy";
 
 export const Route = createFileRoute("/_authenticated/field-work")({
   beforeLoad: blockManagersGuard,
@@ -137,6 +138,55 @@ async function assessSessionForResume(
       motivo: "session_date diferente da Data da Produção selecionada",
     });
     return decide("blocked_by_date", false, "data expirada", { operational_date: opDate });
+  }
+
+  // Um expediente já consolidado encerra a retomada automática da jornada,
+  // mesmo que o quarteirão ainda tenha imóveis pendentes. As pendências
+  // continuam no cadastro e podem ser trabalhadas em uma nova jornada; não
+  // devemos reapresentar uma sessão de um dia que o agente já encerrou.
+  // A consulta usa o repositório offline-first para respeitar fechamentos
+  // já sincronizados/cacheados quando o agente está sem sinal.
+  let closedRecord: any = null;
+  try {
+    const dailyRecords = await listRemoteOrCache<any>({
+      name: "daily_work_records",
+      remote: () =>
+        supabase
+          .from("daily_work_records")
+          .select("id, agent_id, work_date, status, end_time")
+          .eq("agent_id", session.user_id)
+          .eq("work_date", session.session_date)
+          .limit(1) as any,
+      filter: (record) =>
+        record.agent_id === session.user_id && record.work_date === session.session_date,
+    });
+    closedRecord = dailyRecords.find(isDailyWorkRecordClosed) ?? null;
+  } catch (e: any) {
+    console.warn("[JOURNEY_DWR_CHECK_ERR]", {
+      session_id: session?.id,
+      session_date: session?.session_date,
+      error: e?.message ?? String(e),
+    });
+  }
+  if (closedRecord) {
+    if (session.status === "paused" || session.status === "in_progress") {
+      try {
+        await updateOffline("field_work_sessions", session.id, {
+          status: "closed",
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e: any) {
+        console.warn("[JOURNEY_DWR_SESSION_CLOSE_ERR]", {
+          session_id: session?.id,
+          daily_work_record_id: closedRecord.id,
+          error: e?.message ?? String(e),
+        });
+      }
+    }
+    return decide("blocked_by_dwr", false, "expediente desta data já foi encerrado", {
+      daily_work_record_id: closedRecord.id,
+      daily_work_record_status: closedRecord.status,
+    });
   }
 
   const statusOk = session?.status === "paused" || session?.status === "in_progress";
