@@ -21,6 +21,7 @@ type Visit = {
   property_id: string;
   status?: string | null;
   has_focus?: boolean | null;
+  visit_date?: string | null;
 };
 
 type FilterKey =
@@ -63,8 +64,9 @@ function classify(p: Property, v?: Visit): { status: MarkerStatus; label: string
     return { status: "strategic", label: "Ponto Estratégico" };
   if (v?.status === "refused") return { status: "refused", label: "Recusada" };
   if (v?.status === "closed") return { status: "closed", label: "Fechada" };
-  if (v?.status === "visited") return { status: "clean", label: "Visitado" };
-  if (v) return { status: "pendency", label: "Pendente" };
+  if (["visited", "treated", "partial", "partially_visited"].includes(String(v?.status)))
+    return { status: "clean", label: "Visitado" };
+  if (v) return { status: "clean", label: "Visitado" };
   return { status: "unknown", label: "Não iniciado" };
 }
 
@@ -76,7 +78,9 @@ export function BlockOperationalMap({
 
   const lastVisitByProp = useMemo(() => {
     const m = new Map<string, Visit>();
-    for (const v of visits) if (v.property_id) m.set(v.property_id, v);
+    for (const v of [...visits].sort((a, b) => String(a.visit_date ?? "").localeCompare(String(b.visit_date ?? "")))) {
+      if (v.property_id) m.set(v.property_id, v);
+    }
     return m;
   }, [visits]);
 
@@ -105,12 +109,16 @@ export function BlockOperationalMap({
       .map((p) => {
         const v = lastVisitByProp.get(p.id);
         const cls = classify(p, v);
+        const workedDate = v?.visit_date
+          ? new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(v.visit_date))
+          : null;
         const nav = `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}`;
         const popupHtml = `
           <div style="font-family:system-ui;font-size:12px;min-width:180px">
             <div style="font-weight:800;margin-bottom:2px">Nº ${p.number ?? "—"}${p.complement ? " · " + p.complement : ""}</div>
             <div style="color:#64748b;margin-bottom:4px">${p.street_name ?? ""}</div>
             <div style="margin-bottom:6px"><span style="color:${MARKER_COLORS[cls.status]}">●</span> ${cls.label}</div>
+            ${workedDate ? `<div style="color:#059669;margin-bottom:6px;font-weight:700">Trabalhado em ${workedDate}</div>` : ""}
             <div style="display:flex;gap:6px;margin-top:6px">
               <a href="/property/${p.id}" style="flex:1;text-align:center;background:#0f172a;color:#fff;padding:6px 8px;border-radius:6px;text-decoration:none;font-weight:700">Abrir Visita</a>
               <a href="${nav}" target="_blank" rel="noopener" style="flex:1;text-align:center;background:#3b82f6;color:#fff;padding:6px 8px;border-radius:6px;text-decoration:none;font-weight:700">🧭 Navegar</a>

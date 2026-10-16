@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BlockOperationalMap } from "./BlockOperationalMap";
 import { supabase } from "@/integrations/supabase/client";
-import { listRemoteOrCache } from "@/lib/offline/repos";
+import { listLocal, listRemoteOrCache } from "@/lib/offline/repos";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 import { format } from "date-fns";
@@ -25,6 +25,7 @@ import { ptBR } from "date-fns/locale";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { comparePropertyOrder, sortPropertiesOperational } from "@/lib/property-order";
 import { useBlockProgress } from "@/hooks/useBlockProgress";
+import { selectLatestWorkedVisits } from "@/lib/cycle-property-visits";
 
 type FilterKey =
   | "all" | "pending" | "visited" | "closed" | "refused"
@@ -150,7 +151,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       session.cycle_id
         ? listRemoteOrCache<any>({
             name: "cycles",
-            remote: () => supabase.from("cycles").select("id, number, year, name").eq("id", session.cycle_id) as any,
+            remote: () => supabase.from("cycles").select("id, number, year, name, start_date, end_date").eq("id", session.cycle_id) as any,
             filter: (c) => c.id === session.cycle_id,
           })
         : Promise.resolve([] as any[]),
@@ -237,23 +238,42 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         return;
       }
       const propIds = properties.map((p) => p.id);
-      const bv = await listRemoteOrCache<any>({
+      const remoteVisits = await listRemoteOrCache<any>({
         name: "visits",
         remote: () =>
           supabase.from("visits")
             .select("id, property_id, status, has_focus, visit_date, is_recovery, cycle_id, agent_id")
-            .eq("cycle_id", session.cycle_id)
-            .in("property_id", propIds) as any,
-        filter: (v) =>
-          v.cycle_id === session.cycle_id && propIds.includes(v.property_id),
+            .in("property_id", propIds)
+            .order("visit_date", { ascending: true }) as any,
+        filter: (v) => propIds.includes(String(v.property_id)),
+      });
+      // A successful remote read can still omit unsynchronized offline visits.
+      // Merge the local queue/cache, then scope and deduplicate at the property level.
+      const localVisits = await listLocal<any>("visits", (v) => propIds.includes(String(v.property_id)));
+      const mergedById = new Map<string, any>();
+      [...localVisits, ...remoteVisits].forEach((v) => {
+        const key = String(v.id ?? `${v.property_id}:${v.visit_date}:${v.status}`);
+        mergedById.set(key, v);
+      });
+      const bv = selectLatestWorkedVisits([...mergedById.values()], {
+        propertyIds: propIds,
+        agentId: String(session.user_id),
+        cycleId: String(session.cycle_id),
+        cycleStartDate: cycle?.start_date ?? null,
+        cycleEndDate: cycle?.end_date ?? null,
       });
       if (!cancelled) {
-        setBlockVisits(bv || []);
-        audit("OP_PANEL_BLOCK_VISITS", { count: (bv || []).length, cycle_id: session.cycle_id });
+        setBlockVisits(bv);
+        audit("OP_PANEL_BLOCK_VISITS", {
+          count: bv.length,
+          cycle_id: session.cycle_id,
+          source_rows: mergedById.size,
+          legacy_date_matches: bv.filter((v: any) => !v.cycle_id).length,
+        });
       }
     })();
     return () => { cancelled = true; };
-  }, [session?.cycle_id, properties, refreshTick]);
+  }, [session?.cycle_id, session?.user_id, properties, cycle?.start_date, cycle?.end_date, refreshTick]);
 
   // Realtime: escuta visitas/depósitos/pendências e recarrega
   useEffect(() => {
@@ -301,14 +321,9 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
   const total = bp?.total_properties ?? properties.length ?? session?.property_count ?? 0;
   const lastVisitByProp = useMemo(() => {
     const m = new Map<string, any>();
-    // Prefere visitas do ciclo inteiro; fallback para as visitas do dia.
-    const source = blockVisits.length ? blockVisits : visits;
-    for (const v of [...source].sort((a, b) =>
-      String(a.visit_date).localeCompare(String(b.visit_date)))) {
-      if (v.property_id) m.set(v.property_id, v);
-    }
+    for (const v of blockVisits) if (v.property_id) m.set(String(v.property_id), v);
     return m;
-  }, [visits, blockVisits]);
+  }, [blockVisits]);
 
   const stats = useMemo(() => {
     let focus = 0;
@@ -320,22 +335,29 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
     const depositos = deposits.length;
     const pendenciasAbertas = pendencies.filter((p) => !p.resolved_at).length;
     const semGeo = properties.filter((p) => p.latitude == null || p.longitude == null).length;
-    const visited = bp?.visited_properties ?? 0;
-    const closed = bp?.closed_properties ?? 0;
-    const refused = 0; // recusas contam como parte de "fechados operacionais" no block_progress
-    const pendingCount = bp?.pending_properties ?? Math.max(0, total - visited - closed);
+    // Visitas válidas do ciclo são a fonte para o status mostrado em cada imóvel.
+    // Isso também corrige um snapshot antigo de block_progress que ainda marque
+    // como pendentes imóveis com visita sincronizada ou recuperada do cache.
+    const cycleVisits = [...lastVisitByProp.values()];
+    const visited = cycleVisits.filter((v) => v.status === "visited").length;
+    const closed = cycleVisits.filter((v) => v.status === "closed").length;
+    const refused = cycleVisits.filter((v) => v.status === "refused").length;
+    const otherWorked = cycleVisits.filter((v) => !["visited", "closed", "refused"].includes(String(v.status))).length;
+    const done = cycleVisits.length;
+    const pendingCount = Math.max(0, total - done);
     return {
       visited,
       closed,
       refused,
+      otherWorked,
       focus,
-      done: visited + closed,
+      done,
       pendingCount,
       larvicida, depositos, pendenciasAbertas, semGeo,
     };
-  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, bp]);
+  }, [properties, lastVisitByProp, visits, deposits, pendencies, total]);
 
-  const progress = bp?.completion_percentage ?? (total > 0 ? Math.round((stats.done / total) * 100) : 0);
+  const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
   useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total, bp_status: bp?.status ?? null }); }, [progress, stats.done, total, bp?.status]);
 
   const startedMs = session?.started_at ? new Date(session.started_at).getTime() : now;
@@ -649,7 +671,7 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
         onOpenChange={setMapOpen}
         blockNumber={session?.block_number}
         properties={properties}
-        visits={visits}
+        visits={blockVisits}
       />
 
       {/* 🆕 Dialog: Confirmação de Encerramento do Quarteirão */}
@@ -820,6 +842,9 @@ function statusChip(status?: string | null, visited?: boolean) {
     case "closed": return { label: "Fechado", cls: "bg-slate-200 text-slate-700" };
     case "refused": return { label: "Recusa", cls: "bg-red-100 text-red-700" };
     case "abandoned": return { label: "Abandonado", cls: "bg-amber-100 text-amber-700" };
+    case "treated": return { label: "Tratado", cls: "bg-emerald-100 text-emerald-700" };
+    case "partial":
+    case "partially_visited": return { label: "Parcial", cls: "bg-emerald-100 text-emerald-700" };
     default: return { label: status || "—", cls: "bg-slate-100 text-slate-600" };
   }
 }
