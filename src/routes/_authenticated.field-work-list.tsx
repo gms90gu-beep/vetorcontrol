@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils";
 import { translate } from "@/lib/translations";
 import { getOperationalDate, isOperationalDateInWindow, MAX_FUTURE_PRODUCTION_DAYS } from "@/lib/operational-date";
 import { ensureExpiredSessionsClosed } from "@/lib/session-expiry";
+import { isWorkedVisitStatus, selectLatestWorkedVisits } from "@/lib/cycle-property-visits";
 
 export const Route = createFileRoute("/_authenticated/field-work-list")({
   beforeLoad: blockManagersGuard,
@@ -204,13 +205,17 @@ function FieldWorkListPage() {
         // atual do sistema. cycle_id / week_id / block_id da jornada
         // são a única fonte de verdade até o encerramento.
         let operationalCycleId: string | null = session.cycle_id ?? null;
+        let operationalCycleStartDate: string | null = null;
+        let operationalCycleEndDate: string | null = null;
         let currentSystemCycleId: string | null = null;
+        let currentSystemCycle: any = null;
         if (online) {
           const { data: currentCycle } = await supabase
             .from("cycles")
-            .select("id, number")
+            .select("id, number, start_date, end_date")
             .eq("status", "in_progress")
             .maybeSingle();
+          currentSystemCycle = currentCycle;
           currentSystemCycleId = currentCycle?.id ?? null;
           console.log("[SESSION_CURRENT_CYCLE]", {
             system_cycle_id: currentSystemCycleId,
@@ -239,6 +244,8 @@ function FieldWorkListPage() {
             .eq("id", operationalCycleId)
             .maybeSingle();
           if (sessionCycle) {
+            operationalCycleStartDate = sessionCycle.start_date ?? null;
+            operationalCycleEndDate = sessionCycle.end_date ?? null;
             setActiveCycle(sessionCycle);
             const wk = session.week_id
               ? (await supabase.from("weeks").select("*").eq("id", session.week_id).maybeSingle()).data
@@ -247,6 +254,9 @@ function FieldWorkListPage() {
           }
         } else if (!operationalCycleId && currentSystemCycleId) {
           operationalCycleId = currentSystemCycleId;
+          operationalCycleStartDate = currentSystemCycle?.start_date ?? null;
+          operationalCycleEndDate = currentSystemCycle?.end_date ?? null;
+          if (currentSystemCycle) setActiveCycle(currentSystemCycle);
         }
 
         console.log("[SESSION_RESTORE_BLOCK]", {
@@ -623,7 +633,11 @@ function FieldWorkListPage() {
             // Estratégia 1: SESSION (visitas feitas dentro desta sessão específica)
             console.log("[VISIT_MATCH_STRATEGY]", { strategy: "SESSION", session_id: session.id });
             const bySession = inScopeVisits.filter(
-              (v: any) => v.field_work_session_id && String(v.field_work_session_id) === String(session.id),
+              (v: any) =>
+                v.agent_id === user.id &&
+                v.field_work_session_id &&
+                String(v.field_work_session_id) === String(session.id) &&
+                isWorkedVisitStatus(v.status),
             );
             console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
 
@@ -631,9 +645,13 @@ function FieldWorkListPage() {
             const sessionCycleId = session.cycle_id ?? null;
             console.log("[VISIT_MATCH_STRATEGY]", { strategy: "CYCLE", cycle_id: sessionCycleId });
             const byCycle = sessionCycleId
-              ? inScopeVisits.filter(
-                  (v: any) => v.cycle_id && String(v.cycle_id) === String(sessionCycleId),
-                )
+              ? selectLatestWorkedVisits(inScopeVisits, {
+                  propertyIds,
+                  agentId: String(user.id),
+                  cycleId: String(sessionCycleId),
+                  cycleStartDate: operationalCycleStartDate,
+                  cycleEndDate: operationalCycleEndDate,
+                })
               : [];
             console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
 
@@ -655,12 +673,25 @@ function FieldWorkListPage() {
               });
               byDate = startTs
                 ? inScopeVisits.filter((v: any) => {
-                    if (!v.visit_date) return false;
+                    if (v.agent_id !== user.id || !isWorkedVisitStatus(v.status) || !v.visit_date) return false;
                     const t = new Date(v.visit_date).getTime();
                     return t >= startTs && t <= endTs;
                   })
                 : [];
               console.log("[VISIT_MATCH_RESULT]", { strategy: "LEGACY_DATE", found: byDate.length });
+            }
+
+            if (sessionCycleId && operationalCycleStartDate && operationalCycleEndDate) {
+              byDate = inScopeVisits.filter((v: any) => {
+                if (v.cycle_id || v.agent_id !== user.id || !isWorkedVisitStatus(v.status)) return false;
+                return selectLatestWorkedVisits([v], {
+                  propertyIds,
+                  agentId: String(user.id),
+                  cycleId: String(sessionCycleId),
+                  cycleStartDate: operationalCycleStartDate,
+                  cycleEndDate: operationalCycleEndDate,
+                }).length > 0;
+              });
             }
 
             // Fonte de verdade: UNIÃO das estratégias (dedupe por visit.id).
