@@ -71,8 +71,9 @@ function PlatformPage() {
       } else {
         setAdminRequests(requests || []);
       }
-    } catch {
-      setError('Não foi possível carregar os municípios. Tente novamente.');
+    } catch (cause) {
+      console.error('[Admin Geral] Falha ao carregar municípios:', cause);
+      setError(cause instanceof Error ? cause.message : 'Não foi possível carregar os municípios. Tente novamente.');
     } finally {
       setLoading(false);
     }
