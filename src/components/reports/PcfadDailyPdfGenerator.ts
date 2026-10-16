@@ -183,7 +183,7 @@ export async function generatePcfadDailyPDF(
     });
 
     const fileName = `PCFAD_Diario_${data.workDate}_${String(registration).slice(0, 12)}.pdf`;
-    return { pdf, blob: pdf.output("blob"), fileName };
+    return { pdf, blob: pdf.output("blob"), fileName, workDate: data.workDate, cycleId: data.cycleId };
   } catch (error: any) {
     console.error("[PCFAD DIÁRIO PDF] erro:", error);
     toast.error(`Erro ao gerar Boletim Diário: ${error?.message || "desconhecido"}`);
