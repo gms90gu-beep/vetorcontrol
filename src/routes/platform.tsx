@@ -45,10 +45,8 @@ function PlatformPage() {
         rows = await getPlatformMunicipalities();
       } catch {
         // Keep the registry available when an older PWA bundle cannot reach server functions.
-        const { data: session, error: sessionError } = await supabase.auth.getUser();
-        if (sessionError || !session.user) throw new Error('Sessão indisponível.');
         const { data: access, error: accessError } = await (supabase as any)
-          .from('platform_administrators').select('is_active').eq('user_id', session.user.id).maybeSingle();
+          .from('platform_administrators').select('is_active').maybeSingle();
         if (accessError) throw new Error('Acesso indisponível.');
         assertPlatformAdministrator(access);
         const { data: fallbackRows, error: queryError } = await (supabase as any)
