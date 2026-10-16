@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
-import { assertPlatformAdministrator, normalizeMunicipalityDraft } from './platform-policy.mjs';
+import { assertPlatformAdministrator, normalizeMunicipalityDraft, normalizeMunicipalAdministrator } from './platform-policy.mjs';
 
 async function requirePlatform(supabase: any, userId: string) {
   const { data, error } = await supabase.from('platform_administrators').select('is_active').eq('user_id', userId).maybeSingle();
@@ -19,6 +19,16 @@ export const getPlatformMunicipalities = createServerFn({ method: 'GET' })
     return data as {id:string;name:string;state_code:string;slug:string;state:string;created_at:string}[];
   });
 
+export const getPlatformAdminRequests = createServerFn({ method: 'GET' })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatform(context.supabase, context.userId);
+    const { data, error } = await (context.supabase as any).from('municipal_admin_requests')
+      .select('id,municipality_id,email,state,created_at').order('created_at', { ascending: false });
+    if (error) throw new Error('Não foi possível consultar os Admin Masters registrados.');
+    return data as {id:string;municipality_id:string;email:string;state:'pending'|'linked';created_at:string}[];
+  });
+
 export const createMunicipalityDraft = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { name: string; stateCode: string; slug: string }) => normalizeMunicipalityDraft(input))
@@ -30,4 +40,24 @@ export const createMunicipalityDraft = createServerFn({ method: 'POST' })
     });
     if (error) throw new Error(error.code === '23505' ? 'Já existe um município com esse identificador.' : 'Não foi possível cadastrar o rascunho.');
     return { id: result as string };
+  });
+
+export const registerMunicipalAdministrator = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { municipalityId: string; email: string }) => normalizeMunicipalAdministrator(input))
+  .handler(async ({ data, context }) => {
+    await requirePlatform(context.supabase, context.userId);
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { data: state, error } = await (supabaseAdmin as any).rpc('register_municipal_administrator', {
+      actor: context.userId,
+      target_municipality: data.municipalityId,
+      administrator_email: data.email,
+    });
+    if (error) {
+      if (error.code === '42501') throw new Error('A conta informada precisa ser Admin Master ativo deste município.');
+      if (error.code === '22023') throw new Error('Essa conta não está apta para ser Admin Master municipal.');
+      if (error.code === '23505') throw new Error('Já existe um registro para esse e-mail neste município.');
+      throw new Error('Não foi possível registrar o Admin Master.');
+    }
+    return { state: state as 'pending'|'linked' };
   });
