@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   getPlatformMunicipalities,
-  getPlatformAdminRequests,
   createMunicipalityDraft,
   registerMunicipalAdministrator,
 } from '@/lib/platform.functions';
@@ -29,6 +28,7 @@ function PlatformPage() {
   const [adminRequests, setAdminRequests] = useState<Awaited<ReturnType<typeof getPlatformAdminRequests>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [adminRequestsError, setAdminRequestsError] = useState('');
   const [saving, setSaving] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [name, setName] = useState('');
@@ -38,35 +38,44 @@ function PlatformPage() {
   const [adminEmail, setAdminEmail] = useState('');
 
   async function load() {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setAdminRequestsError('');
     try {
+      let rows: Awaited<ReturnType<typeof getPlatformMunicipalities>>;
       try {
-        const [rows, requests] = await Promise.all([
-          getPlatformMunicipalities(),
-          getPlatformAdminRequests(),
-        ]);
-        setMunicipalities(rows);
-        setAdminRequests(requests);
+        rows = await getPlatformMunicipalities();
       } catch {
-        // An old PWA bundle or unavailable server-function transport must not
-        // hide records that this authenticated platform administrator can read with RLS.
+        // Keep the registry available when an older PWA bundle cannot reach server functions.
         const { data: session, error: sessionError } = await supabase.auth.getUser();
         if (sessionError || !session.user) throw new Error('Sessão indisponível.');
         const { data: access, error: accessError } = await (supabase as any)
           .from('platform_administrators').select('is_active').eq('user_id', session.user.id).maybeSingle();
         if (accessError) throw new Error('Acesso indisponível.');
         assertPlatformAdministrator(access);
-        const [{ data: rows, error: queryError }, { data: requests, error: requestsError }] = await Promise.all([
-          (supabase as any).from('municipalities').select('id,name,state_code,slug,state,created_at').order('name'),
-          (supabase as any).from('municipal_admin_requests').select('id,municipality_id,email,state,created_at').order('created_at', { ascending: false }),
-        ]);
-        if (queryError || requestsError) throw new Error('Consulta indisponível.');
-        setMunicipalities(rows || []);
+        const { data: fallbackRows, error: queryError } = await (supabase as any)
+          .from('municipalities').select('id,name,state_code,slug,state,created_at').order('name');
+        if (queryError) throw new Error('Consulta de municípios indisponível.');
+        rows = fallbackRows || [];
+      }
+      setMunicipalities(rows || []);
+      if (!selectedMunicipalityId && rows?.length) setSelectedMunicipalityId(rows[0].id);
+
+      // This read uses the authenticated client and the platform-admin RLS policy.
+      // A request-list failure must not hide the municipality registry.
+      const { data: requests, error: requestsError } = await (supabase as any)
+        .from('municipal_admin_requests')
+        .select('id,municipality_id,email,state,created_at')
+        .order('created_at', { ascending: false });
+      if (requestsError) {
+        setAdminRequests([]);
+        setAdminRequestsError('Não foi possível consultar os vínculos de Admin Master.');
+      } else {
         setAdminRequests(requests || []);
       }
+    } catch {
+      setError('Não foi possível carregar os municípios. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
-    catch { setError('Não foi possível carregar os municípios. Tente novamente.'); }
-    finally { setLoading(false); }
   }
 
   useEffect(() => { void load(); }, []);
@@ -123,7 +132,8 @@ function PlatformPage() {
     </form>
     <form onSubmit={registerAdministrator} className="rounded-xl border p-5 space-y-4">
       <div><h2 className="text-lg font-semibold">Admin Master do município</h2>
-        <p className="text-sm text-muted-foreground">Registre o e-mail do responsável municipal. O vínculo só ocorre imediatamente se a conta já for um Admin Master ativo nesse município. Caso contrário, fica pendente; este passo não envia convite nem ativa o município.</p></div>
+        <p className="text-sm text-muted-foreground">Registre o e-mail do responsável municipal. O vínculo só ocorre imediatamente se a conta já for um Admin Master ativo nesse município. Caso contrário, fica pendente; este passo não envia convite nem ativa o município.</p>
+        {adminRequestsError && <p role="alert" className="text-sm text-destructive">{adminRequestsError}</p>}</div>
       <div><Label htmlFor="administrator-municipality">Município</Label>
         <select id="administrator-municipality" value={selectedMunicipalityId} onChange={e=>{setSelectedMunicipalityId(e.target.value);setAdminEmail('');}} required disabled={loading || !!error || municipalities.length===0}
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
