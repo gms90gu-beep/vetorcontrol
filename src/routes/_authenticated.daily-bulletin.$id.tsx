@@ -13,6 +13,8 @@ import { computePropertyTypeComposition, type PropertyTypeComposition } from "@/
 import { DepositDistributionBars } from "@/components/reports/DepositDistributionBars";
 import { generatePcfadDailyPDF } from "@/components/reports/PcfadDailyPdfGenerator";
 import { PcfadDailyLandscape } from "@/components/agent/PcfadDailyLandscape";
+import { BulletinSignatureDialog } from "@/components/reports/BulletinSignatureDialog";
+import type { BulletinForSignature } from "@/lib/bulletin-archive";
 
 
 import { logDirectSource } from "@/lib/operational-metrics";
@@ -39,10 +41,14 @@ function DailyBulletinView() {
   const [supervisor, setSupervisor] = useState<string>("—");
   const [propTypes, setPropTypes] = useState<PropertyTypeComposition | null>(null);
   const [propTypesTotal, setPropTypesTotal] = useState<number>(0);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [bulletinToSign, setBulletinToSign] = useState<BulletinForSignature | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
+        const { data: auth } = await supabase.auth.getUser();
+        setAuthUserId(auth.user?.id ?? null);
         const { data, error } = await supabase
           .from("daily_work_records")
           .select("*")
@@ -69,16 +75,29 @@ function DailyBulletinView() {
         }
 
         if (data.agent_id) {
-          const { data: prof } = await supabase
+          const { data: prof, error: profileError } = await supabase
             .from("profiles")
-            .select("full_name, registration_id, municipality, supervisor_name")
+            .select("full_name, registration_number, city, supervisor_id")
             .eq("id", data.agent_id)
             .maybeSingle();
+          if (profileError) throw profileError;
+          const { data: agentMeta } = await supabase
+            .from("agents")
+            .select("name, registration_id, municipality")
+            .eq("profile_id", data.agent_id)
+            .maybeSingle();
           if (prof) {
-            setAgentName((prof as any).full_name || "—");
-            setRegistration((prof as any).registration_id || "—");
-            setMunicipality((prof as any).municipality || "—");
-            setSupervisor((prof as any).supervisor_name || "—");
+            setAgentName(prof.full_name || agentMeta?.name || "—");
+            setRegistration(prof.registration_number || agentMeta?.registration_id || "—");
+            setMunicipality(prof.city || agentMeta?.municipality || "—");
+            if (prof.supervisor_id) {
+              const { data: supervisorProfile } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", prof.supervisor_id)
+                .maybeSingle();
+              setSupervisor(supervisorProfile?.full_name || "—");
+            }
           }
         }
       } catch (e: any) {
@@ -111,12 +130,35 @@ function DailyBulletinView() {
   // ANTIVETORIAL" em paisagem, mesma fonte (buildPcfadDayData) da visão em tela.
   async function downloadPDF() {
     if (!rec) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const currentUserId = auth.user?.id || authUserId;
+    const isSigningAgent = Boolean(currentUserId && currentUserId === rec.agent_id);
+    if (isSigningAgent && rec.status !== "completed") {
+      toast.error("Encerre a jornada antes de assinar o boletim diário.");
+      return;
+    }
     const res = await generatePcfadDailyPDF(rec.id, {
       agentName,
       registration,
       municipality,
     });
-    if (res) res.pdf.save(res.fileName);
+    if (!res) return;
+    if (isSigningAgent) {
+      setBulletinToSign({
+        pdf: res.pdf,
+        fileName: res.fileName,
+        reportType: "daily",
+        periodStart: res.workDate,
+        periodEnd: res.workDate,
+        cycleId: res.cycleId,
+        sourceDailyRecordId: rec.id,
+        agentName,
+        registration,
+        municipality,
+      });
+      return;
+    }
+    res.pdf.save(res.fileName);
   }
 
 
@@ -141,7 +183,8 @@ function DailyBulletinView() {
             <Printer className="h-4 w-4 mr-1" /> Imprimir
           </Button>
           <Button size="sm" onClick={downloadPDF}>
-            <Download className="h-4 w-4 mr-1" /> PDF
+            <Download className="h-4 w-4 mr-1" />
+            {authUserId && rec.agent_id === authUserId ? "Assinar PDF" : "PDF"}
           </Button>
         </div>
       </div>
@@ -328,6 +371,10 @@ function DailyBulletinView() {
           </div>
         )}
       </Section>
+      <BulletinSignatureDialog
+        bulletin={bulletinToSign}
+        onClose={() => setBulletinToSign(null)}
+      />
     </div>
   );
 }
