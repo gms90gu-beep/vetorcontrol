@@ -1358,6 +1358,72 @@ export type Database = {
         }
         Relationships: []
       }
+      signed_bulletin_archive: {
+        Row: {
+          agent_name_snapshot: string
+          agent_profile_id: string
+          created_at: string
+          cycle_id: string | null
+          document_sha256: string | null
+          epi_week: number | null
+          epi_year: number | null
+          file_name: string
+          id: string
+          period_end: string
+          period_start: string
+          registration_snapshot: string | null
+          report_type: string
+          signed_at: string
+          signature_method: string
+          source_daily_record_id: string | null
+          status: string
+          storage_path: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          agent_name_snapshot: string
+          agent_profile_id: string
+          created_at?: string
+          cycle_id?: string | null
+          document_sha256?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
+          file_name: string
+          id?: string
+          period_end: string
+          period_start: string
+          registration_snapshot?: string | null
+          report_type: string
+          signed_at?: string
+          signature_method?: string
+          source_daily_record_id?: string | null
+          status?: string
+          storage_path: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          agent_name_snapshot?: string
+          agent_profile_id?: string
+          created_at?: string
+          cycle_id?: string | null
+          document_sha256?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
+          file_name?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          registration_snapshot?: string | null
+          report_type?: string
+          signed_at?: string
+          signature_method?: string
+          source_daily_record_id?: string | null
+          status?: string
+          storage_path?: string
+          uploaded_at?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           access_scope: string
