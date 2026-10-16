@@ -640,7 +640,6 @@ function FieldWorkListPage() {
                 isWorkedVisitStatus(v.status),
             );
             console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
-            console.log("[VISIT_MATCH_RESULT]", { strategy: "SESSION", found: bySession.length });
 
             // Estratégia 2: CYCLE (mesmo ciclo da jornada) — jamais remover filtro de ciclo
             const sessionCycleId = session.cycle_id ?? null;
@@ -654,7 +653,6 @@ function FieldWorkListPage() {
                   cycleEndDate: operationalCycleEndDate,
                 })
               : [];
-            console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
             console.log("[VISIT_MATCH_RESULT]", { strategy: "CYCLE", found: byCycle.length });
 
             // Estratégia 3: LEGACY_DATE — apenas quando a sessão não tem cycle_id
@@ -675,7 +673,7 @@ function FieldWorkListPage() {
               });
               byDate = startTs
                 ? inScopeVisits.filter((v: any) => {
-                    if (!v.visit_date) return false;
+                    if (v.agent_id !== user.id || !isWorkedVisitStatus(v.status) || !v.visit_date) return false;
                     const t = new Date(v.visit_date).getTime();
                     return t >= startTs && t <= endTs;
                   })

@@ -345,7 +345,6 @@ export function OperationalPanel({ session, onCloseSessionRoute }: Props) {
       larvicida, depositos, pendenciasAbertas, semGeo,
     };
   }, [properties, lastVisitByProp, visits, deposits, pendencies, total]);
-  }, [properties, lastVisitByProp, visits, deposits, pendencies, total, bp]);
 
   const progress = total > 0 ? Math.round((stats.done / total) * 100) : 0;
   useEffect(() => { audit("OP_PANEL_PROGRESS", { progress, done: stats.done, total, bp_status: bp?.status ?? null }); }, [progress, stats.done, total, bp?.status]);
