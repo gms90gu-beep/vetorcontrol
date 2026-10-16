@@ -8,6 +8,22 @@
 
 import { toast } from "sonner";
 
+const DEFAULT_REMOTE_TIMEOUT_MS = 6_000;
+
+function withRemoteTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error(`Tempo limite ao consultar ${label} — usando dados locais.`);
+      error.name = "RemoteReadTimeoutError";
+      reject(error);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  });
+}
+
 export function isOnline(): boolean {
   if (typeof navigator === "undefined") return true;
   return navigator.onLine !== false;
@@ -18,6 +34,7 @@ export function isNetworkError(err: unknown): boolean {
   const e = err as any;
   const msg = String(e?.message || e || "");
   if (/Failed to fetch|NetworkError|Network request failed|fetch failed|TypeError: fetch/i.test(msg)) return true;
+  if (e?.name === "RemoteReadTimeoutError" || e?.name === "TimeoutError") return true;
   if (e?.name === "TypeError" && /fetch/i.test(msg)) return true;
   if (e?.code === "ECONNREFUSED" || e?.code === "ENETUNREACH") return true;
   // Supabase-js empacota erros de rede como AuthRetryableFetchError
@@ -57,7 +74,9 @@ export async function safeFetch<T>(
       console.warn("[RG_DIRECT_SUPABASE]", { label, online: false, stack });
       return await tryFallback();
     }
-    const data = await remote();
+    // navigator.onLine pode continuar true sem conexão utilizável; limite a espera
+    // para o usuário não ficar preso antes de ler o cache local.
+    const data = await withRemoteTimeout(remote(), DEFAULT_REMOTE_TIMEOUT_MS, label);
     if (opts?.hydrate) {
       try { await opts.hydrate(data); } catch (e) { console.warn("[OFFLINE] hydrate falhou:", e); }
     }
@@ -68,7 +87,7 @@ export async function safeFetch<T>(
       notifyOfflineOnce();
       return await tryFallback();
     }
-    // Erros não-rede: log e fallback silencioso (não bloqueia UI)
+    // Erros não-rede: fallback silencioso (não bloqueia UI)
     console.log("[POST_BOOT_SAFEFETCH]", { label, stage: "remote-error", message: String((err as any)?.message || err) });
     return await tryFallback();
   }
