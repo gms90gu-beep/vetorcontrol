@@ -19,16 +19,6 @@ export const getPlatformMunicipalities = createServerFn({ method: 'GET' })
     return data as {id:string;name:string;state_code:string;slug:string;state:string;created_at:string}[];
   });
 
-export const getPlatformAdminRequests = createServerFn({ method: 'GET' })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await requirePlatform(context.supabase, context.userId);
-    const { data, error } = await (context.supabase as any).from('municipal_admin_requests')
-      .select('id,municipality_id,email,state,created_at').order('created_at', { ascending: false });
-    if (error) throw new Error('Não foi possível consultar os Admin Masters registrados.');
-    return data as {id:string;municipality_id:string;email:string;state:'pending'|'linked';created_at:string}[];
-  });
-
 export const createMunicipalityDraft = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { name: string; stateCode: string; slug: string }) => normalizeMunicipalityDraft(input))
