@@ -33,6 +33,7 @@ interface Property {
   treatment_applied?: boolean;
   is_pending?: boolean;
   observation?: string;
+  latest_visit?: { visit_date?: string | null } | null;
 }
 
 interface DigitalBulletinTableProps {
@@ -66,6 +67,10 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
         return <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><XCircle className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       case "abandoned":
         return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><AlertCircle className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
+      case "treated":
+      case "partial":
+      case "partially_visited":
+        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap"><CheckCircle2 className="w-2.5 h-2.5 mr-1" /> {translate(status)}</Badge>;
       default:
         return <Badge variant="outline" className="border-dashed text-slate-400 rounded-md px-1.5 py-0 text-[9px] font-black uppercase whitespace-nowrap">{translate("NOT_VISITED")}</Badge>;
     }
@@ -112,7 +117,14 @@ export function DigitalBulletinTable({ properties, onPropertyClick, onStatusUpda
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(prop.status)}
+                  <div className="flex flex-col items-start gap-1">
+                    {getStatusBadge(prop.status)}
+                    {prop.latest_visit?.visit_date && (
+                      <span className="text-[9px] font-bold text-emerald-700 whitespace-nowrap">
+                        Trabalhado em {new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(new Date(prop.latest_visit.visit_date))}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-center">
                   <div className={cn(
