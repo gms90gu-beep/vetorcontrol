@@ -13,6 +13,7 @@ import {
   Users,
   BarChart3,
   CalendarDays,
+  Archive,
   type LucideIcon,
 } from "lucide-react";
 
@@ -86,6 +87,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
 
       // ── Administração ───────────────────────────────────────────
       { key: "mgr-reports", label: "Relatórios", icon: FileText, to: "/relatorios", group: "administracao" },
+      { key: "mgr-bulletin-archive", label: "Arquivo de Boletins", icon: Archive, to: "/arquivo-boletins", group: "administracao" },
       { key: "mgr-cycles", label: "Ciclos por Ano", icon: Layers, to: "/cycles", group: "administracao" },
       { key: "mgr-gps-audit", label: "Auditoria GPS", icon: MapPin, to: "/admin/georef-audit", group: "administracao" },
       { key: "mgr-sync", label: "Sincronização", icon: RefreshCw, to: "/sync-status", group: "administracao", badge: "sync" },
@@ -130,6 +132,7 @@ export function buildNavItems(userRole: string | null): NavItem[] {
 
     // ── Administração ─────────────────────────────────────────────
     { key: "agt-reports", label: "Relatórios", icon: FileText, to: "/relatorios", group: "administracao", primary: true },
+    { key: "agt-bulletin-archive", label: "Arquivo de Boletins", icon: Archive, to: "/arquivo-boletins", group: "administracao" },
     { key: "agt-sync", label: "Sincronização", icon: RefreshCw, to: "/sync-status", group: "administracao", badge: "sync" },
     { key: "agt-settings", label: "Configurações", icon: Settings, to: "/settings", group: "administracao" },
   ];

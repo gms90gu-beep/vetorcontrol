@@ -51,6 +51,8 @@ import { generatePcfadWeeklyPDF } from "@/components/reports/PcfadWeeklyPdfGener
 import { computePropertyTypeComposition } from "@/lib/property-composition";
 import { PcfadWeeklyLandscape } from "@/components/agent/PcfadWeeklyLandscape";
 import { PcfadDailyLandscape } from "@/components/agent/PcfadDailyLandscape";
+import { BulletinSignatureDialog } from "@/components/reports/BulletinSignatureDialog";
+import type { BulletinForSignature } from "@/lib/bulletin-archive";
 
 
 
@@ -78,6 +80,7 @@ export function AgentReportsSimple() {
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildConfirmOpen, setRebuildConfirmOpen] = useState(false);
   const [authId, setAuthId] = useState<string | null>(null);
+  const [bulletinToSign, setBulletinToSign] = useState<BulletinForSignature | null>(null);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [agentMeta, setAgentMeta] = useState({
     name: "Agente",
@@ -157,7 +160,7 @@ export function AgentReportsSimple() {
       );
       setAgentId(session.user.id);
       setAgentMeta({
-        name: agent?.name || profile?.full_name || "Agente",
+        name: profile?.full_name || agent?.name || "Agente",
         registration:
           agent?.registration_id || profile?.registration_number || "—",
         municipality: agent?.municipality || profile?.city || "—",
@@ -308,11 +311,26 @@ export function AgentReportsSimple() {
       toast.info("Nenhum relatório diário encontrado.");
       return;
     }
+    const target = dailies.find((daily) => daily.id === targetId);
+    if (target?.status !== "completed") {
+      toast.error("Encerre a jornada antes de assinar o boletim diário.");
+      return;
+    }
     toast.info("Gerando PDF diário (PCFAD)…");
     const res = await buildDailyPdf(targetId);
     if (res) {
-      res.pdf.save(res.fileName);
-      toast.success("PDF gerado");
+      setBulletinToSign({
+        pdf: res.pdf,
+        fileName: res.fileName,
+        reportType: "daily",
+        periodStart: res.workDate,
+        periodEnd: res.workDate,
+        cycleId: res.cycleId,
+        sourceDailyRecordId: targetId,
+        agentName: agentMeta.name,
+        registration: agentMeta.registration,
+        municipality: agentMeta.municipality,
+      });
     }
   };
 
@@ -343,6 +361,14 @@ export function AgentReportsSimple() {
   // Boletim Semanal = PCFAD em PAISAGEM (mesmo formato da visão em tela).
   const handleWeeklyPdf = async () => {
     if (!authId) return;
+    if (!selectedWeekRecords.some((record) => record.status === "completed")) {
+      toast.info("Não há diária encerrada nesta semana para assinar.");
+      return;
+    }
+    if (selectedWeekRecords.some((record) => record.status !== "completed")) {
+      toast.warning("Encerre a jornada em andamento antes de assinar o boletim semanal.");
+      return;
+    }
     toast.info("Gerando Boletim Semanal (PCFAD)…");
     const res = await generatePcfadWeeklyPDF({
       agentAuthId: authId,
@@ -350,8 +376,20 @@ export function AgentReportsSimple() {
       year: selectedWeek.year,
     });
     if (res) {
-      res.pdf.save(res.fileName);
-      toast.success(`SE ${String(res.week).padStart(2, "0")}/${res.year} gerado`);
+      const range = epiWeekToDateRange(res.week, res.year);
+      setBulletinToSign({
+        pdf: res.pdf,
+        fileName: res.fileName,
+        reportType: "weekly",
+        periodStart: range.start,
+        periodEnd: range.end,
+        epiWeek: res.week,
+        epiYear: res.year,
+        cycleId: selectedWeekRecords.find((record) => record.status === "completed")?.cycle_id ?? null,
+        agentName: agentMeta.name,
+        registration: agentMeta.registration,
+        municipality: agentMeta.municipality,
+      });
     }
   };
 
@@ -577,7 +615,7 @@ export function AgentReportsSimple() {
             onClick={handleWeeklyPdf}
             className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-5 font-bold text-xs uppercase tracking-wide"
           >
-            <FileText className="h-4 w-4 mr-2" /> Ver Boletim Semanal
+            <FileText className="h-4 w-4 mr-2" /> Assinar e arquivar semanal
           </Button>
         </div>
 
@@ -608,14 +646,14 @@ export function AgentReportsSimple() {
             variant="outline"
             className="rounded-xl h-11 px-4 font-bold text-xs uppercase tracking-wide border-slate-200"
           >
-            <Download className="h-4 w-4 mr-2" /> PDF Diário
+            <Download className="h-4 w-4 mr-2" /> Assinar PDF diário
           </Button>
           <Button
             onClick={handleWeeklyPdf}
             variant="outline"
             className="rounded-xl h-11 px-4 font-bold text-xs uppercase tracking-wide border-slate-200"
           >
-            <Download className="h-4 w-4 mr-2" /> PDF Semanal
+            <Download className="h-4 w-4 mr-2" /> Assinar PDF semanal
           </Button>
           <Button
             onClick={handleCsv}
@@ -651,6 +689,11 @@ export function AgentReportsSimple() {
           {rebuilding ? "Reconstruindo…" : "Reconstruir meus boletins"}
         </Button>
       </Card>
+
+      <BulletinSignatureDialog
+        bulletin={bulletinToSign}
+        onClose={() => setBulletinToSign(null)}
+      />
 
       <AlertDialog open={rebuildConfirmOpen} onOpenChange={setRebuildConfirmOpen}>
         <AlertDialogContent>
