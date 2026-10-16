@@ -45,9 +45,79 @@ export const registerMunicipalAdministrator = createServerFn({ method: 'POST' })
     });
     if (error) {
       if (error.code === '42501') throw new Error('A conta informada precisa ser Admin Master ativo deste município.');
+      if (error.code === '22023' && error.message?.includes('município em operação')) {
+        throw new Error('Convites só podem ser enviados para municípios em operação.');
+      }
       if (error.code === '22023') throw new Error('Essa conta não está apta para ser Admin Master municipal.');
       if (error.code === '23505') throw new Error('Já existe um registro para esse e-mail neste município.');
       throw new Error('Não foi possível registrar o Admin Master.');
     }
     return { state: state as 'pending'|'linked' };
+  });
+
+export const sendMunicipalAdministratorInvitation = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { municipalityId: string; email: string }) => normalizeMunicipalAdministrator(input))
+  .handler(async ({ data, context }) => {
+    await requirePlatform(context.supabase, context.userId);
+
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { data: municipality, error: municipalityError } = await (supabaseAdmin as any)
+      .from('municipalities')
+      .select('id,state')
+      .eq('id', data.municipalityId)
+      .maybeSingle();
+    if (municipalityError || municipality?.state !== 'active') {
+      throw new Error('Convites só podem ser enviados para um município em operação.');
+    }
+
+    const { data: request, error: requestError } = await (supabaseAdmin as any)
+      .from('municipal_admin_requests')
+      .select('state,invited_at')
+      .eq('municipality_id', data.municipalityId)
+      .eq('email', data.email)
+      .maybeSingle();
+    if (requestError || !request || request.state !== 'pending') {
+      throw new Error('Não há convite pendente para este e-mail e município.');
+    }
+    if (request.invited_at) return { state: 'already_sent' as const };
+
+    // This feature is intentionally deployed only on the validation copy.
+    // The fixed origin prevents an authenticated request from choosing an
+    // arbitrary redirect destination for a privileged invitation.
+    const redirectTo = 'https://vetorcontrol-copy-validation.vetorcontrol-reserva-gms90gu.workers.dev/reset-password?invite=1';
+    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+      redirectTo,
+    });
+    if (inviteError) {
+      throw new Error('Não foi possível enviar o convite. Confira o e-mail e a configuração de envio do Supabase.');
+    }
+
+    const { error: updateError } = await (supabaseAdmin as any)
+      .from('municipal_admin_requests')
+      .update({ invited_at: new Date().toISOString() })
+      .eq('municipality_id', data.municipalityId)
+      .eq('email', data.email)
+      .eq('state', 'pending');
+    if (updateError) {
+      // The email is already sent. The acceptance RPC can still safely match
+      // the pending request to the confirmed email and dormant profile.
+      console.error('[platform] Invitation sent but status timestamp could not be saved.');
+    }
+
+    return { state: 'sent' as const };
+  });
+
+export const acceptMunicipalAdministratorInvitation = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(() => ({}))
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+    const { data, error } = await (supabaseAdmin as any)
+      .rpc('accept_municipal_admin_invitation', { actor: context.userId });
+    if (error) {
+      if (error.code === '42501') throw new Error(error.message || 'Este convite não é válido para esta conta.');
+      throw new Error('Não foi possível ativar o acesso municipal. Entre em contato com o Administrador Geral.');
+    }
+    return { municipalityName: data as string };
   });

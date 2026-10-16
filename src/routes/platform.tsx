@@ -5,6 +5,7 @@ import {
   getPlatformMunicipalities,
   createMunicipalityDraft,
   registerMunicipalAdministrator,
+  sendMunicipalAdministratorInvitation,
 } from '@/lib/platform.functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,7 @@ export const Route = createFileRoute('/platform')({
 
 function PlatformPage() {
   const [municipalities, setMunicipalities] = useState<Awaited<ReturnType<typeof getPlatformMunicipalities>>>([]);
-  const [adminRequests, setAdminRequests] = useState<Array<{id:string;municipality_id:string;email:string;state:'pending'|'linked';created_at:string}>>([]);
+  const [adminRequests, setAdminRequests] = useState<Array<{id:string;municipality_id:string;email:string;state:'pending'|'linked';created_at:string;invited_at:string|null}>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [adminRequestsError, setAdminRequestsError] = useState('');
@@ -61,7 +62,7 @@ function PlatformPage() {
       // A request-list failure must not hide the municipality registry.
       const { data: requests, error: requestsError } = await (supabase as any)
         .from('municipal_admin_requests')
-        .select('id,municipality_id,email,state,created_at')
+        .select('id,municipality_id,email,state,created_at,invited_at')
         .order('created_at', { ascending: false });
       if (requestsError) {
         setAdminRequests([]);
@@ -101,13 +102,38 @@ function PlatformPage() {
         municipalityId: selectedMunicipalityId,
         email: adminEmail,
       }});
+      if (result.state === 'pending') {
+        await sendMunicipalAdministratorInvitation({data:{
+          municipalityId: selectedMunicipalityId,
+          email: adminEmail,
+        }});
+      }
       setAdminEmail('');
       toast.success(result.state === 'linked'
         ? 'Admin Master vinculado ao município.'
-        : 'E-mail registrado como pendente de criação/vínculo da conta.');
+        : 'Convite enviado. O responsável deve abrir o e-mail e criar a senha para ativar o acesso.');
       await load();
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível registrar o Admin Master.');
+      await load();
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  async function sendPendingInvitation(request: {municipality_id:string;email:string}) {
+    setRegistering(true);
+    try {
+      const result = await sendMunicipalAdministratorInvitation({data:{
+        municipalityId: request.municipality_id,
+        email: request.email,
+      }});
+      toast.success(result.state === 'already_sent'
+        ? 'O convite já foi enviado para este e-mail.'
+        : 'Convite enviado. O responsável deve abrir o e-mail e criar a senha para ativar o acesso.');
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || 'Não foi possível enviar o convite.');
     } finally {
       setRegistering(false);
     }
@@ -130,7 +156,7 @@ function PlatformPage() {
     </form>
     <form onSubmit={registerAdministrator} className="rounded-xl border p-5 space-y-4">
       <div><h2 className="text-lg font-semibold">Admin Master do município</h2>
-        <p className="text-sm text-muted-foreground">Registre o e-mail do responsável municipal. O vínculo só ocorre imediatamente se a conta já for um Admin Master ativo nesse município. Caso contrário, fica pendente; este passo não envia convite nem ativa o município.</p>
+        <p className="text-sm text-muted-foreground">Informe o e-mail do responsável de um município em operação. Ele receberá um convite para confirmar o e-mail e criar a própria senha. O acesso de Admin Master só será ativado depois dessa confirmação.</p>
         {adminRequestsError && <p role="alert" className="text-sm text-destructive">{adminRequestsError}</p>}</div>
       <div><Label htmlFor="administrator-municipality">Município</Label>
         <select id="administrator-municipality" value={selectedMunicipalityId} onChange={e=>{setSelectedMunicipalityId(e.target.value);setAdminEmail('');}} required disabled={loading || !!error || municipalities.length===0}
@@ -141,11 +167,17 @@ function PlatformPage() {
       </div>
       {selectedRequest ? <div className="rounded-md border bg-muted/30 p-3 text-sm">
         <p><strong>{selectedRequest.email}</strong></p>
-        <p className="text-muted-foreground">{selectedRequest.state==='linked'?'Admin Master vinculado':'Aguardando criação ou vínculo seguro da conta'}</p>
+        <p className="text-muted-foreground">{selectedRequest.state==='linked'
+          ? 'Admin Master ativo e vinculado'
+          : selectedRequest.invited_at
+            ? `Convite enviado em ${new Date(selectedRequest.invited_at).toLocaleString('pt-BR')}. Aguardando confirmação e criação de senha.`
+            : 'Convite ainda não enviado.'}</p>
+        {selectedRequest.state==='pending' && !selectedRequest.invited_at && <Button type="button" disabled={registering || loading || !!error}
+          onClick={()=>void sendPendingInvitation(selectedRequest)}>{registering?'Enviando...':'Enviar convite'}</Button>}
       </div> : <div><Label htmlFor="administrator-email">E-mail do Admin Master</Label>
         <Input id="administrator-email" type="email" autoComplete="email" value={adminEmail} onChange={e=>setAdminEmail(e.target.value)} required maxLength={254} placeholder="responsavel@municipio.gov.br"/>
       </div>}
-      {!selectedRequest && <Button disabled={registering || loading || !!error || !selectedMunicipalityId}>{registering?'Registrando...':'Registrar Admin Master'}</Button>}
+      {!selectedRequest && <Button disabled={registering || loading || !!error || !selectedMunicipalityId}>{registering?'Enviando convite...':'Convidar Admin Master'}</Button>}
     </form>
   </div></main>;
 }

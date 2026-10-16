@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Lock, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { acceptMunicipalAdministratorInvitation } from "@/lib/platform.functions";
 
 export const Route = createFileRoute("/reset-password")({
   component: ResetPasswordPage,
@@ -32,8 +33,10 @@ function ResetPasswordPage() {
   const [showCf, setShowCf] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [isMunicipalInvitation, setIsMunicipalInvitation] = useState(false);
 
   useEffect(() => {
+    setIsMunicipalInvitation(new URLSearchParams(window.location.search).get("invite") === "1");
     // Supabase coloca os tokens no hash; o cliente processa automaticamente.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
@@ -63,7 +66,12 @@ function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      toast.success("Senha alterada com sucesso. Faça login novamente.");
+      if (isMunicipalInvitation) {
+        const { municipalityName } = await acceptMunicipalAdministratorInvitation({ data: {} });
+        toast.success(`Senha criada e acesso Admin Master ativado para ${municipalityName}. Faça login.`);
+      } else {
+        toast.success("Senha alterada com sucesso. Faça login novamente.");
+      }
       await supabase.auth.signOut();
       navigate({ to: "/login", replace: true });
     } catch (err: any) {
@@ -82,9 +90,11 @@ function ResetPasswordPage() {
               <ShieldCheck className="h-10 w-10" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-black tracking-tighter text-primary">Redefinir Senha</CardTitle>
+          <CardTitle className="text-3xl font-black tracking-tighter text-primary">{isMunicipalInvitation ? "Criar Senha do Admin Master" : "Redefinir Senha"}</CardTitle>
           <CardDescription className="text-base font-medium text-auth-muted">
-            Crie uma nova senha segura para sua conta
+            {isMunicipalInvitation
+              ? "Defina sua senha para ativar o acesso ao município"
+              : "Crie uma nova senha segura para sua conta"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -164,7 +174,7 @@ function ResetPasswordPage() {
                   Salvando...
                 </>
               ) : (
-                "Salvar Nova Senha"
+                isMunicipalInvitation ? "Criar Senha e Ativar Acesso" : "Salvar Nova Senha"
               )}
             </Button>
           </CardContent>
