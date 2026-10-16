@@ -75,16 +75,29 @@ function DailyBulletinView() {
         }
 
         if (data.agent_id) {
-          const { data: prof } = await supabase
+          const { data: prof, error: profileError } = await supabase
             .from("profiles")
-            .select("full_name, registration_id, municipality, supervisor_name")
+            .select("full_name, registration_number, city, supervisor_id")
             .eq("id", data.agent_id)
             .maybeSingle();
+          if (profileError) throw profileError;
+          const { data: agentMeta } = await supabase
+            .from("agents")
+            .select("name, registration_id, municipality")
+            .eq("profile_id", data.agent_id)
+            .maybeSingle();
           if (prof) {
-            setAgentName((prof as any).full_name || "—");
-            setRegistration((prof as any).registration_id || "—");
-            setMunicipality((prof as any).municipality || "—");
-            setSupervisor((prof as any).supervisor_name || "—");
+            setAgentName(prof.full_name || agentMeta?.name || "—");
+            setRegistration(prof.registration_number || agentMeta?.registration_id || "—");
+            setMunicipality(prof.city || agentMeta?.municipality || "—");
+            if (prof.supervisor_id) {
+              const { data: supervisorProfile } = await supabase
+                .from("profiles")
+                .select("full_name")
+                .eq("id", prof.supervisor_id)
+                .maybeSingle();
+              setSupervisor(supervisorProfile?.full_name || "—");
+            }
           }
         }
       } catch (e: any) {
@@ -117,7 +130,9 @@ function DailyBulletinView() {
   // ANTIVETORIAL" em paisagem, mesma fonte (buildPcfadDayData) da visão em tela.
   async function downloadPDF() {
     if (!rec) return;
-    const isSigningAgent = Boolean(authUserId && authUserId === rec.agent_id);
+    const { data: auth } = await supabase.auth.getUser();
+    const currentUserId = auth.user?.id || authUserId;
+    const isSigningAgent = Boolean(currentUserId && currentUserId === rec.agent_id);
     if (isSigningAgent && rec.status !== "completed") {
       toast.error("Encerre a jornada antes de assinar o boletim diário.");
       return;

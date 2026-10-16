@@ -141,6 +141,7 @@ begin
         is distinct from (to_jsonb(old) - 'status' - 'uploaded_at' - 'document_sha256') then
     raise exception 'Signed bulletins are immutable';
   end if;
+  new.uploaded_at := statement_timestamp();
   return new;
 end;
 $function$;

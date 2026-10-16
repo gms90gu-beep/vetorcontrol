@@ -239,7 +239,7 @@ export async function signAndArchiveBulletin(
 
   const { data: ready, error: readyError } = await supabase
     .from("signed_bulletin_archive")
-    .update({ status: "ready", uploaded_at: new Date().toISOString(), document_sha256: checksum })
+    .update({ status: "ready", document_sha256: checksum })
     .eq("id", id)
     .select("*")
     .single();
