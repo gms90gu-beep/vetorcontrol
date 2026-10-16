@@ -25,7 +25,7 @@ export const Route = createFileRoute('/platform')({
 
 function PlatformPage() {
   const [municipalities, setMunicipalities] = useState<Awaited<ReturnType<typeof getPlatformMunicipalities>>>([]);
-  const [adminRequests, setAdminRequests] = useState<Awaited<ReturnType<typeof getPlatformAdminRequests>>>([]);
+  const [adminRequests, setAdminRequests] = useState<Array<{id:string;municipality_id:string;email:string;state:'pending'|'linked';created_at:string}>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [adminRequestsError, setAdminRequestsError] = useState('');
