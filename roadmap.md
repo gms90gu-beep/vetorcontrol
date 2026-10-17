@@ -1,11 +1,13 @@
 # Tarefas
 
+- [x] Rodada 17/10 15:16: somente 20261017103000_enforce_bulletin_pdf_upload.sql do PR #46 (head 59c5bc637a8e389e2bd6724ac573769e83f0a156) aplicada byte-for-byte como Drizzle 0020 na produção confirmada. Política INSERT authenticated exige extensão pdf, metadata.mimetype application/pdf, pasta auth.uid e arquivo de boletim pending próprio. Nenhuma migration anterior repetida, nenhum dado de produção criado e nenhuma publicação. Bucket preservado privado, 20.971.520 bytes; allowed_mime_types permanece NULL, restrição MIME efetiva pela política.
+
 - [x] Rodada 17/10 04:02: identidade Live de produção confirmada; PR #46 atualizado no head d3dd9b2b98072471e8e05f7bc5c00052470b9f28 conferido; bucket signed-bulletins criado pela API nativa, privado, limite verificado de 20.971.520 bytes (20 MiB).
 - [x] Rodada 17/10 12:23: PR #46 atualizado no head fe24802b98d71a5d9b9f6a30dad3c8ab9f5cfd40; três migrations aplicadas byte-for-byte em ordem (Drizzle 0017, 0018, 0019). Verificado: tabela signed_bulletin_archive criada, 3 políticas na tabela, 2 políticas em storage.objects, funções signed_bulletin_epi_week_matches (estrita/imutável, confirmada em pg_proc) e keep_signed_bulletin_immutable, trigger signed_bulletin_immutable. Bucket signed-bulletins privado, limite 20.971.520 bytes. Nenhuma publicação realizada.
-- [ ] Restrição MIME application/pdf do bucket signed-bulletins pendente: API nativa de Storage não expõe allowed_mime_types (conferido NULL); exige ajuste manual na interface do Cloud ou política adicional.
+- [x] Restrição MIME application/pdf resolvida pela política adicional da migration 0020; allowed_mime_types do bucket permanece NULL, sem alteração da configuração nativa.
 
 - [x] Rodada 17/10: ferramenta de identidade confirmou conexão Live de produção correta; PR #46 aberto, head 87a4f5a38a1db8a97d75b0b30094f601bcde5baa, contém três migrations 20261016165000, 20261016172000 e 20261016174500; tabela, função, políticas e bucket signed-bulletins ausentes na consulta.
-- [ ] Rodada 17/10: aplicação bloqueada aguardando SQL corrigido no PR #46: primeira migration escreve em storage.buckets (proibido no Cloud; bucket deve usar API nativa), omite GRANT para service_role e verifica papel em profiles em vez de user_roles; não reescrever SQL exato nem aplicar parcialmente. Nenhuma alteração de produção ou publicação realizada.
+- [x] Bloqueio inicial do PR #46 superado pelas migrations atualizadas aplicadas na rodada 17/10 12:23; registro histórico, nenhuma reaplicação necessária.
 
 - [x] Rodada 12/10 20:55: análise somente leitura da reserva externa; autenticação hospedada e armazenamento consultados, dependências do aplicativo e exportação oficial revisadas; apresentar plano sem mudar dados, credenciais, conexão ou publicação.
 - [ ] Execução da reserva externa aguarda autorização específica; SMTP e inventário completo de funções implantadas precisam de conferência nas telas do Cloud, sem inferência pelo código.
