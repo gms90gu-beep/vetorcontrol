@@ -1,5 +1,8 @@
 # Tarefas
 
+- [x] Rodada 17/10: ferramenta de identidade confirmou conexão Live de produção correta; PR #46 aberto, head 87a4f5a38a1db8a97d75b0b30094f601bcde5baa, contém três migrations 20261016165000, 20261016172000 e 20261016174500; tabela, função, políticas e bucket signed-bulletins ausentes na consulta.
+- [ ] Rodada 17/10: aplicação bloqueada aguardando SQL corrigido no PR #46: primeira migration escreve em storage.buckets (proibido no Cloud; bucket deve usar API nativa), omite GRANT para service_role e verifica papel em profiles em vez de user_roles; não reescrever SQL exato nem aplicar parcialmente. Nenhuma alteração de produção ou publicação realizada.
+
 - [x] Rodada 12/10 20:55: análise somente leitura da reserva externa; autenticação hospedada e armazenamento consultados, dependências do aplicativo e exportação oficial revisadas; apresentar plano sem mudar dados, credenciais, conexão ou publicação.
 - [ ] Execução da reserva externa aguarda autorização específica; SMTP e inventário completo de funções implantadas precisam de conferência nas telas do Cloud, sem inferência pelo código.
 
