@@ -301,7 +301,16 @@ export async function generatePcfadWeeklyPDF(params: {
     });
 
     const fileName = params.suppliedData?.fileName ?? `PCFAD_Semanal_SE${String(week).padStart(2, "0")}_${year}_${String(registration).slice(0, 12)}.pdf`;
-    return { pdf, fileName, week, year, blob: pdf.output("blob") };
+    return {
+      pdf,
+      fileName,
+      week,
+      year,
+      startDate: range.start,
+      endDate: range.end,
+      cycleId: (cycle as any)?.id ?? null,
+      blob: pdf.output("blob"),
+    };
   } catch (error: any) {
     console.error("[PCFAD PDF] erro:", error);
     toast.error(`Erro ao gerar Boletim PCFAD: ${error?.message || "desconhecido"}`);

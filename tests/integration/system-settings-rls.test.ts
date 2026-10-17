@@ -1,16 +1,21 @@
 import { execFileSync } from "node:child_process";
 import { beforeAll, describe, expect, it } from "vitest";
 
+// These tests inspect the connected Lovable Cloud database through its CLI.
+// Keep them opt-in so ordinary GitHub CI never depends on a production CLI/session.
+const liveCloudIntegration = process.env.LOVABLE_CLOUD_INTEGRATION === "1";
+
 // Evaluate the installed database policies with real role records, without
 // inserting settings or changing identities/credentials in the database.
 function query(sql: string): any[] {
   const output = execFileSync("lovable", ["supabase", "query", sql, "--json"], {
-    encoding: "utf8", timeout: 60000,
+    encoding: "utf8",
+    timeout: 60000,
   });
   return JSON.parse(output).rows;
 }
 
-describe("installed system settings access rules", () => {
+describe.skipIf(!liveCloudIntegration)("installed system settings access rules", () => {
   let readRule = "false";
   let writeRule = "false";
   const users = {
@@ -21,22 +26,41 @@ describe("installed system settings access rules", () => {
   };
 
   beforeAll(() => {
-    const policies = query("select cmd, qual, with_check from pg_policies where schemaname='public' and tablename='system_settings'");
-    readRule = policies.filter((p) => ["SELECT", "ALL"].includes(p.cmd)).map((p) => `(${p.qual})`).join(" OR ") || "false";
-    writeRule = policies.filter((p) => ["INSERT", "ALL"].includes(p.cmd)).map((p) => `(${p.with_check})`).join(" OR ") || "false";
+    const policies = query(
+      "select cmd, qual, with_check from pg_policies where schemaname='public' and tablename='system_settings'",
+    );
+    readRule =
+      policies
+        .filter((p) => ["SELECT", "ALL"].includes(p.cmd))
+        .map((p) => `(${p.qual})`)
+        .join(" OR ") || "false";
+    writeRule =
+      policies
+        .filter((p) => ["INSERT", "ALL"].includes(p.cmd))
+        .map((p) => `(${p.with_check})`)
+        .join(" OR ") || "false";
   }, 60000);
 
   function allowed(userId: string, scope: string, rule: string): boolean {
     // The read-only audit connection cannot EXECUTE auth helpers. Expand
     // has_role using its installed EXISTS definition and real user_roles rows.
-    const expanded = rule.replace(/has_role\(auth\.uid\(\), '([^']+)'::app_role\)/g,
-      (_match, role) => `EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = '${userId}'::uuid AND role = '${role}'::public.app_role)`);
-    const rows = query(`SELECT (${expanded}) AS allowed FROM (VALUES ('${scope}'::text)) AS settings(access_scope)`);
+    const expanded = rule.replace(
+      /has_role\(auth\.uid\(\), '([^']+)'::app_role\)/g,
+      (_match, role) =>
+        `EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = '${userId}'::uuid AND role = '${role}'::public.app_role)`,
+    );
+    const rows = query(
+      `SELECT (${expanded}) AS allowed FROM (VALUES ('${scope}'::text)) AS settings(access_scope)`,
+    );
     return rows[0]?.allowed === true;
   }
 
   it("keeps RLS enabled", () => {
-    expect(query("select relrowsecurity as enabled from pg_class where oid='public.system_settings'::regclass")[0]?.enabled).toBe(true);
+    expect(
+      query(
+        "select relrowsecurity as enabled from pg_class where oid='public.system_settings'::regclass",
+      )[0]?.enabled,
+    ).toBe(true);
   }, 60000);
   it("master reads administrative settings", () => {
     expect(allowed(users.admin_master, "administrative", readRule)).toBe(true);
@@ -44,13 +68,21 @@ describe("installed system settings access rules", () => {
   it("master manages administrative settings", () => {
     expect(allowed(users.admin_master, "administrative", writeRule)).toBe(true);
   }, 60000);
-  it.each(["supervisor", "coordenador"] as const)("%s reads only explicitly operational settings", (role) => {
-    expect(allowed(users[role], "operational", readRule)).toBe(true);
-    expect(allowed(users[role], "administrative", readRule)).toBe(false);
-  }, 60000);
-  it.each(["supervisor", "coordenador"] as const)("%s cannot promote a setting to operational", (role) => {
-    expect(allowed(users[role], "operational", writeRule)).toBe(false);
-  }, 60000);
+  it.each(["supervisor", "coordenador"] as const)(
+    "%s reads only explicitly operational settings",
+    (role) => {
+      expect(allowed(users[role], "operational", readRule)).toBe(true);
+      expect(allowed(users[role], "administrative", readRule)).toBe(false);
+    },
+    60000,
+  );
+  it.each(["supervisor", "coordenador"] as const)(
+    "%s cannot promote a setting to operational",
+    (role) => {
+      expect(allowed(users[role], "operational", writeRule)).toBe(false);
+    },
+    60000,
+  );
   it("agent cannot read administrative settings", () => {
     expect(allowed(users.agente, "administrative", readRule)).toBe(false);
   }, 60000);
