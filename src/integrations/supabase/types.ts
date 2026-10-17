@@ -1287,6 +1287,101 @@ export type Database = {
         }
         Relationships: []
       }
+      signed_bulletin_archive: {
+        Row: {
+          agent_name_snapshot: string
+          agent_profile_id: string
+          created_at: string
+          cycle_id: string
+          document_sha256: string | null
+          epi_week: number | null
+          epi_year: number | null
+          file_name: string
+          id: string
+          period_end: string
+          period_start: string
+          registration_snapshot: string | null
+          report_type: string
+          signature_method: string
+          signed_at: string
+          source_daily_record_id: string | null
+          status: string
+          storage_path: string
+          uploaded_at: string | null
+        }
+        Insert: {
+          agent_name_snapshot: string
+          agent_profile_id: string
+          created_at?: string
+          cycle_id: string
+          document_sha256?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
+          file_name: string
+          id?: string
+          period_end: string
+          period_start: string
+          registration_snapshot?: string | null
+          report_type: string
+          signature_method?: string
+          signed_at?: string
+          source_daily_record_id?: string | null
+          status?: string
+          storage_path: string
+          uploaded_at?: string | null
+        }
+        Update: {
+          agent_name_snapshot?: string
+          agent_profile_id?: string
+          created_at?: string
+          cycle_id?: string
+          document_sha256?: string | null
+          epi_week?: number | null
+          epi_year?: number | null
+          file_name?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          registration_snapshot?: string | null
+          report_type?: string
+          signature_method?: string
+          signed_at?: string
+          source_daily_record_id?: string | null
+          status?: string
+          storage_path?: string
+          uploaded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signed_bulletin_archive_agent_profile_id_fkey"
+            columns: ["agent_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signed_bulletin_archive_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_coverage_summary"
+            referencedColumns: ["cycle_id"]
+          },
+          {
+            foreignKeyName: "signed_bulletin_archive_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signed_bulletin_archive_source_daily_record_id_fkey"
+            columns: ["source_daily_record_id"]
+            isOneToOne: false
+            referencedRelation: "daily_work_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       streets: {
         Row: {
           id: string
@@ -2181,6 +2276,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: undefined
+      }
+      signed_bulletin_epi_week_matches: {
+        Args: { p_end: string; p_start: string; p_week: number; p_year: number }
+        Returns: boolean
       }
       sync_cycle_statuses: { Args: never; Returns: Json }
       validate_end_session: {
