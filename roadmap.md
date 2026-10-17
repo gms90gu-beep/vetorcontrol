@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Rodada 17/10 04:02: conferir PR #46 atualizado, criar bucket privado pela API de Storage, aplicar somente as três migrations atualizadas em ordem no Cloud de produção e confirmar tabela/RLS/bucket; sem publicação.
+
 - [x] Rodada 17/10: ferramenta de identidade confirmou conexão Live de produção correta; PR #46 aberto, head 87a4f5a38a1db8a97d75b0b30094f601bcde5baa, contém três migrations 20261016165000, 20261016172000 e 20261016174500; tabela, função, políticas e bucket signed-bulletins ausentes na consulta.
 - [ ] Rodada 17/10: aplicação bloqueada aguardando SQL corrigido no PR #46: primeira migration escreve em storage.buckets (proibido no Cloud; bucket deve usar API nativa), omite GRANT para service_role e verifica papel em profiles em vez de user_roles; não reescrever SQL exato nem aplicar parcialmente. Nenhuma alteração de produção ou publicação realizada.
 
