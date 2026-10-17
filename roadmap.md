@@ -1,6 +1,6 @@
 # Tarefas
 
-- [ ] Rodada 17/10 15:16: aplicar somente 20261017103000_enforce_bulletin_pdf_upload.sql do PR #46 na produção confirmada; verificar PDF, MIME declarado, autenticação e boletim pendente próprio; não repetir migrations anteriores nem publicar.
+- [x] Rodada 17/10 15:16: somente 20261017103000_enforce_bulletin_pdf_upload.sql do PR #46 (head 59c5bc637a8e389e2bd6724ac573769e83f0a156) aplicada byte-for-byte como Drizzle 0020 na produção confirmada. Política INSERT authenticated exige extensão pdf, metadata.mimetype application/pdf, pasta auth.uid e arquivo de boletim pending próprio. Nenhuma migration anterior repetida, nenhum dado de produção criado e nenhuma publicação. Bucket preservado privado, 20.971.520 bytes; allowed_mime_types permanece NULL, restrição MIME efetiva pela política.
 
 - [x] Rodada 17/10 04:02: identidade Live de produção confirmada; PR #46 atualizado no head d3dd9b2b98072471e8e05f7bc5c00052470b9f28 conferido; bucket signed-bulletins criado pela API nativa, privado, limite verificado de 20.971.520 bytes (20 MiB).
 - [x] Rodada 17/10 12:23: PR #46 atualizado no head fe24802b98d71a5d9b9f6a30dad3c8ab9f5cfd40; três migrations aplicadas byte-for-byte em ordem (Drizzle 0017, 0018, 0019). Verificado: tabela signed_bulletin_archive criada, 3 políticas na tabela, 2 políticas em storage.objects, funções signed_bulletin_epi_week_matches (estrita/imutável, confirmada em pg_proc) e keep_signed_bulletin_immutable, trigger signed_bulletin_immutable. Bucket signed-bulletins privado, limite 20.971.520 bytes. Nenhuma publicação realizada.
