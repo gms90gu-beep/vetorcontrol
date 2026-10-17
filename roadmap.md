@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Rodada 17/10: confirmar backend de produção, localizar e analisar a migration do PR #46 “feat: assinar e arquivar boletins”, aplicar somente a migration pendente autorizada e verificar tabelas, RLS e bucket privado; não publicar frontend nesta etapa.
+
 - [x] Rodada 12/10 20:55: análise somente leitura da reserva externa; autenticação hospedada e armazenamento consultados, dependências do aplicativo e exportação oficial revisadas; apresentar plano sem mudar dados, credenciais, conexão ou publicação.
 - [ ] Execução da reserva externa aguarda autorização específica; SMTP e inventário completo de funções implantadas precisam de conferência nas telas do Cloud, sem inferência pelo código.
 
