@@ -1,5 +1,3 @@
-begin;
-
 create function public.signed_bulletin_epi_week_matches(
   p_start date,
   p_end date,
@@ -234,6 +232,10 @@ create trigger signed_bulletin_immutable
   before update on public.signed_bulletin_archive
   for each row execute function public.keep_signed_bulletin_immutable();
 
+-- Storage API privileges are distinct from RLS policies. Uploads need INSERT;
+-- downloads need SELECT. Do not grant UPDATE or DELETE for these immutable PDFs.
+grant insert, select on storage.objects to authenticated;
+
 create policy signed_bulletins_upload_pending_own
   on storage.objects for insert to authenticated
   with check (
@@ -259,4 +261,3 @@ create policy signed_bulletins_read_scoped
     )
   );
 
-commit;

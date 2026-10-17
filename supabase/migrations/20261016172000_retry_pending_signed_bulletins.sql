@@ -1,5 +1,3 @@
-begin;
-
 drop policy signed_bulletins_read_scoped on storage.objects;
 
 create policy signed_bulletins_read_scoped
@@ -16,4 +14,3 @@ create policy signed_bulletins_read_scoped
     )
   );
 
-commit;
