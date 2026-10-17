@@ -28,7 +28,7 @@ export type SignedBulletinRow = {
   period_end: string;
   epi_week: number | null;
   epi_year: number | null;
-  cycle_id: string | null;
+  cycle_id: string;
   source_daily_record_id: string | null;
   file_name: string;
   storage_path: string;
@@ -130,6 +130,16 @@ async function sha256(blob: Blob): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export async function verifySignedBulletinHash(blob: Blob, expectedHash: string): Promise<void> {
+  if (!/^[0-9a-f]{64}$/.test(expectedHash)) {
+    throw new Error("O boletim tem um registro SHA-256 inválido. Avise o administrador.");
+  }
+  const actualHash = await sha256(blob);
+  if (actualHash !== expectedHash) {
+    throw new Error("O PDF baixado não corresponde ao resumo SHA-256 do arquivo.");
+  }
+}
+
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -143,6 +153,10 @@ export async function signAndArchiveBulletin(
   bulletin: BulletinForSignature,
   typedName: string,
 ): Promise<SignedBulletinRow> {
+  const cycleId = bulletin.cycleId?.trim();
+  if (!cycleId) {
+    throw new Error("Este boletim não está vinculado a um ciclo válido e não pode ser assinado.");
+  }
   const normalizedName = typedName.trim().replace(/\s+/g, " ");
   const { data: auth, error: authError } = await supabase.auth.getUser();
   if (authError || !auth.user) throw new Error("Sua sessão expirou. Entre novamente para assinar.");
@@ -173,7 +187,7 @@ export async function signAndArchiveBulletin(
       period_end: bulletin.periodEnd,
       epi_week: bulletin.epiWeek ?? null,
       epi_year: bulletin.epiYear ?? null,
-      cycle_id: bulletin.cycleId ?? null,
+      cycle_id: cycleId,
       source_daily_record_id: bulletin.sourceDailyRecordId ?? null,
       file_name: bulletin.fileName,
       storage_path: storagePath,
@@ -193,9 +207,7 @@ export async function signAndArchiveBulletin(
       .eq("period_start", bulletin.periodStart)
       .eq("period_end", bulletin.periodEnd)
       .eq("status", "pending");
-    retryQuery = bulletin.cycleId
-      ? retryQuery.eq("cycle_id", bulletin.cycleId)
-      : retryQuery.is("cycle_id", null);
+    retryQuery = retryQuery.eq("cycle_id", cycleId);
     const { data: retry } = await retryQuery.maybeSingle();
     if (retry) {
       pending = retry;
@@ -233,6 +245,13 @@ export async function signAndArchiveBulletin(
       throw new Error(
         `A assinatura foi registrada, mas o PDF não foi arquivado: ${uploadError.message}`,
       );
+    const { data: storedBlob, error: verifyError } = await storage.download(storagePath);
+    if (verifyError || !storedBlob) {
+      throw new Error(
+        "O PDF foi enviado, mas não foi possível conferir o arquivo armazenado. Avise o administrador.",
+      );
+    }
+    blob = storedBlob;
   }
 
   const checksum = await sha256(blob);

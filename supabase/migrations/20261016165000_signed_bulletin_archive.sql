@@ -1,5 +1,45 @@
 begin;
 
+create function public.signed_bulletin_epi_week_matches(
+  p_start date,
+  p_end date,
+  p_week integer,
+  p_year integer
+)
+returns boolean
+language plpgsql
+immutable
+strict
+set search_path = ''
+as $function$
+declare
+  v_jan1 date := make_date(p_year, 1, 1);
+  v_next_jan1 date := make_date(p_year + 1, 1, 1);
+  v_days_to_saturday integer;
+  v_next_days_to_saturday integer;
+  v_first_sunday date;
+  v_next_first_sunday date;
+begin
+  v_days_to_saturday := mod(6 - extract(dow from v_jan1)::integer + 7, 7);
+  v_first_sunday := v_jan1 + v_days_to_saturday
+    - case when v_days_to_saturday >= 4 then 7 else 0 end - 6;
+
+  v_next_days_to_saturday := mod(6 - extract(dow from v_next_jan1)::integer + 7, 7);
+  v_next_first_sunday := v_next_jan1 + v_next_days_to_saturday
+    - case when v_next_days_to_saturday >= 4 then 7 else 0 end - 6;
+
+  return p_week between 1 and 53
+    and p_start = v_first_sunday + ((p_week - 1) * 7)
+    and p_start < v_next_first_sunday
+    and p_end = p_start + 6;
+end;
+$function$;
+
+revoke all on function public.signed_bulletin_epi_week_matches(date, date, integer, integer)
+  from public, anon;
+grant execute on function public.signed_bulletin_epi_week_matches(date, date, integer, integer)
+  to authenticated;
+
 create table public.signed_bulletin_archive (
   id uuid primary key default gen_random_uuid(),
   agent_profile_id uuid not null references public.profiles(id) on delete restrict,
@@ -10,8 +50,8 @@ create table public.signed_bulletin_archive (
   period_end date not null,
   epi_week integer,
   epi_year integer,
-  cycle_id uuid,
-  source_daily_record_id uuid,
+  cycle_id uuid not null references public.cycles(id) on delete restrict,
+  source_daily_record_id uuid references public.daily_work_records(id) on delete restrict,
   file_name text not null,
   storage_path text not null unique,
   document_sha256 text,
@@ -30,6 +70,15 @@ create table public.signed_bulletin_archive (
   constraint signed_bulletin_daily_source check (
     (report_type = 'daily' and source_daily_record_id is not null and period_start = period_end)
     or (report_type = 'weekly' and source_daily_record_id is null)
+  ),
+  constraint signed_bulletin_week_metadata check (
+    (report_type = 'daily' and epi_week is null and epi_year is null)
+    or (
+      report_type = 'weekly'
+      and epi_week is not null and epi_week between 1 and 53
+      and epi_year is not null and epi_year between 2000 and 2200
+      and public.signed_bulletin_epi_week_matches(period_start, period_end, epi_week, epi_year)
+    )
   )
 );
 
@@ -38,21 +87,35 @@ create index signed_bulletin_archive_period_idx
 create index signed_bulletin_archive_agent_idx
   on public.signed_bulletin_archive (agent_profile_id, period_start desc);
 create index signed_bulletin_archive_cycle_idx
-  on public.signed_bulletin_archive (cycle_id, period_start desc)
-  where cycle_id is not null;
+  on public.signed_bulletin_archive (cycle_id, period_start desc);
 create unique index signed_bulletin_archive_one_official_issue
   on public.signed_bulletin_archive (
     agent_profile_id,
     report_type,
     period_start,
     period_end,
-    coalesce(cycle_id, '00000000-0000-0000-0000-000000000000'::uuid)
+    cycle_id
   );
 
 alter table public.signed_bulletin_archive enable row level security;
 revoke all on public.signed_bulletin_archive from public, anon, authenticated;
-grant select, insert on public.signed_bulletin_archive to authenticated;
-grant update (status, uploaded_at, document_sha256) on public.signed_bulletin_archive to authenticated;
+grant select on public.signed_bulletin_archive to authenticated;
+grant insert (
+  agent_profile_id,
+  agent_name_snapshot,
+  registration_snapshot,
+  report_type,
+  period_start,
+  period_end,
+  epi_week,
+  epi_year,
+  cycle_id,
+  source_daily_record_id,
+  file_name,
+  storage_path,
+  signature_method
+) on public.signed_bulletin_archive to authenticated;
+grant update (status, document_sha256) on public.signed_bulletin_archive to authenticated;
 
 create policy signed_bulletins_read_scoped
   on public.signed_bulletin_archive for select to authenticated
@@ -73,9 +136,19 @@ create policy signed_bulletins_insert_self
       select 1
       from public.profiles p
       where p.id = (select auth.uid())
-        and p.role::text in ('agente', 'agent')
         and coalesce(p.is_active, false)
         and p.full_name = agent_name_snapshot
+    )
+    and exists (
+      select 1 from public.user_roles ur
+      where ur.user_id = (select auth.uid())
+        and ur.role::text in ('agente', 'agent')
+    )
+    and exists (
+      select 1 from public.cycles c
+      where c.id = signed_bulletin_archive.cycle_id
+        and c.start_date <= period_end
+        and c.end_date >= period_start
     )
     and (
       (
@@ -85,23 +158,44 @@ create policy signed_bulletins_insert_self
           where d.id = source_daily_record_id
             and d.agent_id = (select auth.uid())
             and d.work_date = period_start
+            and d.cycle_id = signed_bulletin_archive.cycle_id
             and d.status = 'completed'
+            and exists (
+              select 1 from public.cycles c
+              where c.id = d.cycle_id
+                and d.work_date between c.start_date and c.end_date
+            )
         )
       )
       or
       (
         report_type = 'weekly'
+        and public.signed_bulletin_epi_week_matches(period_start, period_end, epi_week, epi_year)
         and exists (
           select 1 from public.daily_work_records d
           where d.agent_id = (select auth.uid())
             and d.work_date between period_start and period_end
             and d.status = 'completed'
+            and d.cycle_id = signed_bulletin_archive.cycle_id
+            and exists (
+              select 1 from public.cycles c
+              where c.id = d.cycle_id
+                and d.work_date between c.start_date and c.end_date
+            )
         )
         and not exists (
           select 1 from public.daily_work_records d
           where d.agent_id = (select auth.uid())
             and d.work_date between period_start and period_end
-            and d.status <> 'completed'
+            and (
+              d.status <> 'completed'
+              or d.cycle_id <> signed_bulletin_archive.cycle_id
+              or not exists (
+                select 1 from public.cycles c
+                where c.id = d.cycle_id
+                  and d.work_date between c.start_date and c.end_date
+              )
+            )
         )
       )
     )
@@ -139,13 +233,6 @@ $function$;
 create trigger signed_bulletin_immutable
   before update on public.signed_bulletin_archive
   for each row execute function public.keep_signed_bulletin_immutable();
-
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('signed-bulletins', 'signed-bulletins', false, 20971520, array['application/pdf'])
-on conflict (id) do update
-set public = false,
-    file_size_limit = 20971520,
-    allowed_mime_types = array['application/pdf'];
 
 create policy signed_bulletins_upload_pending_own
   on storage.objects for insert to authenticated

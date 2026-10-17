@@ -10,7 +10,11 @@ import { getOperationalDate } from "@/lib/operational-date";
 import { supabase } from "@/integrations/supabase/client";
 import { readAllQueryPages } from "@/lib/query-pages";
 import { buildZip, type ZipEntry } from "@/lib/zip";
-import { downloadSignedBulletin, type SignedBulletinRow } from "@/lib/bulletin-archive";
+import {
+  downloadSignedBulletin,
+  verifySignedBulletinHash,
+  type SignedBulletinRow,
+} from "@/lib/bulletin-archive";
 
 export const Route = createFileRoute("/_authenticated/arquivo-boletins")({
   component: BulletinArchivePage,
@@ -101,6 +105,7 @@ function BulletinArchivePage() {
       .from("signed-bulletins")
       .download(row.storage_path);
     if (error || !data) throw error || new Error("PDF não encontrado no arquivo.");
+    await verifySignedBulletinHash(data, row.document_sha256);
     return data;
   }
 

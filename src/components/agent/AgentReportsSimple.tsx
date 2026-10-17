@@ -319,6 +319,10 @@ export function AgentReportsSimple() {
     toast.info("Gerando PDF diário (PCFAD)…");
     const res = await buildDailyPdf(targetId);
     if (res) {
+      if (!res.cycleId) {
+        toast.error("Esta diária não está vinculada a um ciclo. Corrija o ciclo antes de assinar.");
+        return;
+      }
       setBulletinToSign({
         pdf: res.pdf,
         fileName: res.fileName,
@@ -369,6 +373,11 @@ export function AgentReportsSimple() {
       toast.warning("Encerre a jornada em andamento antes de assinar o boletim semanal.");
       return;
     }
+    const cycleIds = new Set(selectedWeekRecords.map((record) => record.cycle_id).filter(Boolean));
+    if (cycleIds.size !== 1 || selectedWeekRecords.some((record) => !record.cycle_id)) {
+      toast.error("As diárias desta semana não pertencem a um único ciclo válido.");
+      return;
+    }
     toast.info("Gerando Boletim Semanal (PCFAD)…");
     const res = await generatePcfadWeeklyPDF({
       agentAuthId: authId,
@@ -385,7 +394,7 @@ export function AgentReportsSimple() {
         periodEnd: range.end,
         epiWeek: res.week,
         epiYear: res.year,
-        cycleId: selectedWeekRecords.find((record) => record.status === "completed")?.cycle_id ?? null,
+        cycleId: [...cycleIds][0],
         agentName: agentMeta.name,
         registration: agentMeta.registration,
         municipality: agentMeta.municipality,
