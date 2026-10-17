@@ -120,6 +120,27 @@
       "when": 1791813585470,
       "tag": "0016_restore_exact_focus_history_projection",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792239872970,
+      "tag": "0017_signed_bulletin_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792239895512,
+      "tag": "0018_retry_pending_signed_bulletins",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792239911485,
+      "tag": "0019_trust_server_archive_timestamps",
+      "breakpoints": true
     }
   ]
 }
