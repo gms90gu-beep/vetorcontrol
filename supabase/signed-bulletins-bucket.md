@@ -7,6 +7,6 @@ The private bucket already exists in Lovable Cloud. Before deploying the bulleti
 - Maximum file size: 20 MiB
 - Allowed MIME type: `application/pdf`
 
-The database migration intentionally does not write to `storage.buckets`. It creates the access policies on `storage.objects`; bucket configuration is managed by Lovable Cloud.
+The database migrations intentionally do not write to `storage.buckets`. They create access policies on `storage.objects`; the upload policy requires the `.pdf` suffix and declared `application/pdf` MIME type. The app also checks the PDF header before upload. Bucket configuration is managed by Lovable Cloud.
 
 Set **Allowed MIME type** to `application/pdf` on the existing bucket and save. This bucket setting is managed by Lovable Cloud; do not try to change it through SQL. Verify all settings in the project connected to production backend `ttjzgszxrnmcsygtzfcu`. Do not configure a different Supabase project.

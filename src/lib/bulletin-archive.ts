@@ -38,6 +38,19 @@ export type SignedBulletinRow = {
   status: "ready";
 };
 
+export async function assertPdfBlob(blob: Blob) {
+  if (blob.size < 5) throw new Error("O arquivo do boletim está vazio ou não é um PDF válido.");
+
+  // PDF readers allow the header near the beginning of a file. jsPDF emits it
+  // at byte zero; allow the standard first 1 KiB for compatible PDF producers.
+  const header = new TextDecoder("ascii").decode(
+    await blob.slice(0, Math.min(blob.size, 1024)).arrayBuffer(),
+  );
+  if (!/%PDF-\d\.\d/.test(header)) {
+    throw new Error("O arquivo gerado não contém a assinatura de um PDF válido.");
+  }
+}
+
 function formatSignatureDate(value: string) {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "long",
@@ -237,6 +250,7 @@ export async function signAndArchiveBulletin(
     if (priorFile.error && !notFound) throw priorFile.error;
     appendSignaturePage(bulletin.pdf, bulletin, profile.full_name, pending!.signed_at, id);
     blob = bulletin.pdf.output("blob") as Blob;
+    await assertPdfBlob(blob);
     const { error: uploadError } = await storage.upload(storagePath, blob, {
       contentType: "application/pdf",
       upsert: false,

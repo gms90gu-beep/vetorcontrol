@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verifySignedBulletinHash } from "../../src/lib/bulletin-archive";
+import { assertPdfBlob, verifySignedBulletinHash } from "../../src/lib/bulletin-archive";
 
 async function hash(value: Blob) {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", await value.arrayBuffer());
@@ -23,5 +23,22 @@ describe("verifySignedBulletinHash", () => {
     await expect(verifySignedBulletinHash(new Blob(["bulletin"]), "invalid")).rejects.toThrow(
       "inválido",
     );
+  });
+});
+
+describe("assertPdfBlob", () => {
+  it("accepts a PDF header at the start of the generated document", async () => {
+    await expect(assertPdfBlob(new Blob(["%PDF-1.7\ncontent"]))).resolves.toBeUndefined();
+  });
+
+  it("accepts a PDF header within the first 1 KiB", async () => {
+    await expect(
+      assertPdfBlob(new Blob([`${" ".repeat(200)}%PDF-1.4\ncontent`])),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects empty or non-PDF uploads", async () => {
+    await expect(assertPdfBlob(new Blob([]))).rejects.toThrow("vazio");
+    await expect(assertPdfBlob(new Blob(["not a pdf"]))).rejects.toThrow("assinatura de um PDF");
   });
 });

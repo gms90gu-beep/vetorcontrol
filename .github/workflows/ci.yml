@@ -39,13 +39,13 @@ jobs:
         run: bunx vitest run tests/unit --reporter=default
 
   integration:
-    name: Integration tests (Dashboard · Relatórios · DWR)
+    name: Integration tests (local + optional Lovable Cloud)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      - name: Run integration tests
+      - name: Run integration tests (Lovable Cloud checks are opt-in)
         run: bunx vitest run tests/integration --reporter=default
 
   offline:
