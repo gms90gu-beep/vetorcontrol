@@ -127,6 +127,13 @@
       "when": 1792239872970,
       "tag": "0017_signed_bulletin_archive",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792239895512,
+      "tag": "0018_retry_pending_signed_bulletins",
+      "breakpoints": true
     }
   ]
 }
