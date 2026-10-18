@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Bulletin archive failures are wrapped with operation and safe error codes, never raw backend payloads, because database errors may be plain objects containing sensitive details.
+
 - Daily production records use `profiles.id` in `agent_id`, the matching `agents.id` in `legacy_agent_id`, and `(agent_id, work_date)` as the canonical conflict key, because reports and RLS are profile-scoped.
 - Operational maps must use the shared resilient tile provider layer, because a single external tile provider may fail independently of backend data.
 - Pendency reads share the cycle/week/agent scope helper for remote and cached rows, because offline fallback must not mix production periods.
