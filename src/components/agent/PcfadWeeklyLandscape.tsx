@@ -11,12 +11,11 @@ import {
 } from "@/lib/pcfad-week";
 import { fetchFocusObservations, type FocusObservation } from "@/lib/focus-observations";
 import { FocusObservationsGrid } from "@/components/FocusObservationsGrid";
-import { useOrientation } from "@/hooks/useOrientation";
 
 /**
  * Visão "P.C.F.A.D. — Resumo dos Trabalhos de Campo" (formulário oficial em papel).
  * Uma linha por dia da semana epidemiológica selecionada + linha TOTAL.
- * Só aparece com o aparelho em PAISAGEM (padrão do LandscapeBulletinLayout).
+ * Em telas estreitas, conserva as colunas oficiais e permite rolagem horizontal.
  * Dados: buildPcfadWeekData() — MESMA fonte usada pelo PDF paisagem.
  */
 
@@ -39,7 +38,6 @@ export function PcfadWeeklyLandscape({
   municipality: string;
   suppliedData?: { rows: PcfadRow[]; observations: FocusObservation[] };
 }) {
-  const isLandscape = useOrientation();
   const [rows, setRows] = useState<PcfadRow[]>([]);
   const [focusObservations, setFocusObservations] = useState<FocusObservation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,7 +46,7 @@ export function PcfadWeeklyLandscape({
 
   useEffect(() => {
     if (suppliedData) { setRows(suppliedData.rows); setFocusObservations(suppliedData.observations); return; }
-    if (!isLandscape || !agentAuthId) return;
+    if (!agentAuthId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -63,11 +61,9 @@ export function PcfadWeeklyLandscape({
     return () => {
       cancelled = true;
     };
-  }, [isLandscape, agentAuthId, week, year, range.start, range.end, suppliedData]);
+  }, [agentAuthId, week, year, range.start, range.end, suppliedData]);
 
   const total = useMemo(() => sumPcfadRows(rows), [rows]);
-
-  if (!isLandscape && !suppliedData) return null;
 
   const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
   const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
@@ -94,8 +90,12 @@ export function PcfadWeeklyLandscape({
           Carregando resumo PCFAD…
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+        <>
+          <p className="mb-1 text-[10px] text-muted-foreground sm:hidden">
+            No celular, deslize a tabela para os lados para ver todas as colunas.
+          </p>
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[1500px] border-collapse sm:min-w-full">
             <thead>
               <tr>
                 <th className={th} rowSpan={2}>
@@ -269,7 +269,8 @@ export function PcfadWeeklyLandscape({
               )}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       <p className="mt-2 text-[8px] font-semibold uppercase tracking-wider text-slate-400">
