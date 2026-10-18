@@ -528,8 +528,8 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
   const PanelBody = panelView === "detail" && selected ? PanelDetail : PanelDefault;
 
   return (
-    <div className={fullscreen ? "fixed inset-0 z-50 bg-background" : "h-[calc(100vh-64px)] w-full"}>
-      <div className="flex flex-col h-full">
+    <div className={fullscreen ? "fixed inset-0 z-50 h-[100dvh] bg-background" : "w-full lg:h-[calc(100dvh-64px)] lg:min-h-0"}>
+      <div className="flex h-full min-h-0 flex-col lg:h-full">
         {/* TOP BAR */}
         <header className="border-b bg-card/70 backdrop-blur-xl px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
@@ -607,11 +607,11 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
         </div>
 
         {/* MAIN SPLIT */}
-        <div className="flex-1 min-h-0 flex">
-          <main className="flex-1 min-w-0 p-3">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <main className="min-w-0 flex-1 p-3">
             <div
               ref={mapWrapRef}
-              className="relative h-full w-full rounded-2xl overflow-hidden border shadow-sm bg-muted/30"
+              className={`relative w-full overflow-hidden rounded-2xl border bg-muted/30 shadow-sm ${fullscreen ? "h-full min-h-0" : "h-[46dvh] min-h-[280px] lg:h-full"}`}
             >
               {props.isLoading ? (
                 <MapSkeleton />
@@ -680,6 +680,11 @@ export default function OperationalMapView({ agentId }: { agentId?: string }) {
             {PanelBody}
           </aside>
         </div>
+        {!fullscreen && (
+          <section aria-label="Análises e filtros do mapa" className="px-3 pb-28 lg:hidden">
+            {PanelBody}
+          </section>
+        )}
       </div>
     </div>
   );
