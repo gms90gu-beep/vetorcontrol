@@ -148,6 +148,13 @@
       "when": 1792250249735,
       "tag": "0020_enforce_bulletin_pdf_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792333690119,
+      "tag": "0021_restore_signed_bulletin_write_grants",
+      "breakpoints": true
     }
   ]
 }

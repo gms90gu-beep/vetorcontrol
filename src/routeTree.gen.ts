@@ -110,11 +110,12 @@ const AuthenticatedAmostrasRoute = AuthenticatedAmostrasRouteImport.update({
   path: '/amostras',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedArquivoBoletinsRoute = AuthenticatedArquivoBoletinsRouteImport.update({
-  id: '/arquivo-boletins',
-  path: '/arquivo-boletins',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
+const AuthenticatedArquivoBoletinsRoute =
+  AuthenticatedArquivoBoletinsRouteImport.update({
+    id: '/arquivo-boletins',
+    path: '/arquivo-boletins',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCalendarioProducaoRoute =
   AuthenticatedCalendarioProducaoRouteImport.update({
     id: '/calendario-producao',
@@ -510,6 +511,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/agente'
     | '/amostras'
+    | '/arquivo-boletins'
     | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
@@ -560,6 +562,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/agente'
     | '/amostras'
+    | '/arquivo-boletins'
     | '/calendario-producao'
     | '/campo'
     | '/coordenacao'
@@ -612,6 +615,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/agente'
     | '/_authenticated/amostras'
+    | '/_authenticated/arquivo-boletins'
     | '/_authenticated/calendario-producao'
     | '/_authenticated/campo'
     | '/_authenticated/coordenacao'

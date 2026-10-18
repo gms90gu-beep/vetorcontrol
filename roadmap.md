@@ -1,5 +1,7 @@
 # Tarefas
 
+- [ ] Investigar assinatura diária: confirmar versão publicada, reproduzir erro real, corrigir somente fluxo/erros e validar RLS, Storage e conclusão sem alterar registros existentes ou reaplicar migrations. Informar publicação.
+
 - [x] Rodada 17/10 15:16: somente 20261017103000_enforce_bulletin_pdf_upload.sql do PR #46 (head 59c5bc637a8e389e2bd6724ac573769e83f0a156) aplicada byte-for-byte como Drizzle 0020 na produção confirmada. Política INSERT authenticated exige extensão pdf, metadata.mimetype application/pdf, pasta auth.uid e arquivo de boletim pending próprio. Nenhuma migration anterior repetida, nenhum dado de produção criado e nenhuma publicação. Bucket preservado privado, 20.971.520 bytes; allowed_mime_types permanece NULL, restrição MIME efetiva pela política.
 
 - [x] Rodada 17/10 04:02: identidade Live de produção confirmada; PR #46 atualizado no head d3dd9b2b98072471e8e05f7bc5c00052470b9f28 conferido; bucket signed-bulletins criado pela API nativa, privado, limite verificado de 20.971.520 bytes (20 MiB).

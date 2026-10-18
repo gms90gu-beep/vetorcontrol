@@ -1,5 +1,6 @@
 import type jsPDF from "jspdf";
 import { supabase } from "@/integrations/supabase/client";
+import { bulletinOperationError } from "@/lib/bulletin-errors";
 
 export type BulletinType = "daily" | "weekly";
 
@@ -179,7 +180,8 @@ export async function signAndArchiveBulletin(
     .select("id, full_name, registration_number, city")
     .eq("id", auth.user.id)
     .single();
-  if (profileError || !profile?.full_name)
+  if (profileError) throw bulletinOperationError("profile", profileError);
+  if (!profile?.full_name)
     throw new Error("Não foi possível confirmar seu perfil de agente.");
   if (normalizedName !== profile.full_name.trim().replace(/\s+/g, " ")) {
     throw new Error("Digite seu nome completo exatamente como aparece no cadastro.");
@@ -221,7 +223,8 @@ export async function signAndArchiveBulletin(
       .eq("period_end", bulletin.periodEnd)
       .eq("status", "pending");
     retryQuery = retryQuery.eq("cycle_id", cycleId);
-    const { data: retry } = await retryQuery.maybeSingle();
+    const { data: retry, error: retryError } = await retryQuery.maybeSingle();
+    if (retryError) throw bulletinOperationError("retry", retryError);
     if (retry) {
       pending = retry;
       id = retry.id;
@@ -232,8 +235,10 @@ export async function signAndArchiveBulletin(
       );
     }
   } else {
-    throw createError || new Error("Não foi possível registrar a assinatura.");
+    throw bulletinOperationError("insert", createError);
   }
+
+  if (!pending) throw new Error("Não foi possível recuperar a assinatura pendente.");
 
   const storage = supabase.storage.from("signed-bulletins");
   const priorFile = await storage.download(storagePath);
@@ -247,23 +252,18 @@ export async function signAndArchiveBulletin(
       /not found|404|object does not exist/i.test(
         `${priorFile.error.message} ${storageError?.statusCode || ""}`,
       );
-    if (priorFile.error && !notFound) throw priorFile.error;
-    appendSignaturePage(bulletin.pdf, bulletin, profile.full_name, pending!.signed_at, id);
+    if (priorFile.error && !notFound) throw bulletinOperationError("read", priorFile.error);
+    appendSignaturePage(bulletin.pdf, bulletin, profile.full_name, pending.signed_at, id);
     blob = bulletin.pdf.output("blob") as Blob;
     await assertPdfBlob(blob);
     const { error: uploadError } = await storage.upload(storagePath, blob, {
       contentType: "application/pdf",
       upsert: false,
     });
-    if (uploadError)
-      throw new Error(
-        `A assinatura foi registrada, mas o PDF não foi arquivado: ${uploadError.message}`,
-      );
+    if (uploadError) throw bulletinOperationError("upload", uploadError);
     const { data: storedBlob, error: verifyError } = await storage.download(storagePath);
     if (verifyError || !storedBlob) {
-      throw new Error(
-        "O PDF foi enviado, mas não foi possível conferir o arquivo armazenado. Avise o administrador.",
-      );
+      throw bulletinOperationError("verify", verifyError);
     }
     blob = storedBlob;
   }
@@ -277,9 +277,7 @@ export async function signAndArchiveBulletin(
     .select("*")
     .single();
   if (readyError || !ready)
-    throw new Error(
-      "O PDF foi enviado, mas não foi possível concluir o arquivo. Avise o administrador antes de tentar assinar novamente.",
-    );
+    throw bulletinOperationError("ready", readyError);
 
   downloadBlob(blob, bulletin.fileName);
   return ready as SignedBulletinRow;
@@ -298,7 +296,8 @@ export async function getAuthenticatedSignerFullName(): Promise<string> {
     .select("full_name")
     .eq("id", auth.user.id)
     .single();
-  if (profileError || !profile?.full_name) {
+  if (profileError) throw bulletinOperationError("profile", profileError);
+  if (!profile?.full_name) {
     throw new Error("Não foi possível carregar seu nome completo do cadastro.");
   }
 
