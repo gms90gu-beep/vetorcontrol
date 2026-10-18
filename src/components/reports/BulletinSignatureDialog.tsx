@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { signAndArchiveBulletin, type BulletinForSignature } from "@/lib/bulletin-archive";
+import { getAuthenticatedSignerFullName, signAndArchiveBulletin, type BulletinForSignature } from "@/lib/bulletin-archive";
 
 export function BulletinSignatureDialog({
   bulletin,
@@ -21,18 +21,50 @@ export function BulletinSignatureDialog({
   const [typedName, setTypedName] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [expectedName, setExpectedName] = useState("");
+  const [loadingName, setLoadingName] = useState(false);
+  const [nameLoadError, setNameLoadError] = useState("");
 
   useEffect(() => {
-    if (bulletin) {
-      setTypedName("");
-      setAccepted(false);
-      setSaving(false);
+    let cancelled = false;
+    setTypedName("");
+    setAccepted(false);
+    setSaving(false);
+    setExpectedName("");
+    setNameLoadError("");
+
+    if (!bulletin) {
+      setLoadingName(false);
+      return () => {
+        cancelled = true;
+      };
     }
+
+    setLoadingName(true);
+    getAuthenticatedSignerFullName()
+      .then((name) => {
+        if (!cancelled) setExpectedName(name);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNameLoadError(
+            error instanceof Error ? error.message : "Não foi possível carregar seu nome do cadastro.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingName(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [bulletin]);
 
   const matchesName = Boolean(
     bulletin &&
-    typedName.trim().replace(/\s+/g, " ") === bulletin.agentName.trim().replace(/\s+/g, " "),
+    expectedName &&
+    typedName.trim().replace(/\s+/g, " ") === expectedName,
   );
 
   async function handleSign() {
@@ -80,12 +112,15 @@ export function BulletinSignatureDialog({
               <span>Digite seu nome completo para confirmar</span>
               <input
                 autoComplete="name"
+                disabled={loadingName || !expectedName}
                 className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
                 value={typedName}
                 onChange={(event) => setTypedName(event.target.value)}
-                placeholder={bulletin.agentName}
+                placeholder={loadingName ? "Carregando nome do cadastro…" : expectedName || "Nome completo do cadastro"}
               />
             </label>
+            {loadingName && <p className="text-xs text-muted-foreground">Carregando nome completo do seu cadastro…</p>}
+            {nameLoadError && <p role="alert" className="text-xs text-destructive">{nameLoadError}</p>}
 
             <label className="flex items-start gap-2 text-sm text-slate-700">
               <input
@@ -109,7 +144,7 @@ export function BulletinSignatureDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSign} disabled={!matchesName || !accepted || saving}>
+          <Button onClick={handleSign} disabled={loadingName || !expectedName || !matchesName || !accepted || saving}>
             {saving ? "Registrando assinatura…" : "Assinar, arquivar e baixar"}
           </Button>
         </DialogFooter>
