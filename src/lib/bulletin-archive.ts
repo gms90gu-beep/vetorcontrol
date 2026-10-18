@@ -288,3 +288,19 @@ export async function signAndArchiveBulletin(
 export function downloadSignedBulletin(blob: Blob, fileName: string) {
   downloadBlob(blob, fileName);
 }
+
+export async function getAuthenticatedSignerFullName(): Promise<string> {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) throw new Error("Sua sessão expirou. Entre novamente para assinar.");
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", auth.user.id)
+    .single();
+  if (profileError || !profile?.full_name) {
+    throw new Error("Não foi possível carregar seu nome completo do cadastro.");
+  }
+
+  return profile.full_name.trim().replace(/\s+/g, " ");
+}
