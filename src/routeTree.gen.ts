@@ -19,6 +19,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
 import { Route as AuthenticatedAgenteRouteImport } from './routes/_authenticated.agente'
 import { Route as AuthenticatedAmostrasRouteImport } from './routes/_authenticated.amostras'
+import { Route as AuthenticatedArquivoBoletinsRouteImport } from './routes/_authenticated.arquivo-boletins'
 import { Route as AuthenticatedCalendarioProducaoRouteImport } from './routes/_authenticated.calendario-producao'
 import { Route as AuthenticatedCampoRouteImport } from './routes/_authenticated.campo'
 import { Route as AuthenticatedCoordenacaoRouteImport } from './routes/_authenticated.coordenacao'
@@ -107,6 +108,11 @@ const AuthenticatedAgenteRoute = AuthenticatedAgenteRouteImport.update({
 const AuthenticatedAmostrasRoute = AuthenticatedAmostrasRouteImport.update({
   id: '/amostras',
   path: '/amostras',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedArquivoBoletinsRoute = AuthenticatedArquivoBoletinsRouteImport.update({
+  id: '/arquivo-boletins',
+  path: '/arquivo-boletins',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedCalendarioProducaoRoute =
@@ -344,6 +350,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
   '/amostras': typeof AuthenticatedAmostrasRoute
+  '/arquivo-boletins': typeof AuthenticatedArquivoBoletinsRoute
   '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -394,6 +401,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/agente': typeof AuthenticatedAgenteRoute
   '/amostras': typeof AuthenticatedAmostrasRoute
+  '/arquivo-boletins': typeof AuthenticatedArquivoBoletinsRoute
   '/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/campo': typeof AuthenticatedCampoRoute
   '/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -447,6 +455,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/agente': typeof AuthenticatedAgenteRoute
   '/_authenticated/amostras': typeof AuthenticatedAmostrasRoute
+  '/_authenticated/arquivo-boletins': typeof AuthenticatedArquivoBoletinsRoute
   '/_authenticated/calendario-producao': typeof AuthenticatedCalendarioProducaoRoute
   '/_authenticated/campo': typeof AuthenticatedCampoRoute
   '/_authenticated/coordenacao': typeof AuthenticatedCoordenacaoRoute
@@ -727,6 +736,13 @@ declare module '@tanstack/react-router' {
       path: '/amostras'
       fullPath: '/amostras'
       preLoaderRoute: typeof AuthenticatedAmostrasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/arquivo-boletins': {
+      id: '/_authenticated/arquivo-boletins'
+      path: '/arquivo-boletins'
+      fullPath: '/arquivo-boletins'
+      preLoaderRoute: typeof AuthenticatedArquivoBoletinsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/calendario-producao': {
@@ -1029,6 +1045,7 @@ const AuthenticatedRgRouteWithChildren = AuthenticatedRgRoute._addFileChildren(
 interface AuthenticatedRouteChildren {
   AuthenticatedAgenteRoute: typeof AuthenticatedAgenteRoute
   AuthenticatedAmostrasRoute: typeof AuthenticatedAmostrasRoute
+  AuthenticatedArquivoBoletinsRoute: typeof AuthenticatedArquivoBoletinsRoute
   AuthenticatedCalendarioProducaoRoute: typeof AuthenticatedCalendarioProducaoRoute
   AuthenticatedCampoRoute: typeof AuthenticatedCampoRoute
   AuthenticatedCoordenacaoRoute: typeof AuthenticatedCoordenacaoRoute
@@ -1072,6 +1089,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAgenteRoute: AuthenticatedAgenteRoute,
   AuthenticatedAmostrasRoute: AuthenticatedAmostrasRoute,
+  AuthenticatedArquivoBoletinsRoute: AuthenticatedArquivoBoletinsRoute,
   AuthenticatedCalendarioProducaoRoute: AuthenticatedCalendarioProducaoRoute,
   AuthenticatedCampoRoute: AuthenticatedCampoRoute,
   AuthenticatedCoordenacaoRoute: AuthenticatedCoordenacaoRoute,
