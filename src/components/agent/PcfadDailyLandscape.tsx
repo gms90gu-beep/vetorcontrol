@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useOrientation } from "@/hooks/useOrientation";
 import {
   buildPcfadDayData,
   pcfadDayBlockLabel,
@@ -12,7 +11,7 @@ import {
 /**
  * Visão "RESUMO DIÁRIO DO SERVIÇO ANTIVETORIAL" (formulário oficial em papel).
  * Uma única linha de dados (é diário), com cabeçalhos agrupados por bloco.
- * Só aparece com o aparelho em PAISAGEM (mesmo padrão do PcfadWeeklyLandscape).
+ * Em telas estreitas, conserva as colunas oficiais e permite rolagem horizontal.
  * Dados: buildPcfadDayData() — MESMA fonte usada pelo PDF paisagem diário.
  */
 export function PcfadDailyLandscape({
@@ -26,12 +25,11 @@ export function PcfadDailyLandscape({
   registration: string;
   municipality: string;
 }) {
-  const isLandscape = useOrientation();
   const [data, setData] = useState<PcfadDayData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isLandscape || !recordId) return;
+    if (!recordId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -42,9 +40,7 @@ export function PcfadDailyLandscape({
       }
     })();
     return () => { cancelled = true; };
-  }, [isLandscape, recordId]);
-
-  if (!isLandscape) return null;
+  }, [recordId]);
 
   const th = "border border-slate-300 px-1 py-0.5 text-[9px] font-black uppercase tracking-tight text-center bg-slate-100 text-slate-700";
   const td = "border border-slate-200 px-1 py-0.5 text-[10px] tabular-nums text-center text-slate-800";
@@ -73,8 +69,11 @@ export function PcfadDailyLandscape({
         </p>
       ) : (
         <>
+          <p className="mb-1 text-[10px] text-muted-foreground sm:hidden">
+            No celular, deslize a tabela para os lados para ver todas as colunas.
+          </p>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full min-w-[980px] border-collapse sm:min-w-full">
               <thead>
                 <tr>
                   <th className={th} colSpan={6}>Nº imóveis trabalhados por tipo</th>
@@ -133,7 +132,7 @@ export function PcfadDailyLandscape({
           </div>
 
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full min-w-[700px] border-collapse sm:min-w-full">
               <thead>
                 <tr>
                   <th className={th} colSpan={3}>Larvicida (1)</th>
@@ -173,7 +172,7 @@ export function PcfadDailyLandscape({
           </div>
 
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full min-w-[700px] border-collapse sm:min-w-full">
               <thead>
                 <tr>
                   <th className={th}>Nº e seq. dos quarteirões trabalhados</th>
