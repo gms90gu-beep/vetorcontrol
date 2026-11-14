@@ -1,3 +1,4 @@
+import { formatCollectionNumber, tubitoNumber } from "@/lib/collection-tubitos";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,6 +89,12 @@ function SamplesPage() {
         <p className="font-semibold">Imóvel {sample.property_number} · Quart. {sample.block_number}</p>
         <p className="text-sm">{sample.street} · {sample.agent_name}</p>
         <p className="text-sm">Coleta: {date(sample.visit_date)} · {sample.cycle_name} · {sample.tubes || 0} tubito(s)</p>
+        {!!sample.numbered_tubes?.length && <div className="text-sm">
+          <strong>Coleta {formatCollectionNumber(sample.numbered_tubes[0].collection_number, sample.numbered_tubes[0].collection_year)}</strong>
+          <ul>
+            {sample.numbered_tubes.map(tube => <li key={tube.position}><strong>{tubitoNumber(tube)}</strong> · Depósito {tube.deposit_type}</li>)}
+          </ul>
+        </div>}
         <p className="text-sm">Depósitos com foco/coleta: {sample.deposits.map(d => `${d.type_code} (${d.quantity})`).join(", ") || "Nenhum registrado"}</p>
         <p className="font-semibold">{labels[sample.status]}</p>
         <Button variant="outline" onClick={() => setSelected(sample)}>{sample.can_record && sample.status === "pending" ? "Lançar resultado" : "Ver resultado e histórico"}</Button>

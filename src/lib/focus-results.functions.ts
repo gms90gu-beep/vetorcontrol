@@ -1,3 +1,4 @@
+import type { CollectionTubito } from "@/lib/collection-tubitos";
 import { focusResultInput } from "@/lib/focus-results-input";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -27,7 +28,15 @@ export const getFocusSamples = createServerFn({ method: "POST" })
       if (["PGRST202", "42883", "42P01"].includes(error.code)) throw new Error("A área de resultados ainda aguarda ativação no banco. Suas coletas permanecem preservadas.");
       throw new Error(`Não foi possível carregar as coletas: ${error.message}`);
     }
-    return { samples: (result?.samples ?? []) as FocusSample[], total: Number(result?.total ?? 0), counts: result?.counts as Record<string, number>, agents: (result?.agents ?? []) as { id: string; name: string }[] };
+    const samples = (result?.samples ?? []) as FocusSample[];
+    if (samples.length) {
+      const tubes = await readAllQueryPages<CollectionTubito & { visit_id: string }>(client.from("collection_tubitos")
+        .select("visit_id,position,collection_year,serial,collection_number,deposit_type")
+        .in("visit_id", samples.map(sample => sample.id))
+        .order("visit_id").order("position"));
+      for (const sample of samples) sample.numbered_tubes = (tubes ?? []).filter((tube: CollectionTubito & { visit_id: string }) => tube.visit_id === sample.id);
+    }
+    return { samples, total: Number(result?.total ?? 0), counts: result?.counts as Record<string, number>, agents: (result?.agents ?? []) as { id: string; name: string }[] };
 
   });
 
@@ -35,6 +44,7 @@ export interface FocusSample {
   id: string; visit_date: string; agent_id: string; agent_name: string; cycle_id: string; cycle_name: string;
   property_number: string; street: string; block_number: string; tubes: number; version: number;
   status: "pending" | "positive" | "negative" | "inconclusive";
+  numbered_tubes?: CollectionTubito[];
   can_record: boolean; can_correct: boolean;
   needs_focus_identification?: boolean;
   inspected_deposits?: { id: string; type_code: string; quantity: number }[];

@@ -1,3 +1,5 @@
+import { fetchTubitosForVisit, formatCollectionNumber, tubitoNumber, type CollectionTubito } from "@/lib/collection-tubitos";
+import { flushMutations } from "@/lib/offline/sync";
 import { propertyLabel } from "@/lib/property-label";
 import { createFileRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
@@ -143,6 +145,9 @@ function PropertyVisitPage() {
   const [routineData, setRoutineData] = useState({ ...DEFAULT_ROUTINE });
   const [surveyData, setSurveyData] = useState({ ...DEFAULT_SURVEY });
   const [pendingData, setPendingData] = useState({ ...DEFAULT_PENDING });
+  const [tubeOrigins, setTubeOrigins] = useState<string[]>([]);
+  const [savedOrigins, setSavedOrigins] = useState<string[] | null>(null);
+  const [tubeReceipt, setTubeReceipt] = useState<CollectionTubito[] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -212,6 +217,9 @@ function PropertyVisitPage() {
     setSurveyData({ ...DEFAULT_SURVEY });
     setPendingData({ ...DEFAULT_PENDING });
     setDeposits([]);
+    setTubeOrigins([]);
+    setSavedOrigins(null);
+    setTubeReceipt(null);
     setIsDirty(false);
     setJustSaved(false);
   };
@@ -537,7 +545,7 @@ function PropertyVisitPage() {
             remote: () =>
               supabase
                 .from("visits")
-                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
+                .select("id, property_id, agent_id, cycle_id, field_work_session_id, status, activity_type, has_focus, sample_collected, tubitos_coletados, tubito_deposit_types, treatment_applied, treatment_amount, larvicide_unit, treated_deposits, elimination_done, elimination_amount, notes, guidance_given, is_recovered, visit_date")
                 .eq("property_id", propertyId as string)
                 .eq("agent_id", user.id)
                 .eq("cycle_id", session.cycle_id as string)
@@ -598,6 +606,10 @@ function PropertyVisitPage() {
               isRecovered: existingVisit.is_recovered || false,
               notes: existingVisit.notes || ""
             });
+
+            const assignedOrigins = existingVisit.tubito_deposit_types ?? null;
+            setSavedOrigins(assignedOrigins);
+            setTubeOrigins(assignedOrigins ?? []);
 
             // Load deposits (offline-first)
             const existingDeposits = await listRemoteOrCache<any>({
@@ -788,6 +800,21 @@ function PropertyVisitPage() {
       const collected = deposits.filter(d => d.selected && d.focusFound);
       if (!collected.length || collected.some(d => Number(d.quantity) <= 0)) { toast.error("Marque na coluna Foco os depósitos onde houve coleta e informe sua quantidade."); return; }
     }
+    const collecting = status === "visited" && activity === "survey" && surveyData.sampleCollected;
+    const collectedTypes = deposits.filter(d => d.selected && d.focusFound).map(d => d.type);
+    const tubeCount = surveyData.tubitosColetados;
+    const origins = collecting && Number.isInteger(tubeCount) && tubeCount > 0 && tubeCount <= 100
+      ? Array.from({ length: tubeCount }, (_, index) => tubeOrigins[index] || (collectedTypes.length === 1 ? collectedTypes[0] : ""))
+      : null;
+    if (collecting && (!origins || origins.some(type => !collectedTypes.includes(type))
+      || collectedTypes.some(type => !origins.includes(type)))) {
+      toast.error("Informe de 1 a 100 tubitos e indique o depósito de cada um. Todo depósito com coleta precisa ter um tubito.");
+      return;
+    }
+    if (savedOrigins && JSON.stringify(savedOrigins) !== JSON.stringify(origins)) {
+      toast.error("Preserve os tubitos e depósitos da coleta já registrada.");
+      return;
+    }
     if (status === 'visited' && activity === 'routine' && routineData.treatment) {
       if (routineData.treatmentAmount <= 0) {
         toast.error("Informe a quantidade de larvicida utilizada.");
@@ -839,7 +866,8 @@ function PropertyVisitPage() {
           ? surveyData.hasFocus || deposits.some((deposit) => deposit.selected && (deposit.focusFound || deposit.positive))
           : false,
         sample_collected: (status === 'visited' && activity === 'survey') ? (surveyData.hasFocus || surveyData.sampleCollected || deposits.some((deposit) => deposit.selected && (deposit.focusFound || deposit.positive))) : false,
-        tubitos_coletados: (status === 'visited' && activity === 'survey') ? surveyData.tubitosColetados : 0,
+        tubitos_coletados: origins?.length ?? 0,
+        ...(origins ? { tubito_deposit_types: origins } : {}),
         treatment_applied: (status === 'visited' && activity === 'routine') ? routineData.treatment : (status === 'visited' && activity === 'survey') ? surveyData.treatment : false,
         treatment_amount: (status === 'visited' && activity === 'routine') ? routineData.treatmentAmount : (status === 'visited' && activity === 'survey') ? surveyData.treatmentAmount : 0,
         larvicide_unit: (status === 'visited' && activity === 'routine') ? routineData.larvicideUnit : (status === 'visited' && activity === 'survey' && surveyData.treatment) ? surveyData.larvicideUnit : null,
@@ -876,6 +904,7 @@ function PropertyVisitPage() {
       console.log("[VISIT_SAVE_CALL]", { existingId: currentVisitId, visitPayload, deposits: selectedDeposits });
       const visitId = await saveVisitOffline(currentVisitId, visitPayload as any, selectedDeposits as any);
       setCurrentVisitId(visitId);
+      setSavedOrigins(origins);
 
       setJustSaved(true);
       setIsDirty(false);
@@ -883,6 +912,19 @@ function PropertyVisitPage() {
       const offlineHint = !isOnline()
         ? "Visita salva localmente. Aguardando sincronização."
         : "Visita salva com sucesso";
+
+      if (origins) {
+        setTubeReceipt([]);
+        if (isOnline()) {
+          try {
+            await flushMutations();
+            setTubeReceipt(await fetchTubitosForVisit(visitId));
+          } catch {
+            toast.info("Coleta salva. Consulte a numeração em Minhas amostras após a sincronização.");
+          }
+        }
+        return;
+      }
 
       if (nextProperty) {
         toast.success(`✅ ${offlineHint}`, { description: "Carregando próximo imóvel..." });
@@ -1021,6 +1063,30 @@ function PropertyVisitPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-lg mx-auto relative">
+      <Dialog open={tubeReceipt !== null} onOpenChange={(open) => { if (!open && !isSaving) setTubeReceipt(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tubeReceipt?.length
+              ? `Coleta ${formatCollectionNumber(tubeReceipt[0].collection_number, tubeReceipt[0].collection_year)}`
+              : "Tubitos da coleta"}</DialogTitle>
+            <DialogDescription>
+              {isSaving ? "Sincronizando a coleta…" : tubeReceipt?.length
+                ? "Anote os números nos tubitos correspondentes."
+                : "Coleta salva no aparelho. Consulte os números em Minhas amostras após sincronizar."}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-64 overflow-y-auto text-sm">
+            {tubeReceipt?.map(tube => <li key={tube.position}>Tubito <strong>{tubitoNumber(tube)}</strong> · Depósito {tube.deposit_type}</li>)}
+          </ul>
+          <DialogFooter>
+            <Button disabled={isSaving} onClick={() => {
+              setTubeReceipt(null);
+              if (nextProperty) navigate({ to: `/property/${nextProperty.id}` });
+              else if (navigationReady) setAskEndBlock(true);
+            }}>Continuar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <GeolocationCaptureDialog
         open={geoDialogOpen}
         propertyId={(property?.id as string) || (propertyId as string)}
@@ -1516,12 +1582,28 @@ function PropertyVisitPage() {
                           type="number"
                           inputMode="numeric"
                           min="1"
+                          max="100"
+                          disabled={!!savedOrigins}
                           placeholder="0"
                           autoFocus
                           value={surveyData.tubitosColetados === 0 ? "" : surveyData.tubitosColetados}
                           onChange={(e) => setSurveyData({...surveyData, tubitosColetados: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value))})}
                           className="h-14 rounded-xl border-amber-200 bg-white text-xl font-black text-center focus:ring-amber-500"
                         />
+                        {deposits.filter(d => d.selected && d.focusFound).length > 1 && (
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {Array.from({ length: Math.min(100, Math.max(0, surveyData.tubitosColetados)) }, (_, index) => (
+                              <label key={index} className="flex items-center justify-between gap-2 text-sm">
+                                Depósito do tubito {index + 1}
+                                <select className="rounded border bg-white p-2" disabled={!!savedOrigins} value={tubeOrigins[index] ?? ""}
+                                  onChange={event => { const value = event.target.value; setTubeOrigins(previous => Object.assign([...previous], { [index]: value })); }}>
+                                  <option value="">Selecione</option>
+                                  {deposits.filter(d => d.selected && d.focusFound).map(d => <option key={d.type} value={d.type}>{d.type} · {d.description}</option>)}
+                                </select>
+                              </label>
+                            ))}
+                          </div>
+                        )}
                         <p className="text-[9px] font-bold text-amber-500 text-center uppercase tracking-tighter">
                           Total acumulado hoje: {dailyStats.tubitos + (surveyData.tubitosColetados || 0)} tubitos
                         </p>

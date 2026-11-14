@@ -13,7 +13,7 @@ export interface FocusObservation {
   tipoImovel: string;
 }
 
-const PROPERTY_TYPE_LABELS: Record<string, string> = {
+export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   residence: "Residencial",
   commerce: "Comercial",
   vacant_lot: "Terreno baldio",

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ build: vi.fn(), pdf: vi.fn(), observations: vi.fn(), pages: vi.fn() }));
+const mocks = vi.hoisted(() => ({ build: vi.fn(), pdf: vi.fn(), observations: vi.fn(), tubes: vi.fn(), pages: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: () => {
   const q: any = {}; for (const method of ["select", "eq", "gte", "lte", "order", "is"]) q[method] = () => q;
   return q;
 } } }));
 vi.mock("@/lib/pcfad-week", async (original) => ({ ...(await original<any>()), buildPcfadWeekData: mocks.build }));
 vi.mock("@/lib/focus-observations", () => ({ fetchFocusObservations: mocks.observations }));
+vi.mock("@/lib/collection-tubitos", () => ({ fetchTubitoReportRows: mocks.tubes }));
 vi.mock("@/lib/query-pages", () => ({ readAllQueryPages: mocks.pages }));
 vi.mock("../../src/components/reports/PcfadWeeklyPdfGenerator", () => ({ generatePcfadWeeklyPDF: mocks.pdf }));
 import { generateFilteredOfficialBulletin } from "../../src/components/reports/FilteredOfficialBulletin";
@@ -14,6 +15,7 @@ const daily = (agent: string, date: string, worked: number) => ({ agent_id: agen
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.observations.mockResolvedValue([]);
+  mocks.tubes.mockResolvedValue([]);
   mocks.pages.mockResolvedValue([{ id: "visit-in-selected-cycle" }]);
   mocks.pdf.mockResolvedValue({ fileName: "bulletin.pdf" });
   mocks.build.mockImplementation(async ({ records }) => ({ rows: records.map((r: any) => ({ ...sumPcfadRows([]), work_date: r.work_date, worked: r.properties_worked })) }));
@@ -35,8 +37,11 @@ describe("official dashboard bulletin", () => {
     expect(mocks.build.mock.calls.map(([p]) => p.agentAuthId)).toEqual(["a", "b", "a"]);
   });
   it("restricts focus observations to the selected visits and identifies the agent", async () => {
+    mocks.tubes.mockResolvedValue([{ serial: 4, deposit_type: "B" }]);
     mocks.observations.mockResolvedValue([{ numeroImovel: "2", tipoDeposito: "B" }]);
     await generateFilteredOfficialBulletin([daily("a", "2026-10-08", 26)], "Equipe", "Ciclo 5", new Map([["a", "Gustavo"]]));
+    expect(mocks.tubes).toHaveBeenCalledWith("a", "2026-10-08", "2026-10-08", "Gustavo", expect.anything(), { cycleId: "cycle5" });
+    expect(mocks.pdf.mock.calls[0][0].suppliedData.tubitos).toEqual([{ serial: 4, deposit_type: "B" }]);
     expect(mocks.observations.mock.calls[0][4]).toEqual(["visit-in-selected-cycle"]);
     expect(mocks.pdf.mock.calls[0][0].suppliedData.observations[0].agente).toBe("Gustavo");
   });

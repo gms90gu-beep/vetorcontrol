@@ -1580,6 +1580,44 @@ export type Database = {
           },
         ]
       }
+      collection_tubitos: {
+        Row: {
+          agent_id: string
+          collection_number: number
+          collection_year: number
+          deposit_type: string
+          position: number
+          serial: number
+          visit_id: string
+        }
+        Insert: {
+          agent_id: string
+          collection_number: number
+          collection_year: number
+          deposit_type: string
+          position: number
+          serial: number
+          visit_id: string
+        }
+        Update: {
+          agent_id?: string
+          collection_number?: number
+          collection_year?: number
+          deposit_type?: string
+          position?: number
+          serial?: number
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_tubitos_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visits: {
         Row: {
           activity_type: Database["public"]["Enums"]["activity_type"]
@@ -1603,6 +1641,7 @@ export type Database = {
           treated_deposits: number | null
           treatment_amount: number | null
           treatment_applied: boolean | null
+          tubito_deposit_types: string[] | null
           tubitos_coletados: number | null
           visit_date: string
           week_id: string | null
@@ -1631,6 +1670,7 @@ export type Database = {
           treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
+          tubito_deposit_types?: string[] | null
           tubitos_coletados?: number | null
           visit_date?: string
           week_id?: string | null
@@ -1659,6 +1699,7 @@ export type Database = {
           treated_deposits?: number | null
           treatment_amount?: number | null
           treatment_applied?: boolean | null
+          tubito_deposit_types?: string[] | null
           tubitos_coletados?: number | null
           visit_date?: string
           week_id?: string | null
