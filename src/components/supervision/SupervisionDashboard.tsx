@@ -1,3 +1,4 @@
+import { RgLocalityFilter, rgLocalityKey } from "@/components/rg/RgLocalityFilter";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { listRemoteOrCache, safeSupabaseRead } from "@/lib/offline/repos";
@@ -67,6 +68,10 @@ export function SupervisionDashboard() {
   const [rgAgent, setRgAgent] = useState<any | null>(null);
   const [rgLoading, setRgLoading] = useState(false);
   const [rgBoletins, setRgBoletins] = useState<any[]>([]);
+  const [rgLocality, setRgLocality] = useState("");
+  const visibleRgBoletins = rgLocality
+    ? rgBoletins.filter((boletim) => rgLocalityKey(boletim.locality) === rgLocality)
+    : rgBoletins;
   const [newAgent, setNewAgent] = useState({
     full_name: "",
     email: "",
@@ -179,6 +184,7 @@ export function SupervisionDashboard() {
 
   async function openAgentRG(agent: any) {
     setRgAgent(agent);
+    setRgLocality("");
     setRgLoading(true);
     setRgBoletins([]);
     try {
@@ -623,19 +629,20 @@ export function SupervisionDashboard() {
             </div>
           ) : (
             <div className="space-y-3">
+              <RgLocalityFilter boletins={rgBoletins} value={rgLocality} onChange={setRgLocality} />
               <div className="grid grid-cols-3 gap-2">
-                <StatBox label="Quarteirões" value={rgBoletins.length} />
+                <StatBox label="Quarteirões" value={visibleRgBoletins.length} />
                 <StatBox
                   label="Imóveis"
-                  value={rgBoletins.reduce((s, b) => s + (b.total_imoveis || 0), 0)}
+                  value={visibleRgBoletins.reduce((s, b) => s + (b.total_imoveis || 0), 0)}
                 />
                 <StatBox
                   label="Geo (GPS)"
-                  value={rgBoletins.reduce((s, b) => s + (b.geocoded || 0), 0)}
+                  value={visibleRgBoletins.reduce((s, b) => s + (b.geocoded || 0), 0)}
                 />
               </div>
               <div className="space-y-2">
-                {rgBoletins.map((b) => {
+                {visibleRgBoletins.map((b) => {
                   const pct = b.total_imoveis > 0
                     ? Math.round(((b.geocoded || 0) / b.total_imoveis) * 100)
                     : 0;

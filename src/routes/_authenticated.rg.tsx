@@ -1,3 +1,4 @@
+import { RgLocalityFilter, rgLocalityKey } from "@/components/rg/RgLocalityFilter";
 import { compareBlockNumbers } from "@/lib/block-order";
 import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { blockManagersGuard } from "@/lib/role-guards";
@@ -195,6 +196,7 @@ function RGPage() {
   const [pendingDelete, setPendingDelete] = useState<BoletimRow | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedLocality, setSelectedLocality] = useState("");
   const [agentDefaults, setAgentDefaults] = useState<{ municipality: string; name: string; registration_id: string }>({
     municipality: "", name: "", registration_id: "",
   });
@@ -387,20 +389,20 @@ function RGPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = !q
-      ? boletins
-      : boletins.filter((b) =>
-          (b.block_number || "").toLowerCase().includes(q) ||
-          (b.locality || "").toLowerCase().includes(q) ||
-          (b.agent_name || "").toLowerCase().includes(q),
-        );
+    const base = boletins.filter((boletim) => {
+      if (selectedLocality && rgLocalityKey(boletim.locality) !== selectedLocality) return false;
+      return !q ||
+        (boletim.block_number || "").toLowerCase().includes(q) ||
+        (boletim.locality || "").toLowerCase().includes(q) ||
+        (boletim.agent_name || "").toLowerCase().includes(q);
+    });
     const sorted = [...base].sort((a, b) => compareBlockNumbers(a.block_number, b.block_number));
     // Merge da contagem no momento da renderização (nunca dentro do state `boletins`).
     return sorted.map((b) => ({
       ...b,
       total_imoveis: propertyCounts.get(b.id) ?? b.total_imoveis ?? 0,
     }));
-  }, [boletins, search, propertyCounts]);
+  }, [boletins, search, selectedLocality, propertyCounts]);
 
 
   useEffect(() => {
@@ -775,6 +777,10 @@ function RGPage() {
 
 
 
+
+        {boletins.length > 0 && (
+          <RgLocalityFilter boletins={boletins} value={selectedLocality} onChange={setSelectedLocality} />
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
