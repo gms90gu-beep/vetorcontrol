@@ -1,3 +1,4 @@
+import { fetchTubitoReportRows, type TubitoReportRow } from "@/lib/collection-tubitos";
 import { supabase } from "@/integrations/supabase/client";
 import { getEpiWeek } from "@/lib/cycle-week";
 import { buildPcfadWeekData, groupPcfadDays, sumPcfadRows, type PcfadRow } from "@/lib/pcfad-week";
@@ -19,6 +20,7 @@ export async function generateFilteredOfficialBulletin(records: any[], title: st
     groups.set(key, group);
   }
   const rows: PcfadRow[] = [];
+  const tubitos: TubitoReportRow[] = [];
   const observations: FocusObservation[] = [];
   for (const group of groups.values()) {
     const bulletin = await buildPcfadWeekData({ agentAuthId: group.agentId, week: group.week, year: group.year, records: group.records, client: supabase });
@@ -29,6 +31,7 @@ export async function generateFilteredOfficialBulletin(records: any[], title: st
       // Observations are restricted to the same agent/date/cycles as the daily rows.
       const { readAllQueryPages } = await import("@/lib/query-pages");
       for (const cycle of cycles) {
+        tubitos.push(...await fetchTubitoReportRows(group.agentId, date, date, agentNames.get(group.agentId) || "Agente", supabase, { cycleId: cycle ?? null }));
         let query = supabase.from("visits").select("id").eq("agent_id", group.agentId)
           .gte("visit_date", `${date}T00:00:00-03:00`).lte("visit_date", `${date}T23:59:59.999-03:00`).order("id");
         query = cycle ? query.eq("cycle_id", cycle) : query.is("cycle_id", null);
@@ -43,7 +46,7 @@ export async function generateFilteredOfficialBulletin(records: any[], title: st
   const first = [...groups.values()][0];
   const grouped = groupPcfadDays(rows);
   return generatePcfadWeeklyPDF({ agentAuthId: "", week: first.week, year: first.year,
-    suppliedData: { rows: grouped, total: sumPcfadRows(grouped), range, observations, title,
+    suppliedData: { rows: grouped, total: sumPcfadRows(grouped), range, observations, tubitos, title,
       periodLabel: `Período ${range.start} a ${range.end}`, cycleLabel,
       fileName: `Boletim_Oficial_${range.start}_${range.end}.pdf` } });
 }

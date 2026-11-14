@@ -1,3 +1,5 @@
+import { fetchTubitoReportRows } from "@/lib/collection-tubitos";
+import { appendTubitoReportTable } from "./TubitoReportTable";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
@@ -162,7 +164,12 @@ export async function generatePcfadDailyPDF(
       margin: { left: 6, right: 6 },
     });
 
-    const finalY = (pdf as any).lastAutoTable?.finalY || 80;
+    const tubitos = await fetchTubitoReportRows(data.agentAuthId, data.workDate, data.workDate, agentName || "—", supabase, { cycleId: data.cycleId });
+    let finalY = appendTubitoReportTable(pdf, tubitos, (pdf as any).lastAutoTable?.finalY || 80);
+    if (finalY > pageH - 23) {
+      pdf.addPage();
+      finalY = 7;
+    }
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(6.5);
     pdf.setTextColor(120, 120, 120);

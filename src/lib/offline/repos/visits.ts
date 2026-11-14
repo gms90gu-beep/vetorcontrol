@@ -28,6 +28,7 @@ export interface VisitPayload {
   focus_analysis_status?: "pending" | "positive" | "negative" | "inconclusive" | null;
   sample_collected?: boolean;
   tubitos_coletados?: number;
+  tubito_deposit_types?: string[];
   treatment_applied?: boolean;
   treatment_amount?: number;
   larvicide_unit?: string | null;

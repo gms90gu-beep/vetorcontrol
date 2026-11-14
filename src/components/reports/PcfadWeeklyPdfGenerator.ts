@@ -1,3 +1,5 @@
+import { fetchTubitoReportRows, type TubitoReportRow } from "@/lib/collection-tubitos";
+import { appendTubitoReportTable } from "./TubitoReportTable";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
@@ -16,7 +18,7 @@ export async function generatePcfadWeeklyPDF(params: {
   agentAuthId: string;
   week: number;
   year: number;
-  suppliedData?: { rows: PcfadRow[]; total: PcfadRow; range: { start: string; end: string }; observations: import("@/lib/focus-observations").FocusObservation[]; title: string; periodLabel?: string; cycleLabel?: string; fileName?: string };
+  suppliedData?: { rows: PcfadRow[]; total: PcfadRow; range: { start: string; end: string }; observations: import("@/lib/focus-observations").FocusObservation[]; tubitos: TubitoReportRow[]; title: string; periodLabel?: string; cycleLabel?: string; fileName?: string };
 }) {
   const { agentAuthId, week, year } = params;
   try {
@@ -41,6 +43,8 @@ export async function generatePcfadWeeklyPDF(params: {
 
     const { rows, total, range } = params.suppliedData ?? await buildPcfadWeekData({ agentAuthId, week, year });
     const focusObservations = params.suppliedData?.observations ?? await fetchFocusObservations(agentAuthId, range.start, range.end);
+
+    const tubitos = params.suppliedData?.tubitos ?? await fetchTubitoReportRows(agentAuthId, range.start, range.end, agentName);
 
     const f = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM");
     const rf = (iso: string) => format(new Date(`${iso}T12:00:00`), "dd/MM/yyyy");
@@ -274,6 +278,7 @@ export async function generatePcfadWeeklyPDF(params: {
       finalY = (pdf as any).lastAutoTable?.finalY || firstTableFinalY;
     }
 
+    finalY = appendTubitoReportTable(pdf, tubitos, finalY);
     if (finalY > pageH - 20) {
       pdf.addPage();
       finalY = 12;

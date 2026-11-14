@@ -473,6 +473,7 @@ export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { buildPcfadWeekData, groupPcfadDays, sumPcfadRows } = await import("@/lib/pcfad-week");
     const { fetchFocusObservations } = await import("@/lib/focus-observations");
+    const { fetchTubitoReportRows } = await import("@/lib/collection-tubitos");
     const { profiles, role } = await resolveScopedAgents(context.supabase, context.userId);
     const client = context.supabase;
     let permitted = (profiles as any[]).filter((p) => ["agente", "agent"].includes(p.role));
@@ -483,6 +484,7 @@ export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
     if (data.areaId && !areaRows.some((a) => a.id === data.areaId)) throw new Error("Área fora do seu acesso.");
     const rows: import("@/lib/pcfad-week").PcfadRow[] = [];
     const observations: import("@/lib/focus-observations").FocusObservation[] = [];
+    const tubitos: import("@/lib/collection-tubitos").TubitoReportRow[] = [];
     for (const member of members) {
       let records = await readAllQueryPages<any>(client.from("daily_work_records").select("*").eq("agent_id", member.id).gte("work_date", range.start).lte("work_date", range.end).eq("status", "completed").not("end_time", "is", null).order("work_date").order("id"));
       if (data.areaId) {
@@ -500,6 +502,10 @@ export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
       const bulletin = await buildPcfadWeekData({ agentAuthId: member.id, week: data.week, year: data.year, client, records });
       rows.push(...bulletin.rows);
       for (const date of [...new Set(records.map((r) => String(r.work_date)))]) {
+        const dayCycles = new Set<string | null>(records.filter(r => String(r.work_date) === date).map(r => r.cycle_id ?? null));
+        for (const cycleId of dayCycles) {
+          tubitos.push(...await fetchTubitoReportRows(member.id, date, date, member.full_name, client, { cycleId }));
+        }
         const focos = await fetchFocusObservations(member.id, date, date, client);
         observations.push(...focos.map((f) => ({ ...f, agente: member.full_name })));
       }
@@ -508,5 +514,5 @@ export const getTeamPcfadWeekly = createServerFn({ method: "POST" })
     const supervisorProfiles = supervisorIds.length ? await readAllQueryPages<any>(client.from("profiles").select("id,full_name").in("id", supervisorIds).order("id")) : [];
     const supervisors = supervisorIds.map((id) => ({ id, name: supervisorProfiles.find((p) => p.id === id)?.full_name || `Equipe ${String(id).slice(0, 8)}` }));
     const grouped = groupPcfadDays(rows);
-    return { rows: grouped, total: sumPcfadRows(grouped), observations, range, week: data.week, year: data.year, agents: permitted.map((p) => ({ id: p.id, name: p.full_name, registration: p.registration_number, municipality: p.city })), teams: supervisors, areas: areaRows, dailyCount: rows.length };
+    return { rows: grouped, total: sumPcfadRows(grouped), observations, tubitos, range, week: data.week, year: data.year, agents: permitted.map((p) => ({ id: p.id, name: p.full_name, registration: p.registration_number, municipality: p.city })), teams: supervisors, areas: areaRows, dailyCount: rows.length };
   });
